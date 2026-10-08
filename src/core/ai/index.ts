@@ -1,5 +1,7 @@
 import type { BattleAction, BattleState, BattleUnit, Pos } from '../types';
 import { manhattan, posKey } from '../types';
+import { hashString } from '../rng';
+import { weaponDef } from '@content/weapons';
 import { hpPct, livingUnits, terrainAt } from '../battle/query';
 import { planAssist } from '../battle/assist';
 import { distanceField, reachableTiles, targetsFrom, threatCounts, threatTiles, type ReachMap } from '../map/pathing';
@@ -53,7 +55,12 @@ function evaluateAttacks(state: BattleState, bu: BattleUnit, reach: ReachMap, th
       if (out.attacker.died) score -= 200;
       if (terrainAt(state, node.pos) === 'cover') score += 8;
       score -= (threat.get(posKey(node.pos)) ?? 0) * diff.wExposure;
-      if (diff.focusLowHp) score += (1 - hpPct(target)) * 20;
+      // Добивать раненых, бить в преимущество треугольника и тех, кто не ответит
+      score += (1 - hpPct(target)) * diff.focusLowHp;
+      if (out.triangle === 'adv') score += 6;
+      if (!out.defenderCanCounter) score += 5;
+      // Детерминированная «индивидуальность»: разные враги по-разному ранжируют равные варианты
+      score += jitter(bu.unitId, state.turn, node.pos, target.unitId);
       const ev: AttackEval = {
         action: { type: 'attack', unitId: bu.unitId, to: node.pos, targetId: target.unitId, newStance: 'advance' },
         score,
@@ -96,6 +103,52 @@ function evaluateRefresh(state: BattleState, bu: BattleUnit, reach: ReachMap): B
   return best?.action ?? null;
 }
 
+/** Малый детерминированный шум 0..0.9, чтобы одинаковые оценки решались по-разному у разных врагов и ходов. */
+function jitter(unitId: string, turn: number, pos: Pos, extra = ''): number {
+  return (hashString(`${unitId}:${turn}:${pos.x},${pos.y}:${extra}`) % 1000) / 1100;
+}
+
+/** «Шум боя»: рядом есть раненый или павший враг — стоящие просыпаются. */
+function alarmNearby(state: BattleState, bu: BattleUnit, radius: number): boolean {
+  return Object.values(state.units).some(
+    (e) => e.side === 'enemy' && e.unitId !== bu.unitId && manhattan(e.pos, bu.pos) <= radius && (!e.alive || e.hp < e.maxHp),
+  );
+}
+
+function nearestPlayerDistance(state: BattleState, pos: Pos): number {
+  const players = livingUnits(state, 'player');
+  return players.length === 0 ? 99 : Math.min(...players.map((p) => manhattan(p.pos, pos)));
+}
+
+/** Нужно ли стоящему/охраняющему врагу перейти в наступление. */
+function shouldWake(state: BattleState, bu: BattleUnit): boolean {
+  const diff = difficultyDef(state.difficulty).ai;
+  if (state.turn >= diff.wakeTurn) return true;
+  if (nearestPlayerDistance(state, bu.pos) <= diff.alertRadius) return true;
+  if (alarmNearby(state, bu, 3)) return true;
+  const zone = threatTiles(state, bu);
+  return livingUnits(state, 'player').some((p) => zone.has(posKey(p.pos)));
+}
+
+/** Отступление: подальше от угроз, к лекарю, если он есть. */
+function retreatMove(state: BattleState, bu: BattleUnit, reach: ReachMap, threat: Map<string, number>): Pos {
+  const healer = livingUnits(state, bu.side).find((a) => {
+    const u = state.roster[a.unitId];
+    return a.unitId !== bu.unitId && u && classDef(u.classId).weaponKind === 'bandage';
+  });
+  let best: { pos: Pos; score: number } | null = null;
+  for (const node of reach.values()) {
+    if (!node.canStop) continue;
+    const d = nearestPlayerDistance(state, node.pos);
+    let score = Math.min(d, 5) * 10 - (threat.get(posKey(node.pos)) ?? 0) * 12;
+    if (healer) score -= manhattan(healer.pos, node.pos) * 4;
+    if (terrainAt(state, node.pos) === 'cover') score += 6;
+    score += jitter(bu.unitId, state.turn, node.pos);
+    if (!best || score > best.score) best = { pos: node.pos, score };
+  }
+  return best?.pos ?? bu.pos;
+}
+
 function advanceMove(state: BattleState, bu: BattleUnit, reach: ReachMap, threat: Map<string, number>, keepDistance: boolean): Pos {
   const diff = difficultyDef(state.difficulty).ai;
   const unit = state.roster[bu.unitId];
@@ -104,20 +157,26 @@ function advanceMove(state: BattleState, bu: BattleUnit, reach: ReachMap, threat
   if (players.length === 0) return bu.pos;
   const field = distanceField(state, players.map((p) => p.pos), moveType);
   const allies = livingUnits(state, bu.side).filter((a) => a.unitId !== bu.unitId);
+  const range = unit ? weaponDef(unit.skills.weapon).range : 1;
+  // Дальники подходят на дистанцию 3: на следующем ходу стреляют, не вставая вплотную.
+  const preferDist = range === 2 ? 3 : 1;
   let best: { pos: Pos; score: number } | null = null;
   for (const node of reach.values()) {
     if (!node.canStop) continue;
     const d = field.get(posKey(node.pos)) ?? Math.min(...players.map((p) => manhattan(p.pos, node.pos))) + 20;
+    const nearAlly = allies.length === 0 ? 0 : Math.min(...allies.map((a) => manhattan(a.pos, node.pos)));
     let score: number;
     if (keepDistance) {
-      // Лекарь: держаться подальше от игрока, но рядом со своими.
-      const nearAlly = allies.length === 0 ? 0 : Math.min(...allies.map((a) => manhattan(a.pos, node.pos)));
+      // Лекарь/Мурлыка: держаться подальше от игрока, но рядом со своими.
       score = Math.min(d, 4) * 10 - Math.max(0, nearAlly - 2) * 15 - (threat.get(posKey(node.pos)) ?? 0) * 10;
     } else {
-      score = -d * 10 - (threat.get(posKey(node.pos)) ?? 0) * diff.wExposure;
+      const approach = preferDist === 1 ? d : Math.abs(d - preferDist) + d * 0.3;
+      score = -approach * 10 - (threat.get(posKey(node.pos)) ?? 0) * diff.wExposure;
+      score -= Math.max(0, nearAlly - 2) * diff.cohesion;
       if (terrainAt(state, node.pos) === 'cover') score += 3;
     }
-    if (!best || score > best.score || (score === best.score && posKey(node.pos) < posKey(best.pos))) best = { pos: node.pos, score };
+    score += jitter(bu.unitId, state.turn, node.pos);
+    if (!best || score > best.score) best = { pos: node.pos, score };
   }
   return best?.pos ?? bu.pos;
 }
@@ -130,19 +189,19 @@ export function decideAction(state: BattleState, unitId: string): BattleAction {
   const kind = classDef(unit.classId).weaponKind;
   const reach = reachableTiles(state, bu);
   const threat = threatCounts(state, 'player');
-  const players = livingUnits(state, 'player');
 
-  // Стойки
+  // Стойки: стоящие просыпаются от близости игрока, «шума боя» или по таймеру хода
   let stance = bu.stance;
   if (stance === 'hold') {
-    const zone = threatTiles(state, bu);
-    if (players.some((p) => zone.has(posKey(p.pos)))) stance = 'advance';
+    if (shouldWake(state, bu)) stance = 'advance';
     else return { type: 'wait', unitId, to: bu.pos };
   }
   if (stance === 'guard') {
     const atk = evaluateAttacks(state, bu, reach, threat, bu.pos);
     if (atk && atk.score >= 0) return { ...atk.action, newStance: 'guard' } as BattleAction;
-    return { type: 'wait', unitId, to: bu.pos, newStance: 'guard' };
+    // Вожак бросается в бой, когда рядом гибнут свои или игрок подошёл вплотную
+    if (alarmNearby(state, bu, 3) || nearestPlayerDistance(state, bu.pos) <= 2) stance = 'advance';
+    else return { type: 'wait', unitId, to: bu.pos, newStance: 'guard' };
   }
 
   // Лекарь: лечение приоритетнее
@@ -157,6 +216,13 @@ export function decideAction(state: BattleState, unitId: string): BattleAction {
 
   const atk = evaluateAttacks(state, bu, reach, threat);
   if (atk && atk.score >= 0) return atk.action;
+
+  // Раненый без шанса убить — отступает подлечиться (кроме Легко)
+  const diff = difficultyDef(state.difficulty).ai;
+  if (diff.retreatHp > 0 && hpPct(bu) < diff.retreatHp) {
+    const to = retreatMove(state, bu, reach, threat);
+    return { type: 'wait', unitId, to, newStance: 'advance' };
+  }
 
   const to = advanceMove(state, bu, reach, threat, kind === 'bandage' || kind === 'purr');
   return { type: 'wait', unitId, to, newStance: 'advance' };

@@ -165,7 +165,8 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
   }
 
   let captive: UnitInstance | undefined;
-  if (result === 'victory' && rng.chance(diff.recruitChance)) {
+  const needRecruit = nextUnits.length > 0 && nextUnits.length < REWARDS.guaranteeCaptiveBelow;
+  if (result === 'victory' && (needRecruit || rng.chance(diff.recruitChance))) {
     const avg = Math.round(survivors.reduce((a, u) => a + u.level, 0) / Math.max(1, survivors.length));
     const faction = factionDef(state.map.factionId);
     captive = generateUnit({

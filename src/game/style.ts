@@ -1,21 +1,22 @@
 import type { Color, MoveType, TerrainId } from '@core/types';
 
+/** Цвета оружия в пастельной палитре интерфейса (совпадают с --c-* в styles.css). */
 export const WEAPON_COLOR_HEX: Record<Color, number> = {
-  red: 0xe63946,
-  blue: 0x3a86ff,
-  green: 0x2ec4b6,
-  colorless: 0xadb5bd,
+  red: 0xff5a68,
+  blue: 0x4f8fd1,
+  green: 0x4cc9a8,
+  colorless: 0xb8b8c6,
 };
 
 export const BLOOD_COLORS = [0xd9122b, 0x9b0f20, 0xff2e4a, 0xb3001b];
 
 export const HL = {
-  reach: 0x3a86ff,
-  attack: 0xe63946,
-  assist: 0x2ec4b6,
-  danger: 0xff9f1c,
-  threat: 0x9b5de5,
-  path: 0xe8f1ff,
+  reach: 0x8fc9ff,
+  attack: 0xff5a68,
+  assist: 0x7ad3c2,
+  danger: 0xffb86b,
+  threat: 0xb79cff,
+  path: 0xfff4f7,
 };
 
 export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';

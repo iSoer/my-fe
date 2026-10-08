@@ -17,7 +17,25 @@ export interface DifficultyDef {
   glory: number;
   recruitChance: number;
   unlock: { difficulty: Difficulty; wins: number } | null;
-  ai: { wTaken: number; wExposure: number; focusLowHp: boolean; silentReinforcements: boolean };
+  ai: AiProfile;
+}
+
+export interface AiProfile {
+  /** Вес полученного урона при выборе атаки. */
+  wTaken: number;
+  /** Штраф за каждого бойца игрока, который сможет ударить по клетке назначения. */
+  wExposure: number;
+  /** Бонус за добивание раненых: умножается на долю потерянного HP цели. */
+  focusLowHp: number;
+  silentReinforcements: boolean;
+  /** Стоящий (hold) враг просыпается, если боец игрока ближе этого расстояния. */
+  alertRadius: number;
+  /** С этого хода все стоящие враги идут в атаку сами. */
+  wakeTurn: number;
+  /** Штраф за отрыв от своих (за каждую клетку дальше 2 от ближайшего союзника). */
+  cohesion: number;
+  /** Доля HP, ниже которой враг без возможности убить отступает к лекарю/от угроз. */
+  retreatHp: number;
 }
 
 export const DIFFICULTIES: readonly DifficultyDef[] = [
@@ -35,9 +53,9 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     enemyCovers: 0,
     treatsMult: 1.0,
     glory: 1,
-    recruitChance: 0.2,
+    recruitChance: 0.5,
     unlock: null,
-    ai: { wTaken: 0.3, wExposure: 0, focusLowHp: false, silentReinforcements: false },
+    ai: { wTaken: 0.3, wExposure: 0, focusLowHp: 0, silentReinforcements: false, alertRadius: 3, wakeTurn: 6, cohesion: 0, retreatHp: 0 },
   },
   {
     id: 'normal',
@@ -53,9 +71,9 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     enemyCovers: 1,
     treatsMult: 1.6,
     glory: 3,
-    recruitChance: 0.35,
+    recruitChance: 0.65,
     unlock: null,
-    ai: { wTaken: 0.7, wExposure: 3, focusLowHp: false, silentReinforcements: false },
+    ai: { wTaken: 0.7, wExposure: 3, focusLowHp: 8, silentReinforcements: false, alertRadius: 4, wakeTurn: 4, cohesion: 1.5, retreatHp: 0.3 },
   },
   {
     id: 'hard',
@@ -71,9 +89,9 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     enemyCovers: 2,
     treatsMult: 2.5,
     glory: 7,
-    recruitChance: 0.5,
+    recruitChance: 0.8,
     unlock: { difficulty: 'normal', wins: 3 },
-    ai: { wTaken: 1.0, wExposure: 6, focusLowHp: false, silentReinforcements: false },
+    ai: { wTaken: 1.0, wExposure: 6, focusLowHp: 14, silentReinforcements: false, alertRadius: 5, wakeTurn: 3, cohesion: 2.5, retreatHp: 0.35 },
   },
   {
     id: 'nightmare',
@@ -92,9 +110,9 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     enemyCovers: 2,
     treatsMult: 4.0,
     glory: 15,
-    recruitChance: 0.75,
+    recruitChance: 1.0,
     unlock: { difficulty: 'hard', wins: 3 },
-    ai: { wTaken: 1.0, wExposure: 8, focusLowHp: true, silentReinforcements: true },
+    ai: { wTaken: 1.0, wExposure: 8, focusLowHp: 20, silentReinforcements: true, alertRadius: 6, wakeTurn: 2, cohesion: 3, retreatHp: 0.4 },
   },
 ];
 
@@ -108,9 +126,9 @@ export const PRICES = {
   trainBase: 40,
   trainPerLevel: 12,
   sharpen: [200, 500, 1000] as const,
-  recruitBase: 150,
-  recruitPerLevel: 25,
-  shelterRefresh: 100,
+  recruitBase: 60,
+  recruitPerLevel: 10,
+  shelterRefresh: 40,
   rerollRoster: [0, 10, 20, 40, 80, 160] as const,
 };
 
@@ -133,11 +151,13 @@ export const SP = {
 };
 
 export const REWARDS = {
-  treatsBase: 25,
-  treatsPerLevel: 5,
-  flawlessBonus: 0.25,
+  treatsBase: 40,
+  treatsPerLevel: 8,
+  flawlessBonus: 0.5,
   gloryPerDeath: 1,
   armyFallMinGlory: 5,
+  /** Если после боя в казарме меньше бойцов, чем в отряде, пленник гарантирован. */
+  guaranteeCaptiveBelow: 4,
 };
 
 export const ROSTER = {

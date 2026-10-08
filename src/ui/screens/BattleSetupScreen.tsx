@@ -19,10 +19,10 @@ import { stagger } from '../lib/animate';
 import { haptic } from '@platform/haptics';
 
 const DIFF_STYLE: Record<Difficulty, { icon: string; color: string; rgb: string }> = {
-  easy: { icon: '🌱', color: '#4caf50', rgb: '76, 175, 80' },
-  normal: { icon: '⚔️', color: '#3a86ff', rgb: '58, 134, 255' },
-  hard: { icon: '🔥', color: '#ff9f1c', rgb: '255, 159, 28' },
-  nightmare: { icon: '💀', color: '#e63946', rgb: '230, 57, 70' },
+  easy: { icon: '🌱', color: '#9ad66b', rgb: '154, 214, 107' },
+  normal: { icon: '⚔️', color: '#8fc9ff', rgb: '143, 201, 255' },
+  hard: { icon: '🔥', color: '#ffb86b', rgb: '255, 184, 107' },
+  nightmare: { icon: '💀', color: '#ff5a68', rgb: '255, 90, 104' },
 };
 const BIOME_ICON: Record<string, string> = { yard: '🏡', roofs: '🏙️', basement: '🕯️', dump: '🗑️', winter_park: '❄️' };
 
