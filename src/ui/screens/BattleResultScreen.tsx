@@ -14,7 +14,7 @@ import { STAT_LABELS, difficultyName, g, plural } from '../lib/format';
 import { stagger, useCountUp } from '../lib/animate';
 import { haptic } from '@platform/haptics';
 
-const CONFETTI_COLORS = ['#ffd166', '#ff6f9c', '#7ad3c2', '#b79cff', '#8fc9ff', '#ffffff'];
+const CONFETTI_COLORS = ['#ffffff', '#e63946', '#ffffff', '#ff2d4a', '#ffd166', '#ffffff'];
 const SPLAT_SVG = `<svg viewBox="0 0 260 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <g fill="#9e1420">
     <ellipse cx="130" cy="72" rx="96" ry="38" /><ellipse cx="80" cy="60" rx="40" ry="26" /><ellipse cx="185" cy="58" rx="36" ry="24" />
@@ -174,7 +174,7 @@ export function BattleResultScreen() {
         </div>
 
         {lb.survivors.length > 0 && (
-          <div class="card stack pop-in" style={{ animationDelay: `${next()}ms` }}>
+          <div class="card ink stack pop-in" style={{ animationDelay: `${next()}ms` }}>
             <div class="section-title">Опыт</div>
             {lb.survivors.map((u, i) => {
               const lvl = lb.levelUps.find((l) => l.unitId === u.id);

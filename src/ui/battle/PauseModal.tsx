@@ -18,53 +18,76 @@ export function PauseModal({ battle }: { battle: BattleState }) {
   return (
     <>
       <Modal open={open} onClose={() => $pauseOpen.set(false)} title="Пауза">
-        <div class="bf-pause-meta">
-          <span class="bf-chip">{difficultyName(battle.difficulty)}</span>
-          <span class="bf-chip">{biome.name}</span>
-          <span class="bf-chip">ход {battle.turn}</span>
-          <span class="bf-chip">{battle.map.objective === 'killBoss' ? 'цель: убить вожака' : 'цель: уничтожить всех'}</span>
-        </div>
-        <div class="setting">
-          <div class="row">
-            <span>Скорость анимаций</span>
-            <div class="seg" style={{ width: 120 }}>
-              <button type="button" class={settings.animSpeed === 1 ? 'on' : ''} onClick={() => updateSettings({ animSpeed: 1 })}>
-                ×1
-              </button>
-              <button type="button" class={settings.animSpeed === 2 ? 'on' : ''} onClick={() => updateSettings({ animSpeed: 2 })}>
-                ×2
-              </button>
+        <div class="bf-pause">
+          <div class="bf-pause-meta">
+            <span class="bf-chip">{difficultyName(battle.difficulty)}</span>
+            <span class="bf-chip">{biome.name}</span>
+            <span class="bf-chip">ход {battle.turn}</span>
+            <span class="bf-chip">
+              {battle.map.objective === 'killBoss' ? 'цель: убить вожака' : 'цель: уничтожить всех'}
+            </span>
+          </div>
+          <div class="setting">
+            <div class="row">
+              <span>Скорость анимаций</span>
+              <div class="seg" style={{ width: 120 }}>
+                <button
+                  type="button"
+                  class={settings.animSpeed === 1 ? 'on' : ''}
+                  onClick={() => updateSettings({ animSpeed: 1 })}
+                >
+                  ×1
+                </button>
+                <button
+                  type="button"
+                  class={settings.animSpeed === 2 ? 'on' : ''}
+                  onClick={() => updateSettings({ animSpeed: 2 })}
+                >
+                  ×2
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="setting">
-          <span>Кинематик атак</span>
-          <div class="seg">
-            {(['always', 'mine', 'never'] as const).map((v) => (
-              <button key={v} type="button" class={settings.cinematic === v ? 'on' : ''} onClick={() => updateSettings({ cinematic: v })}>
-                {v === 'always' ? 'Всегда' : v === 'mine' ? 'Только мои' : 'Никогда'}
-              </button>
-            ))}
+          <div class="setting">
+            <span>Кинематик атак</span>
+            <div class="seg">
+              {(['always', 'mine', 'never'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  class={settings.cinematic === v ? 'on' : ''}
+                  onClick={() => updateSettings({ cinematic: v })}
+                >
+                  {v === 'always' ? 'Всегда' : v === 'mine' ? 'Только мои' : 'Никогда'}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div class="setting">
-          <div class="row">
-            <span>Вибрация</span>
-            <span class={`switch ${settings.haptics ? 'on' : ''}`} onClick={() => updateSettings({ haptics: !settings.haptics })} />
+          <div class="setting">
+            <div class="row">
+              <span>Вибрация</span>
+              <span
+                class={`switch ${settings.haptics ? 'on' : ''}`}
+                onClick={() => updateSettings({ haptics: !settings.haptics })}
+              />
+            </div>
           </div>
-        </div>
-        <div class="setting">
-          <div class="row">
-            <span>Подтверждать атаку</span>
-            <span class={`switch ${settings.confirmAttack ? 'on' : ''}`} onClick={() => updateSettings({ confirmAttack: !settings.confirmAttack })} />
+          <div class="setting">
+            <div class="row">
+              <span>Подтверждать атаку</span>
+              <span
+                class={`switch ${settings.confirmAttack ? 'on' : ''}`}
+                onClick={() => updateSettings({ confirmAttack: !settings.confirmAttack })}
+              />
+            </div>
           </div>
+          <Button primary block onClick={() => $pauseOpen.set(false)}>
+            Продолжить
+          </Button>
+          <Button danger block onClick={() => setRetreatAsk(true)}>
+            Отступить
+          </Button>
         </div>
-        <Button primary block onClick={() => $pauseOpen.set(false)}>
-          Продолжить
-        </Button>
-        <Button danger block onClick={() => setRetreatAsk(true)}>
-          Отступить
-        </Button>
       </Modal>
       <ConfirmModal
         open={retreatAsk}

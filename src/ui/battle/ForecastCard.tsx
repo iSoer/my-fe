@@ -29,7 +29,7 @@ function HpBar({ before, after, max }: { before: number; after: number; max: num
 function Side({ unit, res, max, hits, effective, enemy, dies, canCounter }: { unit: UnitInstance; res: CombatSideResult; max: number; hits: number; effective: boolean; enemy: boolean; dies: boolean; canCounter: boolean }) {
   const kind = unitClass(unit).weaponKind;
   return (
-    <div class={`bf-fc-side ${enemy ? 'enemy' : 'player'} ${dies ? 'dies' : ''}`}>
+    <div class={`bf-fc-side ${enemy ? 'enemy' : 'player'} ${dies ? 'dies' : ''} ${res.hpAfter < res.hpBefore ? 'loss' : ''}`}>
       <div class="bf-fc-top">
         <UnitAvatar unit={unit} size="sm" animated={false} />
         <div class="bf-fc-names">

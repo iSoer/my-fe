@@ -14,13 +14,13 @@ interface MenuItem {
   onClick?: () => void;
 }
 
-const BTN = 52;
-const GAP = 8;
+const BTN = 64;
+const GAP = 7;
 const PAD = 8;
-const MENU_H = 92;
+const MENU_H = 80;
 
 /**
- * Контекстное меню действий на самом поле: круглые кнопки рядом с клеткой бойца.
+ * Контекстное меню действий на самом поле: скошенные бумажные полосы (список команд в духе P5) рядом с клеткой бойца.
  * Якорь — movedTo (если боец уже переставлен) или исходная клетка.
  */
 export function ContextMenu({ ui, topBand }: { ui: BattleUiState; topBand: number }) {
@@ -63,7 +63,7 @@ export function ContextMenu({ ui, topBand }: { ui: BattleUiState; topBand: numbe
           aria-label={it.label}
           title={it.caption ? `${it.label} — ${it.caption}` : it.label}
           class={`bf-menu-btn ${it.primary ? 'primary' : ''} ${it.disabled ? 'disabled' : ''}`}
-          style={{ animationDelay: `${i * 35}ms` }}
+          style={{ animationDelay: `${i * 30}ms` }}
           disabled={it.disabled}
           onClick={() => {
             if (it.disabled || !it.onClick) return;

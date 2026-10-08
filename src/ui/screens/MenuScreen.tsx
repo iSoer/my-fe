@@ -102,7 +102,9 @@ export function MenuScreen() {
         <span class="muted small">{armyLabel}</span>
       </div>
       <div class="menu-hero">
-        <Diorama crew={crew} />
+        <div class="paper-frame">
+          <Diorama crew={crew} />
+        </div>
         <h1>Пушистая Резня</h1>
         <span class="title-drip" dangerouslySetInnerHTML={{ __html: DRIP_SVG }} />
         <p class="muted">Тактика про котиков, собачек и мышек</p>

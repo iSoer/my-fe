@@ -30,6 +30,7 @@ function FilledSlot({ unit, index, justHired }: { unit: UnitInstance; index: num
         navigate(`/army/${unit.id}`);
       }}
     >
+      <span class="slot-tab">Ур. {unit.level}</span>
       <div class="slot-head">
         <UnitAvatar unit={unit} size="md" />
         <div class="slot-meta">

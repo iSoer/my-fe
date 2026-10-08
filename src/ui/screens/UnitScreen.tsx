@@ -125,7 +125,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     <div class="screen">
       <TopBar title={displayName(unit)} right={<ResourceBar />} onBack={() => navigate('/army', true)} />
       <div class="screen-body">
-        <div class="card row pop-in">
+        <div class="card row pop-in unit-hero">
           <span key={bounceKey} class={`avatar-wrap ${bounceKey ? 'bounce' : ''}`}>
             <UnitAvatar unit={unit} size="xl" pose={happy ? 'happy' : 'idle'} />
           </span>

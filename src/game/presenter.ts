@@ -115,12 +115,12 @@ export class GamePresenter implements Presenter {
         return wait(map, 150 / sp);
       }
       case 'phaseChanged':
-        return banner(map, ev.phase === 'player' ? `ХОД ${ev.turn} · ВАША ФАЗА` : `ХОД ${ev.turn} · ФАЗА ВРАГА`, ev.phase === 'player' ? 0x1d4ed8 : 0x9b1c31, sp, 450, {
+        return banner(map, ev.phase === 'player' ? `Ход ${ev.turn} · Ваша фаза` : `Ход ${ev.turn} · Фаза врага`, ev.phase === 'player' ? 0xe63946 : 0xffffff, sp, 450, {
           slash: true,
           blood: ev.phase === 'enemy',
         });
       case 'reinforcements': {
-        await banner(map, 'ПОДКРЕПЛЕНИЕ!', 0x7a1f1f, sp, 300);
+        await banner(map, 'Подкрепление!', 0xe63946, sp, 300);
         for (const id of ev.unitIds) {
           const view = map.ensureUnitView(id, after);
           if (!view) continue;

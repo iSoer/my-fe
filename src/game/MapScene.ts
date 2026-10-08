@@ -616,16 +616,31 @@ export class MapScene extends Phaser.Scene {
     this.endOverlay.push(veil);
     this.tweens.add({ targets: veil, fillAlpha: 0.55, duration: 200 / speed });
     const text = result === 'victory' ? 'ПОБЕДА' : result === 'defeat' ? 'ПОРАЖЕНИЕ' : 'ОТСТУПЛЕНИЕ';
-    const color = result === 'victory' ? '#ffd166' : result === 'defeat' ? '#ff4d6d' : '#cccccc';
+    const color = result === 'victory' ? '#ffffff' : result === 'defeat' ? '#ff4d6d' : '#dddddd';
+    const edge = result === 'victory' ? 0xe63946 : result === 'defeat' ? 0xffffff : 0x8e8a94;
     const size = Math.min(result === 'defeat' ? 46 : 52, w * (result === 'defeat' ? 0.115 : 0.13));
-    const label = this.add.text(w / 2, h * 0.42, text, textStyle(size, color, true, 7)).setOrigin(0.5).setDepth(62).setScale(2.4).setAlpha(0);
-    this.endOverlay.push(label);
+    // Косая чернильная полоса в духе Persona за надписью
+    const cy = h * 0.42;
+    const bandH = size * 1.9;
+    const skew = bandH * 0.4;
+    const band = this.add.graphics().setDepth(61.5).setAlpha(0);
+    band.fillStyle(0x0d0b10, 0.96);
+    band.fillPoints([{ x: -w, y: cy - bandH / 2 }, { x: w * 2, y: cy - bandH / 2 }, { x: w * 2 - skew, y: cy + bandH / 2 }, { x: -w - skew, y: cy + bandH / 2 }], true);
+    band.fillStyle(edge, 1);
+    band.fillPoints([{ x: -w, y: cy + bandH / 2 - 6 }, { x: w * 2, y: cy + bandH / 2 - 6 }, { x: w * 2 - skew * 0.1, y: cy + bandH / 2 }, { x: -w - skew * 0.1, y: cy + bandH / 2 }], true);
+    band.setAngle(-4);
+    this.endOverlay.push(band);
+    this.tweens.add({ targets: band, alpha: 1, duration: 180 / speed });
+    const style = { ...textStyle(size, color, true, 0), fontStyle: 'bold italic' };
+    const shadow = this.add.text(w / 2 + 4, cy + 4, text, { ...style, color: result === 'defeat' ? '#7a0012' : '#e63946' }).setOrigin(0.5).setDepth(61.8).setScale(2.4).setAlpha(0).setAngle(-4);
+    const label = this.add.text(w / 2, cy, text, style).setOrigin(0.5).setDepth(62).setScale(2.4).setAlpha(0).setAngle(-4);
+    this.endOverlay.push(shadow, label);
     if (result === 'defeat') {
       const vignette = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x7a0012, 0).setDepth(61);
       this.endOverlay.push(vignette);
       this.tweens.add({ targets: vignette, fillAlpha: 0.28, duration: 900 / speed, ease: 'Sine.easeIn' });
     }
-    await tween(this, { targets: label, scale: 1, alpha: 1, duration: 260 / speed, ease: 'Back.easeOut' });
+    await tween(this, { targets: [shadow, label], scale: 1, alpha: 1, duration: 260 / speed, ease: 'Back.easeOut' });
     if (!sceneAlive(this)) return;
     this.cameras.main.shake(140 / speed, 0.012);
     if (result === 'victory') confettiRain(this, 30, speed);

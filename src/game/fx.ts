@@ -125,38 +125,79 @@ export async function banner(scene: Phaser.Scene, text: string, color: number, s
   const w = scene.scale.width;
   const h = scene.scale.height;
   const bandH = Math.min(72, h * 0.12);
-  const band = scene.add.rectangle(-w / 2, h / 2, w, bandH, color, 0.92).setDepth(30);
+  const skew = bandH * 0.45;
+  const cy = h / 2;
+  // Плашка в духе Persona: чернильный параллелограмм с цветной кромкой и белой тонкой полосой.
+  const band = scene.add.graphics().setDepth(30);
+  const bw = w + skew * 2;
+  band.fillStyle(0x0d0b10, 0.96);
+  band.fillPoints([
+    { x: skew, y: -bandH / 2 },
+    { x: bw, y: -bandH / 2 },
+    { x: bw - skew, y: bandH / 2 },
+    { x: 0, y: bandH / 2 },
+  ], true);
+  band.fillStyle(color, 1);
+  band.fillPoints([
+    { x: skew, y: bandH / 2 - 6 },
+    { x: bw - 6, y: bandH / 2 - 6 },
+    { x: bw - skew, y: bandH / 2 },
+    { x: 0, y: bandH / 2 },
+  ], true);
+  band.fillStyle(0xffffff, 0.9);
+  band.fillPoints([
+    { x: skew + 2, y: -bandH / 2 },
+    { x: bw, y: -bandH / 2 },
+    { x: bw - 2, y: -bandH / 2 + 3 },
+    { x: skew + 3, y: -bandH / 2 + 3 },
+  ], true);
+  band.setPosition(-bw - w / 2, cy);
+  const upper = text.toUpperCase();
+  const fontSize = Math.round(bandH * 0.4);
+  const shadow = scene.add
+    .text(-w / 2 + 3, cy + 3, upper, { fontFamily: FONT, fontSize: `${fontSize}px`, color: Phaser.Display.Color.IntegerToColor(color).rgba, fontStyle: 'bold italic' })
+    .setOrigin(0.5)
+    .setDepth(31);
   const label = scene.add
-    .text(-w / 2, h / 2, text, { fontFamily: FONT, fontSize: `${Math.round(bandH * 0.42)}px`, color: '#ffffff', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 })
+    .text(-w / 2, cy, upper, { fontFamily: FONT, fontSize: `${fontSize}px`, color: '#ffffff', fontStyle: 'bold italic' })
     .setOrigin(0.5)
     .setDepth(31);
   let slash: Phaser.GameObjects.Rectangle | null = null;
   if (opts.slash) {
-    // Наклонная светлая полоса шире экрана, летит слева направо чуть впереди плашки
-    slash = scene.add.rectangle(-w, h / 2, w * 0.35, bandH * 2.6, 0xffffff, 0.22).setDepth(29).setAngle(-18);
+    slash = scene.add.rectangle(-w, cy, w * 0.3, bandH * 2.8, 0xffffff, 0.18).setDepth(29).setAngle(-18);
     scene.tweens.add({ targets: slash, x: w * 2, duration: (220 + hold * 0.5) / speed, ease: 'Cubic.easeOut' });
   }
-  await tween(scene, { targets: [band, label], x: w / 2, duration: 220 / speed, ease: 'Cubic.easeOut' });
+  await Promise.all([
+    tween(scene, { targets: band, x: -skew, duration: 200 / speed, ease: 'Cubic.easeOut' }),
+    tween(scene, { targets: [label, shadow], x: w / 2, duration: 200 / speed, ease: 'Cubic.easeOut' }),
+  ]);
+  if (sceneAlive(scene)) shadow.setX(w / 2 + 3);
   if (opts.blood) {
     for (let i = 0; i < 4; i++) {
-      bloodBurst(scene, w * (0.15 + i * 0.23), h / 2 + bandH * 0.45, 8, { min: 40, max: 140 }, 0.6, speed);
+      bloodBurst(scene, w * (0.15 + i * 0.23), cy + bandH * 0.45, 8, { min: 40, max: 140 }, 0.6, speed);
     }
   }
   await wait(scene, hold / speed);
-  await tween(scene, { targets: [band, label], x: w * 1.5, duration: 220 / speed, ease: 'Cubic.easeIn' });
+  await Promise.all([
+    tween(scene, { targets: band, x: w * 1.5, duration: 200 / speed, ease: 'Cubic.easeIn' }),
+    tween(scene, { targets: [label, shadow], x: w * 1.6, duration: 200 / speed, ease: 'Cubic.easeIn' }),
+  ]);
   band.destroy();
   label.destroy();
+  shadow.destroy();
   slash?.destroy();
 }
 
-/** «Штамп» — текст с ударом (ПАЛ, ПОБЕДА...). */
 export async function stamp(scene: Phaser.Scene, x: number, y: number, text: string, color: string, size: number, speed: number, hold = 500): Promise<void> {
   if (!sceneAlive(scene)) return;
-  const t = scene.add.text(x, y, text, textStyle(size, color, true, 6)).setOrigin(0.5).setDepth(32).setScale(2.2).setAlpha(0);
-  await tween(scene, { targets: t, scale: 1, alpha: 1, duration: 160 / speed, ease: 'Back.easeIn' });
+  const style = { ...textStyle(size, color, true, 6), fontStyle: 'bold italic' };
+  const back = scene.add.text(x + 3, y + 3, text, { ...style, color: '#e63946', stroke: '#e63946', strokeThickness: 2 }).setOrigin(0.5).setDepth(31).setScale(2.2).setAlpha(0).setAngle(-6);
+  const t = scene.add.text(x, y, text, style).setOrigin(0.5).setDepth(32).setScale(2.2).setAlpha(0).setAngle(-6);
+  await tween(scene, { targets: [back, t], scale: 1, alpha: 1, duration: 160 / speed, ease: 'Back.easeIn' });
   scene.cameras.main.shake(120 / speed, 0.01);
   await wait(scene, hold / speed);
-  await tween(scene, { targets: t, alpha: 0, duration: 200 / speed });
+  await tween(scene, { targets: [back, t], alpha: 0, duration: 200 / speed });
+  back.destroy();
   t.destroy();
 }
 

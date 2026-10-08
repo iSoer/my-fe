@@ -44,8 +44,14 @@ export function Button(p: ButtonProps) {
   };
   return (
     <button type="button" class={cls} onClick={onClick} disabled={p.disabled} title={p.title} style={p.style}>
-      {p.icon !== undefined && <span class="ico" aria-hidden="true">{p.icon}</span>}
-      {p.children}
+      <span class="btn-inner">
+        {p.icon !== undefined && (
+          <span class="ico" aria-hidden="true">
+            {p.icon}
+          </span>
+        )}
+        {p.children}
+      </span>
     </button>
   );
 }
