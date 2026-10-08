@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { backdropSvg, critterSvg, tileSvg, unitSvg, unitArtKey, furArt, eyeArt, type CritterArt, type Pose } from '@art/index';
+import { backdropSvg, critterSvg, tileSvg, unitSvg, unitPartSvg, unitArtKey, furArt, eyeArt, CRITTER_PARTS, type CritterArt, type Pose } from '@art/index';
 import { BIOMES } from '@content/biomes';
 import { CLASSES } from '@content/classes';
 import { generateUnit } from '@core/units';
 import type { TerrainId } from '@core/types';
 
 const TERRAINS: TerrainId[] = ['plain', 'forest', 'mountain', 'water', 'wall', 'wall_breakable', 'cover'];
-const POSES: Pose[] = ['idle', 'run', 'hurt', 'dead', 'happy', 'carried'];
+const POSES: Pose[] = ['idle', 'run', 'hurt', 'dead', 'happy', 'carried', 'blink'];
 
 function wellFormed(svg: string): void {
   expect(svg.startsWith('<svg')).toBe(true);
@@ -46,6 +46,12 @@ describe('арт: миниатюры', () => {
     const svg = critterSvg({ species: 'cat', fur: furArt(0), iris: eyeArt(0), pattern: 0, eyes: 0, accessory: 0, animated: true, blinkDelay: -1.5 });
     for (const cls of ['class="tail"', 'class="legs"', 'leg-front', 'leg-back', 'class="head"', 'ear-l', 'class="eyes-open"', 'class="eyes-happy"']) expect(svg).toContain(cls);
     expect(svg).toContain('animation-delay:-1.50s');
+  });
+  it('части тела для разлёта — корректный SVG для всех видов и классов', () => {
+    for (let i = 0; i < 24; i++) {
+      const u = generateUnit({ seed: 5000 + i, level: 3, classId: CLASSES[i % CLASSES.length]!.id });
+      for (const part of CRITTER_PARTS) wellFormed(unitPartSvg(u, part));
+    }
   });
   it('unitSvg работает для сгенерированных бойцов, ключ стабилен', () => {
     for (let i = 0; i < 40; i++) {

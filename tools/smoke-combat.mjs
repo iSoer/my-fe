@@ -5,6 +5,11 @@ const base = process.argv[2] ?? 'http://localhost:4173/my-fe/';
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 const page = await ctx.newPage();
+const confirmEndTurn = async () => {
+  await page.waitForTimeout(250);
+  const c = page.getByRole('button', { name: /^Завершить$/ });
+  if (await c.count()) await c.first().click();
+};
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
@@ -17,11 +22,16 @@ const readBattle = () => page.evaluate(() => {
   return s.battle ? { difficulty: s.battle.difficulty, phase: s.battle.phase, turn: s.battle.turn, result: s.battle.result ?? null, units: Object.values(s.battle.units).map((u) => ({ id: u.unitId, side: u.side, pos: u.pos, hp: u.hp, alive: u.alive, acted: u.acted, weapon: s.battle.roster[u.unitId]?.skills.weapon, cls: s.battle.roster[u.unitId]?.classId })) } : null;
 });
 
-const tileClick = async (pos) => {
+const geom = async () => {
   const box = await page.locator('#battle-canvas canvas').boundingBox();
-  const tile = Math.min(box.width / 6, box.height / 8);
-  const ox = box.x + (box.width - tile * 6) / 2;
-  const oy = box.y + (box.height - tile * 8) / 2;
+  const lay = await page.evaluate(() => window.__pf?.layout?.get?.() ?? null);
+  const tile = lay?.tile ?? Math.min(box.width / 6, box.height / 8);
+  const ox = box.x + (lay?.ox ?? (box.width - tile * 6) / 2);
+  const oy = box.y + (lay?.oy ?? (box.height - tile * 8) / 2);
+  return { tile, ox, oy };
+};
+const tileClick = async (pos) => {
+  const { tile, ox, oy } = await geom();
   await page.mouse.click(ox + tile * (pos.x + 0.5), oy + tile * (pos.y + 0.5));
 };
 
@@ -114,6 +124,7 @@ for (let iter = 0; iter < 40; iter++) {
     const endBtn = page.getByRole('button', { name: /Завершить ход/ });
     if (await endBtn.count()) {
       await endBtn.first().click();
+      await confirmEndTurn();
       log(`→ конец хода ${b.turn}`);
       await page.waitForTimeout(800);
       await waitIdle(30000);

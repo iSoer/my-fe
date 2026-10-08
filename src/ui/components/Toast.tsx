@@ -9,7 +9,14 @@ export function Toast({ message, at, error = false }: { message?: string; at?: n
     return () => clearTimeout(t);
   }, [message, at]);
   if (!visible || !message) return null;
-  return <div class={`toast ${error ? 'toast-error' : ''}`}>{message}</div>;
+  return (
+    <div key={at} class={`toast ${error ? 'toast-error' : ''}`} role="status">
+      <span class="ico" aria-hidden="true">
+        {error ? '✕' : '✓'}
+      </span>
+      <span>{message}</span>
+    </div>
+  );
 }
 
 /** Локальный тост для экранов: возвращает [элемент, show]. */

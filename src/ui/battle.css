@@ -1,0 +1,851 @@
+/* ---------- Экран боя: канвас на весь экран + контекстные накладки ---------- */
+:root {
+  --bf-glass: rgba(20, 19, 28, 0.78);
+  --bf-glass-2: rgba(32, 30, 42, 0.86);
+  --bf-line: rgba(255, 255, 255, 0.08);
+  --bf-accent: #e63946;
+  --bf-teal: #2ec4b6;
+  --bf-purple: #9b5de5;
+  --bf-gold: #ffd166;
+  --bf-text: #f5f5f7;
+  --bf-muted: #a7a5b4;
+  --bf-radius: 18px;
+  --bf-top-band: 76px;
+}
+
+.bf-root {
+  position: relative;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  background: #0f0e14;
+  color: var(--bf-text);
+}
+.bf-canvas,
+.bf-root #battle-canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  overflow: hidden;
+  background: #0f0e14;
+  flex: none;
+  min-height: 0;
+}
+.bf-canvas canvas {
+  display: block;
+}
+.bf-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.bf-overlay button,
+.bf-overlay .bf-card {
+  pointer-events: auto;
+}
+/* Боец зажат или перетаскивается: накладки не перехватывают курсор и меню уходят. */
+.bf-overlay.is-pressing * {
+  pointer-events: none !important;
+}
+.bf-overlay.is-pressing .bf-endturn,
+.bf-overlay.is-pressing .bf-menu {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* ---------- Общие элементы ---------- */
+.bf-grow {
+  flex: 1;
+}
+.bf-muted {
+  color: var(--bf-muted);
+  font-size: 12px;
+}
+.bf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--bf-glass);
+  border: 1px solid var(--bf-line);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bf-text);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+.bf-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--bf-line);
+  background: var(--bf-glass);
+  color: var(--bf-text);
+  font-size: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease;
+}
+.bf-icon:active {
+  transform: scale(0.92);
+}
+.bf-icon.active {
+  background: rgba(230, 57, 70, 0.28);
+  border-color: rgba(230, 57, 70, 0.6);
+}
+.bf-icon.active.warn {
+  background: rgba(255, 159, 28, 0.28);
+  border-color: rgba(255, 159, 28, 0.7);
+}
+.bf-card {
+  background: var(--bf-glass);
+  border: 1px solid var(--bf-line);
+  border-radius: var(--bf-radius);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 10px 12px;
+  animation: bf-slide-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* ---------- Верхняя полоса ---------- */
+.bf-top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: calc(8px + var(--tg-safe-top)) 10px 36px;
+  background: linear-gradient(180deg, rgba(10, 9, 14, 0.88) 0%, rgba(10, 9, 14, 0.55) 55%, rgba(10, 9, 14, 0) 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bf-hud-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bf-phase {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--bf-glass-2);
+  border: 1px solid var(--bf-line);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: bf-pop 0.3s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  white-space: nowrap;
+}
+.bf-phase-turn {
+  font-size: 12px;
+  color: var(--bf-muted);
+  font-weight: 600;
+}
+.bf-phase-name {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
+.bf-phase.player {
+  box-shadow: inset 0 0 0 1px rgba(230, 57, 70, 0.45);
+}
+.bf-phase.player .bf-phase-name {
+  color: #ff6b6b;
+}
+.bf-phase.enemy {
+  box-shadow: inset 0 0 0 1px rgba(155, 93, 229, 0.55);
+}
+.bf-phase.enemy .bf-phase-name {
+  color: #c39bff;
+}
+.bf-acted {
+  color: var(--bf-muted);
+  font-weight: 600;
+}
+.bf-acted.done {
+  color: var(--bf-teal);
+  border-color: rgba(46, 196, 182, 0.5);
+}
+.bf-biome {
+  color: var(--bf-muted);
+  font-weight: 500;
+}
+
+/* ---------- Контекстное меню на поле ---------- */
+.bf-menu {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 20px;
+  background: var(--bf-glass-2);
+  border: 1px solid var(--bf-line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+  z-index: 5;
+  transition:
+    left 0.18s ease,
+    top 0.18s ease;
+}
+.bf-menu-notch {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--bf-glass-2);
+  border-right: 1px solid var(--bf-line);
+  border-bottom: 1px solid var(--bf-line);
+  transform: translateX(-50%) rotate(45deg);
+  bottom: -8px;
+}
+.bf-menu.below .bf-menu-notch {
+  bottom: auto;
+  top: -8px;
+  transform: translateX(-50%) rotate(225deg);
+}
+.bf-menu-btn {
+  width: 52px;
+  min-height: 52px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--bf-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  animation: bf-pop 0.24s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+.bf-menu-btn:active {
+  transform: scale(0.9);
+}
+.bf-menu-btn.primary {
+  background: linear-gradient(180deg, #ff5a68, var(--bf-accent));
+  box-shadow: 0 6px 18px rgba(230, 57, 70, 0.45);
+}
+.bf-menu-btn.disabled {
+  opacity: 0.45;
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 4px, rgba(255, 255, 255, 0.02) 4px 8px);
+}
+.bf-menu-ico {
+  font-size: 20px;
+  line-height: 1;
+}
+.bf-menu-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.bf-menu-label small {
+  font-size: 8px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+/* ---------- Нижняя полоса ---------- */
+.bf-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 28px 12px calc(12px + var(--tg-safe-bottom));
+  background: linear-gradient(0deg, rgba(10, 9, 14, 0.92) 0%, rgba(10, 9, 14, 0.6) 60%, rgba(10, 9, 14, 0) 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+.bf-hint {
+  align-self: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--bf-glass);
+  border: 1px solid var(--bf-line);
+  color: var(--bf-muted);
+  font-size: 13px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: bf-fade 0.2s ease both;
+  pointer-events: none;
+}
+.bf-hint.thin {
+  font-size: 12px;
+  padding: 5px 12px;
+  opacity: 0.85;
+}
+.bf-hint.accent {
+  color: var(--bf-text);
+  border-color: rgba(230, 57, 70, 0.5);
+}
+.bf-hint.danger {
+  color: #ff6b6b;
+  font-weight: 700;
+  border-color: rgba(230, 57, 70, 0.7);
+  animation: bf-shake 0.3s ease;
+}
+.bf-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.bf-pill-btn {
+  pointer-events: auto;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--bf-line);
+  background: var(--bf-glass-2);
+  color: var(--bf-text);
+  font-size: 15px;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: bf-slide-up 0.2s ease both;
+  transition: transform 0.12s ease;
+}
+.bf-pill-btn:active {
+  transform: scale(0.95);
+}
+.bf-pill-btn.primary {
+  background: linear-gradient(180deg, #ff5a68, var(--bf-accent));
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 26px rgba(230, 57, 70, 0.45);
+}
+.bf-pill-btn.big {
+  flex: 1;
+  max-width: 260px;
+  min-height: 52px;
+  font-size: 17px;
+}
+.bf-pill-btn.danger {
+  color: #ff6b6b;
+}
+
+/* ---------- Карточка бойца ---------- */
+.bf-unit {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.bf-unit.enemy {
+  border-color: rgba(155, 93, 229, 0.45);
+}
+.bf-unit-avatar {
+  flex: none;
+  width: 44px;
+  height: 50px;
+}
+.bf-unit-avatar .critter-svg {
+  width: 44px;
+  height: 50px;
+}
+.bf-unit-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bf-unit-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.bf-unit-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bf-unit-hp {
+  font-weight: 800;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.bf-unit-hp small {
+  font-size: 11px;
+  color: var(--bf-muted);
+  font-weight: 600;
+}
+.bf-unit-hp.low {
+  color: var(--bf-gold);
+}
+.bf-unit-hp.crit {
+  color: #ff6b6b;
+}
+.bf-bar {
+  position: relative;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.bf-bar > div {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4caf50, #7ddc84);
+  transition: width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bf-bar.low > div {
+  background: linear-gradient(90deg, #ffb74d, var(--bf-gold));
+}
+.bf-bar.crit > div {
+  background: linear-gradient(90deg, #d62839, #ff6b6b);
+}
+.bf-unit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.bf-weapon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+.bf-weapon i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.bf-special {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 11px;
+  color: var(--bf-muted);
+}
+.bf-special b {
+  color: var(--bf-text);
+}
+.bf-special.ready {
+  color: var(--bf-gold);
+  background: rgba(255, 209, 102, 0.15);
+}
+.bf-special.ready b {
+  color: var(--bf-gold);
+}
+.bf-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--bf-muted);
+}
+.bf-stats b {
+  color: var(--bf-text);
+}
+.bf-up {
+  color: var(--bf-teal);
+}
+.bf-down {
+  color: #ff6b6b;
+}
+.bf-skills,
+.bf-caption {
+  font-size: 11px;
+}
+
+/* ---------- Прогноз ---------- */
+.bf-forecast {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 10px;
+  pointer-events: auto;
+}
+.bf-fc-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bf-fc-side.enemy {
+  text-align: right;
+  align-items: flex-end;
+}
+.bf-fc-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.bf-fc-side.enemy .bf-fc-top {
+  flex-direction: row-reverse;
+}
+.bf-fc-top .critter-svg {
+  width: 36px;
+  height: 42px;
+}
+.bf-fc-names {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.bf-fc-names b {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+.bf-fc-weapon {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  width: 100%;
+}
+.bf-fc-hp {
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.bf-fc-hp .before {
+  color: var(--bf-muted);
+  font-size: 15px;
+}
+.bf-fc-hp .arrow {
+  color: var(--bf-muted);
+  font-size: 13px;
+}
+.bf-fc-hp .after.dead {
+  color: #ff6b6b;
+}
+.bf-bar-fc {
+  width: 100%;
+  height: 8px;
+}
+.bf-bar-fc .bf-bar-lost {
+  background: rgba(230, 57, 70, 0.55);
+  transition: none;
+}
+.bf-fc-dmg {
+  font-size: 15px;
+  font-weight: 700;
+}
+.bf-fc-dmg small {
+  font-weight: 600;
+  color: var(--bf-muted);
+  font-size: 12px;
+}
+.bf-fc-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: 18px;
+}
+.bf-fc-side.enemy .bf-fc-tags {
+  justify-content: flex-end;
+}
+.bf-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+}
+.bf-tag.red {
+  color: #ff6b6b;
+  background: rgba(230, 57, 70, 0.18);
+}
+.bf-tag.gold {
+  color: var(--bf-gold);
+  background: rgba(255, 209, 102, 0.16);
+}
+.bf-tag.death {
+  color: #fff;
+  background: var(--bf-accent);
+  letter-spacing: 0.5px;
+  animation: bf-pulse 1s ease-in-out infinite;
+}
+.bf-tag.kill {
+  color: var(--bf-teal);
+  background: rgba(46, 196, 182, 0.16);
+}
+.bf-tag.tiny {
+  font-size: 10px;
+}
+.bf-fc-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 6px;
+}
+.bf-tri {
+  font-size: 22px;
+  line-height: 1;
+}
+.bf-tri.adv {
+  color: var(--bf-teal);
+}
+.bf-tri.dis {
+  color: #ff6b6b;
+}
+.bf-tri.neutral {
+  color: var(--bf-muted);
+}
+.bf-fc-vs {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--bf-muted);
+  letter-spacing: 1px;
+}
+.bf-fc-side.dies.player .bf-fc-hp .after {
+  animation: bf-pulse 1s ease-in-out infinite;
+}
+
+/* ---------- Поддержка / стена ---------- */
+.bf-assist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.bf-assist-parts {
+  font-size: 12px;
+  color: var(--bf-teal);
+}
+
+/* ---------- Завершить ход ---------- */
+.bf-endturn {
+  position: absolute;
+  right: 12px;
+  bottom: calc(68px + var(--tg-safe-bottom));
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #ff5a68, var(--bf-accent));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 10px 26px rgba(230, 57, 70, 0.45);
+  animation: bf-slide-up 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  transition: transform 0.12s ease;
+  z-index: 4;
+}
+.bf-endturn:active {
+  transform: scale(0.95);
+}
+.bf-endturn.pulse {
+  animation:
+    bf-slide-up 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+    bf-glow 1.4s ease-in-out 0.3s infinite;
+}
+.bf-endturn-ico {
+  font-size: 16px;
+}
+
+/* ---------- Пауза ---------- */
+.bf-pause-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---------- Анимации ---------- */
+@keyframes bf-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes bf-slide-up {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes bf-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes bf-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes bf-glow {
+  0%,
+  100% {
+    box-shadow: 0 10px 26px rgba(230, 57, 70, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 10px 32px rgba(230, 57, 70, 0.8),
+      0 0 0 6px rgba(230, 57, 70, 0.18);
+  }
+}
+@keyframes bf-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bf-card,
+  .bf-menu-btn,
+  .bf-phase,
+  .bf-pill-btn,
+  .bf-endturn,
+  .bf-hint,
+  .bf-tag.death {
+    animation: none !important;
+  }
+  .bf-menu,
+  .bf-bar > div {
+    transition: none !important;
+  }
+}
+
+/* ---------- Доводка: узкие экраны и подписи меню ---------- */
+.bf-menu-btn {
+  width: 60px;
+  overflow: visible;
+}
+.bf-menu-label {
+  white-space: nowrap;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+.bf-hud-row > * {
+  min-width: 0;
+}
+.bf-hud-row .bf-icon {
+  flex-shrink: 0;
+}
+.bf-phase {
+  flex-shrink: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+@media (max-width: 430px) {
+  .bf-biome {
+    display: none;
+  }
+  .bf-hud-row {
+    gap: 5px;
+  }
+  .bf-phase-name {
+    font-size: 12px;
+  }
+}
+@media (max-width: 360px) {
+  .bf-phase-turn {
+    display: none;
+  }
+}
+
+/* ---------- Предложение завершить ход ---------- */
+.bf-endprompt {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  /* Внутри нижней полосы (в режиме ожидания там только подсказка), не заходит на поле. */
+  bottom: calc(14px + var(--tg-safe-bottom));
+  z-index: 6;
+  pointer-events: auto;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--bf-glass-2);
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: bf-slide-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+.bf-endprompt-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bf-endprompt-ico {
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(46, 196, 182, 0.5));
+}
+.bf-endprompt-title {
+  font-weight: 800;
+  font-size: 15px;
+}
+.bf-endprompt-sub {
+  font-size: 12.5px;
+  color: var(--bf-muted);
+}
+.bf-endprompt-actions {
+  display: flex;
+  gap: 8px;
+}
+.bf-endprompt-actions .bf-pill-btn {
+  flex: 1;
+  min-height: 46px;
+  font-size: 14.5px;
+  padding: 0 12px;
+}
+.bf-overlay.is-pressing .bf-endprompt {
+  opacity: 0;
+}

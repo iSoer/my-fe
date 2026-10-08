@@ -64,6 +64,8 @@ export interface BattleUiState {
   infoId?: string;
   infoThreat?: Set<string>;
   actions: ContextActions;
+  /** На юните зажата кнопка/палец (ещё не перетаскивание): меню скрыты, накладки не перехватывают курсор. */
+  pressedId?: string;
   /** Юнита держат за шкирку. */
   dragging: boolean;
   dragHover?: Pos;
@@ -120,6 +122,7 @@ function clearSelection(extra: Partial<BattleUiState> = {}): void {
   $battleUi.set({
     ...BASE,
     mode: cur.mode === 'ended' ? 'ended' : 'idle',
+    pressedId: cur.pressedId,
     dangerOn: cur.dangerOn,
     dangerTiles: cur.dangerTiles,
     busy: cur.busy,
@@ -227,6 +230,7 @@ function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiStat
     attackTiles,
     assistTiles,
     actions: actionsAt(st, bu, reach, bu.pos, true),
+    pressedId: cur.pressedId,
     dangerOn: cur.dangerOn,
     dangerTiles: cur.dangerTiles,
     fastForward: cur.fastForward,
@@ -487,6 +491,13 @@ export function tapTile(pos: Pos): void {
 }
 
 /* ---------- Перетаскивание ---------- */
+
+/** Палец лёг на своего бойца (до порога перетаскивания) или отпущен (null). */
+export function setPressed(unitId: string | null): void {
+  const cur = $battleUi.get();
+  if ((cur.pressedId ?? null) === unitId) return;
+  patch({ pressedId: unitId ?? undefined });
+}
 
 /** Палец лёг на юнита и начал движение. */
 export function beginDrag(unitId: string): boolean {

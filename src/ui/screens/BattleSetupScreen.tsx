@@ -15,7 +15,16 @@ import { UnitRow } from '../components/UnitRow';
 import { BottomSheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { statTotal } from '../lib/format';
+import { stagger } from '../lib/animate';
 import { haptic } from '@platform/haptics';
+
+const DIFF_STYLE: Record<Difficulty, { icon: string; color: string; rgb: string }> = {
+  easy: { icon: '🌱', color: '#4caf50', rgb: '76, 175, 80' },
+  normal: { icon: '⚔️', color: '#3a86ff', rgb: '58, 134, 255' },
+  hard: { icon: '🔥', color: '#ff9f1c', rgb: '255, 159, 28' },
+  nightmare: { icon: '💀', color: '#e63946', rgb: '230, 57, 70' },
+};
+const BIOME_ICON: Record<string, string> = { yard: '🏡', roofs: '🏙️', basement: '🕯️', dump: '🗑️', winter_park: '❄️' };
 
 export function BattleSetupScreen() {
   const save = useStore($save);
@@ -45,7 +54,8 @@ export function BattleSetupScreen() {
   const enemyPower = Math.round(enemyCount * (50 + 2.95 * Math.max(0, enemyLevel - 1)));
   const ratio = enemyPower > 0 ? squadPower / enemyPower : 1;
   const ratioLabel = ratio >= 1.1 ? 'Преимущество у вас' : ratio >= 0.85 ? 'Силы равны' : ratio >= 0.6 ? 'Будет тяжело' : 'Самоубийство';
-  const ratioClass = ratio >= 1.1 ? 'ok' : ratio >= 0.85 ? '' : ratio >= 0.6 ? 'warn' : 'danger';
+  const ratioClass = ratio >= 1.0 ? 'ok' : ratio >= 0.75 ? 'warn' : 'danger';
+  const barClass = ratio >= 1.0 ? 'good' : ratio >= 0.75 ? 'mid' : 'bad';
 
   const removeFromSquad = (id: string) => {
     haptic('select');
@@ -72,106 +82,112 @@ export function BattleSetupScreen() {
     <div class="screen">
       <TopBar title="Подготовка к бою" right={<ResourceBar />} onBack={() => navigate('/', true)} />
       <div class="screen-body">
-        <h3>Сложность</h3>
+        <div class="section-title">Сложность</div>
         <div class="stack">
-          {DIFFICULTIES.map((d) => {
+          {DIFFICULTIES.map((d, i) => {
             const unlocked = difficultyUnlocked(save, d.id);
+            const st = DIFF_STYLE[d.id];
             const rules: string[] = [];
             if (d.reinforcements.length) rules.push(`подкрепления (ход ${d.reinforcements.map((r) => r.turn).join(', ')})`);
             if (d.boss) rules.push('вожак');
             if (d.objective === 'killBoss') rules.push('цель: убить вожака');
+            const unlockText = d.unlock ? `после ${d.unlock.wins} побед на «${DIFFICULTIES.find((x) => x.id === d.unlock?.difficulty)?.name}»` : '';
             return (
               <div
                 key={d.id}
-                class={`card clickable diff-card ${difficulty === d.id ? 'selected' : ''} ${unlocked ? '' : 'locked'}`}
+                class={`card clickable diff-card pop-in ${difficulty === d.id ? 'selected' : ''} ${unlocked ? '' : 'locked'}`}
+                style={{ ...stagger(i, 60), '--diff-color': st.color, '--diff-rgb': st.rgb } as Record<string, string>}
                 onClick={() => {
-                  if (!unlocked) return toast(`Откроется после ${d.unlock?.wins} побед на «${DIFFICULTIES.find((x) => x.id === d.unlock?.difficulty)?.name}»`);
+                  if (!unlocked) return toast(`Откроется ${unlockText}`);
                   haptic('select');
                   setDifficulty(d.id);
                 }}
               >
-                {!unlocked && <span class="lock">🔒</span>}
-                <b>{d.name}</b>
-                <div class="muted small">{d.desc}</div>
-                <div class="diff-meta">
-                  <span class="chip">
-                    Врагов {d.enemies[0]}–{d.enemies[1]}
-                  </span>
-                  <span class="chip">
-                    Уровень {d.levelRange[0] >= 0 ? '+' : ''}
-                    {d.levelRange[0]}…+{d.levelRange[1]}
-                  </span>
-                  <span class="chip">🦴 ×{d.treatsMult}</span>
-                  <span class="chip">✦ {d.glory}</span>
-                  <span class="chip">Рекрут {Math.round(d.recruitChance * 100)}%</span>
-                  {rules.map((r) => (
-                    <span key={r} class="chip red">
-                      {r}
+                <span class="diff-ico" aria-hidden="true">
+                  {unlocked ? st.icon : '🔒'}
+                </span>
+                <div class="diff-body">
+                  <b>{d.name}</b>
+                  <div class="muted small">{unlocked ? d.desc : `Закрыто: ${unlockText}`}</div>
+                  <div class="diff-meta">
+                    <span class="chip">
+                      Врагов {d.enemies[0]}–{d.enemies[1]}
                     </span>
-                  ))}
+                    <span class="chip">
+                      Уровень {d.levelRange[0] >= 0 ? '+' : ''}
+                      {d.levelRange[0]}…+{d.levelRange[1]}
+                    </span>
+                    <span class="chip">🦴 ×{d.treatsMult}</span>
+                    <span class="chip gold">✦ {d.glory}</span>
+                    <span class="chip">Рекрут {Math.round(d.recruitChance * 100)}%</span>
+                    {rules.map((r) => (
+                      <span key={r} class="chip red">
+                        {r}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
 
-        <h3>Биом</h3>
-        <div class="row wrap">
-          <Button sm primary={biome === 'random'} onClick={() => setBiome('random')}>
-            🎲 Случайно
+        <div class="section-title">Биом</div>
+        <div class="biome-chips">
+          <Button sm primary={biome === 'random'} icon="🎲" onClick={() => setBiome('random')}>
+            Случайно
           </Button>
           {biomes.map((id) => (
-            <Button key={id} sm primary={biome === id} onClick={() => setBiome(id)}>
+            <Button key={id} sm primary={biome === id} icon={BIOME_ICON[id] ?? '🗺️'} onClick={() => setBiome(id)}>
               {biomeDef(id).name}
             </Button>
           ))}
         </div>
 
-        <h3>
+        <div class="section-title">
           Отряд {squad.length}/{SQUAD_SIZE}
-        </h3>
+        </div>
         <div class="squad-slots">
           {Array.from({ length: SQUAD_SIZE }, (_, i) => {
             const u = squadUnits[i];
             return u ? (
-              <div key={u.id} class="squad-slot filled" onClick={() => removeFromSquad(u.id)}>
+              <div key={u.id} class="squad-slot filled pop-in" onClick={() => removeFromSquad(u.id)}>
                 <UnitAvatar unit={u} size="sm" />
                 <span class="nm">{u.name}</span>
                 <span class="muted">Ур. {u.level}</span>
               </div>
             ) : (
-              <div key={`empty-${i}`} class="squad-slot" onClick={() => setPicker(true)}>
-                <span style={{ fontSize: 24 }}>＋</span>
+              <div key={`empty-${i}`} class="squad-slot empty" onClick={() => setPicker(true)}>
+                <span class="plus">＋</span>
                 <span class="muted">Добавить</span>
               </div>
             );
           })}
         </div>
-        <div class="card">
+        <div class="card power-card">
           <div class="row between">
             <span>Сила отряда</span>
             <b class={ratioClass}>{ratioLabel}</b>
           </div>
           <div class="muted small">
-            Ваши {squadPower} против ≈{enemyPower} у врага
+            Ваши <b>{squadPower}</b> против ≈<b>{enemyPower}</b> у врага
           </div>
-          <div class="bar" style={{ marginTop: 6 }}>
-            <div style={{ width: `${Math.min(100, ratio * 50)}%`, background: ratio >= 1 ? 'var(--ok)' : ratio >= 0.6 ? 'var(--warn)' : 'var(--accent)' }} />
+          <div class="bar" style={{ marginTop: 8 }}>
+            <div class={barClass} style={{ width: `${Math.min(100, ratio * 50)}%` }} />
           </div>
         </div>
         <div class="warning-box">☠️ Павшие в бою не возвращаются</div>
-        <Button big primary block onClick={onStart} disabled={squad.length === 0}>
+        <Button big primary block pulse={squad.length > 0} icon="⚔️" onClick={onStart} disabled={squad.length === 0}>
           Начать бой
         </Button>
       </div>
       <BottomSheet open={picker} onClose={() => setPicker(false)} title="Кого взять?">
         {notInSquad.length === 0 && <p class="muted">Все бойцы уже в отряде.</p>}
-        {notInSquad.map((u) => (
-          <UnitRow key={u.id} unit={u} onClick={() => addToSquad(u.id)} />
+        {notInSquad.map((u, i) => (
+          <UnitRow key={u.id} unit={u} index={i} onClick={() => addToSquad(u.id)} />
         ))}
       </BottomSheet>
       {toastEl}
     </div>
   );
 }
-

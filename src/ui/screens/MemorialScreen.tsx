@@ -6,6 +6,7 @@ import { navigate } from '@state/router';
 import { TopBar } from '../components/TopBar';
 import { UnitAvatar } from '../components/UnitAvatar';
 import { fmtDate, g } from '../lib/format';
+import { stagger } from '../lib/animate';
 
 export function MemorialScreen() {
   const memorial = useStore($memorial);
@@ -14,7 +15,9 @@ export function MemorialScreen() {
     <div class="screen">
       <TopBar title="Кладбище" onBack={() => navigate('/', true)} />
       <div class="screen-body">
-        <p class="muted small">Всего павших: {memorial.length}. Они были хорошими мальчиками и девочками.</p>
+        <p class="muted small">
+          Всего павших: <b>{memorial.length}</b>. Они были хорошими мальчиками и девочками.
+        </p>
         {list.length === 0 && (
           <div class="empty">
             <div class="big">🪦</div>
@@ -22,7 +25,7 @@ export function MemorialScreen() {
           </div>
         )}
         {list.map((m, i) => (
-          <div key={m.id} class="card grave">
+          <div key={m.id} class="card grave pop-in" style={stagger(i, 50)}>
             <UnitAvatar unit={m.unit} size="md" dead animated={i < 12} />
             <div class="grow">
               <b>{displayName(m.unit)}</b>

@@ -60,6 +60,13 @@ export class UnitView extends Phaser.GameObjects.Container {
   private invalidTint = false;
   private liftTweens: Phaser.Tweens.Tween[] = [];
   private landingTweens: Phaser.Tweens.Tween[] = [];
+  /* Жизнь в покое: дыхание (scaleY тела) и моргание (смена текстуры). */
+  private breath: Phaser.Tweens.Tween | null = null;
+  private blinkTimer: Phaser.Time.TimerEvent | null = null;
+  private blinkBack: Phaser.Time.TimerEvent | null = null;
+  private lifePaused = false;
+  private blinkCount = 0;
+  private hopTween: Phaser.Tweens.Tween | null = null;
 
   constructor(scene: Phaser.Scene, unit: UnitInstance, side: Side, opts: UnitViewOptions) {
     super(scene, 0, 0);
@@ -101,6 +108,98 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.add([this.moveGlyph, this.hpBar, this.hpText, this.cdBadge]);
     scene.add.existing(this);
     this.resize(opts.size);
+    this.startLife();
+  }
+
+  /* ---------- Дыхание и моргание ---------- */
+
+  private seedFromId(): number {
+    let h = 2166136261;
+    for (let i = 0; i < this.unitId.length; i++) {
+      h ^= this.unitId.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) / 4294967296;
+  }
+
+  /** Запустить дыхание и моргание (с фазовым сдвигом по id, чтобы юниты не дышали синхронно). */
+  private startLife(): void {
+    if (!this.scene || this.dead) return;
+    const r = this.seedFromId();
+    if (!this.breath) {
+      const dur = 2200 + Math.round(r * 600);
+      this.breath = this.scene.tweens.add({
+        targets: this.rig,
+        scaleY: 1.03,
+        duration: dur,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        delay: Math.round(r * dur),
+      });
+    }
+    this.scheduleBlink();
+  }
+
+  private scheduleBlink(): void {
+    if (!this.scene || this.dead) return;
+    this.blinkTimer?.remove(false);
+    // Псевдослучайный, но детерминированный по id интервал 3–6 с.
+    this.blinkCount++;
+    const delay = 3000 + Math.round((this.seedFromId() * 7919 + this.blinkCount * 2663) % 3000);
+    this.blinkTimer = this.scene.time.delayedCall(delay, () => {
+      this.blinkTimer = null;
+      if (!this.scene || this.dead) return;
+      const canBlink = this.pose === 'idle' && !this.lifted && !this.runTimer && !this.hurtTimer && !this.lifePaused;
+      if (canBlink) {
+        this.setPose('blink');
+        this.blinkBack = this.scene.time.delayedCall(110, () => {
+          this.blinkBack = null;
+          if (!this.scene || this.dead) return;
+          if (this.pose === 'blink') this.setPose('idle');
+        });
+      }
+      this.scheduleBlink();
+    });
+  }
+
+  /** Приостановить дыхание (подъём, приземление, смерть) — тело возвращается к масштабу 1. */
+  private pauseLife(): void {
+    this.lifePaused = true;
+    if (this.breath) {
+      this.breath.stop();
+      this.breath = null;
+    }
+    if (this.blinkBack) {
+      this.blinkBack.remove(false);
+      this.blinkBack = null;
+      if (this.pose === 'blink' && !this.dead) this.setPose('idle');
+    }
+    if (this.scene) this.rig.setScale(this.rig.scaleX, 1);
+  }
+
+  private resumeLife(): void {
+    if (this.lifted || this.dead) return;
+    this.lifePaused = false;
+    this.startLife();
+  }
+
+  /** Короткий подскок тела (выбор юнита). Не блокирует. */
+  hop(): void {
+    if (!this.scene || this.dead || this.lifted) return;
+    this.hopTween?.stop();
+    const y0 = 0;
+    this.hopTween = this.scene.tweens.add({
+      targets: this.rig,
+      y: y0 - 10,
+      duration: 90,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.hopTween = null;
+        if (this.scene && !this.lifted) this.rig.setY(0);
+      },
+    });
   }
 
   /** Заменить плейсхолдер на миниатюру. */
@@ -216,6 +315,10 @@ export class UnitView extends Phaser.GameObjects.Container {
     if (!this.scene) return;
     if (on) {
       if (this.runTimer || this.dead) return;
+      if (this.blinkBack) {
+        this.blinkBack.remove(false);
+        this.blinkBack = null;
+      }
       this.runFrame = 0;
       this.setPose('run');
       this.runTimer = this.scene.time.addEvent({
@@ -271,6 +374,11 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.dead = false;
     this.setPose('dead');
     this.dead = true;
+    this.pauseLife();
+    this.blinkTimer?.remove(false);
+    this.blinkTimer = null;
+    this.hopTween?.stop();
+    this.hopTween = null;
   }
 
   /** Подсветка «сюда нельзя» при перетаскивании. */
@@ -302,6 +410,9 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.killLift();
     const size = this.size;
     if (on) {
+      this.pauseLife();
+      this.hopTween?.stop();
+      this.hopTween = null;
       if (!this.dead) this.setPose('carried');
       this.liftTweens.push(
         this.scene.tweens.add({ targets: this.rig, y: -size * 0.45, scaleX: 1.12, scaleY: 1.12, angle: -8, duration, ease: 'Back.easeOut' }),
@@ -312,9 +423,45 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.setInvalidTint(false);
     if (!this.dead && !this.runTimer) this.setPose('idle');
     this.liftTweens.push(
-      this.scene.tweens.add({ targets: this.rig, y: 0, scaleX: 1, scaleY: 1, angle: 0, duration, ease: 'Quad.easeIn' }),
+      this.scene.tweens.add({
+        targets: this.rig,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        angle: 0,
+        duration,
+        ease: 'Quad.easeIn',
+        onComplete: () => this.resumeLife(),
+      }),
       this.scene.tweens.add({ targets: this.shadow, displayWidth: size * 0.7, displayHeight: size * 0.25, alpha: 0.55, duration, ease: 'Quad.easeIn' }),
     );
+  }
+
+  /* ---------- Доступ для анимаций гибели (deathFx) ---------- */
+
+  /** Контейнер тела: его двигают/вращают/масштабируют варианты гибели. */
+  bodyRig(): Phaser.GameObjects.Container {
+    return this.rig;
+  }
+
+  /** Спрайт миниатюры (null, пока показан плейсхолдер). */
+  bodyImage(): Phaser.GameObjects.Image | null {
+    return this.sprite;
+  }
+
+  /** Локальный Y лап относительно контейнера тела. */
+  feetLocalY(): number {
+    return this.size * 0.36;
+  }
+
+  /** Спрятать HP, значки и тень — тело остаётся для анимации гибели. */
+  hideHud(): void {
+    if (!this.scene) return;
+    this.hpBar.setVisible(false);
+    this.hpText.setVisible(false);
+    this.cdBadge.setVisible(false);
+    this.moveGlyph.setVisible(false);
+    this.shadow.setAlpha(0);
   }
 
   /** Мировые координаты лап (для пыли). */
@@ -334,6 +481,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.landingTweens = [];
     this.killLift();
     this.lifted = false;
+    this.pauseLife();
     this.setInvalidTint(false);
     this.rig.setPosition(0, 0).setAngle(0);
     this.shadow.setAlpha(0.55);
@@ -359,7 +507,10 @@ export class UnitView extends Phaser.GameObjects.Container {
       if (!this.scene) return;
       await tween(this.scene, { targets: this.rig, angle: st.angle, scaleX: st.sx, duration: st.d, ease: 'Sine.easeInOut' });
     }
-    if (this.scene) this.rig.setAngle(0).setScale(1);
+    if (this.scene) {
+      this.rig.setAngle(0).setScale(1);
+      this.resumeLife();
+    }
   }
 
   override destroy(fromScene?: boolean): void {
@@ -369,6 +520,14 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.hurtTimer = null;
     this.killLift();
     for (const t of this.landingTweens) t.stop();
+    this.breath?.stop();
+    this.breath = null;
+    this.blinkTimer?.remove(false);
+    this.blinkBack?.remove(false);
+    this.blinkTimer = null;
+    this.blinkBack = null;
+    this.hopTween?.stop();
+    this.hopTween = null;
     super.destroy(fromScene);
   }
 

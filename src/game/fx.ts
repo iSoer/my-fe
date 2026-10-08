@@ -112,8 +112,15 @@ export function ghostRise(scene: Phaser.Scene, x: number, y: number, size: numbe
   });
 }
 
+export interface BannerOptions {
+  /** Диагональный светлый «слэш», пролетающий за текстом. */
+  slash?: boolean;
+  /** Брызги крови вдоль плашки (фаза врага). */
+  blood?: boolean;
+}
+
 /** Полноэкранная плашка «ВАША ФАЗА» и т. п. */
-export async function banner(scene: Phaser.Scene, text: string, color: number, speed: number, hold = 450): Promise<void> {
+export async function banner(scene: Phaser.Scene, text: string, color: number, speed: number, hold = 450, opts: BannerOptions = {}): Promise<void> {
   if (!sceneAlive(scene)) return;
   const w = scene.scale.width;
   const h = scene.scale.height;
@@ -123,11 +130,23 @@ export async function banner(scene: Phaser.Scene, text: string, color: number, s
     .text(-w / 2, h / 2, text, { fontFamily: FONT, fontSize: `${Math.round(bandH * 0.42)}px`, color: '#ffffff', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 })
     .setOrigin(0.5)
     .setDepth(31);
+  let slash: Phaser.GameObjects.Rectangle | null = null;
+  if (opts.slash) {
+    // Наклонная светлая полоса шире экрана, летит слева направо чуть впереди плашки
+    slash = scene.add.rectangle(-w, h / 2, w * 0.35, bandH * 2.6, 0xffffff, 0.22).setDepth(29).setAngle(-18);
+    scene.tweens.add({ targets: slash, x: w * 2, duration: (220 + hold * 0.5) / speed, ease: 'Cubic.easeOut' });
+  }
   await tween(scene, { targets: [band, label], x: w / 2, duration: 220 / speed, ease: 'Cubic.easeOut' });
+  if (opts.blood) {
+    for (let i = 0; i < 4; i++) {
+      bloodBurst(scene, w * (0.15 + i * 0.23), h / 2 + bandH * 0.45, 8, { min: 40, max: 140 }, 0.6, speed);
+    }
+  }
   await wait(scene, hold / speed);
   await tween(scene, { targets: [band, label], x: w * 1.5, duration: 220 / speed, ease: 'Cubic.easeIn' });
   band.destroy();
   label.destroy();
+  slash?.destroy();
 }
 
 /** «Штамп» — текст с ударом (ПАЛ, ПОБЕДА...). */
@@ -139,4 +158,116 @@ export async function stamp(scene: Phaser.Scene, x: number, y: number, text: str
   await wait(scene, hold / speed);
   await tween(scene, { targets: t, alpha: 0, duration: 200 / speed });
   t.destroy();
+}
+
+/* ---------- Дополнительные эффекты (полировка поля) ---------- */
+
+/** Зелёные искры лечения + два поднимающихся сердечка. Не блокирует. */
+export function healSparkles(scene: Phaser.Scene, x: number, y: number, size: number, speed: number): void {
+  if (!sceneAlive(scene)) return;
+  const emitter = scene.add.particles(x, y + size * 0.1, TEX.star, {
+    speed: { min: size * 0.4, max: size * 1.1 },
+    angle: { min: 220, max: 320 },
+    scale: { start: 0.9, end: 0 },
+    alpha: { start: 1, end: 0 },
+    lifespan: { min: 400, max: 700 },
+    gravityY: -size * 0.6,
+    rotate: { min: 0, max: 180 },
+    tint: [0x80ed99, 0xb7f7c6, 0x57cc99, 0xffffff],
+    emitting: false,
+    quantity: 10,
+  });
+  emitter.setDepth(24);
+  emitter.explode(10);
+  scene.time.delayedCall(900 / speed + 100, () => emitter.destroy());
+  floatText(scene, x - size * 0.22, y - size * 0.1, '♥', '#ff6f9c', speed, { size: size * 0.3, rise: size * 0.7, duration: 700, stroke: 2 });
+  scene.time.delayedCall(140 / speed, () => floatText(scene, x + size * 0.22, y - size * 0.25, '♥', '#80ed99', speed, { size: size * 0.24, rise: size * 0.6, duration: 650, stroke: 2 }));
+}
+
+/** Кольцо статуса: бафф — расширяется зелёным, дебафф — сжимается фиолетовым. Не блокирует. */
+export function statusRing(scene: Phaser.Scene, x: number, y: number, size: number, kind: 'buff' | 'debuff', speed: number): void {
+  if (!sceneAlive(scene)) return;
+  const ring = scene.add.image(x, y, TEX.ring).setDepth(23);
+  const color = kind === 'buff' ? 0x80ed99 : 0xc77dff;
+  ring.setTint(color).setDisplaySize(size, size);
+  if (kind === 'buff') {
+    ring.setScale(ring.scaleX * 0.3, ring.scaleY * 0.3).setAlpha(0.9);
+    scene.tweens.add({ targets: ring, scaleX: ring.scaleX / 0.3 * 1.1, scaleY: ring.scaleY / 0.3 * 1.1, alpha: 0, duration: 350 / speed, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
+  } else {
+    const sx = ring.scaleX;
+    const sy = ring.scaleY;
+    ring.setScale(sx * 1.2, sy * 1.2).setAlpha(0.9);
+    scene.tweens.add({ targets: ring, scaleX: sx * 0.4, scaleY: sy * 0.4, alpha: 0, duration: 350 / speed, ease: 'Quad.easeIn', onComplete: () => ring.destroy() });
+  }
+}
+
+/** Обломки стены (коричневые щепки/крошка). Не блокирует. */
+export function debrisBurst(scene: Phaser.Scene, x: number, y: number, size: number, count: number, speed: number): void {
+  if (!sceneAlive(scene)) return;
+  const emitter = scene.add.particles(x, y, TEX.square, {
+    speed: { min: size * 0.8, max: size * 2.4 },
+    angle: { min: 200, max: 340 },
+    scale: { start: 0.18, end: 0.04 },
+    alpha: { start: 1, end: 0.3 },
+    lifespan: { min: 350, max: 650 },
+    gravityY: size * 9,
+    rotate: { min: 0, max: 360 },
+    tint: [0x8d6e63, 0x6d4c41, 0xa1887f, 0x5d4037, 0xbcaaa4],
+    emitting: false,
+    quantity: count,
+  });
+  emitter.setDepth(24);
+  emitter.explode(count);
+  scene.time.delayedCall(800 / speed + 100, () => emitter.destroy());
+}
+
+/** Золотой звёздный взрыв (повышение уровня). Не блокирует. */
+export function starBurst(scene: Phaser.Scene, x: number, y: number, size: number, count = 8, speed = 1): void {
+  if (!sceneAlive(scene)) return;
+  const emitter = scene.add.particles(x, y, TEX.star, {
+    speed: { min: size * 1.2, max: size * 2.2 },
+    angle: { min: 0, max: 360 },
+    scale: { start: 1.1, end: 0 },
+    alpha: { start: 1, end: 0 },
+    lifespan: { min: 450, max: 750 },
+    rotate: { min: 0, max: 360 },
+    tint: [0xffd166, 0xfff3b0, 0xffb703, 0xffffff],
+    emitting: false,
+    quantity: count,
+  });
+  emitter.setDepth(26);
+  emitter.explode(count);
+  scene.time.delayedCall(900 / speed + 100, () => emitter.destroy());
+}
+
+/** Белое кольцо-вспышка под юнитом: «сейчас ходит этот». Не блокирует. */
+export function actorFlash(scene: Phaser.Scene, x: number, y: number, size: number, speed: number): void {
+  if (!sceneAlive(scene)) return;
+  const ring = scene.add.image(x, y, TEX.ring).setDepth(8).setTint(0xffffff).setAlpha(0.9);
+  ring.setDisplaySize(size * 0.6, size * 0.6);
+  const sx = ring.scaleX;
+  const sy = ring.scaleY;
+  scene.tweens.add({ targets: ring, scaleX: sx * 2.2, scaleY: sy * 2.2, alpha: 0, duration: 300 / speed, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
+}
+
+/** Конфетти сверху (победа). Не блокирует. */
+export function confettiRain(scene: Phaser.Scene, count: number, speed: number): void {
+  if (!sceneAlive(scene)) return;
+  const w = scene.scale.width;
+  const emitter = scene.add.particles(0, -10, TEX.square, {
+    x: { min: 0, max: w },
+    speedY: { min: 120, max: 260 },
+    speedX: { min: -60, max: 60 },
+    scale: { start: 0.35, end: 0.2 },
+    alpha: { start: 1, end: 0.8 },
+    lifespan: { min: 1400, max: 2200 },
+    gravityY: 120,
+    rotate: { min: 0, max: 360 },
+    tint: [0xe63946, 0x3a86ff, 0x2ec4b6, 0xffd166, 0xff6f9c, 0xffffff],
+    emitting: false,
+    quantity: count,
+  });
+  emitter.setDepth(61);
+  emitter.explode(count);
+  scene.time.delayedCall(2500 / speed + 100, () => emitter.destroy());
 }

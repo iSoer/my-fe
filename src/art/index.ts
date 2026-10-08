@@ -1,10 +1,10 @@
 import type { UnitInstance } from '@core/types';
 import { classDef } from '@content/classes';
 import { KIND_COLOR } from '@content/weapons';
-import { critterSvg, type CritterArt, type Pose } from './critter';
+import { critterSvg, critterPartSvg, type CritterArt, type CritterPart, type Pose } from './critter';
 import { eyeArt, furArt } from './palettes';
 
-export { critterSvg, VIEW, VIEW_BOX, type CritterArt, type Pose } from './critter';
+export { critterSvg, critterPartSvg, CRITTER_PARTS, CRITTER_PART_ANCHORS, VIEW, VIEW_BOX, type CritterArt, type Pose, type CritterPart } from './critter';
 export { backdropSvg, BACKDROP } from './backdrop';
 export { tileSvg, TILE_SIZE } from './tile';
 export { svgToImage, svgDataUri, clearRasterCache } from './raster';
@@ -55,4 +55,8 @@ export function unitSvg(unit: UnitInstance, opts: UnitArtOptions = {}): string {
 export function unitArtKey(unit: UnitInstance, pose: Pose): string {
   const a = unit.appearance;
   return `${unit.species}:${unit.classId}:${a.furPalette}:${a.pattern}:${a.eyes}:${a.eyeColor}:${a.accessory}:${unit.isBoss ? 'b' : ''}${unit.isEnemy ? 'e' : ''}:${pose}`;
+}
+
+export function unitPartSvg(unit: UnitInstance, part: CritterPart): string {
+  return critterPartSvg(unitArt(unit, { pose: 'dead' }), part);
 }

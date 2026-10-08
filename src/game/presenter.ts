@@ -5,12 +5,21 @@ import { $battleUi, type Presenter } from '@state/battleUi';
 import { haptic } from '@platform/haptics';
 import { MAP_SCENE_KEY, MapScene } from './MapScene';
 import { CINEMATIC_SCENE_KEY, type CinematicData, type CombatEvent } from './CinematicScene';
-import { banner, bloodBurst, floatText, ghostRise, stamp, tween, wait } from './fx';
+import { banner, bloodBurst, floatText, ghostRise, healSparkles, starBurst, statusRing, stamp, tween, wait } from './fx';
 import { specialDef } from '@content/skills/specials';
+import { weaponDef } from '@content/weapons';
+import { classDef } from '@content/classes';
+import type { CritterPart } from '@art/index';
+import { deathSeed, pickDeathVariant, playDeathMap, preloadDeathParts, type DeathCtx } from './deathFx';
+import { playQuickAttackFx, shakePx, weaponKindOf } from './attackFx';
 
 /** Проигрывает события боя на сцене карты (и в кинематике). Логики игры не содержит. */
 export class GamePresenter implements Presenter {
   private seedCounter = 0;
+  /** Последний проигранный бой — чтобы в `died` знать убийцу и направление удара. */
+  private lastCombat: CombatEvent | null = null;
+  /** Части тела (карта) для юнитов, которые погибнут в ближайшем бою. */
+  private mapParts = new Map<string, Record<CritterPart, string>>();
 
   constructor(private readonly game: Phaser.Game) {}
 
@@ -35,6 +44,11 @@ export class GamePresenter implements Presenter {
       // событие moved начнёт анимацию с того места, где он стоит.
       const skip = map.beginPlayback();
       map.syncFromState(before, skip);
+      const actor = this.enemyActor(events, before);
+      if (actor) {
+        map.flashActor(actor, this.speed());
+        await wait(map, 220 / this.speed());
+      }
       for (const ev of events) {
         if (!map.sys.isActive()) break;
         await this.handle(ev, before, after, map);
@@ -47,12 +61,37 @@ export class GamePresenter implements Presenter {
     }
   }
 
+  /** Id врага, чьё действие проигрывается (первое событие действия в фазе врага), иначе null. */
+  private enemyActor(events: BattleEvent[], before: BattleState): string | null {
+    if (before.phase !== 'enemy') return null;
+    for (const ev of events) {
+      let id: string | undefined;
+      if (ev.type === 'moved' || ev.type === 'assist' || ev.type === 'waited') id = ev.unitId;
+      else if (ev.type === 'combat') id = ev.attackerId;
+      else continue;
+      return before.units[id]?.side === 'enemy' ? id : null;
+    }
+    return null;
+  }
+
   private async handle(ev: BattleEvent, before: BattleState, after: BattleState, map: MapScene): Promise<void> {
     const sp = this.speed();
     switch (ev.type) {
       case 'moved':
         return this.moved(ev.unitId, ev.path, map, sp);
       case 'combat':
+        // Кто-то погибнет — заранее растеризуем части тела для анимации гибели (с потолком 600 мс).
+        this.lastCombat = ev;
+        for (const [id, hpAfter] of [
+          [ev.defenderId, ev.defenderHpAfter],
+          [ev.attackerId, ev.attackerHpAfter],
+        ] as const) {
+          const u = before.roster[id];
+          if (u && hpAfter <= 0 && !this.mapParts.has(id)) {
+            const parts = await preloadDeathParts(map, u, 'map', 600);
+            if (parts) this.mapParts.set(id, parts);
+          }
+        }
         return this.combat(ev, before, after, map, sp);
       case 'died':
         return this.died(ev.unitId, ev.pos, ev.side, after, map, sp);
@@ -62,7 +101,8 @@ export class GamePresenter implements Presenter {
         return this.assist(ev, after, map, sp);
       case 'wallHit': {
         map.shakeTile(ev.pos);
-        map.setWallHp(ev.pos, ev.hpAfter);
+        map.setWallHp(ev.pos, ev.hpAfter, sp);
+        map.cameras.main.shake(80 / sp, 0.004);
         const c = map.center(ev.pos);
         floatText(map, c.x, c.y - map.tile * 0.3, ev.hpAfter > 0 ? 'Хрясь!' : 'Сломано!', '#ffd166', sp, { size: map.tile * 0.3 });
         const view = map.units.get(ev.unitId);
@@ -75,7 +115,10 @@ export class GamePresenter implements Presenter {
         return wait(map, 150 / sp);
       }
       case 'phaseChanged':
-        return banner(map, ev.phase === 'player' ? `ХОД ${ev.turn} · ВАША ФАЗА` : `ХОД ${ev.turn} · ФАЗА ВРАГА`, ev.phase === 'player' ? 0x1d4ed8 : 0x9b1c31, sp);
+        return banner(map, ev.phase === 'player' ? `ХОД ${ev.turn} · ВАША ФАЗА` : `ХОД ${ev.turn} · ФАЗА ВРАГА`, ev.phase === 'player' ? 0x1d4ed8 : 0x9b1c31, sp, 450, {
+          slash: true,
+          blood: ev.phase === 'enemy',
+        });
       case 'reinforcements': {
         await banner(map, 'ПОДКРЕПЛЕНИЕ!', 0x7a1f1f, sp, 300);
         for (const id of ev.unitIds) {
@@ -89,7 +132,9 @@ export class GamePresenter implements Presenter {
       case 'levelUp': {
         const view = map.units.get(ev.unitId);
         if (view) {
+          starBurst(map, view.x, view.y - map.tile * 0.1, map.tile, 8, sp);
           floatText(map, view.x, view.y - map.tile * 0.6, 'LV UP!', '#ffd166', sp, { size: map.tile * 0.34, rise: 30, duration: 800 });
+          view.hop();
           haptic('success');
           return wait(map, 350 / sp);
         }
@@ -100,10 +145,8 @@ export class GamePresenter implements Presenter {
       case 'waited':
         return wait(map, 60 / sp);
       case 'battleEnded': {
-        const text = ev.result === 'victory' ? 'ПОБЕДА' : ev.result === 'defeat' ? 'ПОРАЖЕНИЕ' : 'ОТСТУПЛЕНИЕ';
-        const color = ev.result === 'victory' ? '#ffd166' : ev.result === 'defeat' ? '#ff4d6d' : '#cccccc';
-        haptic(ev.result === 'victory' ? 'success' : 'warning');
-        return stamp(map, map.scale.width / 2, map.scale.height * 0.45, text, color, Math.min(44, map.scale.width * 0.12), sp, 800);
+        haptic(ev.result === 'victory' ? 'success' : ev.result === 'defeat' ? 'error' : 'warning');
+        return map.showEnd(ev.result, sp);
       }
     }
   }
@@ -197,8 +240,26 @@ export class GamePresenter implements Presenter {
       } else haptic('medium');
       atk.setPose('run');
       await tween(map, { targets: atk, x: ox + (dx / len) * map.tile * 0.35, y: oy + (dy / len) * map.tile * 0.35, duration: 100 / sp, ease: 'Quad.easeIn' });
+      // Фирменный эффект оружия у клетки цели (облегчённый) + зум-удар; контакт — по его сигналу.
+      const quickFx = playQuickAttackFx({
+        scene: map,
+        kind: weaponKindOf(before, strike.attackerId),
+        attacker: atk,
+        defender: def,
+        atkPos: { x: atk.x, y: atk.y - map.tile * 0.1 },
+        defPos: { x: def.x, y: def.y - map.tile * 0.1 },
+        home: { x: ox, y: oy },
+        dir: dx >= 0 ? 1 : -1,
+        speed: sp,
+        special: !!strike.special,
+        effective: strike.effective,
+        damage: strike.damage,
+        size: map.tile,
+        color: 0xffffff,
+      });
+      await quickFx.impactAt;
       def.hitFlash(160 / sp);
-      map.cameras.main.shake(90 / sp, (strike.special ? 6 : 3) / map.scale.width);
+      map.cameras.main.shake(90 / sp, (shakePx(!!strike.special, strike.effective) * 0.75) / map.scale.width);
       const color = strike.damage === 0 ? '#bbbbbb' : strike.special ? '#ffd166' : strike.effective ? '#ff6b6b' : '#ffffff';
       floatText(map, def.x, def.y - map.tile * 0.5, strike.damage === 0 ? 'Хлоп!' : String(strike.damage), color, sp, { size: map.tile * (strike.special ? 0.4 : 0.34) });
       if (strike.damage > 0) {
@@ -213,6 +274,7 @@ export class GamePresenter implements Presenter {
       atk.setHp(strike.attackerHpAfter, strike.attackerId === ev.attackerId ? aMax : dMax);
       await tween(map, { targets: atk, x: ox, y: oy, duration: 100 / sp, ease: 'Quad.easeOut' });
       atk.setPose('idle');
+      await quickFx.done;
       await wait(map, 90 / sp);
     }
   }
@@ -242,16 +304,37 @@ export class GamePresenter implements Presenter {
     const unit = after.roster[unitId];
     const c = map.center(pos);
     if (side === 'player') haptic('error');
-    if (view) {
+    // Убийца и направление удара — из последнего боя; вариант гибели совпадает с кинематиком (тот же seed).
+    const lc = this.lastCombat;
+    const killerId = lc ? (lc.defenderId === unitId ? lc.attackerId : lc.attackerId === unitId ? lc.defenderId : undefined) : undefined;
+    const killerUnit = killerId ? after.roster[killerId] : undefined;
+    const killerKind = killerUnit ? weaponDef(killerUnit.skills.weapon).kind : undefined;
+    let dir: 1 | -1 = side === 'player' ? -1 : 1;
+    const kb = killerId ? after.units[killerId] : undefined;
+    if (kb && kb.pos.x !== pos.x) dir = pos.x > kb.pos.x ? 1 : -1;
+    let pooled = false;
+    const onPool = (): void => {
+      if (pooled) return;
+      pooled = true;
+      map.addDecal(pos, 'pool', pos.x * 3 + pos.y * 7 + this.seedCounter++);
+    };
+    if (view && unit) {
       view.setDead();
-      bloodBurst(map, view.x, view.y, 50, null, 1.1, sp);
-      map.cameras.main.shake(160 / sp, 0.012);
-      await tween(map, { targets: view, angle: side === 'player' ? -90 : 90, y: view.y + map.tile * 0.2, alpha: 0.9, duration: 350 / sp, ease: 'Bounce.easeOut' });
+      view.hideHud();
+      const feet = view.feetWorld();
+      const variant = pickDeathVariant(deathSeed(unitId, after.turn), killerKind, classDef(unit.classId).moveType);
+      const ctx: DeathCtx = { scene: map, variant, sprite: view, unit, x: feet.x, y: feet.y, size: map.tile, dir, speed: sp, side, onPool };
+      const parts = this.mapParts.get(unitId);
+      if (parts) ctx.parts = parts;
+      if (killerKind) ctx.killerKind = killerKind;
+      this.mapParts.delete(unitId);
+      await playDeathMap(ctx);
+      if (!map.sys.isActive()) return;
     }
-    map.addDecal(pos, 'pool', pos.x * 3 + pos.y * 7 + this.seedCounter++);
+    onPool();
     const word = side === 'player' ? (unit?.gender === 'f' ? 'ПАЛА' : 'ПАЛ') : unit?.gender === 'f' ? 'ГОТОВА' : 'ГОТОВ';
     const ghost = ghostRise(map, c.x, c.y - map.tile * 0.2, map.tile, sp);
-    if (view) this.tweenNoWait(map, { targets: view, alpha: 0, duration: 300 / sp, delay: 150 / sp });
+    if (view?.scene) this.tweenNoWait(map, { targets: view, alpha: 0, duration: 300 / sp, delay: 150 / sp });
     await stamp(map, c.x, c.y - map.tile * 0.9, word, side === 'player' ? '#ff4d6d' : '#f1f1f1', Math.max(14, map.tile * 0.42), sp, side === 'player' ? 500 : 250);
     await ghost;
     map.removeUnitView(unitId);
@@ -262,6 +345,7 @@ export class GamePresenter implements Presenter {
     if (!view) return;
     switch (ev.effect.type) {
       case 'heal':
+        healSparkles(map, view.x, view.y, map.tile, sp);
         floatText(map, view.x, view.y - map.tile * 0.5, `+${ev.effect.amount}`, '#80ed99', sp, { size: map.tile * 0.32 });
         if (ev.hpAfter !== undefined) view.setHp(ev.hpAfter, view.getHp() > ev.hpAfter ? view.getHp() : Math.max(ev.hpAfter, view.getHp()));
         break;
@@ -270,9 +354,11 @@ export class GamePresenter implements Presenter {
         bloodBurst(map, view.x, view.y, 6, null, 0.5, sp);
         break;
       case 'buff':
+        statusRing(map, view.x, view.y + map.tile * 0.1, map.tile, 'buff', sp);
         floatText(map, view.x + map.tile * 0.25, view.y - map.tile * 0.4, '▲', '#80ed99', sp, { size: map.tile * 0.3, rise: 18, duration: 400 });
         break;
       case 'debuff':
+        statusRing(map, view.x, view.y + map.tile * 0.1, map.tile, 'debuff', sp);
         floatText(map, view.x + map.tile * 0.25, view.y - map.tile * 0.4, '▼', '#c77dff', sp, { size: map.tile * 0.3, rise: 18, duration: 400 });
         break;
       case 'flag':
@@ -293,6 +379,7 @@ export class GamePresenter implements Presenter {
     const target = map.units.get(ev.targetId);
     const actor = map.units.get(ev.unitId);
     if (target && ev.heal > 0) {
+      healSparkles(map, target.x, target.y, map.tile, sp);
       floatText(map, target.x, target.y - map.tile * 0.5, `+${ev.heal}`, '#80ed99', sp, { size: map.tile * 0.34 });
       const tb = after.units[ev.targetId];
       if (ev.targetHpAfter !== undefined && tb) target.setHp(ev.targetHpAfter, tb.maxHp);
@@ -306,7 +393,10 @@ export class GamePresenter implements Presenter {
       floatText(map, target.x, target.y - map.tile * 0.6, '↻ ещё раз!', '#ffd166', sp, { size: map.tile * 0.28 });
       target.setActed(false);
     }
-    if (target && ev.assistId.startsWith('as_rally')) floatText(map, target.x, target.y - map.tile * 0.6, '▲', '#80ed99', sp, { size: map.tile * 0.34, rise: 20 });
+    if (target && ev.assistId.startsWith('as_rally')) {
+      statusRing(map, target.x, target.y + map.tile * 0.1, map.tile, 'buff', sp);
+      floatText(map, target.x, target.y - map.tile * 0.6, '▲', '#80ed99', sp, { size: map.tile * 0.34, rise: 20 });
+    }
     return wait(map, 200 / sp);
   }
 }

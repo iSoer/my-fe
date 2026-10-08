@@ -4,6 +4,7 @@ import { displayName, unitClass, unitClassName, visibleStats } from '@core/units
 import { UnitAvatar } from './UnitAvatar';
 import { WeaponBadge, RarityStars } from './Badges';
 import { MOVE_EMOJI } from '../lib/format';
+import { stagger } from '../lib/animate';
 
 export function UnitRow({
   unit,
@@ -14,6 +15,7 @@ export function UnitRow({
   tags,
   animated = true,
   friendly = false,
+  index,
 }: {
   unit: UnitInstance;
   onClick?: () => void;
@@ -23,11 +25,17 @@ export function UnitRow({
   tags?: ComponentChildren;
   animated?: boolean;
   friendly?: boolean;
+  /** Индекс в списке для поочерёдного появления. */
+  index?: number;
 }) {
   const cls = unitClass(unit);
   const st = visibleStats(unit);
   return (
-    <div class={`card unit-row ${onClick ? 'clickable' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick}>
+    <div
+      class={`card unit-row ${onClick ? 'clickable' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${index !== undefined ? 'pop-in' : ''}`}
+      style={index !== undefined ? stagger(index) : undefined}
+      onClick={onClick}
+    >
       <UnitAvatar unit={unit} size="md" animated={animated} friendly={friendly} />
       <div class="info">
         <div class="name">{displayName(unit)}</div>

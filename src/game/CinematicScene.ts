@@ -7,10 +7,13 @@ import { KIND_COLOR } from '@content/weapons';
 import { specialDef } from '@content/skills/specials';
 import { displayName, unitClassName } from '@core/units';
 import { haptic } from '@platform/haptics';
-import type { Pose } from '@art/index';
+import type { CritterPart, Pose } from '@art/index';
+import { weaponDef } from '@content/weapons';
+import { deathSeed, pickDeathVariant, playDeathCine, preloadDeathParts, type DeathCtx } from './deathFx';
 import { ensureTextures, TEX } from './textures';
 import { FONT, WEAPON_COLOR_HEX, hpColor, textStyle } from './style';
 import { bloodBurst, floatText, ghostRise, tween, wait } from './fx';
+import { impactFeel, playAttackFx, weaponKindOfUnit } from './attackFx';
 import { backdropTexKey, ensureBackdropTexture, ensureUnitTextures, hasTexture, unitTexKey, withTimeout } from './svgTextures';
 import { FUR_PALETTES } from '@content/appearance';
 
@@ -61,6 +64,9 @@ export class CinematicScene extends Phaser.Scene {
   private skipped = false;
   private fighters = new Map<string, Fighter>();
   private speed = 1;
+  private blinkTimers: Phaser.Time.TimerEvent[] = [];
+  /** Текстуры частей тела для бойцов, которые погибнут в этом бою (разлёт, хвост в луже). */
+  private parts = new Map<string, Record<CritterPart, string>>();
 
   constructor() {
     super(CINEMATIC_SCENE_KEY);
@@ -152,6 +158,9 @@ export class CinematicScene extends Phaser.Scene {
         ensureBackdropTexture(this, biome.id, rightTerrain, 'right', halfW, h),
         ensureUnitTextures(this, aUnit, 'cine'),
         ensureUnitTextures(this, dUnit, 'cine'),
+        // Части тела только тем, кто погибнет: нужны для разлёта и «хвоста из лужи».
+        event.defenderHpAfter <= 0 ? preloadDeathParts(this, dUnit, 'cine', 1500).then((p) => p && this.parts.set(dUnit.id, p)) : Promise.resolve(),
+        event.attackerHpAfter <= 0 ? preloadDeathParts(this, aUnit, 'cine', 1500).then((p) => p && this.parts.set(aUnit.id, p)) : Promise.resolve(),
       ]),
       ART_WAIT_MS,
     );
@@ -228,6 +237,7 @@ export class CinematicScene extends Phaser.Scene {
     }
 
     this.input.on('pointerdown', this.skip);
+    this.startBlinking([fa, fd]);
 
     // Въезд
     await tween(this, { targets: fade, alpha: 0, duration: 250 / this.speed });
@@ -318,18 +328,29 @@ export class CinematicScene extends Phaser.Scene {
       floatText(this, def.sprite.x, defBodyY - 70, specialDef(strike.defenseSpecial).name, '#8ecae6', sp, { size: 14, rise: 20 });
     }
 
-    // Замах
+    // Хореография по оружию: замах/бросок атакующего и фирменный эффект на цели.
     this.setPose(atk, 'run');
-    await tween(this, { targets: atk.sprite, x: atk.x + dir * 24, duration: 150 / sp, ease: 'Quad.easeIn' });
-    // Снаряд для дальней атаки
-    if (strike.range === 2) {
-      const proj = this.add.circle(atk.sprite.x, atkBodyY, 7, atk.weaponColor).setDepth(15);
-      await tween(this, { targets: proj, x: def.sprite.x, y: defBodyY, duration: 220 / sp, ease: 'Quad.easeIn' });
-      proj.destroy();
-    }
-    // Контакт
-    const shakePx = strike.special ? 8 : 4;
-    this.cameras.main.shake(140 / sp, shakePx / w);
+    const fx = playAttackFx({
+      scene: this,
+      kind: weaponKindOfUnit(atk.unit),
+      attacker: atk.sprite,
+      defender: def.sprite,
+      atkPos: { x: atk.x, y: atkBodyY },
+      defPos: { x: def.sprite.x, y: defBodyY },
+      home: { x: atk.x, y: atk.feetY },
+      dir,
+      speed: sp,
+      special: !!strike.special,
+      effective: strike.effective,
+      damage: strike.damage,
+      size: atk.height,
+      color: atk.weaponColor,
+      skipped: this.skipped,
+    });
+    await fx.impactAt;
+    // Контакт: хит-стоп, зум-удар, тряска по силе удара
+    void w;
+    impactFeel(this, { special: !!strike.special, effective: strike.effective, damage: strike.damage, speed: sp, skipped: this.skipped, heavy: true });
     this.hurt(def, 160 / sp);
     haptic(strike.special ? 'heavy' : 'medium');
     const dmgColor = strike.damage === 0 ? '#bbbbbb' : strike.special ? '#ffd166' : strike.effective ? '#ff6b6b' : '#ffffff';
@@ -366,8 +387,8 @@ export class CinematicScene extends Phaser.Scene {
     });
     this.drawBar(def, topY);
     this.drawBar(atk, topY);
-    // Отход
-    await tween(this, { targets: atk.sprite, x: atk.x, duration: 200 / sp, ease: 'Quad.easeOut' });
+    // Отход (возврат на место — часть хореографии оружия)
+    await fx.done;
     if (!atk.dead) this.setPose(atk, 'idle');
   }
 
@@ -407,28 +428,70 @@ export class CinematicScene extends Phaser.Scene {
     f.dead = false;
     this.setPose(f, 'dead');
     f.dead = true;
-    f.sprite.setTintFill(0xffffff);
-    this.time.delayedCall(80 / sp, () => {
-      if (f.sprite.scene) f.sprite.clearTint();
-    });
-    this.cameras.main.shake(200 / sp, 0.02);
-    bloodBurst(this, f.sprite.x, bodyY, 55, null, 1.8, sp);
     if (isPlayer) haptic('error');
-    const pool = this.add.image(f.sprite.x, f.feetY + 4, TEX.pool).setTint(0xd9122b).setAlpha(0).setDepth(6).setDisplaySize(size * 0.9, size * 0.4);
-    this.tweens.add({ targets: pool, alpha: 0.9, duration: 400 / sp });
-    // Падение: вращение вокруг лап, тело ложится на землю.
-    await tween(this, { targets: f.sprite, angle: f.onLeft ? -90 : 90, alpha: 0.85, duration: 450 / sp, ease: 'Bounce.easeOut' });
+    // Вариант гибели: тот же seed, что и на карте (юнит + ход), с уклоном под оружие убийцы.
+    const killer = [...this.fighters.values()].find((o) => o.id !== f.id);
+    const killerKind = killer ? weaponDef(killer.unit.skills.weapon).kind : undefined;
+    const variant = pickDeathVariant(deathSeed(f.id, this.cine.before.turn), killerKind, classDef(f.unit.classId).moveType);
+    let pooled = false;
+    const ctx: DeathCtx = {
+      scene: this,
+      variant,
+      sprite: f.sprite,
+      unit: f.unit,
+      x: f.sprite.x,
+      y: f.feetY,
+      size,
+      dir: f.onLeft ? -1 : 1,
+      speed: sp,
+      side: f.side,
+      onPool: () => {
+        if (pooled || !this.sys) return;
+        pooled = true;
+        const pool = this.add.image(f.x, f.feetY + 4, TEX.pool).setTint(0xd9122b).setAlpha(0).setDepth(6).setDisplaySize(size * 0.9, size * 0.4);
+        this.tweens.add({ targets: pool, alpha: 0.9, duration: 400 / sp });
+      },
+    };
+    const parts = this.parts.get(f.id);
+    if (parts) ctx.parts = parts;
+    if (killerKind) ctx.killerKind = killerKind;
+    await playDeathCine(ctx);
+    if (!this.sys || !this.sys.isActive()) return;
+    ctx.onPool?.();
     const word = isPlayer ? (unit?.gender === 'f' ? 'ПАЛА' : 'ПАЛ') : unit?.gender === 'f' ? 'ГОТОВА' : 'ГОТОВ';
     const w = this.scale.width;
     const stampText = this.add.text(w / 2, this.scale.height * 0.35, word, textStyle(Math.min(48, w * 0.14), isPlayer ? '#ff4d6d' : '#f1f1f1', true, 7)).setOrigin(0.5).setDepth(45).setScale(2.5).setAlpha(0);
-    const ghost = ghostRise(this, f.sprite.x, bodyY, size * 0.4, sp);
+    const ghost = ghostRise(this, f.x, bodyY, size * 0.4, sp);
     await tween(this, { targets: stampText, scale: 1, alpha: 1, duration: 180 / sp, ease: 'Back.easeIn' });
     await ghost;
     await wait(this, (isPlayer ? 500 : 250) / sp);
   }
 
+  /** Бойцы изредка моргают, пока стоят в позе idle. */
+  private startBlinking(fs: Fighter[]): void {
+    fs.forEach((f, i) => {
+      const tick = (): void => {
+        if (!this.sys || !this.sys.isActive()) return;
+        if (f.pose === 'idle' && !f.dead && !f.hurtTimer) {
+          this.setPose(f, 'blink');
+          this.blinkTimers.push(
+            this.time.delayedCall(110, () => {
+              if (f.pose === 'blink' && !f.dead) this.setPose(f, 'idle');
+            }),
+          );
+        }
+        count++;
+        this.blinkTimers.push(this.time.delayedCall(2600 + ((count * 1237 + i * 911) % 1800), tick));
+      };
+      let count = 0;
+      this.blinkTimers.push(this.time.delayedCall(900 + i * 700, tick));
+    });
+  }
+
   private finish(): void {
     this.input.off('pointerdown', this.skip);
+    for (const t of this.blinkTimers) t.remove(false);
+    this.blinkTimers = [];
     for (const f of this.fighters.values()) f.hurtTimer?.remove(false);
     const resolve = this.cine.resolve;
     this.scene.stop();

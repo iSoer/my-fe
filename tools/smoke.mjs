@@ -5,10 +5,23 @@ const base = process.argv[2] ?? 'http://localhost:4173/my-fe/';
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
+const confirmEndTurn = async () => {
+  await page.waitForTimeout(250);
+  const c = page.getByRole('button', { name: /^Завершить$/ });
+  if (await c.count()) await c.first().click();
+};
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
 
+const geom = async () => {
+  const box = await page.locator('#battle-canvas canvas').boundingBox();
+  const lay = await page.evaluate(() => window.__pf?.layout?.get?.() ?? null);
+  const tile = lay?.tile ?? Math.min(box.width / 6, box.height / 8);
+  const ox = box.x + (lay?.ox ?? (box.width - tile * 6) / 2);
+  const oy = box.y + (lay?.oy ?? (box.height - tile * 8) / 2);
+  return { tile, ox, oy };
+};
 const step = async (name, fn) => {
   try { await fn(); console.log('✓', name); } catch (e) { console.log('✗', name, '—', e.message); await page.screenshot({ path: `/tmp/smoke-fail.png` }); throw e; }
 };
@@ -49,12 +62,8 @@ await step('начать бой', async () => {
   await page.waitForTimeout(1500);
 });
 await step('тап по своему юниту и «Завершить ход»', async () => {
-  const canvas = page.locator('#battle-canvas canvas');
-  const box = await canvas.boundingBox();
-  // нижний ряд, вторая колонка (спавн 1,7)
-  const tile = Math.min(box.width / 6, box.height / 8);
-  const ox = box.x + (box.width - tile * 6) / 2;
-  const oy = box.y + (box.height - tile * 8) / 2;
+  // нижний ряд, вторая колонка (спавн 1,7); раскладку поля берём из отладочного хука
+  const { tile, ox, oy } = await geom();
   await page.mouse.click(ox + tile * 1.5, oy + tile * 7.5);
   await page.waitForTimeout(400);
   await page.screenshot({ path: '/tmp/smoke-selected.png' });
@@ -62,6 +71,7 @@ await step('тап по своему юниту и «Завершить ход»
   if (await cancel.count()) await cancel.first().click();
   await page.waitForTimeout(200);
   await page.getByRole('button', { name: /Завершить ход/ }).first().click();
+  await confirmEndTurn();
   await page.waitForTimeout(6000);
   await page.screenshot({ path: '/tmp/smoke-after-enemy.png' });
 });

@@ -4,12 +4,14 @@ import { MAP_H, MAP_W, posKey } from '@core/types';
 import { terrainAt, unitAt } from '@core/battle/query';
 import { biomeDef } from '@content/biomes';
 import { $save } from '@state/save';
-import { $battleUi, beginDrag, cancelDrag, dragHover, endDrag, isDisplaced, tapTile, type BattleUiState } from '@state/battleUi';
+import { $battleUi, beginDrag, cancelDrag, dragHover, endDrag, isDisplaced, setPressed, tapTile, type BattleUiState } from '@state/battleUi';
+import { $boardInsets, publishBoardLayout } from '@state/boardLayout';
 import { computeLayout, pixelToGrid, tileCenter, tileOrigin, type BoardLayout } from './layout';
-import { ensureTextures } from './textures';
+import { ensureTextures, TEX } from './textures';
 import { HL, TERRAIN_GLYPH, textStyle } from './style';
+import type { BattleResult } from '@core/types';
 import { UnitView } from './UnitView';
-import { bloodDecal, sceneAlive, tween } from './fx';
+import { actorFlash, bloodBurst, bloodDecal, confettiRain, debrisBurst, sceneAlive, tween } from './fx';
 import { haptic } from '@platform/haptics';
 import { ensureTileTextures, ensureUnitTextures, hasTexture, tileTexKey, withTimeout } from './svgTextures';
 
@@ -28,12 +30,28 @@ export class MapScene extends Phaser.Scene {
   private glyphs: Phaser.GameObjects.Text[] = [];
   private wallTexts = new Map<string, Phaser.GameObjects.Text>();
   private decalLayer!: Phaser.GameObjects.Container;
-  private hlG!: Phaser.GameObjects.Graphics;
+  /** Зона опасности (пульсирует) и зона угрозы выбранного врага. */
+  private dangerG!: Phaser.GameObjects.Graphics;
+  private threatG!: Phaser.GameObjects.Graphics;
+  private pulseTweens: Phaser.Tweens.Tween[] = [];
+  /** Подсветка хода/атаки/поддержки: пул тонированных квадратов, появляются «волной». */
+  private hlLayer!: Phaser.GameObjects.Container;
+  private reachPool: Phaser.GameObjects.Image[] = [];
+  private targetPool: Phaser.GameObjects.Image[] = [];
+  private reachSig = '';
+  private targetSig = '';
   private pathG!: Phaser.GameObjects.Graphics;
   private ghost: UnitView | null = null;
   private ghostKey = '';
-  private marker: Phaser.GameObjects.Rectangle | null = null;
-  private markerTween: Phaser.Tweens.Tween | null = null;
+  /** Прицел: четыре скобки по углам клетки цели. */
+  private marker: Phaser.GameObjects.Container | null = null;
+  private markerTweens: Phaser.Tweens.Tween[] = [];
+  private markerKind: 'attack' | 'assist' | 'wall' | '' = '';
+  private lastSelectedId: string | undefined;
+  /** Трещины на хлипких стенах и их HP по данным последней отрисовки. */
+  private cracks = new Map<string, Phaser.GameObjects.Graphics>();
+  private wallHp = new Map<string, number>();
+  private endOverlay: Phaser.GameObjects.GameObject[] = [];
   private unsubSave: (() => void) | null = null;
   private unsubUi: (() => void) | null = null;
   private pendingSync = false;
@@ -44,6 +62,8 @@ export class MapScene extends Phaser.Scene {
   /* ---- Перетаскивание и предпросмотр ---- */
   /** Палец лёг на своего юнита; ждём, сдвинется ли он дальше порога. */
   private armed: { unitId: string; x: number; y: number } | null = null;
+  private captureHandler: ((e: PointerEvent) => void) | null = null;
+  private unsubInsets: (() => void) | null = null;
   /** Юнит в руке. */
   private drag: { unitId: string; view: UnitView; hoverKey: string | null } | null = null;
   /** Юнит, который сейчас шлёпается на клетку (его положение анимируется). */
@@ -64,8 +84,15 @@ export class MapScene extends Phaser.Scene {
     this.tileLayer = this.add.container(0, 0).setDepth(0);
     this.tilesG = this.add.graphics().setDepth(0.2);
     this.decalLayer = this.add.container(0, 0).setDepth(1);
-    this.hlG = this.add.graphics().setDepth(2);
+    this.dangerG = this.add.graphics().setDepth(1.8);
+    this.threatG = this.add.graphics().setDepth(1.85);
+    this.hlLayer = this.add.container(0, 0).setDepth(2);
     this.pathG = this.add.graphics().setDepth(3);
+    // Пульс зоны опасности: графика рисуется в полную силу, а её alpha качается 0.55 ↔ 1.
+    this.pulseTweens.push(
+      this.tweens.add({ targets: this.dangerG, alpha: 0.55, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }),
+      this.tweens.add({ targets: this.threatG, alpha: 0.7, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }),
+    );
     this.relayout();
 
     this.unsubSave = $save.subscribe(() => {
@@ -78,9 +105,29 @@ export class MapScene extends Phaser.Scene {
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
     this.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => this.onPointerUp(p, true));
     this.input.on(Phaser.Input.Events.GAME_OUT, () => {
-      // Палец/курсор ушёл с канваса: юнит в руке возвращается, тап отменяется.
-      if (this.drag) void this.finishDrag(null);
-      this.armed = null;
+      // Курсор ушёл с канваса (например, на DOM-накладку): перетаскивание НЕ обрываем —
+      // юнит остаётся в руке, бросок произойдёт по отпусканию кнопки. Только тап отменяем.
+      if (this.drag) dragHover(null);
+      else this.armed = null;
+    });
+    // Захват указателя канвасом: пока кнопка зажата, события идут в канвас, даже если курсор над DOM-накладками.
+    this.captureHandler = (e: PointerEvent) => {
+      try {
+        this.game.canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    };
+    this.game.canvas.addEventListener('pointerdown', this.captureHandler);
+    this.unsubInsets = $boardInsets.subscribe(() => {
+      if (!sceneAlive(this)) return;
+      this.relayout();
+      const cur = $save.get().battle;
+      if (cur && !this.playing) {
+        this.lastMapRef = null;
+        this.syncFromState(cur);
+      }
+      this.drawHighlights($battleUi.get());
     });
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup, this);
@@ -119,6 +166,13 @@ export class MapScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    if (this.captureHandler) {
+      this.game.canvas.removeEventListener('pointerdown', this.captureHandler);
+      this.captureHandler = null;
+    }
+    this.unsubInsets?.();
+    this.unsubInsets = null;
+    setPressed(null);
     this.unsubSave?.();
     this.unsubUi?.();
     this.unsubSave = null;
@@ -128,6 +182,10 @@ export class MapScene extends Phaser.Scene {
       cancelDrag();
     }
     this.armed = null;
+    for (const t of this.pulseTweens) t.stop();
+    this.pulseTweens = [];
+    for (const t of this.markerTweens) t.stop();
+    this.markerTweens = [];
     this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
   }
 
@@ -179,6 +237,8 @@ export class MapScene extends Phaser.Scene {
     const occ = unitAt(st, pos);
     if (!occ || occ.side !== 'player' || occ.acted || !occ.alive) return;
     this.armed = { unitId: occ.unitId, x: p.x, y: p.y };
+    // Боец зажат: DOM скрывает меню и перестаёт перехватывать курсор.
+    setPressed(occ.unitId);
   }
 
   private onPointerMove(p: Phaser.Input.Pointer): void {
@@ -221,6 +281,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   private onPointerUp(p: Phaser.Input.Pointer, outside = false): void {
+    setPressed(null);
     if (this.drag) {
       const tile = outside ? null : pixelToGrid(this.layout, p.x, p.y);
       void this.finishDrag(tile);
@@ -374,14 +435,17 @@ export class MapScene extends Phaser.Scene {
   }
 
   private relayout(): void {
-    this.layout = computeLayout(this.scale.width, this.scale.height);
+    this.layout = computeLayout(this.scale.width, this.scale.height, $boardInsets.get());
     const key = `${this.layout.tile}:${this.layout.ox}:${this.layout.oy}`;
     if (key !== this.lastLayoutKey) {
       this.lastLayoutKey = key;
       this.lastMapRef = null;
       this.decalCount = -1;
+      this.reachSig = '';
+      this.targetSig = '';
       for (const v of this.units.values()) v.resize(this.layout.tile);
     }
+    publishBoardLayout({ tile: this.layout.tile, ox: this.layout.ox, oy: this.layout.oy, width: this.scale.width, height: this.scale.height });
   }
 
   /* ---------- Публичные помощники для Presenter ---------- */
@@ -467,9 +531,94 @@ export class MapScene extends Phaser.Scene {
     if (kind === 'pool') this.decalCount++;
   }
 
-  setWallHp(pos: Pos, hp: number): void {
-    const t = this.wallTexts.get(posKey(pos));
+  /** Удар по хлипкой стене: число HP, трещины и обломки; при разрушении — крупный разлёт. */
+  setWallHp(pos: Pos, hp: number, speed = 1): void {
+    const key = posKey(pos);
+    const t = this.wallTexts.get(key);
     if (t) t.setText(hp > 0 ? String(hp) : '');
+    const c = this.center(pos);
+    if (hp > 0) {
+      this.drawCrack(pos, hp);
+      debrisBurst(this, c.x, c.y, this.tile, 8, speed);
+    } else {
+      this.cracks.get(key)?.destroy();
+      this.cracks.delete(key);
+      debrisBurst(this, c.x, c.y, this.tile, 18, speed);
+    }
+  }
+
+  /** Трещина на тайле стены; при HP 1 — длиннее и с ответвлениями. */
+  private drawCrack(pos: Pos, hp: number): void {
+    const key = posKey(pos);
+    let g = this.cracks.get(key);
+    if (!g) {
+      g = this.add.graphics().setDepth(0.55);
+      this.cracks.set(key, g);
+    }
+    g.clear();
+    const o = tileOrigin(this.layout, pos);
+    const t = this.layout.tile;
+    g.lineStyle(Math.max(2, t * 0.045), 0x1a1a1a, 0.85);
+    g.beginPath();
+    g.moveTo(o.x + t * 0.45, o.y + t * 0.05);
+    g.lineTo(o.x + t * 0.55, o.y + t * 0.3);
+    g.lineTo(o.x + t * 0.42, o.y + t * 0.48);
+    g.lineTo(o.x + t * 0.58, o.y + t * 0.72);
+    g.lineTo(o.x + t * 0.5, o.y + t * 0.95);
+    g.strokePath();
+    if (hp <= 1) {
+      g.beginPath();
+      g.moveTo(o.x + t * 0.42, o.y + t * 0.48);
+      g.lineTo(o.x + t * 0.2, o.y + t * 0.58);
+      g.lineTo(o.x + t * 0.12, o.y + t * 0.8);
+      g.moveTo(o.x + t * 0.55, o.y + t * 0.3);
+      g.lineTo(o.x + t * 0.78, o.y + t * 0.36);
+      g.lineTo(o.x + t * 0.9, o.y + t * 0.2);
+      g.strokePath();
+    }
+  }
+
+  /** Вспышка под юнитом + подскок: «сейчас действует этот». */
+  flashActor(unitId: string, speed = 1): void {
+    const view = this.units.get(unitId);
+    if (!view || !view.scene) return;
+    actorFlash(this, view.x, view.y + this.tile * 0.36, this.tile, speed);
+    view.hop();
+  }
+
+  /** Финальная заставка боя поверх поля. Остаётся на экране до ухода со сцены. */
+  async showEnd(result: BattleResult, speed = 1): Promise<void> {
+    if (!sceneAlive(this)) return;
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const veil = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x000000, 0).setDepth(60);
+    this.endOverlay.push(veil);
+    this.tweens.add({ targets: veil, fillAlpha: 0.55, duration: 200 / speed });
+    const text = result === 'victory' ? 'ПОБЕДА' : result === 'defeat' ? 'ПОРАЖЕНИЕ' : 'ОТСТУПЛЕНИЕ';
+    const color = result === 'victory' ? '#ffd166' : result === 'defeat' ? '#ff4d6d' : '#cccccc';
+    const size = Math.min(result === 'defeat' ? 46 : 52, w * (result === 'defeat' ? 0.115 : 0.13));
+    const label = this.add.text(w / 2, h * 0.42, text, textStyle(size, color, true, 7)).setOrigin(0.5).setDepth(62).setScale(2.4).setAlpha(0);
+    this.endOverlay.push(label);
+    if (result === 'defeat') {
+      const vignette = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x7a0012, 0).setDepth(61);
+      this.endOverlay.push(vignette);
+      this.tweens.add({ targets: vignette, fillAlpha: 0.28, duration: 900 / speed, ease: 'Sine.easeIn' });
+    }
+    await tween(this, { targets: label, scale: 1, alpha: 1, duration: 260 / speed, ease: 'Back.easeOut' });
+    if (!sceneAlive(this)) return;
+    this.cameras.main.shake(140 / speed, 0.012);
+    if (result === 'victory') confettiRain(this, 30, speed);
+    else if (result === 'defeat') {
+      bloodBurst(this, w / 2, h * 0.42, 60, null, 1.6, speed);
+      for (let i = 0; i < 5; i++) {
+        const x = w * (0.1 + i * 0.2);
+        this.endOverlay.push(bloodDecal(this, x, h * (0.3 + ((i * 37) % 50) / 100), this.tile * 1.4, 'splat', i + 3).setDepth(60.5).setAlpha(0.55));
+      }
+    }
+    await new Promise<void>((resolve) => {
+      if (!sceneAlive(this)) return resolve();
+      this.time.delayedCall(1200 / speed, () => resolve());
+    });
   }
 
   shakeTile(pos: Pos): void {
@@ -491,6 +640,9 @@ export class MapScene extends Phaser.Scene {
     this.glyphs = [];
     for (const t of this.wallTexts.values()) t.destroy();
     this.wallTexts.clear();
+    for (const g of this.cracks.values()) g.destroy();
+    this.cracks.clear();
+    this.wallHp.clear();
     const l = this.layout;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
@@ -519,6 +671,8 @@ export class MapScene extends Phaser.Scene {
           const hp = st.walls[posKey(pos)] ?? 0;
           const t = this.add.text(c.x + l.tile * 0.3, c.y - l.tile * 0.3, hp > 0 ? String(hp) : '', textStyle(l.tile * 0.22, '#ffd166', true, 3)).setOrigin(0.5).setDepth(0.6);
           this.wallTexts.set(posKey(pos), t);
+          this.wallHp.set(posKey(pos), hp);
+          if (hp > 0 && hp < 2) this.drawCrack(pos, hp);
         }
       }
     }
@@ -532,10 +686,10 @@ export class MapScene extends Phaser.Scene {
     for (const [key, t] of this.wallTexts) {
       const hp = st.walls[key] ?? 0;
       const txt = hp > 0 ? String(hp) : '';
-      if (t.text !== txt) {
-        t.setText(txt);
-        if (hp <= 0) changed = true;
-      }
+      if (t.text !== txt) t.setText(txt);
+      const drawn = this.wallHp.get(key) ?? 0;
+      if (drawn > 0 && hp <= 0) changed = true;
+      if (hp > 0 && hp < drawn && !this.cracks.has(key)) this.drawCrack({ x: Number(key.split(',')[0]), y: Number(key.split(',')[1]) }, hp);
     }
     if (changed) {
       this.lastMapRef = st.map;
@@ -638,26 +792,161 @@ export class MapScene extends Phaser.Scene {
     }
   }
 
-  private drawHighlights(ui: BattleUiState): void {
-    if (!this.hlG) return;
-    const g = this.hlG;
-    g.clear();
-    const pg = this.pathG;
-    pg.clear();
+  /* ---------- Подсветки ---------- */
 
+  private tileAt(key: string): Pos | null {
+    const [xs, ys] = key.split(',');
+    const x = Number(xs);
+    const y = Number(ys);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+  }
+
+  /** Квадрат из пула: создаётся по требованию, переиспользуется между перерисовками. */
+  private poolTile(pool: Phaser.GameObjects.Image[], i: number): Phaser.GameObjects.Image {
+    let img = pool[i];
+    if (!img) {
+      img = this.add.image(0, 0, TEX.square).setOrigin(0, 0);
+      this.hlLayer.add(img);
+      pool[i] = img;
+    }
+    return img;
+  }
+
+  private hidePool(pool: Phaser.GameObjects.Image[], from = 0): void {
+    for (let i = from; i < pool.length; i++) {
+      const img = pool[i];
+      if (!img) continue;
+      this.tweens.killTweensOf(img);
+      img.setVisible(false);
+    }
+  }
+
+  /** Разложить квадраты пула по клеткам; при animate они появляются волной по delayFn. */
+  private layTiles(pool: Phaser.GameObjects.Image[], tiles: { key: string; color: number; alpha: number; delay: number }[], animate: boolean): void {
+    const t = this.layout.tile;
+    tiles.forEach((spec, i) => {
+      const pos = this.tileAt(spec.key);
+      const img = this.poolTile(pool, i);
+      if (!pos) {
+        img.setVisible(false);
+        return;
+      }
+      const o = tileOrigin(this.layout, pos);
+      this.tweens.killTweensOf(img);
+      img.setPosition(o.x + 1, o.y + 1).setDisplaySize(t - 2, t - 2).setTint(spec.color).setVisible(true);
+      if (animate) {
+        img.setAlpha(0);
+        this.tweens.add({ targets: img, alpha: spec.alpha, duration: 160, delay: spec.delay, ease: 'Quad.easeOut' });
+      } else img.setAlpha(spec.alpha);
+    });
+    this.hidePool(pool, tiles.length);
+  }
+
+  private drawDanger(ui: BattleUiState): void {
+    const g = this.dangerG;
+    g.clear();
     if (ui.dangerOn) {
       for (const k of ui.dangerTiles) {
-        this.fillTile(g, k, HL.danger, 0.22);
+        this.fillTile(g, k, HL.danger, 0.3);
         this.hatchTile(g, k, HL.danger);
       }
     }
-    if (ui.infoThreat) for (const k of ui.infoThreat) this.fillTile(g, k, HL.threat, 0.3);
-    if (ui.reach && ui.mode !== 'idle' && ui.mode !== 'enemyInfo' && ui.mode !== 'busy') {
-      for (const node of ui.reach.values()) if (node.canStop) this.fillTile(g, posKey(node.pos), HL.reach, 0.35);
-      if (ui.attackTiles) for (const k of ui.attackTiles) this.fillTile(g, k, HL.attack, 0.4);
-      if (ui.assistTiles) for (const k of ui.assistTiles) this.fillTile(g, k, HL.assist, 0.4);
+    const tg = this.threatG;
+    tg.clear();
+    if (ui.infoThreat) for (const k of ui.infoThreat) this.fillTile(tg, k, HL.threat, 0.38);
+  }
+
+  private drawReach(ui: BattleUiState): void {
+    const show = !!ui.reach && ui.mode !== 'idle' && ui.mode !== 'enemyInfo' && ui.mode !== 'busy' && ui.mode !== 'ended';
+    if (!show || !ui.reach) {
+      this.reachSig = '';
+      this.targetSig = '';
+      this.hidePool(this.reachPool);
+      this.hidePool(this.targetPool);
+      return;
     }
+    const reachTiles: { key: string; color: number; alpha: number; delay: number }[] = [];
+    let maxCost = 0;
+    for (const node of ui.reach.values()) {
+      if (!node.canStop) continue;
+      maxCost = Math.max(maxCost, node.cost);
+      reachTiles.push({ key: posKey(node.pos), color: HL.reach, alpha: 0.35, delay: node.cost * 45 });
+    }
+    const reachSig = `${ui.selectedId}:${reachTiles.map((r) => r.key).join('|')}`;
+    if (reachSig !== this.reachSig) {
+      const fresh = !this.reachSig.startsWith(`${ui.selectedId}:`);
+      this.reachSig = reachSig;
+      this.layTiles(this.reachPool, reachTiles, fresh);
+    }
+    const targetTiles: { key: string; color: number; alpha: number; delay: number }[] = [];
+    const after = maxCost * 45 + 60;
+    if (ui.attackTiles) for (const k of ui.attackTiles) targetTiles.push({ key: k, color: HL.attack, alpha: 0.4, delay: after });
+    if (ui.assistTiles) for (const k of ui.assistTiles) targetTiles.push({ key: k, color: HL.assist, alpha: 0.4, delay: after + 40 });
+    const targetSig = `${ui.selectedId}:${ui.mode}:${targetTiles.map((r) => r.key + r.color).join('|')}`;
+    if (targetSig !== this.targetSig) {
+      const fresh = !this.targetSig.startsWith(`${ui.selectedId}:`);
+      this.targetSig = targetSig;
+      this.layTiles(this.targetPool, targetTiles, fresh);
+    }
+  }
+
+  /** Прицел из четырёх скобок: дышит и медленно поворачивается. */
+  private drawMarker(pos: Pos | null, kind: 'attack' | 'assist' | 'wall'): void {
+    if (!pos) {
+      if (this.marker) {
+        for (const t of this.markerTweens) t.stop();
+        this.markerTweens = [];
+        this.marker.destroy();
+        this.marker = null;
+        this.markerKind = '';
+      }
+      return;
+    }
+    const c = this.center(pos);
+    const color = kind === 'attack' ? HL.attack : kind === 'assist' ? HL.assist : 0xffb703;
+    const t = this.tile;
+    if (!this.marker) {
+      const cont = this.add.container(c.x, c.y).setDepth(12);
+      const half = t / 2 - 1;
+      const sz = Math.max(10, t * 0.34);
+      const corners: [number, number, number][] = [
+        [-half, -half, 0],
+        [half, -half, 90],
+        [half, half, 180],
+        [-half, half, 270],
+      ];
+      for (const [x, y, angle] of corners) {
+        const img = this.add.image(x, y, TEX.corner).setOrigin(0, 0).setDisplaySize(sz, sz).setAngle(angle).setTint(color);
+        cont.add(img);
+      }
+      this.marker = cont;
+      this.markerTweens = [
+        this.tweens.add({ targets: cont, scale: 1.12, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }),
+        this.tweens.add({ targets: cont, angle: 90, duration: 4000, repeat: -1, ease: 'Linear' }),
+      ];
+      cont.setAlpha(0);
+      this.tweens.add({ targets: cont, alpha: 1, duration: 120 });
+    } else this.marker.setPosition(c.x, c.y);
+    if (this.markerKind !== kind) {
+      this.markerKind = kind;
+      for (const child of this.marker.list) if (child instanceof Phaser.GameObjects.Image) child.setTint(color);
+    }
+  }
+
+  private drawHighlights(ui: BattleUiState): void {
+    if (!this.hlLayer) return;
+    const pg = this.pathG;
+    pg.clear();
+
+    this.drawDanger(ui);
+    this.drawReach(ui);
     if (ui.path && ui.path.length > 1) this.drawPathArrow(pg, ui.path);
+
+    // Выбрали юнита тапом — подскок
+    if (ui.selectedId !== this.lastSelectedId) {
+      this.lastSelectedId = ui.selectedId;
+      if (ui.selectedId && !ui.dragging && ui.mode === 'unitSelected') this.units.get(ui.selectedId)?.hop();
+    }
 
     // Сам юнит стоит на клетке предпросмотра (или в руке), а на исходной клетке — бледный призрак
     const st = $save.get().battle;
@@ -681,23 +970,20 @@ export class MapScene extends Phaser.Scene {
     // Юнит в руке: подсветка «сюда нельзя»
     if (this.drag && this.drag.view.scene) this.drag.view.setInvalidTint(ui.dragging && !ui.dragValid);
 
-    // Маркер цели
+    // Прицел на цели
     let markerPos: Pos | null = null;
+    let kind: 'attack' | 'assist' | 'wall' = 'attack';
     if (ui.targetId && st) {
       const t = st.units[ui.targetId];
-      if (t) markerPos = t.pos;
-    } else if (ui.wallPos) markerPos = ui.wallPos;
-    if (markerPos) {
-      const c = this.center(markerPos);
-      if (!this.marker) {
-        this.marker = this.add.rectangle(c.x, c.y, this.tile - 4, this.tile - 4).setStrokeStyle(3, 0xffffff, 1).setDepth(12);
-        this.markerTween = this.tweens.add({ targets: this.marker, scale: 1.12, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      } else this.marker.setPosition(c.x, c.y).setSize(this.tile - 4, this.tile - 4).setVisible(true);
-    } else if (this.marker) {
-      this.markerTween?.destroy();
-      this.marker.destroy();
-      this.marker = null;
-      this.markerTween = null;
+      const sel = ui.selectedId ? st.units[ui.selectedId] : undefined;
+      if (t) {
+        markerPos = t.pos;
+        kind = sel && t.side === sel.side ? 'assist' : 'attack';
+      }
+    } else if (ui.wallPos) {
+      markerPos = ui.wallPos;
+      kind = 'wall';
     }
+    this.drawMarker(markerPos, kind);
   }
 }

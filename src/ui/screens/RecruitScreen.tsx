@@ -20,6 +20,7 @@ export function RecruitScreen() {
   const save = useStore($save);
   const [details, setDetails] = useState<{ unit: UnitInstance; source: 'captive' | number } | null>(null);
   const [toastEl, toast] = useToast();
+  const [spin, setSpin] = useState(0);
   const army = save.army;
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export function RecruitScreen() {
   const refresh = () => {
     const r = refreshShelterAction();
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
+    setSpin((k) => k + 1);
     haptic('medium');
   };
 
@@ -49,27 +51,30 @@ export function RecruitScreen() {
       <ArmyTabs active="shelter" />
       <div class="screen-body">
         <p class="muted small">
-          Кандидаты обновляются после каждого боя. Казарма: {army.units.length}/{BARRACKS_CAP}.
+          Кандидаты обновляются после каждого боя. Казарма: <b>{army.units.length}</b>/{BARRACKS_CAP}.
           {full ? ' Казарма полна — отпустите кого-нибудь, чтобы принять нового.' : ''}
         </p>
         {shelter.captive && (
           <>
-            <h3>Пленник</h3>
+            <div class="section-title">⛓️ Пленник</div>
             <UnitRow
               unit={shelter.captive}
               friendly
+              index={0}
               onClick={() => setDetails({ unit: shelter.captive as UnitInstance, source: 'captive' })}
-              tags={<span class="chip red">Бесплатно</span>}
+              tags={<span class="chip gold">Бесплатно</span>}
             />
           </>
         )}
-        <h3>Бродяги</h3>
+        <div class="section-title">🐾 Бродяги</div>
         {shelter.candidates.length === 0 && <p class="muted">Пока никого. Сыграйте бой или обновите список.</p>}
-        {shelter.candidates.map((u, i) => (
-          <UnitRow key={u.id} unit={u} onClick={() => setDetails({ unit: u, source: i })} right={<span class="small">🦴 {recruitCost(u.level)}</span>} />
-        ))}
-        <Button block onClick={refresh} disabled={save.profile.treats < PRICES.shelterRefresh}>
-          🔄 Обновить список (🦴 {PRICES.shelterRefresh})
+        <div class="stack" key={shelter.seed}>
+          {shelter.candidates.map((u, i) => (
+            <UnitRow key={u.id} unit={u} index={i + 1} onClick={() => setDetails({ unit: u, source: i })} right={<span class="small">🦴 {recruitCost(u.level)}</span>} />
+          ))}
+        </div>
+        <Button block icon="🔄" key={spin} class={spin ? 'spin' : ''} onClick={refresh} disabled={save.profile.treats < PRICES.shelterRefresh}>
+          Обновить список (🦴 {PRICES.shelterRefresh})
         </Button>
       </div>
       <BottomSheet open={!!details} onClose={() => setDetails(null)}>

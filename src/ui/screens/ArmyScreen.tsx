@@ -17,10 +17,10 @@ export function ArmyTabs({ active }: { active: 'barracks' | 'shelter' }) {
   return (
     <div class="tabs">
       <button type="button" class={active === 'barracks' ? 'on' : ''} onClick={() => navigate('/army', true)}>
-        Казарма
+        🏠 Казарма
       </button>
       <button type="button" class={active === 'shelter' ? 'on' : ''} onClick={() => navigate('/army/recruit', true)}>
-        Приют
+        🏚️ Приют
       </button>
     </div>
   );
@@ -57,6 +57,7 @@ export function ArmyScreen() {
             <Button
               primary
               big
+              icon="🐾"
               onClick={() => {
                 beginRosterCreation('army');
                 navigate('/army/create');
@@ -85,36 +86,39 @@ export function ArmyScreen() {
       <div class="screen-body">
         <div class="row between">
           <span class="muted small">
-            Бойцов: {army.units.length}/{BARRACKS_CAP} · Отряд: {army.squadIds.length}/{SQUAD_SIZE}
+            Бойцов: <b>{army.units.length}</b>/{BARRACKS_CAP} · Отряд: <b>{army.squadIds.length}</b>/{SQUAD_SIZE}
           </span>
         </div>
-        <div class="sort-row">
+        <div class="seg">
           {sorts.map((s) => (
-            <Button key={s.k} sm ghost={sort !== s.k} onClick={() => setSort(s.k)}>
+            <button key={s.k} type="button" class={sort === s.k ? 'on' : ''} onClick={() => setSort(s.k)}>
               {s.label}
-            </Button>
+            </button>
           ))}
         </div>
-        {units.map((u, i) => {
-          const inSquad = army.squadIds.includes(u.id);
-          const canLearn = learnableNow(u).some((id) => skillCost(id) <= u.sp);
-          return (
-            <UnitRow
-              key={u.id}
-              unit={u}
-              animated={i < 12}
-              onClick={() => navigate(`/army/${u.id}`)}
-              tags={
-                <>
-                  {inSquad && <span class="chip squad">В отряде</span>}
-                  {canLearn && <span class="chip red">Есть навык</span>}
-                </>
-              }
-              right={<span class="muted small">SP {u.sp}</span>}
-            />
-          );
-        })}
-        <Button block onClick={() => navigate('/battle/setup')} primary>
+        <div class="stack" key={sort}>
+          {units.map((u, i) => {
+            const inSquad = army.squadIds.includes(u.id);
+            const canLearn = learnableNow(u).some((id) => skillCost(id) <= u.sp);
+            return (
+              <UnitRow
+                key={u.id}
+                unit={u}
+                index={i}
+                animated={i < 12}
+                onClick={() => navigate(`/army/${u.id}`)}
+                tags={
+                  <>
+                    {inSquad && <span class="chip squad pop">В отряде</span>}
+                    {canLearn && <span class="chip red pop">Есть навык</span>}
+                  </>
+                }
+                right={<span class="muted small">SP {u.sp}</span>}
+              />
+            );
+          })}
+        </div>
+        <Button block icon="⚔️" onClick={() => navigate('/battle/setup')} primary>
           К подготовке боя
         </Button>
       </div>

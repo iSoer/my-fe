@@ -20,6 +20,7 @@ import { StatBar, StatsGrid } from '../components/Stats';
 import { BottomSheet, ConfirmModal } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { STAT_LABELS, fmtGains, speciesName } from '../lib/format';
+import { useReplay } from '../lib/animate';
 import { haptic } from '@platform/haptics';
 
 const SLOT_NAMES: Record<keyof UnitSkills, string> = {
@@ -30,6 +31,7 @@ const SLOT_NAMES: Record<keyof UnitSkills, string> = {
   b: 'Навык B',
   c: 'Навык C',
 };
+const SLOT_ICONS: Record<keyof UnitSkills, string> = { weapon: '⚔️', assist: '🤝', special: '✨', a: 'A', b: 'B', c: 'C' };
 const SLOTS: (keyof UnitSkills)[] = ['weapon', 'assist', 'special', 'a', 'b', 'c'];
 
 export function UnitScreen({ unitId }: { unitId: string }) {
@@ -37,12 +39,19 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   const [slot, setSlot] = useState<keyof UnitSkills | null>(null);
   const [release, setRelease] = useState<0 | 1 | 2>(0);
   const [toastEl, toast] = useToast();
+  const [bounceKey, replayBounce] = useReplay();
+  const [happy, setHappy] = useState(false);
   const army = save.army;
   const unit = army?.units.find((u) => u.id === unitId);
 
   useEffect(() => {
     if (!unit) navigate('/army', true);
   }, [unit]);
+  useEffect(() => {
+    if (!happy) return;
+    const t = setTimeout(() => setHappy(false), 1400);
+    return () => clearTimeout(t);
+  }, [happy, bounceKey]);
   if (!unit || !army) return <div class="screen" />;
 
   const cls = unitClass(unit);
@@ -53,23 +62,31 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   const sCost = sharpenCost(unit.weaponTier);
   const learnable = learnableNow(unit);
 
+  const celebrate = (): void => {
+    replayBounce();
+    setHappy(true);
+  };
+
   const onTrain = () => {
     const gains = levelGains(unit, unit.level, unit.level + 1);
     const r = trainUnitAction(unit.id);
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
     haptic('success');
+    celebrate();
     toast(`Уровень ${unit.level + 1}! ${fmtGains(gains)}`);
   };
   const onSharpen = () => {
     const r = sharpenAction(unit.id);
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
     haptic('medium');
+    celebrate();
     toast('Оружие заточено');
   };
   const onSquad = () => {
     const r = toggleSquad(unit.id);
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
     haptic('select');
+    replayBounce();
   };
   const onRelease = () => {
     const r = releaseUnit(unit.id);
@@ -101,6 +118,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     const r = learnSkillAction(unit.id, id);
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
     haptic('success');
+    celebrate();
     toast(`Изучено: ${skillInfo(id)?.name ?? id}`);
   };
   const onEquip = (s: keyof UnitSkills, id: string | undefined) => {
@@ -114,8 +132,10 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     <div class="screen">
       <TopBar title={displayName(unit)} right={<ResourceBar />} onBack={() => navigate('/army', true)} />
       <div class="screen-body">
-        <div class="card row">
-          <UnitAvatar unit={unit} size="xl" />
+        <div class="card row pop-in">
+          <span key={bounceKey} class={`avatar-wrap ${bounceKey ? 'bounce' : ''}`}>
+            <UnitAvatar unit={unit} size="xl" pose={happy ? 'happy' : 'idle'} />
+          </span>
           <div class="grow stack" style={{ gap: 4, minWidth: 0 }}>
             <div class="muted small">
               {speciesName(unit)} · {breedDef(unit.breedId).name} · {unitClassName(unit)}
@@ -123,32 +143,37 @@ export function UnitScreen({ unitId }: { unitId: string }) {
             <div class="row wrap">
               <RarityStars rarity={unit.rarity} />
               <b>Ур. {unit.level}</b>
-              <span class="muted small">SP {unit.sp}</span>
+              {inSquad && <span class="chip squad pop">В отряде</span>}
             </div>
             <div class="row wrap">
               <MoveBadge moveType={cls.moveType} />
               <WeaponBadge kind={cls.weaponKind} />
-              {inSquad && <span class="chip squad">В отряде</span>}
             </div>
-            <StatBar value={unit.xp} max={100} kind="xp" />
-            <div class="muted small">XP {unit.xp}/100</div>
+            <StatBar value={unit.xp} max={100} kind="xp" animate />
+            <div class="row between small muted">
+              <span>XP {unit.xp}/100</span>
+              <span class="gold">SP {unit.sp}</span>
+            </div>
           </div>
         </div>
 
-        <div class="card stack">
+        <div class="card stack pop-in" style={{ animationDelay: '60ms' }}>
           <div class="row between">
             <b>Характеристики</b>
-            <span class="muted small">Mt оружия {weaponMt(unit)}{unit.weaponTier ? ` (заточка ${'I'.repeat(unit.weaponTier)})` : ''}</span>
+            <span class="muted small">
+              Mt оружия {weaponMt(unit)}
+              {unit.weaponTier ? ` · заточка ${'I'.repeat(unit.weaponTier)}` : ''}
+            </span>
           </div>
-          <StatsGrid stats={stats} asset={unit.asset} flaw={unit.flaw} />
+          <StatsGrid stats={stats} asset={unit.asset} flaw={unit.flaw} animate />
           <div class="stack" style={{ gap: 4 }}>
-            {STATS.map((s) => (
+            {STATS.map((s, i) => (
               <div key={s} class="row small">
                 <span class="muted" style={{ width: 32 }}>
                   {STAT_LABELS[s]}
                 </span>
                 <div class="grow">
-                  <StatBar value={unit.growths[s]} max={100} kind="xp" />
+                  <StatBar value={unit.growths[s]} max={100} kind="growth" animate delay={120 + i * 60} />
                 </div>
                 <span class="muted" style={{ width: 36, textAlign: 'right' }}>
                   {unit.growths[s]}%
@@ -160,38 +185,42 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         </div>
 
         {trait && (
-          <div class="card">
-            <b>Особенность: {trait.name}</b>
+          <div class="card pop-in" style={{ animationDelay: '100ms' }}>
+            <b>★ Особенность: {trait.name}</b>
             <div class="muted small">{trait.desc}</div>
           </div>
         )}
 
-        <div class="card stack">
+        <div class="card stack pop-in" style={{ animationDelay: '140ms' }}>
           <b>Навыки</b>
           {SLOTS.map((s) => {
             const id = unit.skills[s];
             const info = id ? skillInfo(id) : undefined;
             const hasLearnable = learnable.some((l) => slotOf(l) === s && skillCost(l) <= unit.sp);
+            const letter = s === 'a' || s === 'b' || s === 'c';
             return (
               <div key={s} class="slot" onClick={() => setSlot(s)}>
-                <span class="slot-name">{SLOT_NAMES[s]}</span>
-                <span class={`slot-value ${info ? '' : 'empty'}`}>{info?.name ?? '— пусто —'}</span>
-                {hasLearnable && <span class="chip red">Новое</span>}
+                <span class={`slot-ico ${letter ? 'letter' : ''}`}>{SLOT_ICONS[s]}</span>
+                <span class="slot-text">
+                  <div class="slot-name">{SLOT_NAMES[s]}</div>
+                  <div class={`slot-value ${info ? '' : 'empty'}`}>{info?.name ?? '— пусто —'}</div>
+                </span>
+                {hasLearnable && <span class="chip red pop">Новое</span>}
                 <span class="muted">›</span>
               </div>
             );
           })}
         </div>
 
-        <div class="card stack">
+        <div class="card stack pop-in" style={{ animationDelay: '180ms' }}>
           <b>Прокачка</b>
-          <Button block onClick={onTrain} disabled={unit.level >= 40 || save.profile.treats < tCost}>
-            🏋️ Тренировка: +1 уровень {unit.level >= 40 ? '(максимум)' : `(🦴 ${tCost})`}
+          <Button block icon="🏋️" onClick={onTrain} disabled={unit.level >= 40 || save.profile.treats < tCost}>
+            Тренировка: +1 уровень {unit.level >= 40 ? '(максимум)' : `(🦴 ${tCost})`}
           </Button>
-          <Button block onClick={onSharpen} disabled={sCost === null || save.profile.treats < sCost}>
-            🔪 Заточить оружие {sCost === null ? '(предел)' : `(🦴 ${sCost}, Mt +2)`}
+          <Button block icon="🔪" onClick={onSharpen} disabled={sCost === null || save.profile.treats < sCost}>
+            Заточить оружие {sCost === null ? '(предел)' : `(🦴 ${sCost}, Mt +2)`}
           </Button>
-          <Button block primary={!inSquad} onClick={onSquad}>
+          <Button block primary={!inSquad} icon={inSquad ? '↩️' : '🛡️'} onClick={onSquad}>
             {inSquad ? 'Убрать из отряда' : 'В отряд'}
           </Button>
           <Button block danger onClick={() => setRelease(1)}>
@@ -199,17 +228,29 @@ export function UnitScreen({ unitId }: { unitId: string }) {
           </Button>
         </div>
 
-        <div class="card stack">
+        <div class="card stack pop-in" style={{ animationDelay: '220ms' }}>
           <b>История</b>
-          <div class="muted small">
-            Боёв: {unit.history.battles} · Убийств: {unit.history.kills} · Урона нанесено: {unit.history.damageDealt} · Получено: {unit.history.damageTaken}
-            {unit.history.closestCall < 999 ? ` · Ближе всего к смерти: ${unit.history.closestCall} HP` : ''}
+          <div class="stats-table">
+            <span class="k">Боёв</span>
+            <span class="v">{unit.history.battles}</span>
+            <span class="k">Убийств</span>
+            <span class="v">{unit.history.kills}</span>
+            <span class="k">Урона нанесено</span>
+            <span class="v">{unit.history.damageDealt}</span>
+            <span class="k">Урона получено</span>
+            <span class="v">{unit.history.damageTaken}</span>
+            {unit.history.closestCall < 999 && (
+              <>
+                <span class="k">Ближе всего к смерти</span>
+                <span class="v danger">{unit.history.closestCall} HP</span>
+              </>
+            )}
           </div>
           <p class="muted small">«{personalityText(unit.personalityId)}»</p>
         </div>
       </div>
 
-      <BottomSheet open={!!slot} onClose={() => setSlot(null)} title={slot ? SLOT_NAMES[slot] : ''}>
+      <BottomSheet open={!!slot} onClose={() => setSlot(null)} title={slot ? `${SLOT_ICONS[slot]} ${SLOT_NAMES[slot]}` : ''}>
         {slot && (
           <div class="stack">
             {slotOptions(slot).map(({ id, state }) => {
@@ -217,10 +258,10 @@ export function UnitScreen({ unitId }: { unitId: string }) {
               if (!info) return null;
               const cost = skillCost(id);
               return (
-                <div key={id} class="skill-item">
+                <div key={id} class={`skill-item ${state === 'equipped' ? 'equipped' : ''}`}>
                   <div class="txt">
                     <div>
-                      {info.name} {state === 'equipped' && <span class="chip squad">Экипирован</span>}
+                      <b>{info.name}</b> {state === 'equipped' && <span class="chip squad">Экипирован</span>}
                     </div>
                     <div class="desc">{info.desc}</div>
                   </div>
@@ -243,7 +284,9 @@ export function UnitScreen({ unitId }: { unitId: string }) {
                 Снять
               </Button>
             )}
-            <p class="muted small">SP: {unit.sp}. Очки навыков копятся в боях.</p>
+            <p class="muted small">
+              SP: <b class="gold">{unit.sp}</b>. Очки навыков копятся в боях.
+            </p>
           </div>
         )}
       </BottomSheet>

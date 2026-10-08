@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { TerrainId, UnitInstance } from '@core/types';
-import { backdropSvg, svgToImage, tileSvg, unitArtKey, unitSvg, type Pose } from '@art/index';
+import { backdropSvg, svgToImage, tileSvg, unitArtKey, unitPartSvg, unitSvg, CRITTER_PARTS, type CritterPart, type Pose } from '@art/index';
 
 /** Размеры растеризации миниатюр (пропорция VIEW 120:140). */
 export const UNIT_TEX_SIZE = {
@@ -10,8 +10,8 @@ export const UNIT_TEX_SIZE = {
 export type UnitTexSize = keyof typeof UNIT_TEX_SIZE;
 
 export const TILE_TEX_PX = 128;
-export const MAP_POSES: readonly Pose[] = ['idle', 'run', 'hurt', 'dead', 'carried'];
-export const CINE_POSES: readonly Pose[] = ['idle', 'run', 'hurt', 'dead', 'happy'];
+export const MAP_POSES: readonly Pose[] = ['idle', 'run', 'hurt', 'dead', 'carried', 'blink'];
+export const CINE_POSES: readonly Pose[] = ['idle', 'run', 'hurt', 'dead', 'happy', 'blink'];
 export const TERRAINS: readonly TerrainId[] = ['plain', 'forest', 'mountain', 'water', 'wall', 'wall_breakable', 'cover'];
 
 const inflight = new Map<string, Promise<string>>();
@@ -61,6 +61,24 @@ export function ensureUnitTexture(scene: Phaser.Scene, unit: UnitInstance, pose:
 
 export function ensureUnitTextures(scene: Phaser.Scene, unit: UnitInstance, size: UnitTexSize, poses: readonly Pose[] = size === 'cine' ? CINE_POSES : MAP_POSES): Promise<string[]> {
   return Promise.all(poses.map((p) => ensureUnitTexture(scene, unit, p, size)));
+}
+
+/* ---------- Части тела (разлёт при гибели) ---------- */
+
+export function unitPartTexKey(unit: UnitInstance, part: CritterPart, size: UnitTexSize): string {
+  return `up:${unitArtKey(unit, 'dead')}:${part}:${size}`;
+}
+
+/** Текстуры частей тела в том же viewBox, что и целая миниатюра: накладываются на спрайт 1:1. */
+export function ensureUnitPartTextures(scene: Phaser.Scene, unit: UnitInstance, size: UnitTexSize): Promise<Record<CritterPart, string>> {
+  const px = UNIT_TEX_SIZE[size];
+  const out = {} as Record<CritterPart, string>;
+  return Promise.all(
+    CRITTER_PARTS.map(async (part) => {
+      const key = unitPartTexKey(unit, part, size);
+      out[part] = hasTexture(scene, key) ? key : await ensureTexture(scene, key, unitPartSvg(unit, part), px.w, px.h);
+    }),
+  ).then(() => out);
 }
 
 /* ---------- Тайлы ---------- */

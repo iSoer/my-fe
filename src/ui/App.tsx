@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
-import { $route } from '@state/router';
+import { $route, type Route } from '@state/router';
 import { $conflict, $saveError, $saveStatus, resolveConflict } from '@state/save';
 import { MenuScreen } from './screens/MenuScreen';
 import { ArmyCreateScreen } from './screens/ArmyCreateScreen';
@@ -32,7 +32,7 @@ function Splash({ onStart, ready }: { onStart: () => void; ready: boolean }) {
           ))}
         </div>
         <h1>Пушистая Резня</h1>
-        <p class="muted">Тактика про котиков и собачек. Милая и кровавая.</p>
+        <p class="muted">Тактика про котиков, собачек и мышек. Милая и кровавая.</p>
       </div>
       <p class="splash-hint">{ready ? 'Нажмите, чтобы начать' : 'Загрузка…'}</p>
     </div>
@@ -44,7 +44,7 @@ function ConflictScreen() {
   if (!c) return null;
   return (
     <div class="screen center">
-      <div class="card stack">
+      <div class="card stack pop-in">
         <h2>Найден прогресс с другого устройства</h2>
         <p class="muted">
           В облаке: {fmtDate(c.cloud.updatedAt)}, бойцов: {c.cloud.army?.units.length ?? 0}, Славы: {c.cloud.profile.glory}.
@@ -52,17 +52,22 @@ function ConflictScreen() {
         <p class="muted">
           Здесь: {fmtDate(c.local.updatedAt)}, бойцов: {c.local.army?.units.length ?? 0}, Славы: {c.local.profile.glory}.
         </p>
-        <Button primary onClick={() => resolveConflict('cloud')}>
+        <Button primary icon="☁️" onClick={() => resolveConflict('cloud')}>
           Загрузить из облака
         </Button>
-        <Button onClick={() => resolveConflict('local')}>Оставить этот</Button>
+        <Button icon="📱" onClick={() => resolveConflict('local')}>
+          Оставить этот
+        </Button>
       </div>
     </div>
   );
 }
 
-function Router() {
-  const route = useStore($route);
+function routeKey(r: Route): string {
+  return r.name === 'unit' ? `unit:${r.unitId}` : r.name;
+}
+
+function Screen({ route }: { route: Route }) {
   switch (route.name) {
     case 'menu':
       return <MenuScreen />;
@@ -89,6 +94,16 @@ function Router() {
   }
 }
 
+function Router() {
+  const route = useStore($route);
+  // key пересоздаёт контейнер при смене маршрута — проигрывается CSS-переход route-in
+  return (
+    <div class="route" key={routeKey(route)}>
+      <Screen route={route} />
+    </div>
+  );
+}
+
 export function App() {
   const status = useStore($saveStatus);
   const err = useStore($saveError);
@@ -98,7 +113,12 @@ export function App() {
     return (
       <>
         <Splash ready={status === 'ready'} onStart={() => setStarted(true)} />
-        {err && <div class="toast toast-error">Сейв повреждён: {err}. Начат новый.</div>}
+        {err && (
+          <div class="toast toast-error">
+            <span class="ico">✕</span>
+            <span>Сейв повреждён: {err}. Начат новый.</span>
+          </div>
+        )}
       </>
     );
   }

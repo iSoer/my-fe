@@ -16,45 +16,46 @@ import { BottomSheet } from '../components/Sheet';
 import { UnitDetails } from '../components/UnitDetails';
 import { useToast } from '../components/Toast';
 import { MOVE_EMOJI } from '../lib/format';
+import { stagger, useReplay } from '../lib/animate';
 import { haptic } from '@platform/haptics';
 
-function RosterCard({ unit, selected, onClick }: { unit: UnitInstance; selected: boolean; onClick: () => void }) {
+function RosterCard({ unit, selected, onClick, index }: { unit: UnitInstance; selected: boolean; onClick: () => void; index: number }) {
   const cls = unitClass(unit);
   const st = visibleStats(unit);
   const trait = unit.traitId ? traitDef(unit.traitId) : undefined;
   return (
-    <div class={`card clickable stack ${selected ? 'selected' : ''}`} style={{ gap: 6 }} onClick={onClick}>
+    <div class={`card clickable stack roster-card pop-in ${selected ? 'selected' : ''}`} style={stagger(index, 50)} onClick={onClick}>
+      {selected && <span class="check">✓</span>}
       <div class="row">
-        <UnitAvatar unit={unit} size="md" />
+        <UnitAvatar unit={unit} size="md" pose={selected ? 'happy' : 'idle'} />
         <div class="grow" style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(unit)}</div>
+          <div class="name">{displayName(unit)}</div>
           <RarityStars rarity={unit.rarity} />
+          <div class="muted small">
+            {MOVE_EMOJI[cls.moveType]} {unitClassName(unit)}
+          </div>
         </div>
-        {selected && <span class="chip squad">✓</span>}
-      </div>
-      <div class="muted small">
-        {MOVE_EMOJI[cls.moveType]} {unitClassName(unit)}
       </div>
       <WeaponBadge kind={cls.weaponKind} />
-      <div class="mini-stats" style={{ flexWrap: 'wrap' }}>
+      <div class="stats-mini">
         <span>
-          HP <b>{st.hp}</b>
+          <b>{st.hp}</b>HP
         </span>
         <span>
-          Atk <b>{st.atk}</b>
+          <b>{st.atk}</b>Atk
         </span>
         <span>
-          Spd <b>{st.spd}</b>
+          <b>{st.spd}</b>Spd
         </span>
         <span>
-          Def <b>{st.def}</b>
+          <b>{st.def}</b>Def
         </span>
         <span>
-          Res <b>{st.res}</b>
+          <b>{st.res}</b>Res
         </span>
       </div>
-      {trait && <div class="small">★ {trait.name}</div>}
-      <div class="muted small">
+      {trait && <div class="trait">★ {trait.name}</div>}
+      <div class="skills">
         {Object.values(unit.skills)
           .filter((id): id is string => !!id)
           .map((id) => skillInfo(id)?.name)
@@ -71,6 +72,8 @@ export function ArmyCreateScreen() {
   const [selected, setSelected] = useState<string[]>([]);
   const [details, setDetails] = useState<UnitInstance | null>(null);
   const [toastEl, toast] = useToast();
+  const [counterKey, replayCounter] = useReplay();
+  const [spinKey, setSpinKey] = useState(0);
   const pr = save.pendingRoster;
 
   useEffect(() => {
@@ -84,16 +87,19 @@ export function ArmyCreateScreen() {
 
   const cost = currentRerollCost(save);
   const canReroll = save.profile.glory >= cost;
+  const full = selected.length === SQUAD_SIZE;
 
   const toggle = (id: string) => {
     haptic('select');
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= SQUAD_SIZE ? s : [...s, id]));
+    replayCounter();
   };
 
   const onReroll = () => {
     const r = rerollRoster();
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
     setSelected([]);
+    setSpinKey((k) => k + 1);
     haptic('medium');
   };
 
@@ -108,19 +114,24 @@ export function ArmyCreateScreen() {
     <div class="screen">
       <TopBar title="Соберите отряд" right={<ResourceBar />} onBack={() => navigate('/', true)} />
       <div class="screen-body">
-        <p class="muted">
-          Выберите {SQUAD_SIZE} из {roster.length}. Остальные уйдут в закат. Выбрано: <b>{selected.length}/{SQUAD_SIZE}</b>
-        </p>
-        <div class="grid-2">
-          {roster.map((u) => (
-            <RosterCard key={u.id} unit={u} selected={selected.includes(u.id)} onClick={() => setDetails(u)} />
+        <div class="row between">
+          <p class="muted small">
+            Выберите {SQUAD_SIZE} из {roster.length}. Остальные уйдут в закат.
+          </p>
+          <span key={counterKey} class={`pick-counter pulse-once ${full ? 'full' : ''}`}>
+            {full ? '✓' : '🐾'} {selected.length}/{SQUAD_SIZE}
+          </span>
+        </div>
+        <div class="grid-2" key={pr.rerolls}>
+          {roster.map((u, i) => (
+            <RosterCard key={u.id} unit={u} index={i} selected={selected.includes(u.id)} onClick={() => setDetails(u)} />
           ))}
         </div>
-        <div class="row">
-          <Button block onClick={onReroll} disabled={!canReroll} title={canReroll ? '' : 'Недостаточно Славы'}>
-            🔀 Перемешать {cost === 0 ? '(бесплатно)' : `✦${cost}`}
+        <div class="row sticky-actions">
+          <Button block icon="🔀" class={spinKey ? 'spin' : ''} key={spinKey} onClick={onReroll} disabled={!canReroll} title={canReroll ? '' : 'Недостаточно Славы'}>
+            Перемешать {cost === 0 ? '(бесплатно)' : `✦${cost}`}
           </Button>
-          <Button block primary onClick={onConfirm} disabled={selected.length !== SQUAD_SIZE}>
+          <Button block primary glow={full} big={full} onClick={onConfirm} disabled={!full}>
             Подтвердить
           </Button>
         </div>

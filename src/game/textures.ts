@@ -8,6 +8,8 @@ export const TEX = {
   pool: 'tex_pool',
   splat: 'tex_splat',
   square: 'tex_square',
+  corner: 'tex_corner',
+  star: 'tex_star',
 } as const;
 
 /** Плейсхолдерные текстуры, рисуются один раз на Graphics. */
@@ -49,6 +51,23 @@ export function ensureTextures(scene: Phaser.Scene): void {
   g.fillCircle(30, 40, 7);
   g.fillCircle(44, 14, 6);
   g.generateTexture(TEX.pool, 64, 48);
+
+  // Уголок прицела (L-образная скобка), 32×32, толщина 6
+  g.clear();
+  g.fillStyle(0xffffff, 1);
+  g.fillRoundedRect(0, 0, 32, 7, 3);
+  g.fillRoundedRect(0, 0, 7, 32, 3);
+  g.generateTexture(TEX.corner, 32, 32);
+
+  // Звёздочка-искра (четырёхлучевая)
+  g.clear();
+  g.fillStyle(0xffffff, 1);
+  g.fillTriangle(8, 0, 10, 6, 6, 6);
+  g.fillTriangle(8, 16, 10, 10, 6, 10);
+  g.fillTriangle(0, 8, 6, 6, 6, 10);
+  g.fillTriangle(16, 8, 10, 6, 10, 10);
+  g.fillCircle(8, 8, 2.5);
+  g.generateTexture(TEX.star, 16, 16);
 
   // Брызг
   g.clear();

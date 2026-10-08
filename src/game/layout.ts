@@ -9,13 +9,38 @@ export interface BoardLayout {
   height: number;
 }
 
-/** Размер клетки = floor(min(w/6, h/8)); доска центрируется. */
-export function computeLayout(width: number, height: number): BoardLayout {
-  const tile = Math.max(12, Math.floor(Math.min(width / MAP_W, height / MAP_H)));
+/**
+ * Поле вписывается между верхним HUD (insets.top) и нижней карточкой (insets.bottom),
+ * чтобы накладки не закрывали клетки. Внутри доступной области доска смещена чуть вверх (ratio).
+ * Если область слишком мала, отступы пропорционально ужимаются, но доска никогда не выходит за канвас.
+ */
+export const LAYOUT_BIAS = { ratio: 0.4, minTile: 36 } as const;
+
+export interface LayoutInsets {
+  top: number;
+  bottom: number;
+}
+
+export function computeLayout(width: number, height: number, insets: LayoutInsets = { top: 84, bottom: 150 }): BoardLayout {
+  let top = Math.max(0, insets.top);
+  let bottom = Math.max(0, insets.bottom);
+  let avail = height - top - bottom;
+  // На очень низких экранах отступы ужимаем, чтобы клетка не стала микроскопической.
+  if (avail / MAP_H < LAYOUT_BIAS.minTile) {
+    const need = LAYOUT_BIAS.minTile * MAP_H;
+    const scale = Math.max(0, (height - need) / Math.max(1, top + bottom));
+    top = Math.floor(top * Math.min(1, scale));
+    bottom = Math.floor(bottom * Math.min(1, scale));
+    avail = height - top - bottom;
+  }
+  const tile = Math.max(12, Math.floor(Math.min(width / MAP_W, avail / MAP_H)));
+  const boardH = tile * MAP_H;
+  const slack = Math.max(0, avail - boardH);
+  const oy = top + Math.round(slack * LAYOUT_BIAS.ratio);
   return {
     tile,
     ox: Math.floor((width - tile * MAP_W) / 2),
-    oy: Math.floor((height - tile * MAP_H) / 2),
+    oy,
     width,
     height,
   };

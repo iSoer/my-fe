@@ -64,11 +64,14 @@ export function SettingsScreen() {
     navigate('/', true);
   };
 
+  const wins = save.profile.wins;
+
   return (
     <div class="screen">
       <TopBar title="Настройки" onBack={() => navigate('/', true)} />
       <div class="screen-body">
-        <div class="card">
+        <div class="card pop-in">
+          <div class="section-title">🔊 Звук и отклик</div>
           <div class="setting">
             <div class="row">
               <span>Музыка</span>
@@ -89,6 +92,10 @@ export function SettingsScreen() {
               <Switch on={s.haptics} onChange={(v) => set({ haptics: v })} />
             </div>
           </div>
+        </div>
+
+        <div class="card pop-in" style={{ animationDelay: '60ms' }}>
+          <div class="section-title">⚔️ Бой</div>
           <div class="setting">
             <span>Скорость анимаций</span>
             <Seg
@@ -143,21 +150,21 @@ export function SettingsScreen() {
           </div>
         </div>
 
-        <div class="card stack">
-          <h3>Сейв</h3>
-          <Button block onClick={() => setExportCode(exportSaveCode())}>
+        <div class="card stack pop-in" style={{ animationDelay: '120ms' }}>
+          <div class="section-title">💾 Сейв</div>
+          <Button block icon="📤" onClick={() => setExportCode(exportSaveCode())}>
             Экспортировать код сейва
           </Button>
           {exportCode && (
             <>
               <textarea readOnly value={exportCode} onClick={(e) => (e.target as HTMLTextAreaElement).select()} />
-              <Button block sm onClick={() => void copy(exportCode)}>
+              <Button block sm icon="📋" onClick={() => void copy(exportCode)}>
                 Скопировать
               </Button>
             </>
           )}
           <textarea placeholder="Вставьте код сейва для импорта" value={importCode} onInput={(e) => setImportCode((e.target as HTMLTextAreaElement).value)} />
-          <Button block onClick={doImport} disabled={!importCode.trim()}>
+          <Button block icon="📥" onClick={doImport} disabled={!importCode.trim()}>
             Импортировать
           </Button>
           <Button block danger onClick={() => setResetOpen(true)}>
@@ -165,14 +172,29 @@ export function SettingsScreen() {
           </Button>
         </div>
 
-        <div class="card stack">
-          <h3>Статистика</h3>
-          <div class="muted small">
-            Боёв: {save.stats.battles} · Побед: {save.stats.wins} · Убийств: {save.stats.kills} · Потерь: {save.stats.deaths} · Армий потеряно: {save.stats.armiesLost} · Армий создано:{' '}
-            {save.profile.armiesCreated}
-          </div>
-          <div class="muted small">
-            Побед по сложностям: Легко {save.profile.wins.easy}, Нормально {save.profile.wins.normal}, Сложно {save.profile.wins.hard}, Кошмар {save.profile.wins.nightmare}
+        <div class="card stack pop-in" style={{ animationDelay: '180ms' }}>
+          <div class="section-title">📊 Статистика</div>
+          <div class="stats-table">
+            <span class="k">Боёв</span>
+            <span class="v">{save.stats.battles}</span>
+            <span class="k">Побед</span>
+            <span class="v">{save.stats.wins}</span>
+            <span class="k">Убийств</span>
+            <span class="v">{save.stats.kills}</span>
+            <span class="k">Потерь</span>
+            <span class="v">{save.stats.deaths}</span>
+            <span class="k">Армий создано</span>
+            <span class="v">{save.profile.armiesCreated}</span>
+            <span class="k">Армий потеряно</span>
+            <span class="v">{save.stats.armiesLost}</span>
+            <span class="k">Побед: Легко / Нормально</span>
+            <span class="v">
+              {wins.easy} / {wins.normal}
+            </span>
+            <span class="k">Побед: Сложно / Кошмар</span>
+            <span class="v">
+              {wins.hard} / {wins.nightmare}
+            </span>
           </div>
         </div>
 

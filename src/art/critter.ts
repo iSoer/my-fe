@@ -5,7 +5,7 @@
 import { BLUSH, INK, NOSE, shade, type FurArt } from './palettes';
 
 export type ArtSpecies = 'cat' | 'dog' | 'mouse';
-export type Pose = 'idle' | 'run' | 'hurt' | 'dead' | 'happy' | 'carried';
+export type Pose = 'idle' | 'run' | 'hurt' | 'dead' | 'happy' | 'carried' | 'blink';
 export type ArtMoveType = 'infantry' | 'armor' | 'cavalry' | 'flier';
 export type ArtWeapon = 'claw' | 'fang' | 'stick' | 'hiss' | 'howl' | 'growl' | 'slingshot' | 'burr' | 'bandage' | 'purr';
 
@@ -85,6 +85,10 @@ function eyesGroup(a: CritterArt, pose: Pose): string {
   if (pose === 'hurt') {
     return `<g fill="none" stroke="${INK}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M38 ${cy - 6} l10 6 l-10 6" /><path d="M82 ${cy - 6} l-10 6 l10 6" /></g>${brows}`;
+  }
+  if (pose === 'blink' && !a.animated) {
+    return `<g fill="none" stroke="${INK}" stroke-width="3.2" stroke-linecap="round">
+      <path d="M37 ${cy + 1} q8 3 16 0" /><path d="M67 ${cy + 1} q8 3 16 0" /></g>${brows}`;
   }
   if (pose === 'happy' && !a.animated) return happy.replace(' class="eyes-happy"', '') + brows;
   const big = pose === 'carried';
@@ -356,4 +360,55 @@ export function critterSvg(a: CritterArt): string {
     ${weaponProp(a)}
   </g>
 </svg>`;
+}
+
+/* ---------- Части тела для анимаций разлёта ---------- */
+
+export type CritterPart = 'head' | 'body' | 'tail' | 'legFront' | 'legBack';
+export const CRITTER_PARTS: readonly CritterPart[] = ['head', 'body', 'tail', 'legFront', 'legBack'];
+
+/** Центры частей в нормированных координатах текстуры (0..1), для origin спрайтов при разлёте. */
+export const CRITTER_PART_ANCHORS: Record<CritterPart, { x: number; y: number }> = {
+  head: { x: 0.5, y: (50 - VIEW.y) / VIEW.h },
+  body: { x: 0.5, y: (86 - VIEW.y) / VIEW.h },
+  tail: { x: 22 / VIEW.w, y: (80 - VIEW.y) / VIEW.h },
+  legFront: { x: 76 / VIEW.w, y: (102 - VIEW.y) / VIEW.h },
+  legBack: { x: 44 / VIEW.w, y: (102 - VIEW.y) / VIEW.h },
+};
+
+function singleLeg(a: CritterArt, which: 'front' | 'back'): string {
+  const f = a.fur;
+  const fill = a.pattern === 3 ? f.belly : f.fur;
+  const rx = a.species === 'mouse' ? 7.5 : 9;
+  const ry = a.species === 'mouse' ? 5.5 : 6.5;
+  const cx = which === 'front' ? 76 : 44;
+  return `<ellipse cx="${cx}" cy="102" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} />
+    <ellipse cx="${cx}" cy="${102 - ry + 1}" rx="${rx * 0.55}" ry="2.2" fill="#d9122b" opacity=".85" />`;
+}
+
+/**
+ * Отдельная часть миниатюры в том же viewBox, что и целая фигура: накладывается поверх спрайта
+ * без пересчёта координат. Голова — с крестиками в глазах, срезы отмечены кровью.
+ */
+export function critterPartSvg(a: CritterArt, part: CritterPart): string {
+  const dead: CritterArt = { ...a, pose: 'dead', animated: false };
+  let inner = '';
+  switch (part) {
+    case 'head':
+      inner = `${head(dead, 'dead')}<ellipse cx="60" cy="84" rx="14" ry="4" fill="#d9122b" opacity=".9" />`;
+      break;
+    case 'body':
+      inner = `${gearBehind(dead)}${body(dead)}${gearBody(dead)}${weaponProp(dead)}<ellipse cx="60" cy="70" rx="12" ry="3.5" fill="#d9122b" opacity=".9" />`;
+      break;
+    case 'tail':
+      inner = `${tail(dead, 'idle')}<circle cx="38" cy="92" r="4" fill="#d9122b" opacity=".9" />`;
+      break;
+    case 'legFront':
+      inner = singleLeg(dead, 'front');
+      break;
+    case 'legBack':
+      inner = singleLeg(dead, 'back');
+      break;
+  }
+  return `<svg viewBox="${VIEW_BOX}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" overflow="visible"><g class="rig">${inner}</g></svg>`;
 }
