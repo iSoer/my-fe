@@ -8,8 +8,8 @@ import { generateMap } from '@core/map/generate';
 import { applyAction, createBattle } from '@core/battle/reducer';
 import {
   generateShelter,
+  hireCost,
   memorialEntry,
-  recruitCost,
   rerollCost,
   resolveBattle,
   sharpenCost,
@@ -17,7 +17,7 @@ import {
   trainCost,
   trainUnit,
 } from '@core/progression';
-import { difficultyDef, PRICES } from '@content/balance';
+import { difficultyDef } from '@content/balance';
 import { BIOMES } from '@content/biomes';
 import { cloudLoad, cloudStore, clearLocal, cloudClear, loadLocal, saveLocal } from '@platform/storage';
 import { setHapticsEnabled } from '@platform/haptics';
@@ -269,48 +269,59 @@ export function releaseUnit(unitId: string): { ok: boolean; armyFell?: boolean }
     if (remaining.length === 0) {
       delete next.army;
       next.stats = { ...st.stats, armiesLost: st.stats.armiesLost + 1 };
-    } else next.army = { ...(st.army as Army), units: remaining, squadIds: (st.army as Army).squadIds.filter((id) => id !== unitId) };
+    } else next.army = { ...(st.army as Army), units: remaining, squadIds: remaining.map((u) => u.id) };
     return next;
   });
   return { ok: true, armyFell: remaining.length === 0 };
 }
 
-export function recruitAction(source: 'captive' | number): { ok: boolean; error?: string } {
+/** Текущая цена найма в пустой слот. */
+export function currentHireCost(save: SaveGame): number {
+  return hireCost(save.profile.hiresSinceBattle);
+}
+
+/** Свободные слоты армии (из 4). */
+export function freeSlots(save: SaveGame): number {
+  return save.army ? Math.max(0, BARRACKS_CAP - save.army.units.length) : 0;
+}
+
+/**
+ * Нанять кандидата в пустой слот. source: индекс из трёх случайных кандидатов или 'captive' (пленник бесплатно).
+ * После найма набор кандидатов обновляется, цена следующего найма растёт до следующего боя.
+ */
+export function hireAction(source: 'captive' | number): { ok: boolean; error?: string } {
   const s = $save.get();
   if (!s.army) return { ok: false, error: 'нет армии' };
-  if (s.army.units.length >= BARRACKS_CAP) return { ok: false, error: 'Казарма полна' };
+  if (s.army.units.length >= BARRACKS_CAP) return { ok: false, error: 'Все слоты заняты' };
   const cand = source === 'captive' ? s.shelter.captive : s.shelter.candidates[source];
   if (!cand) return { ok: false, error: 'нет кандидата' };
-  const cost = source === 'captive' ? 0 : recruitCost(cand.level);
+  const cost = source === 'captive' ? 0 : currentHireCost(s);
   if (s.profile.treats < cost) return { ok: false, error: 'Недостаточно Вкусняшек' };
   updateSave((st) => {
     const army = st.army as Army;
     const unit: UnitInstance = { ...cand, createdAt: Date.now(), isEnemy: false };
     delete unit.factionId;
     delete unit.isBoss;
-    const shelter = { ...st.shelter };
+    const nextArmy: Army = { ...army, units: [...army.units, unit] };
+    nextArmy.squadIds = nextArmy.units.map((u) => u.id);
+    const shelter = { ...generateShelter(randomSeed(), nextArmy, st.profile.glory, Date.now()), captive: st.shelter.captive };
     if (source === 'captive') delete shelter.captive;
-    else shelter.candidates = shelter.candidates.filter((_, i) => i !== source);
     return {
       ...st,
-      army: { ...army, units: [...army.units, unit] },
+      army: nextArmy,
       shelter,
-      profile: { ...st.profile, treats: st.profile.treats - cost },
+      profile: {
+        ...st.profile,
+        treats: st.profile.treats - cost,
+        hiresSinceBattle: source === 'captive' ? st.profile.hiresSinceBattle : st.profile.hiresSinceBattle + 1,
+      },
     };
   });
   return { ok: true };
 }
 
-export function refreshShelterAction(): { ok: boolean; error?: string } {
-  const s = $save.get();
-  if (s.profile.treats < PRICES.shelterRefresh) return { ok: false, error: 'Недостаточно Вкусняшек' };
-  updateSave((st) => ({
-    ...st,
-    shelter: { ...generateShelter(randomSeed(), st.army, st.profile.glory, Date.now()), captive: st.shelter.captive },
-    profile: { ...st.profile, treats: st.profile.treats - PRICES.shelterRefresh },
-  }));
-  return { ok: true };
-}
+/** Совместимость: старое имя действия. */
+export const recruitAction = hireAction;
 
 /* ---------- Бой ---------- */
 

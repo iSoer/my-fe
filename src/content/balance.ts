@@ -126,9 +126,9 @@ export const PRICES = {
   trainBase: 40,
   trainPerLevel: 12,
   sharpen: [200, 500, 1000] as const,
-  recruitBase: 60,
-  recruitPerLevel: 10,
-  shelterRefresh: 40,
+  /** Найм в пустой слот: 60, затем +20 за каждый найм до следующего боя. */
+  hireBase: 60,
+  hireStep: 20,
   rerollRoster: [0, 10, 20, 40, 80, 160] as const,
 };
 

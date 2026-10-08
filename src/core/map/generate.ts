@@ -169,6 +169,101 @@ function makeEnemy(rng: Rng, level: number, rarityRange: [Rarity, Rarity], facti
   return u;
 }
 
+/** Мотивы раскладки поля: добавляют узнаваемую структуру поверх случайной местности. */
+export type MapMotif = 'open' | 'river' | 'corridor' | 'islands' | 'fort' | 'ruins';
+
+const MOTIF_WEIGHTS: Record<string, Partial<Record<MapMotif, number>>> = {
+  default: { open: 4, river: 2, corridor: 2, islands: 1, fort: 1, ruins: 1 },
+  yard: { open: 4, river: 1, corridor: 2, islands: 1, fort: 2, ruins: 1 },
+  roofs: { open: 3, corridor: 3, islands: 2, fort: 1, ruins: 2 },
+  basement: { open: 2, corridor: 4, fort: 2, ruins: 2 },
+  dump: { open: 3, corridor: 2, islands: 1, fort: 1, ruins: 3 },
+  winter_park: { open: 3, river: 2, corridor: 1, islands: 2, fort: 1 },
+  jungle: { open: 2, river: 4, islands: 2, ruins: 3, corridor: 1 },
+  desert: { open: 5, corridor: 2, ruins: 2, fort: 1 },
+  glacier: { open: 2, islands: 4, river: 2, corridor: 1 },
+  canyon: { open: 2, corridor: 5, fort: 2, ruins: 1 },
+};
+
+function pickMotif(rng: Rng, biomeId: string): MapMotif {
+  const w = MOTIF_WEIGHTS[biomeId] ?? MOTIF_WEIGHTS['default'] ?? {};
+  return rng.weighted((Object.entries(w) as [MapMotif, number][]).map(([item, wt]) => ({ item, w: wt })));
+}
+
+/** Применить мотив к уже засеянной сетке. Валидация ниже отбросит непроходимые варианты. */
+function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boolean, waterLike: TerrainId): void {
+  switch (motif) {
+    case 'river': {
+      // Полоса воды поперёк поля с 1–2 бродами
+      const horizontal = rng.chance(0.65);
+      if (horizontal) {
+        const y = rng.int(3, 4);
+        const fords = new Set([rng.int(0, MAP_W - 1)]);
+        if (rng.chance(0.6)) fords.add(rng.int(0, MAP_W - 1));
+        for (let x = 0; x < MAP_W; x++) {
+          const p = { x, y };
+          if (!allowed(p)) continue;
+          set(g, p, fords.has(x) ? 'plain' : waterLike);
+        }
+      } else {
+        const x = rng.int(2, 3);
+        const fords = new Set([rng.int(1, MAP_H - 2), rng.int(1, MAP_H - 2)]);
+        for (let y = 1; y < MAP_H - 1; y++) {
+          const p = { x, y };
+          if (!allowed(p)) continue;
+          set(g, p, fords.has(y) ? 'plain' : waterLike);
+        }
+      }
+      break;
+    }
+    case 'corridor': {
+      // Две стены-«направляющие», между ними проход
+      const x1 = rng.int(1, 2);
+      const x2 = rng.int(3, 4);
+      const y0 = rng.int(2, 3);
+      const len = rng.int(2, 3);
+      for (let i = 0; i < len; i++) {
+        for (const x of [x1, x2]) {
+          const p = { x, y: y0 + i };
+          if (allowed(p) && get(g, p) !== 'water' && get(g, p) !== 'mountain') set(g, p, rng.chance(0.2) ? 'wall_breakable' : 'wall');
+        }
+      }
+      break;
+    }
+    case 'islands': {
+      for (let i = 0; i < rng.int(3, 4); i++) growBlob(g, rng, waterLike, rng.int(2, 3), (p) => allowed(p) && p.y > 1 && p.y < MAP_H - 2);
+      break;
+    }
+    case 'fort': {
+      // Вражеская зона огорожена стеной с 1–2 «воротами» из хлипкой стены
+      const y = 3;
+      const gates = new Set([rng.int(1, MAP_W - 2)]);
+      if (rng.chance(0.5)) gates.add(rng.int(1, MAP_W - 2));
+      for (let x = 0; x < MAP_W; x++) {
+        const p = { x, y };
+        if (!allowed(p)) continue;
+        set(g, p, gates.has(x) ? 'wall_breakable' : 'wall');
+      }
+      // внутри крепости — укрытия
+      for (let i = 0; i < 2; i++) {
+        const p = { x: rng.int(0, MAP_W - 1), y: rng.int(1, 2) };
+        if (allowed(p) && get(g, p) === 'plain') set(g, p, 'cover');
+      }
+      break;
+    }
+    case 'ruins': {
+      // Разбросанные обломки стен и укрытия
+      for (let i = 0; i < rng.int(3, 5); i++) {
+        const p = { x: rng.int(0, MAP_W - 1), y: rng.int(1, MAP_H - 2) };
+        if (allowed(p) && get(g, p) === 'plain') set(g, p, rng.chance(0.5) ? 'wall_breakable' : 'cover');
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 export function availableBiomes(unlocked: string[]): string[] {
   return BIOMES.filter((b) => unlocked.includes(b.id) || b.unlockWins === 0).map((b) => b.id);
 }
@@ -212,6 +307,10 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
       growBlob(g, rng, t, size, (p) => allowed(p) && p.y > 0 && p.y < MAP_H - 1);
       placedImp += size;
     }
+    // Мотив раскладки — узнаваемая структура поля
+    const motif = pickMotif(rng.fork('motif'), biome.id);
+    applyMotif(g, rng.fork('motif-apply'), motif, allowed, biome.bias.mountainVsWater > 0.75 ? 'mountain' : 'water');
+
     const covers = rng.int(TERRAIN_SHARE.covers[0], TERRAIN_SHARE.covers[1]) + biome.bias.covers;
     scatter(g, rng, 'cover', covers, (p) => allowed(p) && p.y > 2 && p.y < 6);
     scatter(g, rng, 'cover', diff.enemyCovers, (p) => allowed(p) && p.y <= 2);

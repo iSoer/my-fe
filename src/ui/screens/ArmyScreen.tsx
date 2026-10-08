@@ -1,48 +1,88 @@
 import { useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import type { UnitInstance } from '@core/types';
-import { SQUAD_SIZE, BARRACKS_CAP } from '@core/types';
-import { learnableNow, skillCost } from '@core/units';
-import { $save, beginRosterCreation } from '@state/save';
+import { BARRACKS_CAP } from '@core/types';
+import { displayName, learnableNow, skillCost, unitClass, unitClassName, visibleStats } from '@core/units';
+import { $save, beginRosterCreation, currentHireCost } from '@state/save';
 import { navigate } from '@state/router';
+import { haptic } from '@platform/haptics';
 import { Button } from '../components/Button';
 import { TopBar } from '../components/TopBar';
 import { ResourceBar } from '../components/ResourceBar';
-import { UnitRow } from '../components/UnitRow';
-import { SPECIES_ORDER } from '../lib/format';
+import { UnitAvatar } from '../components/UnitAvatar';
+import { RarityStars, WeaponBadge } from '../components/Badges';
+import { HireSheet } from '../components/HireSheet';
+import { useToast } from '../components/Toast';
+import { MOVE_EMOJI } from '../lib/format';
+import { stagger } from '../lib/animate';
 
-type SortKey = 'level' | 'class' | 'species' | 'recent';
-
-export function ArmyTabs({ active }: { active: 'barracks' | 'shelter' }) {
+/** Заполненный слот: краткая карточка бойца, тап — на экран бойца. */
+function FilledSlot({ unit, index, justHired }: { unit: UnitInstance; index: number; justHired: boolean }) {
+  const cls = unitClass(unit);
+  const st = visibleStats(unit);
+  const canLearn = learnableNow(unit).some((id) => skillCost(id) <= unit.sp);
   return (
-    <div class="tabs">
-      <button type="button" class={active === 'barracks' ? 'on' : ''} onClick={() => navigate('/army', true)}>
-        🏠 Казарма
-      </button>
-      <button type="button" class={active === 'shelter' ? 'on' : ''} onClick={() => navigate('/army/recruit', true)}>
-        🏚️ Приют
-      </button>
+    <div
+      class={`card slot-card filled clickable ${justHired ? 'just-hired' : 'pop-in'}`}
+      style={stagger(index, 60)}
+      onClick={() => {
+        haptic('select');
+        navigate(`/army/${unit.id}`);
+      }}
+    >
+      <div class="slot-head">
+        <UnitAvatar unit={unit} size="md" />
+        <div class="slot-meta">
+          <div class="slot-name">{displayName(unit)}</div>
+          <RarityStars rarity={unit.rarity} />
+          <div class="muted small slot-class">
+            {MOVE_EMOJI[cls.moveType]} {unitClassName(unit)} · Ур. {unit.level}
+          </div>
+        </div>
+      </div>
+      <div class="slot-foot">
+        <WeaponBadge kind={cls.weaponKind} />
+        {canLearn && <span class="chip red pop">Есть навык</span>}
+      </div>
+      <div class="mini-stats">
+        <span>
+          HP <b>{st.hp}</b>
+        </span>
+        <span>
+          Atk <b>{st.atk}</b>
+        </span>
+        <span>
+          Spd <b>{st.spd}</b>
+        </span>
+        <span>
+          Def <b>{st.def}</b>
+        </span>
+        <span>
+          Res <b>{st.res}</b>
+        </span>
+      </div>
     </div>
   );
 }
 
-function sortUnits(units: UnitInstance[], key: SortKey): UnitInstance[] {
-  const arr = [...units];
-  switch (key) {
-    case 'level':
-      return arr.sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
-    case 'class':
-      return arr.sort((a, b) => a.classId.localeCompare(b.classId) || b.level - a.level);
-    case 'species':
-      return arr.sort((a, b) => SPECIES_ORDER[a.species] - SPECIES_ORDER[b.species] || b.level - a.level);
-    case 'recent':
-      return arr.sort((a, b) => b.createdAt - a.createdAt);
-  }
+/** Пустой слот: цена найма, тап открывает выбор кандидатов. */
+function EmptySlot({ index, cost, affordable, onClick }: { index: number; cost: number; affordable: boolean; onClick: () => void }) {
+  return (
+    <button type="button" class={`slot-card empty ${affordable ? '' : 'poor'}`} style={stagger(index, 60)} onClick={onClick}>
+      <span class="slot-plus" aria-hidden="true">
+        +
+      </span>
+      <span class="slot-hire">Нанять бойца</span>
+      <span class="chip gold slot-price">🦴 {cost}</span>
+    </button>
+  );
 }
 
 export function ArmyScreen() {
   const save = useStore($save);
-  const [sort, setSort] = useState<SortKey>('level');
+  const [hiring, setHiring] = useState(false);
+  const [justHired, setJustHired] = useState<string | null>(null);
+  const [toastEl, toast] = useToast();
   const army = save.army;
 
   if (!army || army.units.length === 0) {
@@ -71,57 +111,53 @@ export function ArmyScreen() {
     );
   }
 
-  const units = sortUnits(army.units, sort);
-  const sorts: { k: SortKey; label: string }[] = [
-    { k: 'level', label: 'Уровень' },
-    { k: 'class', label: 'Класс' },
-    { k: 'species', label: 'Вид' },
-    { k: 'recent', label: 'Новые' },
-  ];
+  const cost = currentHireCost(save);
+  const affordable = save.profile.treats >= cost;
+  const slots = Array.from({ length: BARRACKS_CAP }, (_, i) => army.units[i] ?? null);
+
+  const openHire = () => {
+    haptic('select');
+    if (!affordable && !save.shelter.captive) toast('Недостаточно Вкусняшек', true);
+    setHiring(true);
+  };
 
   return (
     <div class="screen">
       <TopBar title="Моя армия" right={<ResourceBar />} onBack={() => navigate('/', true)} />
-      <ArmyTabs active="barracks" />
       <div class="screen-body">
         <div class="row between">
           <span class="muted small">
-            Бойцов: <b>{army.units.length}</b>/{BARRACKS_CAP} · Отряд: <b>{army.squadIds.length}</b>/{SQUAD_SIZE}
+            Отряд: <b>{army.units.length}</b>/{BARRACKS_CAP}
+          </span>
+          <span class="muted small">
+            Найм: <b>🦴 {cost}</b>
           </span>
         </div>
-        <div class="seg">
-          {sorts.map((s) => (
-            <button key={s.k} type="button" class={sort === s.k ? 'on' : ''} onClick={() => setSort(s.k)}>
-              {s.label}
-            </button>
-          ))}
+        <div class="slot-grid">
+          {slots.map((u, i) =>
+            u ? (
+              <FilledSlot key={u.id} unit={u} index={i} justHired={justHired === u.id} />
+            ) : (
+              <EmptySlot key={`empty-${i}`} index={i} cost={cost} affordable={affordable} onClick={openHire} />
+            ),
+          )}
         </div>
-        <div class="stack" key={sort}>
-          {units.map((u, i) => {
-            const inSquad = army.squadIds.includes(u.id);
-            const canLearn = learnableNow(u).some((id) => skillCost(id) <= u.sp);
-            return (
-              <UnitRow
-                key={u.id}
-                unit={u}
-                index={i}
-                animated={i < 12}
-                onClick={() => navigate(`/army/${u.id}`)}
-                tags={
-                  <>
-                    {inSquad && <span class="chip squad pop">В отряде</span>}
-                    {canLearn && <span class="chip red pop">Есть навык</span>}
-                  </>
-                }
-                right={<span class="muted small">SP {u.sp}</span>}
-              />
-            );
-          })}
-        </div>
+        <p class="muted small hint-line">Цена найма растёт после каждого найма и сбрасывается после боя.</p>
         <Button block icon="⚔️" onClick={() => navigate('/battle/setup')} primary>
           К подготовке боя
         </Button>
       </div>
+      <HireSheet
+        open={hiring}
+        onClose={() => setHiring(false)}
+        toast={toast}
+        onHired={(unit) => {
+          setJustHired(unit.id);
+          toast(`${displayName(unit)} в отряде!`);
+          window.setTimeout(() => setJustHired((cur) => (cur === unit.id ? null : cur)), 900);
+        }}
+      />
+      {toastEl}
     </div>
   );
 }

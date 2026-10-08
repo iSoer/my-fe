@@ -29,8 +29,9 @@ export function trainCost(level: number): number {
 export function sharpenCost(currentTier: number): number | null {
   return PRICES.sharpen[currentTier] ?? null;
 }
-export function recruitCost(level: number): number {
-  return PRICES.recruitBase + PRICES.recruitPerLevel * level;
+/** Цена найма в пустой слот по числу наймов с последнего боя. */
+export function hireCost(hiresSinceBattle: number): number {
+  return PRICES.hireBase + PRICES.hireStep * Math.max(0, hiresSinceBattle);
 }
 export function rerollCost(rerolls: number, freeRerolls: number): number {
   if (rerolls < 1 + freeRerolls) return 0;
@@ -185,6 +186,7 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
     treats: save.profile.treats + treats,
     glory: save.profile.glory + glory,
     wins,
+    hiresSinceBattle: 0,
   };
 
   const nextArmy: Army | undefined = armyFell

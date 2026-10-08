@@ -52,6 +52,7 @@ describe('контент', () => {
     expect(PASSIVES.filter((p) => p.slot === 'b').length).toBeGreaterThanOrEqual(8);
     expect(PASSIVES.filter((p) => p.slot === 'c').length).toBeGreaterThanOrEqual(8);
     expect(TRAITS.length).toBeGreaterThanOrEqual(16);
-    expect(BIOMES.length).toBe(5);
+    expect(BIOMES.length).toBeGreaterThanOrEqual(9);
+    for (const b of BIOMES) expect(b.weather.density).toBeGreaterThanOrEqual(0);
   });
 });

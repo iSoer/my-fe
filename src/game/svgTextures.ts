@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { TerrainId, UnitInstance } from '@core/types';
-import { backdropSvg, svgToImage, tileSvg, unitArtKey, unitPartSvg, unitSvg, CRITTER_PARTS, type CritterPart, type Pose } from '@art/index';
+import { backdropSvg, svgToImage, tileSvg, unitArtKey, unitPartSvg, unitSvg, CRITTER_PARTS, TILE_FRAME_COUNT, type CritterPart, type Pose } from '@art/index';
 
 /** Размеры растеризации миниатюр (пропорция VIEW 120:140). */
 export const UNIT_TEX_SIZE = {
@@ -83,12 +83,23 @@ export function ensureUnitPartTextures(scene: Phaser.Scene, unit: UnitInstance, 
 
 /* ---------- Тайлы ---------- */
 
-export function tileTexKey(biomeId: string, terrain: TerrainId): string {
-  return `tile:${biomeId}:${terrain}`;
+/** Сколько кадров анимации у местности (вода 3, листва 2, остальное 1). */
+export function tileFrameCount(terrain: TerrainId): number {
+  return TILE_FRAME_COUNT[terrain] ?? 1;
 }
 
+export function tileTexKey(biomeId: string, terrain: TerrainId, frame = 0): string {
+  return `tile:${biomeId}:${terrain}:${frame}`;
+}
+
+/** Все кадры анимированных тайлов и нулевой кадр остальных: ≤ 10 текстур на биом. */
 export function ensureTileTextures(scene: Phaser.Scene, biomeId: string): Promise<string[]> {
-  return Promise.all(TERRAINS.map((t) => ensureTexture(scene, tileTexKey(biomeId, t), tileSvg(biomeId, t), TILE_TEX_PX, TILE_TEX_PX)));
+  const jobs: Promise<string>[] = [];
+  for (const t of TERRAINS) {
+    const frames = tileFrameCount(t);
+    for (let f = 0; f < frames; f++) jobs.push(ensureTexture(scene, tileTexKey(biomeId, t, f), tileSvg(biomeId, t, f), TILE_TEX_PX, TILE_TEX_PX));
+  }
+  return Promise.all(jobs);
 }
 
 /* ---------- Фоны кинематика ---------- */

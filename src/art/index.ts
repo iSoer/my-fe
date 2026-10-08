@@ -6,7 +6,7 @@ import { eyeArt, furArt } from './palettes';
 
 export { critterSvg, critterPartSvg, CRITTER_PARTS, CRITTER_PART_ANCHORS, VIEW, VIEW_BOX, type CritterArt, type Pose, type CritterPart } from './critter';
 export { backdropSvg, BACKDROP } from './backdrop';
-export { tileSvg, TILE_SIZE } from './tile';
+export { tileSvg, TILE_SIZE, TILE_FRAME_COUNT } from './tile';
 export { svgToImage, svgDataUri, clearRasterCache } from './raster';
 export { FUR_ART, EYE_ART, furArt, eyeArt, shade, hex } from './palettes';
 

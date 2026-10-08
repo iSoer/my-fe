@@ -13,6 +13,7 @@ import { deathSeed, pickDeathVariant, playDeathCine, preloadDeathParts, type Dea
 import { ensureTextures, TEX } from './textures';
 import { FONT, WEAPON_COLOR_HEX, hpColor, textStyle } from './style';
 import { bloodBurst, floatText, ghostRise, tween, wait } from './fx';
+import { WeatherLayer } from './weather';
 import { impactFeel, playAttackFx, weaponKindOfUnit } from './attackFx';
 import { backdropTexKey, ensureBackdropTexture, ensureUnitTextures, hasTexture, unitTexKey, withTimeout } from './svgTextures';
 import { FUR_PALETTES } from '@content/appearance';
@@ -65,6 +66,7 @@ export class CinematicScene extends Phaser.Scene {
   private fighters = new Map<string, Fighter>();
   private speed = 1;
   private blinkTimers: Phaser.Time.TimerEvent[] = [];
+  private weather: WeatherLayer | null = null;
   /** Текстуры частей тела для бойцов, которые погибнут в этом бою (разлёт, хвост в луже). */
   private parts = new Map<string, Record<CritterPart, string>>();
 
@@ -167,6 +169,9 @@ export class CinematicScene extends Phaser.Scene {
     if (!this.sys || !this.sys.isActive()) return;
 
     this.drawBackdrop(biome.id, leftTerrain, rightTerrain, w, h, halfW);
+    // Та же погода, что на поле, но реже: над фоном, под бойцами.
+    this.weather?.destroy();
+    this.weather = new WeatherLayer(this, biome.weather, { depth: 2, densityMul: 0.6, maxParticles: 24, windDir: before.map.seed % 2 === 0 ? 1 : -1 });
 
     const leftX = w * 0.27;
     const rightX = w * 0.73;
@@ -490,6 +495,8 @@ export class CinematicScene extends Phaser.Scene {
 
   private finish(): void {
     this.input.off('pointerdown', this.skip);
+    this.weather?.destroy();
+    this.weather = null;
     for (const t of this.blinkTimers) t.remove(false);
     this.blinkTimers = [];
     for (const f of this.fighters.values()) f.hurtTimer?.remove(false);

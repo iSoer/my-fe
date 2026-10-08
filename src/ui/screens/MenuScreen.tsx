@@ -64,10 +64,7 @@ export function MenuScreen() {
 
   const pendingSkills = army ? army.units.filter((u) => learnableNow(u).some((id) => skillCost(id) <= u.sp)).length : 0;
   // В диораме — сначала отряд, потом остальные бойцы; без армии — демо-тройка.
-  const crew: UnitInstance[] =
-    army && army.units.length > 0
-      ? [...army.units.filter((u) => army.squadIds.includes(u.id)), ...army.units.filter((u) => !army.squadIds.includes(u.id))].slice(0, 3)
-      : DEMO_CREW;
+  const crew: UnitInstance[] = army && army.units.length > 0 ? army.units.slice(0, 3) : DEMO_CREW;
 
   const onFight = () => {
     if (hasBattle) return navigate('/battle');
@@ -95,7 +92,7 @@ export function MenuScreen() {
   const fightSub = hasBattle
     ? `Ход ${battle?.turn ?? 1} · бой ждёт`
     : army
-      ? `Отряд ${army.squadIds.length}/4 готов`
+      ? `Отряд ${army.units.length}/4 готов`
       : 'Сначала соберём отряд';
 
   return (
@@ -135,7 +132,7 @@ export function MenuScreen() {
           <Button big block icon="🐾" onClick={onArmy}>
             <span class="lbl">
               Моя армия
-              <div class="sub">{army ? `${army.units.length}/10 в казарме` : 'Собрать из ростера'}</div>
+              <div class="sub">{army ? `${army.units.length}/4 бойцов` : 'Собрать из ростера'}</div>
             </span>
           </Button>
           {pendingSkills > 0 && (

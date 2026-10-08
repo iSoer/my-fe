@@ -13,9 +13,18 @@ import type { BattleResult } from '@core/types';
 import { UnitView } from './UnitView';
 import { actorFlash, bloodBurst, bloodDecal, confettiRain, debrisBurst, sceneAlive, tween } from './fx';
 import { haptic } from '@platform/haptics';
-import { ensureTileTextures, ensureUnitTextures, hasTexture, tileTexKey, withTimeout } from './svgTextures';
+import { ensureTileTextures, ensureUnitTextures, hasTexture, tileFrameCount, tileTexKey, withTimeout } from './svgTextures';
+import { WeatherLayer } from './weather';
 
 export const MAP_SCENE_KEY = 'Map';
+
+/** 1–2 клетки для роения мух, детерминированно от seed карты. */
+function pickAnchors(points: { x: number; y: number }[], seed: number): { x: number; y: number }[] {
+  if (points.length === 0) return [];
+  const a = points[seed % points.length];
+  const b = points[(seed * 7 + 3) % points.length];
+  return a && b && a !== b ? [a, b] : a ? [a] : [];
+}
 
 export class MapScene extends Phaser.Scene {
   layout: BoardLayout = computeLayout(360, 480);
@@ -52,6 +61,14 @@ export class MapScene extends Phaser.Scene {
   private cracks = new Map<string, Phaser.GameObjects.Graphics>();
   private wallHp = new Map<string, number>();
   private endOverlay: Phaser.GameObjects.GameObject[] = [];
+  /* ---- Живые тайлы и погода ---- */
+  /** Анимированные клетки: кадры воды/листвы меняются по таймеру, кусты качаются твинами. */
+  private animTiles: { img: Phaser.GameObjects.Image; terrain: TerrainId; frames: number; phase: number; frame: number }[] = [];
+  private tileTimer: Phaser.Time.TimerEvent | null = null;
+  private tileTweens: Phaser.Tweens.Tween[] = [];
+  private tileBiome = '';
+  private weather: WeatherLayer | null = null;
+  private weatherBiome = '';
   private unsubSave: (() => void) | null = null;
   private unsubUi: (() => void) | null = null;
   private pendingSync = false;
@@ -186,6 +203,10 @@ export class MapScene extends Phaser.Scene {
     this.pulseTweens = [];
     for (const t of this.markerTweens) t.stop();
     this.markerTweens = [];
+    this.stopTileAnimations();
+    this.weather?.destroy();
+    this.weather = null;
+    this.weatherBiome = '';
     this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
   }
 
@@ -643,17 +664,39 @@ export class MapScene extends Phaser.Scene {
     for (const g of this.cracks.values()) g.destroy();
     this.cracks.clear();
     this.wallHp.clear();
+    this.stopTileAnimations();
+    this.tileBiome = st.map.biomeId;
     const l = this.layout;
+    const flyAnchors: { x: number; y: number }[] = [];
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const pos = { x, y };
         const terrain: TerrainId = terrainAt(st, pos);
         const o = tileOrigin(l, pos);
-        const texKey = tileTexKey(st.map.biomeId, terrain);
+        const texKey = tileTexKey(st.map.biomeId, terrain, 0);
         const hasArt = hasTexture(this, texKey);
+        if (terrain === 'forest' || terrain === 'cover') flyAnchors.push(tileCenter(l, pos));
         if (hasArt) {
-          const img = this.add.image(o.x, o.y, texKey).setOrigin(0, 0).setDisplaySize(l.tile, l.tile);
+          // Кусты (и ели зимнего парка) качаются от основания: якорь внизу по центру.
+          const sway = terrain === 'forest' || (terrain === 'mountain' && st.map.biomeId === 'winter_park');
+          const img = sway
+            ? this.add.image(o.x + l.tile / 2, o.y + l.tile, texKey).setOrigin(0.5, 1).setDisplaySize(l.tile, l.tile)
+            : this.add.image(o.x, o.y, texKey).setOrigin(0, 0).setDisplaySize(l.tile, l.tile);
           this.tileLayer.add(img);
+          const frames = tileFrameCount(terrain);
+          const phase = ((x * 73 + y * 151) % 997) * 3; // детерминированный сдвиг фазы, мс
+          if (frames > 1) this.animTiles.push({ img, terrain, frames, phase, frame: 0 });
+          if (sway) {
+            this.tileTweens.push(
+              this.tweens.add({ targets: img, angle: { from: -1.2, to: 1.2 }, duration: 2400 + (phase % 800), delay: phase % 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }),
+            );
+          }
+          if (terrain === 'water') {
+            // Блик на воде: белый квадрат с едва заметной пульсацией прозрачности.
+            const sh = this.add.image(o.x, o.y, TEX.square).setOrigin(0, 0).setDisplaySize(l.tile, l.tile).setAlpha(0.06);
+            this.tileLayer.add(sh);
+            this.tileTweens.push(this.tweens.add({ targets: sh, alpha: 0.14, duration: 1800, delay: phase % 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));
+          }
         } else {
           g.fillStyle(biome.colors[terrain], 1);
           g.fillRect(o.x, o.y, l.tile, l.tile);
@@ -679,6 +722,68 @@ export class MapScene extends Phaser.Scene {
     // Разделитель зон спавна
     g.lineStyle(2, 0xffffff, 0.08);
     g.strokeRect(l.ox, l.oy, l.tile * MAP_W, l.tile * MAP_H);
+    this.startTileAnimations();
+    this.ensureWeather(st, flyAnchors);
+  }
+
+  /* ---------- Живые тайлы ---------- */
+
+  private stopTileAnimations(): void {
+    this.tileTimer?.remove(false);
+    this.tileTimer = null;
+    for (const t of this.tileTweens) t.stop();
+    this.tileTweens = [];
+    this.animTiles = [];
+  }
+
+  /** Один таймер на все кадровые анимации: вода 450 мс (0→1→2→1), листва 900 мс (0→1). */
+  private startTileAnimations(): void {
+    if (this.animTiles.length === 0) return;
+    const WATER_SEQ = [0, 1, 2, 1];
+    const FOREST_SEQ = [0, 1];
+    this.tileTimer = this.time.addEvent({
+      delay: 150,
+      loop: true,
+      callback: () => {
+        if (!sceneAlive(this)) return;
+        const now = this.time.now;
+        for (const cell of this.animTiles) {
+          if (!cell.img.scene) continue;
+          const water = cell.terrain === 'water';
+          const seq = water ? WATER_SEQ : FOREST_SEQ;
+          const period = water ? 450 : 900;
+          const idx = Math.floor((now + cell.phase) / period) % seq.length;
+          const frame = Math.min(cell.frames - 1, seq[idx] ?? 0);
+          if (frame === cell.frame) continue;
+          const key = tileTexKey(this.tileBiome, cell.terrain, frame);
+          if (!hasTexture(this, key)) continue;
+          cell.frame = frame;
+          const dw = cell.img.displayWidth;
+          const dh = cell.img.displayHeight;
+          cell.img.setTexture(key);
+          cell.img.setDisplaySize(dw, dh);
+        }
+      },
+    });
+  }
+
+  /** Погода биома над тайлами и под юнитами; пересоздаётся при смене биома. */
+  private ensureWeather(st: BattleState, flyAnchors: { x: number; y: number }[]): void {
+    const biome = biomeDef(st.map.biomeId);
+    const anchors = flyAnchors.length > 0 ? pickAnchors(flyAnchors, st.map.seed) : [];
+    if (this.weather && this.weatherBiome === biome.id) {
+      this.weather.setAnchors(anchors, this.layout.tile * 0.7);
+      return;
+    }
+    this.weather?.destroy();
+    this.weather = new WeatherLayer(this, biome.weather, {
+      depth: 4,
+      maxParticles: 40,
+      windDir: st.map.seed % 2 === 0 ? 1 : -1,
+      anchors,
+      anchorRadius: this.layout.tile * 0.7,
+    });
+    this.weatherBiome = biome.id;
   }
 
   private updateWalls(st: BattleState): void {

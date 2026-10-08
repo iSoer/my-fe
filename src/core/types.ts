@@ -36,7 +36,8 @@ export const MAP_W = 6;
 export const MAP_H = 8;
 export const MAX_LEVEL = 40;
 export const SQUAD_SIZE = 4;
-export const BARRACKS_CAP = 10;
+/** Армия = 4 слота; слоты заполняются наймом. */
+export const BARRACKS_CAP = 4;
 
 export function posKey(p: Pos): string {
   return `${p.x},${p.y}`;
@@ -336,6 +337,8 @@ export interface Profile {
   /** Сколько раз перемешивали текущий ростер (для цены). */
   rosterRerolls: number;
   freeRerolls: number;
+  /** Сколько наймов сделано с последнего боя: цена слота растёт и сбрасывается после боя. */
+  hiresSinceBattle: number;
 }
 
 export interface Shelter {

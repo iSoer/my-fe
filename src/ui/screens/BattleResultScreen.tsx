@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
-import { BARRACKS_CAP, STATS } from '@core/types';
+import { STATS } from '@core/types';
 import type { Stats } from '@core/types';
 import { displayName, unitClassName } from '@core/units';
 import { biomeDef } from '@content/biomes';
-import { $save, beginRosterCreation, recruitAction } from '@state/save';
+import { $save, beginRosterCreation, freeSlots, hireAction } from '@state/save';
 import { navigate } from '@state/router';
 import { Button } from '../components/Button';
 import { UnitAvatar } from '../components/UnitAvatar';
@@ -82,16 +82,17 @@ export function BattleResultScreen() {
 
   const title = lb.result === 'victory' ? 'ПОБЕДА' : lb.result === 'defeat' ? 'ПОРАЖЕНИЕ' : 'ОТСТУПЛЕНИЕ';
   const army = save.army;
-  const captiveAvailable = !!lb.captive && !!save.shelter.captive && save.shelter.captive.id === lb.captive.id && !!army && army.units.length < BARRACKS_CAP;
+  const captiveWaiting = !!lb.captive && !!save.shelter.captive && save.shelter.captive.id === lb.captive.id && !!army;
+  const captiveAvailable = captiveWaiting && freeSlots(save) > 0;
   const mvp = lb.mvpId ? lb.survivors.find((u) => u.id === lb.mvpId) : undefined;
   let delay = 300;
   const next = (step = 90): number => (delay += step);
 
   const acceptCaptive = () => {
-    const r = recruitAction('captive');
+    const r = hireAction('captive');
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
     haptic('success');
-    toast('Пленник принят в казарму');
+    toast('Пленник принят в отряд');
   };
 
   return (
@@ -220,10 +221,12 @@ export function BattleResultScreen() {
             </div>
             {captiveAvailable ? (
               <Button primary block icon="🤝" onClick={acceptCaptive}>
-                Принять в казарму
+                Принять в отряд (бесплатно)
               </Button>
             ) : (
-              <div class="muted small">{army && army.units.length >= BARRACKS_CAP ? 'Казарма полна — пленник ждёт в Приюте.' : 'Пленник ждёт в Приюте.'}</div>
+              <div class="muted small">
+                {captiveWaiting ? 'Слоты заняты — пленник подождёт до следующего найма.' : 'Пленник уже в отряде.'}
+              </div>
             )}
           </div>
         )}

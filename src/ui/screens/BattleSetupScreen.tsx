@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
-import type { Difficulty, UnitInstance } from '@core/types';
+import type { Difficulty } from '@core/types';
 import { SQUAD_SIZE } from '@core/types';
 import { visibleStats } from '@core/units';
 import { DIFFICULTIES } from '@content/balance';
 import { biomeDef } from '@content/biomes';
-import { $save, $unlockedBiomes, difficultyUnlocked, setSquad, startBattle } from '@state/save';
+import { $save, $unlockedBiomes, difficultyUnlocked, startBattle } from '@state/save';
 import { navigate } from '@state/router';
 import { Button } from '../components/Button';
 import { TopBar } from '../components/TopBar';
 import { ResourceBar } from '../components/ResourceBar';
 import { UnitAvatar } from '../components/UnitAvatar';
-import { UnitRow } from '../components/UnitRow';
-import { BottomSheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { statTotal } from '../lib/format';
 import { stagger } from '../lib/animate';
@@ -32,19 +30,17 @@ export function BattleSetupScreen() {
   const army = save.army;
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [biome, setBiome] = useState<string>('random');
-  const [squad, setSquadLocal] = useState<string[]>(army?.squadIds ?? []);
-  const [picker, setPicker] = useState(false);
   const [toastEl, toast] = useToast();
 
   useEffect(() => {
     if (!army) navigate('/', true);
   }, [army]);
 
-  const squadUnits = useMemo(
-    () => squad.map((id) => army?.units.find((u) => u.id === id)).filter((u): u is UnitInstance => !!u),
-    [squad, army],
-  );
   if (!army) return <div class="screen" />;
+
+  // Отряд — это вся армия (4 слота).
+  const squadUnits = army.units;
+  const squad = squadUnits.map((u) => u.id);
 
   const def = DIFFICULTIES.find((d) => d.id === difficulty) ?? DIFFICULTIES[0];
   const avgLevel = squadUnits.length ? squadUnits.reduce((a, u) => a + u.level, 0) / squadUnits.length : 1;
@@ -57,26 +53,13 @@ export function BattleSetupScreen() {
   const ratioClass = ratio >= 1.0 ? 'ok' : ratio >= 0.75 ? 'warn' : 'danger';
   const barClass = ratio >= 1.0 ? 'good' : ratio >= 0.75 ? 'mid' : 'bad';
 
-  const removeFromSquad = (id: string) => {
-    haptic('select');
-    setSquadLocal((s) => s.filter((x) => x !== id));
-  };
-  const addToSquad = (id: string) => {
-    haptic('select');
-    setSquadLocal((s) => (s.length >= SQUAD_SIZE || s.includes(id) ? s : [...s, id]));
-    setPicker(false);
-  };
-
   const onStart = () => {
-    if (squad.length === 0) return toast('Выберите хотя бы одного бойца', true);
-    setSquad(squad);
+    if (squad.length === 0) return toast('В отряде никого нет — наймите бойцов', true);
     const r = startBattle({ difficulty, biomeId: biome, squadIds: squad });
     if (!r.ok) return toast(r.error ?? 'Ошибка', true);
     haptic('heavy');
     navigate('/battle', true);
   };
-
-  const notInSquad = army.units.filter((u) => !squad.includes(u.id));
 
   return (
     <div class="screen">
@@ -151,19 +134,24 @@ export function BattleSetupScreen() {
           {Array.from({ length: SQUAD_SIZE }, (_, i) => {
             const u = squadUnits[i];
             return u ? (
-              <div key={u.id} class="squad-slot filled pop-in" onClick={() => removeFromSquad(u.id)}>
+              <div key={u.id} class="squad-slot filled pop-in" onClick={() => navigate(`/army/${u.id}`)}>
                 <UnitAvatar unit={u} size="sm" />
                 <span class="nm">{u.name}</span>
                 <span class="muted">Ур. {u.level}</span>
               </div>
             ) : (
-              <div key={`empty-${i}`} class="squad-slot empty" onClick={() => setPicker(true)}>
-                <span class="plus">＋</span>
-                <span class="muted">Добавить</span>
+              <div key={`empty-${i}`} class="squad-slot empty readonly" onClick={() => navigate('/army')}>
+                <span class="plus">·</span>
+                <span class="muted">пусто</span>
               </div>
             );
           })}
         </div>
+        {squad.length < SQUAD_SIZE && (
+          <div class="muted small">
+            Свободных слотов: {SQUAD_SIZE - squad.length}. Нанять можно в «Моей армии».
+          </div>
+        )}
         <div class="card power-card">
           <div class="row between">
             <span>Сила отряда</span>
@@ -181,12 +169,6 @@ export function BattleSetupScreen() {
           Начать бой
         </Button>
       </div>
-      <BottomSheet open={picker} onClose={() => setPicker(false)} title="Кого взять?">
-        {notInSquad.length === 0 && <p class="muted">Все бойцы уже в отряде.</p>}
-        {notInSquad.map((u, i) => (
-          <UnitRow key={u.id} unit={u} index={i} onClick={() => addToSquad(u.id)} />
-        ))}
-      </BottomSheet>
       {toastEl}
     </div>
   );

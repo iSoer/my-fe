@@ -66,7 +66,10 @@ describe('арт: фоны и тайлы', () => {
   it('фоны для всех биомов, клеток и сторон', () => {
     for (const b of BIOMES) for (const t of TERRAINS) for (const side of ['left', 'right'] as const) wellFormed(backdropSvg(b.id, t, side));
   });
-  it('тайлы для всех биомов и клеток', () => {
-    for (const b of BIOMES) for (const t of TERRAINS) wellFormed(tileSvg(b.id, t));
+  it('тайлы для всех биомов, клеток и кадров анимации', () => {
+    for (const b of BIOMES) for (const t of TERRAINS) for (const f of [0, 1, 2]) wellFormed(tileSvg(b.id, t, f));
+    // кадры воды действительно различаются
+    expect(tileSvg('yard', 'water', 0)).not.toBe(tileSvg('yard', 'water', 1));
+    expect(tileSvg('jungle', 'forest', 0)).not.toBe(tileSvg('jungle', 'forest', 1));
   });
 });

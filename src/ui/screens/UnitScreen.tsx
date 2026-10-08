@@ -9,7 +9,7 @@ import { traitDef } from '@content/traits';
 import { breedDef } from '@content/breeds';
 import { personalityText } from '@content/personalities';
 import { basicWeaponId, weaponsForKind } from '@content/weapons';
-import { $save, equipAction, learnSkillAction, releaseUnit, sharpenAction, toggleSquad, trainUnitAction } from '@state/save';
+import { $save, equipAction, learnSkillAction, releaseUnit, sharpenAction, trainUnitAction } from '@state/save';
 import { navigate } from '@state/router';
 import { Button } from '../components/Button';
 import { TopBar } from '../components/TopBar';
@@ -57,7 +57,6 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   const cls = unitClass(unit);
   const stats = visibleStats(unit);
   const trait = unit.traitId ? traitDef(unit.traitId) : undefined;
-  const inSquad = army.squadIds.includes(unit.id);
   const tCost = trainCost(unit.level);
   const sCost = sharpenCost(unit.weaponTier);
   const learnable = learnableNow(unit);
@@ -81,12 +80,6 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     haptic('medium');
     celebrate();
     toast('Оружие заточено');
-  };
-  const onSquad = () => {
-    const r = toggleSquad(unit.id);
-    if (!r.ok) return toast(r.error ?? 'Ошибка', true);
-    haptic('select');
-    replayBounce();
   };
   const onRelease = () => {
     const r = releaseUnit(unit.id);
@@ -143,7 +136,6 @@ export function UnitScreen({ unitId }: { unitId: string }) {
             <div class="row wrap">
               <RarityStars rarity={unit.rarity} />
               <b>Ур. {unit.level}</b>
-              {inSquad && <span class="chip squad pop">В отряде</span>}
             </div>
             <div class="row wrap">
               <MoveBadge moveType={cls.moveType} />
@@ -219,9 +211,6 @@ export function UnitScreen({ unitId }: { unitId: string }) {
           </Button>
           <Button block icon="🔪" onClick={onSharpen} disabled={sCost === null || save.profile.treats < sCost}>
             Заточить оружие {sCost === null ? '(предел)' : `(🦴 ${sCost}, Mt +2)`}
-          </Button>
-          <Button block primary={!inSquad} icon={inSquad ? '↩️' : '🛡️'} onClick={onSquad}>
-            {inSquad ? 'Убрать из отряда' : 'В отряд'}
           </Button>
           <Button block danger onClick={() => setRelease(1)}>
             Отпустить

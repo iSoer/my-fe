@@ -6,7 +6,6 @@ import { MenuScreen } from './screens/MenuScreen';
 import { ArmyCreateScreen } from './screens/ArmyCreateScreen';
 import { ArmyScreen } from './screens/ArmyScreen';
 import { UnitScreen } from './screens/UnitScreen';
-import { RecruitScreen } from './screens/RecruitScreen';
 import { BattleSetupScreen } from './screens/BattleSetupScreen';
 import { BattleScreen } from './screens/BattleScreen';
 import { BattleResultScreen } from './screens/BattleResultScreen';
@@ -76,7 +75,7 @@ function Screen({ route }: { route: Route }) {
     case 'armyCreate':
       return <ArmyCreateScreen />;
     case 'recruit':
-      return <RecruitScreen />;
+      return <ArmyScreen />;
     case 'unit':
       return <UnitScreen unitId={route.unitId} />;
     case 'battleSetup':

@@ -3,7 +3,7 @@ import LZString from 'lz-string';
 import type { SaveGame } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 const stat = z.number();
 const statsSchema = z.object({ hp: stat, atk: stat, spd: stat, def: stat, res: stat });
@@ -175,6 +175,7 @@ export const saveSchema = z.object({
     armiesCreated: z.number(),
     rosterRerolls: z.number(),
     freeRerolls: z.number(),
+    hiresSinceBattle: z.number(),
   }),
   army: armySchema.optional(),
   battle: battleSchema.optional(),
@@ -191,7 +192,7 @@ export function createEmptySave(now: number): SaveGame {
   return {
     version: SAVE_VERSION,
     updatedAt: now,
-    profile: { glory: 0, treats: 0, wins: { easy: 0, normal: 0, hard: 0, nightmare: 0 }, armiesCreated: 0, rosterRerolls: 0, freeRerolls: 0 },
+    profile: { glory: 0, treats: 0, wins: { easy: 0, normal: 0, hard: 0, nightmare: 0 }, armiesCreated: 0, rosterRerolls: 0, freeRerolls: 0, hiresSinceBattle: 0 },
     shelter: { candidates: [], seed: 0 },
     memorial: [],
     achievements: [],
@@ -201,7 +202,32 @@ export function createEmptySave(now: number): SaveGame {
 }
 
 /** Миграции: ключ — версия, С которой мигрируем. */
-export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string, unknown>> = {};
+export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string, unknown>> = {
+  // v1 → v2: армия из 4 слотов (лишние бойцы уходят на Кладбище как «ушедшие»), счётчик наймов.
+  1: (old) => {
+    const data = { ...old } as Record<string, unknown>;
+    const profile = { ...((data['profile'] as Record<string, unknown>) ?? {}) };
+    if (typeof profile['hiresSinceBattle'] !== 'number') profile['hiresSinceBattle'] = 0;
+    data['profile'] = profile;
+    const army = data['army'] as { units?: Array<Record<string, unknown>>; squadIds?: string[] } | undefined;
+    if (army && Array.isArray(army.units) && army.units.length > 4) {
+      const squad = new Set(army.squadIds ?? []);
+      const kept = [...army.units.filter((u) => squad.has(String(u['id']))), ...army.units.filter((u) => !squad.has(String(u['id'])))].slice(0, 4);
+      const dropped = army.units.filter((u) => !kept.includes(u));
+      const memorial = Array.isArray(data['memorial']) ? [...(data['memorial'] as unknown[])] : [];
+      const now = Date.now();
+      for (const u of dropped) {
+        memorial.push({ id: `m_${String(u['id'])}_${now.toString(36)}`, unit: u, diedAt: now, epitaph: 'Ушёл при переезде в новую казарму. Писем не шлёт.', reason: 'released' });
+      }
+      data['memorial'] = memorial;
+      data['army'] = { ...army, units: kept, squadIds: kept.map((u) => String(u['id'])) };
+    } else if (army && Array.isArray(army.units)) {
+      data['army'] = { ...army, squadIds: army.units.map((u) => String(u['id'])) };
+    }
+    data['version'] = 2;
+    return data;
+  },
+};
 
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   let data = raw;
