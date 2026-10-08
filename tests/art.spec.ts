@@ -6,7 +6,7 @@ import { generateUnit } from '@core/units';
 import type { TerrainId } from '@core/types';
 
 const TERRAINS: TerrainId[] = ['plain', 'forest', 'mountain', 'water', 'wall', 'wall_breakable', 'cover'];
-const POSES: Pose[] = ['idle', 'run', 'hurt', 'dead', 'happy'];
+const POSES: Pose[] = ['idle', 'run', 'hurt', 'dead', 'happy', 'carried'];
 
 function wellFormed(svg: string): void {
   expect(svg.startsWith('<svg')).toBe(true);

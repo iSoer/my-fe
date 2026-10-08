@@ -1,15 +1,16 @@
 import Phaser from 'phaser';
 import type { BattleState, Pos, TerrainId } from '@core/types';
 import { MAP_H, MAP_W, posKey } from '@core/types';
-import { terrainAt } from '@core/battle/query';
+import { terrainAt, unitAt } from '@core/battle/query';
 import { biomeDef } from '@content/biomes';
 import { $save } from '@state/save';
-import { $battleUi, tapTile, type BattleUiState } from '@state/battleUi';
+import { $battleUi, beginDrag, cancelDrag, dragHover, endDrag, isDisplaced, tapTile, type BattleUiState } from '@state/battleUi';
 import { computeLayout, pixelToGrid, tileCenter, tileOrigin, type BoardLayout } from './layout';
 import { ensureTextures } from './textures';
 import { HL, TERRAIN_GLYPH, textStyle } from './style';
 import { UnitView } from './UnitView';
-import { bloodDecal, sceneAlive } from './fx';
+import { bloodDecal, sceneAlive, tween } from './fx';
+import { haptic } from '@platform/haptics';
 import { ensureTileTextures, ensureUnitTextures, hasTexture, tileTexKey, withTimeout } from './svgTextures';
 
 export const MAP_SCENE_KEY = 'Map';
@@ -40,6 +41,17 @@ export class MapScene extends Phaser.Scene {
   private lastLayoutKey = '';
   private decalCount = -1;
 
+  /* ---- Перетаскивание и предпросмотр ---- */
+  /** Палец лёг на своего юнита; ждём, сдвинется ли он дальше порога. */
+  private armed: { unitId: string; x: number; y: number } | null = null;
+  /** Юнит в руке. */
+  private drag: { unitId: string; view: UnitView; hoverKey: string | null } | null = null;
+  /** Юнит, который сейчас шлёпается на клетку (его положение анимируется). */
+  private landingId: string | null = null;
+  /** Юнит, чей вид стоит на movedTo (предпросмотр), а не на клетке из состояния. */
+  private displacedId: string | null = null;
+  private placementTween: Phaser.Tweens.Tween | null = null;
+
   constructor() {
     super(MAP_SCENE_KEY);
     this.ready = new Promise((r) => {
@@ -61,13 +73,14 @@ export class MapScene extends Phaser.Scene {
     });
     this.unsubUi = $battleUi.subscribe((ui) => this.drawHighlights(ui));
 
-    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      if ($battleUi.get().busy) return;
-      const dx = p.upX - p.downX;
-      const dy = p.upY - p.downY;
-      if (Math.hypot(dx, dy) > 14) return;
-      const pos = pixelToGrid(this.layout, p.upX, p.upY);
-      if (pos) tapTile(pos);
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
+    this.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => this.onPointerUp(p, true));
+    this.input.on(Phaser.Input.Events.GAME_OUT, () => {
+      // Палец/курсор ушёл с канваса: юнит в руке возвращается, тап отменяется.
+      if (this.drag) void this.finishDrag(null);
+      this.armed = null;
     });
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup, this);
@@ -110,6 +123,11 @@ export class MapScene extends Phaser.Scene {
     this.unsubUi?.();
     this.unsubSave = null;
     this.unsubUi = null;
+    if (this.drag) {
+      this.drag = null;
+      cancelDrag();
+    }
+    this.armed = null;
     this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
   }
 
@@ -138,6 +156,223 @@ export class MapScene extends Phaser.Scene {
     this.drawHighlights($battleUi.get());
   }
 
+  /* ---------- Ввод: тап и перетаскивание ---------- */
+
+  /** Порог смещения, после которого тап превращается в перетаскивание (px). */
+  private static readonly DRAG_THRESHOLD = 8;
+  /** Максимальное смещение, при котором отпускание всё ещё считается тапом (px). */
+  private static readonly TAP_SLOP = 14;
+
+  private canDragNow(): boolean {
+    const st = $save.get().battle;
+    const ui = $battleUi.get();
+    return !!st && !st.result && st.phase === 'player' && !ui.busy && !this.playing;
+  }
+
+  private onPointerDown(p: Phaser.Input.Pointer): void {
+    this.armed = null;
+    if (this.drag || !this.canDragNow()) return;
+    const st = $save.get().battle;
+    if (!st) return;
+    const pos = pixelToGrid(this.layout, p.x, p.y);
+    if (!pos) return;
+    const occ = unitAt(st, pos);
+    if (!occ || occ.side !== 'player' || occ.acted || !occ.alive) return;
+    this.armed = { unitId: occ.unitId, x: p.x, y: p.y };
+  }
+
+  private onPointerMove(p: Phaser.Input.Pointer): void {
+    if (!p.isDown) return;
+    if (!this.drag && this.armed) {
+      const d = Math.hypot(p.x - this.armed.x, p.y - this.armed.y);
+      if (d <= MapScene.DRAG_THRESHOLD) return;
+      const unitId = this.armed.unitId;
+      this.armed = null;
+      if (!this.canDragNow() || !beginDrag(unitId)) return;
+      const view = this.units.get(unitId);
+      if (!view || !view.scene) {
+        cancelDrag();
+        return;
+      }
+      this.placementTween?.stop();
+      this.placementTween = null;
+      if (this.displacedId === unitId) this.displacedId = null;
+      this.drag = { unitId, view, hoverKey: null };
+      view.setAlpha(1);
+      view.setDepth(50);
+      view.setLifted(true);
+    }
+    if (!this.drag) return;
+    this.followPointer(p);
+  }
+
+  /** Контейнер юнита следует за пальцем: на тач-экране — чуть выше пальца, чтобы его не заслонять. */
+  private followPointer(p: Phaser.Input.Pointer): void {
+    const drag = this.drag;
+    if (!drag || !drag.view.scene) return;
+    const lift = p.wasTouch ? this.tile * 0.55 : 0;
+    drag.view.setPosition(p.x, p.y - lift);
+    const tile = pixelToGrid(this.layout, p.x, p.y);
+    const key = tile ? posKey(tile) : '';
+    if (key !== drag.hoverKey) {
+      drag.hoverKey = key;
+      dragHover(tile);
+    }
+  }
+
+  private onPointerUp(p: Phaser.Input.Pointer, outside = false): void {
+    if (this.drag) {
+      const tile = outside ? null : pixelToGrid(this.layout, p.x, p.y);
+      void this.finishDrag(tile);
+      this.armed = null;
+      return;
+    }
+    this.armed = null;
+    if (outside || $battleUi.get().busy) return;
+    const dx = p.upX - p.downX;
+    const dy = p.upY - p.downY;
+    if (Math.hypot(dx, dy) > MapScene.TAP_SLOP) return;
+    const pos = pixelToGrid(this.layout, p.upX, p.upY);
+    if (pos) tapTile(pos);
+  }
+
+  /** Отпустили: контроллер решает, куда встал юнит; сцена играет падение и отряхивание. */
+  private async finishDrag(tile: Pos | null): Promise<void> {
+    const drag = this.drag;
+    if (!drag) return;
+    this.drag = null;
+    const { unitId, view } = drag;
+    this.landingId = unitId;
+    const ok = endDrag(tile);
+    const ui = $battleUi.get();
+    const st = $save.get().battle;
+    if (ui.busy || ui.mode === 'busy') {
+      // Действие уже подтверждено (например, атака без подтверждения): анимацию ведёт презентер.
+      this.landingId = null;
+      if (view.scene) view.setLifted(false, 80);
+      return;
+    }
+    let dest: Pos | null = null;
+    if (ok && ui.movedTo && ui.selectedId === unitId) dest = ui.movedTo;
+    else {
+      const bu = st?.units[unitId];
+      if (bu) dest = bu.pos;
+    }
+    if (!view.scene || !dest) {
+      this.landingId = null;
+      return;
+    }
+    await this.landAt(view, dest, ok ? 120 : 180);
+    this.landingId = null;
+    if (ok && ui.selectedId === unitId && isDisplaced($battleUi.get())) this.displacedId = unitId;
+    this.applyPreviewPlacement($battleUi.get(), true);
+    if (sceneAlive(this)) this.drawHighlights($battleUi.get());
+  }
+
+  /** Падение на центр клетки с одновременным опусканием тела, затем шлепок и отряхивание. */
+  private async landAt(view: UnitView, pos: Pos, fallMs: number): Promise<void> {
+    const c = this.center(pos);
+    view.setDepth(50);
+    view.setLifted(false, fallMs);
+    await tween(this, { targets: view, x: c.x, y: c.y, duration: fallMs, ease: 'Quad.easeIn' });
+    if (!view.scene) return;
+    view.setPosition(c.x, c.y);
+    haptic('light');
+    await view.playLanding();
+    if (view.scene) view.setDepth(10 + pos.y * 0.01);
+  }
+
+  /* ---------- Предпросмотр: вид выбранного юнита стоит на movedTo ---------- */
+
+  /** Ids видов, положение которых сейчас контролируют палец или анимация приземления. */
+  private lockedIds(): Set<string> {
+    const set = new Set<string>();
+    if (this.drag) set.add(this.drag.unitId);
+    if (this.landingId) set.add(this.landingId);
+    return set;
+  }
+
+  /**
+   * Перед проигрыванием событий презентером: отдать id смещённого юнита, чтобы его не «дёргало»
+   * обратно на исходную клетку (презентер стартует движение с того места, где вид стоит).
+   */
+  beginPlayback(): Set<string> {
+    const skip = new Set<string>();
+    this.placementTween?.stop();
+    this.placementTween = null;
+    if (this.displacedId) {
+      skip.add(this.displacedId);
+      this.displacedId = null;
+    }
+    this.ghost?.destroy();
+    this.ghost = null;
+    this.ghostKey = '';
+    return skip;
+  }
+
+  private returnView(id: string, st: BattleState, immediate: boolean): void {
+    const view = this.units.get(id);
+    const bu = st.units[id];
+    if (!view || !view.scene || !bu) return;
+    const c = this.center(bu.pos);
+    if (immediate || (Math.abs(view.x - c.x) < 1 && Math.abs(view.y - c.y) < 1)) {
+      view.setPosition(c.x, c.y);
+      view.setDepth(10 + bu.pos.y * 0.01);
+      return;
+    }
+    view.setDepth(40);
+    this.placementTween = this.tweens.add({
+      targets: view,
+      x: c.x,
+      y: c.y,
+      duration: 150,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (view.scene) view.setDepth(10 + bu.pos.y * 0.01);
+      },
+    });
+  }
+
+  private applyPreviewPlacement(ui: BattleUiState, immediate = false): void {
+    const st = $save.get().battle;
+    if (!st) return;
+    if (this.drag || ui.dragging) return; // палец управляет
+    if (ui.mode === 'busy' || this.playing) return; // презентер доигрывает
+    const sel = ui.selectedId;
+    const view = sel ? this.units.get(sel) : undefined;
+    if (sel && view && view.scene && ui.movedTo && isDisplaced(ui) && this.landingId !== sel) {
+      const target = ui.movedTo;
+      const c = this.center(target);
+      if (this.displacedId && this.displacedId !== sel) this.returnView(this.displacedId, st, immediate);
+      this.displacedId = sel;
+      if (Math.abs(view.x - c.x) > 1 || Math.abs(view.y - c.y) > 1) {
+        this.placementTween?.stop();
+        if (immediate) {
+          view.setPosition(c.x, c.y);
+          view.setDepth(10 + target.y * 0.01);
+        } else {
+          view.setDepth(40);
+          this.placementTween = this.tweens.add({
+            targets: view,
+            x: c.x,
+            y: c.y,
+            duration: 150,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+              if (view.scene) view.setDepth(10 + target.y * 0.01);
+            },
+          });
+        }
+      } else view.setDepth(10 + target.y * 0.01);
+      return;
+    }
+    if (this.displacedId) {
+      const id = this.displacedId;
+      this.displacedId = null;
+      if (this.landingId !== id) this.returnView(id, st, immediate);
+    }
+  }
+
   private relayout(): void {
     this.layout = computeLayout(this.scale.width, this.scale.height);
     const key = `${this.layout.tile}:${this.layout.ox}:${this.layout.oy}`;
@@ -159,35 +394,46 @@ export class MapScene extends Phaser.Scene {
     return this.layout.tile;
   }
 
-  /** Полная синхронизация визуала с состоянием боя. */
-  syncFromState(st: BattleState): void {
+  /**
+   * Полная синхронизация визуала с состоянием боя.
+   * skipIds — виды, положение которых не трогаем (смещённый предпросмотр, юнит в руке, приземление).
+   */
+  syncFromState(st: BattleState, skipIds?: Set<string>): void {
     if (st.map !== this.lastMapRef) {
       this.lastMapRef = st.map;
       this.drawTiles(st);
     } else this.updateWalls(st);
     this.syncDecals(st);
+    const locked = this.lockedIds();
+    if (skipIds) for (const id of skipIds) locked.add(id);
     const alive = new Set<string>();
     for (const bu of Object.values(st.units)) {
       if (!bu.alive) continue;
       alive.add(bu.unitId);
       const view = this.ensureUnitView(bu.unitId, st);
       if (!view) continue;
-      const c = this.center(bu.pos);
-      view.setPosition(c.x, c.y);
-      view.setDepth(10 + bu.pos.y * 0.01);
+      const keepPos = locked.has(bu.unitId);
+      if (!keepPos) {
+        const c = this.center(bu.pos);
+        view.setPosition(c.x, c.y);
+        view.setDepth(10 + bu.pos.y * 0.01);
+        view.setScale(1);
+        view.setAngle(0);
+      }
       view.setHp(bu.hp, bu.maxHp);
       view.setCd(bu.specialCd);
       view.setActed(bu.acted && st.phase === bu.side);
-      view.setScale(1);
-      view.setAngle(0);
       view.setAlpha(bu.acted && st.phase === bu.side ? 0.45 : 1);
     }
     for (const [id, view] of this.units) {
       if (!alive.has(id)) {
+        if (this.displacedId === id) this.displacedId = null;
         view.destroy();
         this.units.delete(id);
       }
     }
+    // Если юнит стоит на клетке предпросмотра — вернуть его туда после снапа к состоянию.
+    if (!this.playing) this.applyPreviewPlacement($battleUi.get(), true);
   }
 
   ensureUnitView(unitId: string, st: BattleState): UnitView | null {
@@ -379,14 +625,15 @@ export class MapScene extends Phaser.Scene {
       const by = tipY - dy * hl;
       g.fillTriangle(tipX, tipY, bx + nx * hh, by + ny * hh, bx - nx * hh, by - ny * hh);
     };
-    pass(Math.max(6, t * 0.3), 0x0d1b2a, 0.85, Math.max(2, t * 0.05)); // контур
-    pass(Math.max(3, t * 0.17), HL.path, 0.95, 0); // заливка
+    // Стрелка полупрозрачная, чтобы не перекрывать тайлы и юнитов
+    pass(Math.max(6, t * 0.3), 0x0d1b2a, 0.45, Math.max(2, t * 0.05)); // контур
+    pass(Math.max(3, t * 0.17), HL.path, 0.55, 0); // заливка
     // маркер старта
     const start = pts[0];
     if (start) {
-      g.lineStyle(Math.max(2, t * 0.05), 0x0d1b2a, 0.85);
+      g.lineStyle(Math.max(2, t * 0.05), 0x0d1b2a, 0.45);
       g.strokeCircle(start.x, start.y, t * 0.22);
-      g.lineStyle(Math.max(1, t * 0.03), HL.path, 0.95);
+      g.lineStyle(Math.max(1, t * 0.03), HL.path, 0.55);
       g.strokeCircle(start.x, start.y, t * 0.22);
     }
   }
@@ -412,23 +659,27 @@ export class MapScene extends Phaser.Scene {
     }
     if (ui.path && ui.path.length > 1) this.drawPathArrow(pg, ui.path);
 
-    // Призрак на клетке назначения
+    // Сам юнит стоит на клетке предпросмотра (или в руке), а на исходной клетке — бледный призрак
     const st = $save.get().battle;
-    const ghostKey = ui.selectedId && ui.movedTo && st ? `${ui.selectedId}@${posKey(ui.movedTo)}` : '';
+    this.applyPreviewPlacement(ui);
+    const showGhost = !!ui.selectedId && !!ui.origin && !!st && (ui.dragging || isDisplaced(ui) || this.landingId === ui.selectedId);
+    const ghostKey = showGhost && ui.selectedId && ui.origin ? `${ui.selectedId}@${posKey(ui.origin)}` : '';
     if (ghostKey !== this.ghostKey) {
       this.ghost?.destroy();
       this.ghost = null;
       this.ghostKey = ghostKey;
-      if (ghostKey && ui.selectedId && ui.movedTo && st) {
+      if (ghostKey && ui.selectedId && ui.origin && st) {
         const unit = st.roster[ui.selectedId];
         const bu = st.units[ui.selectedId];
-        if (unit && bu && !(bu.pos.x === ui.movedTo.x && bu.pos.y === ui.movedTo.y)) {
+        if (unit && bu) {
           this.ghost = new UnitView(this, unit, bu.side, { size: this.tile, showHp: false, showBadges: false });
-          const c = this.center(ui.movedTo);
-          this.ghost.setPosition(c.x, c.y).setAlpha(0.5).setDepth(11);
+          const c = this.center(ui.origin);
+          this.ghost.setPosition(c.x, c.y).setAlpha(0.35).setDepth(9);
         }
       }
     }
+    // Юнит в руке: подсветка «сюда нельзя»
+    if (this.drag && this.drag.view.scene) this.drag.view.setInvalidTint(ui.dragging && !ui.dragValid);
 
     // Маркер цели
     let markerPos: Pos | null = null;

@@ -69,6 +69,25 @@ export function bloodBurst(scene: Phaser.Scene, x: number, y: number, count: num
   scene.time.delayedCall(800 / speedMul + 100, () => emitter.destroy());
 }
 
+/** Облачко пыли при приземлении (шлепок на клетку). Не блокирует. */
+export function dustPuff(scene: Phaser.Scene, x: number, y: number, size: number, count = 8): void {
+  if (!sceneAlive(scene)) return;
+  const emitter = scene.add.particles(x, y, TEX.dot, {
+    speed: { min: size * 0.6, max: size * 1.8 },
+    angle: { min: 200, max: 340 },
+    scale: { start: 0.55, end: 0 },
+    alpha: { start: 0.85, end: 0 },
+    lifespan: { min: 280, max: 480 },
+    gravityY: size * 4,
+    tint: [0xbdb7a8, 0xd9d2c3, 0x9e978a, 0xe8e2d4],
+    emitting: false,
+    quantity: count,
+  });
+  emitter.setDepth(24);
+  emitter.explode(count);
+  scene.time.delayedCall(700, () => emitter.destroy());
+}
+
 /** Кровавый декаль на земле. */
 export function bloodDecal(scene: Phaser.Scene, x: number, y: number, size: number, kind: 'splat' | 'pool', seed = 0): Phaser.GameObjects.Image {
   const key = kind === 'pool' ? TEX.pool : TEX.splat;

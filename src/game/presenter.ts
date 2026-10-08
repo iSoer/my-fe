@@ -31,7 +31,10 @@ export class GamePresenter implements Presenter {
     if (!map.sys.isActive()) return;
     map.playing = true;
     try {
-      map.syncFromState(before);
+      // Смещённый предпросмотр: вид уже стоит на клетке назначения — не дёргаем его назад,
+      // событие moved начнёт анимацию с того места, где он стоит.
+      const skip = map.beginPlayback();
+      map.syncFromState(before, skip);
       for (const ev of events) {
         if (!map.sys.isActive()) break;
         await this.handle(ev, before, after, map);
@@ -113,6 +116,17 @@ export class GamePresenter implements Presenter {
     const view = map.units.get(unitId);
     if (!view || path.length < 2) return;
     view.setAlpha(1);
+    const last = path[path.length - 1];
+    const prevLast = path[path.length - 2];
+    if (last) {
+      const c = map.center(last);
+      if (Math.abs(view.x - c.x) < 2 && Math.abs(view.y - c.y) < 2) {
+        // Юнит уже стоит на месте (перетащили или выбрали клетку заранее) — без повторного пробега.
+        if (prevLast && last.x !== prevLast.x) view.setFacing(last.x > prevLast.x ? 1 : -1);
+        view.setDepth(10 + last.y * 0.01);
+        return wait(map, 40 / sp);
+      }
+    }
     view.setRunning(true);
     for (let i = 1; i < path.length; i++) {
       const p = path[i];

@@ -5,7 +5,7 @@
 import { BLUSH, INK, NOSE, shade, type FurArt } from './palettes';
 
 export type ArtSpecies = 'cat' | 'dog' | 'mouse';
-export type Pose = 'idle' | 'run' | 'hurt' | 'dead' | 'happy';
+export type Pose = 'idle' | 'run' | 'hurt' | 'dead' | 'happy' | 'carried';
 export type ArtMoveType = 'infantry' | 'armor' | 'cavalry' | 'flier';
 export type ArtWeapon = 'claw' | 'fang' | 'stick' | 'hiss' | 'howl' | 'growl' | 'slingshot' | 'burr' | 'bandage' | 'purr';
 
@@ -38,10 +38,10 @@ const sw = 'stroke-width="1.5"';
 
 /* ---------- Глаза ---------- */
 
-function openEyes(a: CritterArt, cx: number, cy: number, shiftIn: number): string {
-  let rx = 8;
-  let ry = 10.5;
-  if (a.eyes === 1) {
+function openEyes(a: CritterArt, cx: number, cy: number, shiftIn: number, big = false): string {
+  let rx = big ? 9.5 : 8;
+  let ry = big ? 12 : 10.5;
+  if (a.eyes === 1 && !big) {
     rx = 7.5;
     ry = 8.5;
   }
@@ -87,8 +87,9 @@ function eyesGroup(a: CritterArt, pose: Pose): string {
       <path d="M38 ${cy - 6} l10 6 l-10 6" /><path d="M82 ${cy - 6} l-10 6 l10 6" /></g>${brows}`;
   }
   if (pose === 'happy' && !a.animated) return happy.replace(' class="eyes-happy"', '') + brows;
+  const big = pose === 'carried';
   const open = `<g class="eyes-open"${a.animated ? ` style="animation-delay:${(a.blinkDelay ?? 0).toFixed(2)}s"` : ''}>
-      ${openEyes(a, lx, cy, cross)}${openEyes(a, rx, cy, -cross)}</g>`;
+      ${openEyes(a, lx, cy, cross, big)}${openEyes(a, rx, cy, -cross, big)}</g>`;
   return open + (a.animated ? happy : '') + brows;
 }
 
@@ -101,6 +102,7 @@ function mouth(a: CritterArt, pose: Pose): string {
     if (pose === 'dead') return `${nose}<path d="M52 68 h16" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><ellipse cx="64" cy="71" rx="3.5" ry="4.5" fill="#ff7f9c" />`;
     if (pose === 'hurt') return `${nose}<ellipse cx="60" cy="69" rx="4" ry="4.5" fill="${INK}" /><ellipse cx="60" cy="71" rx="2.2" ry="2" fill="#ff7f9c" />`;
     if (pose === 'happy') return `${nose}<path d="M50 66 q5 7 10 0 q5 7 10 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" />`;
+    if (pose === 'carried') return `${nose}<ellipse cx="60" cy="69" rx="2.6" ry="3" fill="${INK}" />`;
     const fang = a.weapon === 'fang' ? `<path d="M55 67 l2 5 l2 -5 z M61 67 l2 5 l2 -5 z" fill="#fff" stroke="${INK}" stroke-width=".6" />` : '';
     return `${nose}<path d="M53 66 q3.5 4 7 0 q3.5 4 7 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" />${fang}`;
   }
@@ -109,13 +111,14 @@ function mouth(a: CritterArt, pose: Pose): string {
     if (pose === 'dead') return `${base}<path d="M52 69 h16" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M64 69 q6 4 3 9 q-4 1 -5 -4 z" fill="#ff7f9c" />`;
     if (pose === 'hurt') return `${base}<ellipse cx="60" cy="70" rx="5" ry="4.5" fill="${INK}" /><path d="M57 72 q3 4 6 0 z" fill="#ff7f9c" />`;
     if (pose === 'happy') return `${base}<path d="M50 67 q10 10 20 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M56 70 q4 9 8 0 z" fill="#ff8fa8" />`;
+    if (pose === 'carried') return `${base}<ellipse cx="60" cy="70" rx="3" ry="3.4" fill="${INK}" />`;
     const fang = a.weapon === 'fang' ? `<path d="M54 69 l2 5 l2 -5 z M62 69 l2 5 l2 -5 z" fill="#fff" stroke="${INK}" stroke-width=".6" />` : '';
     return `${base}<path d="M60 65 v3 M54 68 q6 5 12 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M57.5 70 q2.5 8 5 0 z" fill="${NOSE}" />${fang}`;
   }
   // мышь: вытянутая мордочка, розовый нос, два зуба
   const muzzle = `<ellipse cx="60" cy="63" rx="13" ry="9.5" fill="${a.fur.belly}" /><circle cx="60" cy="67.5" r="3.4" fill="${NOSE}" stroke="${shade(NOSE, -0.25)}" stroke-width=".8" />`;
   if (pose === 'dead') return `${muzzle}<path d="M54 72 h12" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" /><ellipse cx="63" cy="74" rx="2.5" ry="3.5" fill="#ff7f9c" />`;
-  if (pose === 'hurt') return `${muzzle}<ellipse cx="60" cy="73" rx="3" ry="3.5" fill="${INK}" />`;
+  if (pose === 'hurt' || pose === 'carried') return `${muzzle}<ellipse cx="60" cy="73" rx="${pose === 'carried' ? 2.2 : 3}" ry="3.2" fill="${INK}" />`;
   const teeth = `<rect x="57.2" y="70.5" width="2.6" height="4.5" rx=".6" fill="#fff" stroke="${INK}" stroke-width=".6" /><rect x="60.2" y="70.5" width="2.6" height="4.5" rx=".6" fill="#fff" stroke="${INK}" stroke-width=".6" />`;
   const smile = pose === 'happy' ? `<path d="M53 70 q7 6 14 0" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" />` : `<path d="M60 70.5 v1" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" />`;
   return `${muzzle}${smile}${teeth}`;
@@ -277,14 +280,14 @@ function weaponProp(a: CritterArt): string {
 function tail(a: CritterArt, pose: Pose): string {
   const f = a.fur;
   if (a.species === 'cat') {
-    const d = pose === 'dead' ? 'M38 92 C 20 100, 6 96, 6 90' : pose === 'run' ? 'M38 92 C 12 90, 6 66, 20 56' : 'M38 92 C 14 94, 8 72, 22 62';
+    const d = pose === 'dead' ? 'M38 92 C 20 100, 6 96, 6 90' : pose === 'run' ? 'M38 92 C 12 90, 6 66, 20 56' : pose === 'carried' ? 'M38 92 C 30 100, 30 108, 24 112' : 'M38 92 C 14 94, 8 72, 22 62';
     return `<g class="tail"><path d="${d}" fill="none" stroke="${f.line}" stroke-width="12" stroke-linecap="round" opacity=".35" /><path d="${d}" fill="none" stroke="${f.fur}" stroke-width="9" stroke-linecap="round" /></g>`;
   }
   if (a.species === 'dog') {
-    const d = pose === 'dead' ? 'M34 86 C 20 92, 10 90, 8 86' : 'M34 86 C 18 80, 20 58, 38 62';
+    const d = pose === 'dead' ? 'M34 86 C 20 92, 10 90, 8 86' : pose === 'carried' ? 'M34 86 C 28 94, 28 102, 22 108' : 'M34 86 C 18 80, 20 58, 38 62';
     return `<g class="tail"><path d="${d}" fill="none" stroke="${f.line}" stroke-width="12" stroke-linecap="round" opacity=".35" /><path d="${d}" fill="none" stroke="${f.fur}" stroke-width="9" stroke-linecap="round" /></g>`;
   }
-  const d = pose === 'dead' ? 'M40 94 C 24 104, 10 100, 4 92' : pose === 'run' ? 'M40 94 C 20 100, 8 86, 12 70' : 'M40 94 C 22 98, 10 86, 18 70 C 22 62, 14 60, 12 64';
+  const d = pose === 'dead' ? 'M40 94 C 24 104, 10 100, 4 92' : pose === 'run' ? 'M40 94 C 20 100, 8 86, 12 70' : pose === 'carried' ? 'M40 94 C 34 104, 34 112, 26 118' : 'M40 94 C 22 98, 10 86, 18 70 C 22 62, 14 60, 12 64';
   return `<g class="tail"><path d="${d}" fill="none" stroke="${shade(f.earInner, -0.25)}" stroke-width="5" stroke-linecap="round" /><path d="${d}" fill="none" stroke="${f.earInner}" stroke-width="3" stroke-linecap="round" /></g>`;
 }
 
@@ -292,12 +295,13 @@ function legs(a: CritterArt, pose: Pose): string {
   if (a.moveType === 'cavalry') return '';
   const f = a.fur;
   const fill = a.pattern === 3 ? f.belly : f.fur;
-  const dx = pose === 'run' ? 6 : 0;
+  const dx = pose === 'run' ? 6 : pose === 'carried' ? -4 : 0;
+  const cy = pose === 'carried' ? 99 : 102;
   const rx = a.species === 'mouse' ? 7.5 : 9;
-  const ry = a.species === 'mouse' ? 5.5 : 6.5;
+  const ry = (a.species === 'mouse' ? 5.5 : 6.5) * (pose === 'carried' ? 1.15 : 1);
   return `<g class="legs">
-    <ellipse class="leg leg-back" cx="${44 - dx}" cy="102" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} />
-    <ellipse class="leg leg-front" cx="${76 + dx}" cy="102" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} /></g>`;
+    <ellipse class="leg leg-back" cx="${44 - dx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} />
+    <ellipse class="leg leg-front" cx="${76 + dx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} /></g>`;
 }
 
 function body(a: CritterArt): string {
@@ -334,7 +338,13 @@ function head(a: CritterArt, pose: Pose): string {
 export function critterSvg(a: CritterArt): string {
   const pose: Pose = a.pose ?? 'idle';
   const rigTransform =
-    pose === 'hurt' ? 'transform="translate(0 6) scale(1.06 0.94) translate(0 -2)"' : pose === 'run' ? 'transform="translate(0 -3) rotate(4 60 86)"' : '';
+    pose === 'hurt'
+      ? 'transform="translate(0 6) scale(1.06 0.94) translate(0 -2)"'
+      : pose === 'run'
+        ? 'transform="translate(0 -3) rotate(4 60 86)"'
+        : pose === 'carried'
+          ? 'transform="translate(60 40) scale(0.96 1.06) rotate(-6) translate(-60 -40)"'
+          : '';
   return `<svg viewBox="${VIEW_BOX}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" overflow="visible">
   <g class="rig" ${rigTransform}>
     ${gearBehind(a)}

@@ -7,6 +7,7 @@ import { weaponDef } from '@content/weapons';
 import { TEX } from './textures';
 import { MOVE_GLYPH, WEAPON_COLOR_HEX, hexCss, hpColor, textStyle } from './style';
 import { ensureUnitTexture, ensureUnitTextures, hasTexture, unitTexKey } from './svgTextures';
+import { dustPuff, tween } from './fx';
 
 export interface UnitViewOptions {
   size: number;
@@ -33,6 +34,8 @@ export class UnitView extends Phaser.GameObjects.Container {
 
   private readonly unit: UnitInstance;
   private readonly shadow: Phaser.GameObjects.Image;
+  /** Тело (спрайт или плейсхолдер): поднимается «за шкирку», сплющивается при приземлении. */
+  private readonly rig: Phaser.GameObjects.Container;
   private sprite: Phaser.GameObjects.Image | null = null;
   private disc: Phaser.GameObjects.Image | null = null;
   private emoji: Phaser.GameObjects.Text | null = null;
@@ -53,6 +56,10 @@ export class UnitView extends Phaser.GameObjects.Container {
   private runTimer: Phaser.Time.TimerEvent | null = null;
   private runFrame = 0;
   private hurtTimer: Phaser.Time.TimerEvent | null = null;
+  private lifted = false;
+  private invalidTint = false;
+  private liftTweens: Phaser.Tweens.Tween[] = [];
+  private landingTweens: Phaser.Tweens.Tween[] = [];
 
   constructor(scene: Phaser.Scene, unit: UnitInstance, side: Side, opts: UnitViewOptions) {
     super(scene, 0, 0);
@@ -69,14 +76,15 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.hasSpecial = !!unit.skills.special;
 
     this.shadow = scene.add.image(0, 0, TEX.disc).setTint(this.weaponColor).setAlpha(0.55);
-    this.add(this.shadow);
+    this.rig = scene.add.container(0, 0);
+    this.add([this.shadow, this.rig]);
 
     const idleKey = unitTexKey(unit, 'idle', 'map');
     if (hasTexture(scene, idleKey)) this.attachSprite(idleKey);
     else {
       this.disc = scene.add.image(0, 0, TEX.disc).setTint(this.furColor);
       this.emoji = scene.add.text(0, 0, unit.species === 'cat' ? '🐱' : unit.species === 'dog' ? '🐶' : '🐭', textStyle(24, '#fff', false, 0)).setOrigin(0.5);
-      this.add([this.disc, this.emoji]);
+      this.rig.add([this.disc, this.emoji]);
       void ensureUnitTextures(scene, unit, 'map').then(() => {
         if (!this.scene || this.sprite) return;
         this.attachSprite(unitTexKey(unit, this.pose, 'map'));
@@ -101,8 +109,9 @@ export class UnitView extends Phaser.GameObjects.Container {
     const img = this.scene.add.image(0, 0, key).setOrigin(0.5, 0.62);
     img.setFlipX(this.facing < 0);
     this.sprite = img;
-    // Спрайт над тенью, под HP/значками.
-    this.addAt(img, 1);
+    // Спрайт в контейнере тела: над тенью, под HP/значками.
+    this.rig.addAt(img, 0);
+    if (this.invalidTint) img.setTint(0xffb3b3);
     if (this.disc) {
       this.disc.destroy();
       this.disc = null;
@@ -116,7 +125,9 @@ export class UnitView extends Phaser.GameObjects.Container {
   resize(size: number): void {
     this.size = size;
     const feetY = size * 0.36;
-    this.shadow.setDisplaySize(size * 0.7, size * 0.25);
+    const k = this.lifted ? 0.7 : 1;
+    this.shadow.setDisplaySize(size * 0.7 * k, size * 0.25 * k);
+    this.shadow.setAlpha(this.lifted ? 0.35 : 0.55);
     this.shadow.setPosition(0, feetY);
     if (this.sprite) {
       const h = size * 1.05;
@@ -262,11 +273,102 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.dead = true;
   }
 
+  /** Подсветка «сюда нельзя» при перетаскивании. */
+  setInvalidTint(on: boolean): void {
+    if (!this.scene) return;
+    this.invalidTint = on;
+    if (this.sprite) {
+      if (on) this.sprite.setTint(0xffb3b3);
+      else this.sprite.clearTint();
+    } else this.disc?.setTint(on ? 0xff9f9f : this.furColor);
+  }
+
+  get isLifted(): boolean {
+    return this.lifted;
+  }
+
+  private killLift(): void {
+    for (const t of this.liftTweens) t.stop();
+    this.liftTweens = [];
+  }
+
+  /**
+   * Взять «за шкирку» (on) или опустить (off): тело поднимается на 0.45 клетки, растёт до 1.12,
+   * наклоняется на −8°, поза carried; тень остаётся на земле и уменьшается.
+   */
+  setLifted(on: boolean, duration = 120): void {
+    if (!this.scene || this.lifted === on) return;
+    this.lifted = on;
+    this.killLift();
+    const size = this.size;
+    if (on) {
+      if (!this.dead) this.setPose('carried');
+      this.liftTweens.push(
+        this.scene.tweens.add({ targets: this.rig, y: -size * 0.45, scaleX: 1.12, scaleY: 1.12, angle: -8, duration, ease: 'Back.easeOut' }),
+        this.scene.tweens.add({ targets: this.shadow, displayWidth: size * 0.7 * 0.7, displayHeight: size * 0.25 * 0.7, alpha: 0.35, duration, ease: 'Quad.easeOut' }),
+      );
+      return;
+    }
+    this.setInvalidTint(false);
+    if (!this.dead && !this.runTimer) this.setPose('idle');
+    this.liftTweens.push(
+      this.scene.tweens.add({ targets: this.rig, y: 0, scaleX: 1, scaleY: 1, angle: 0, duration, ease: 'Quad.easeIn' }),
+      this.scene.tweens.add({ targets: this.shadow, displayWidth: size * 0.7, displayHeight: size * 0.25, alpha: 0.55, duration, ease: 'Quad.easeIn' }),
+    );
+  }
+
+  /** Мировые координаты лап (для пыли). */
+  feetWorld(): { x: number; y: number } {
+    const m = this.getWorldTransformMatrix();
+    const p = m.transformPoint(0, this.size * 0.36);
+    return { x: p.x, y: p.y };
+  }
+
+  /**
+   * Шлепок на клетку: сплющивание, отскок, облачко пыли и «отряхивание» (покачивание ±9°).
+   * Контейнер к этому моменту уже стоит на центре клетки.
+   */
+  async playLanding(): Promise<void> {
+    if (!this.scene) return;
+    for (const t of this.landingTweens) t.stop();
+    this.landingTweens = [];
+    this.killLift();
+    this.lifted = false;
+    this.setInvalidTint(false);
+    this.rig.setPosition(0, 0).setAngle(0);
+    this.shadow.setAlpha(0.55);
+    this.resize(this.size);
+    if (!this.dead && !this.runTimer) this.setPose('idle');
+    const feet = this.feetWorld();
+    dustPuff(this.scene, feet.x, feet.y, this.size);
+    await tween(this.scene, { targets: this.rig, scaleX: 1.22, scaleY: 0.78, duration: 70, ease: 'Quad.easeOut' });
+    if (!this.scene) return;
+    await tween(this.scene, { targets: this.rig, scaleX: 0.95, scaleY: 1.05, duration: 90, ease: 'Quad.easeInOut' });
+    if (!this.scene) return;
+    await tween(this.scene, { targets: this.rig, scaleX: 1, scaleY: 1, duration: 80, ease: 'Quad.easeOut' });
+    if (!this.scene) return;
+    // Отряхнуться
+    const steps: { angle: number; sx: number; d: number }[] = [
+      { angle: -9, sx: 1.04, d: 80 },
+      { angle: 9, sx: 0.97, d: 90 },
+      { angle: -6, sx: 1.03, d: 80 },
+      { angle: 6, sx: 0.98, d: 70 },
+      { angle: 0, sx: 1, d: 60 },
+    ];
+    for (const st of steps) {
+      if (!this.scene) return;
+      await tween(this.scene, { targets: this.rig, angle: st.angle, scaleX: st.sx, duration: st.d, ease: 'Sine.easeInOut' });
+    }
+    if (this.scene) this.rig.setAngle(0).setScale(1);
+  }
+
   override destroy(fromScene?: boolean): void {
     this.runTimer?.remove(false);
     this.hurtTimer?.remove(false);
     this.runTimer = null;
     this.hurtTimer = null;
+    this.killLift();
+    for (const t of this.landingTweens) t.stop();
     super.destroy(fromScene);
   }
 

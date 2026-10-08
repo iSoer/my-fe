@@ -10,6 +10,9 @@ import { $battle, $settings, finishBattle, updateSettings } from '@state/save';
 import {
   $battleUi,
   cancel,
+  chooseAssist,
+  chooseAttack,
+  chooseMove,
   confirm,
   endTurn,
   enterBattleScreen,
@@ -146,6 +149,67 @@ function AssistPanel({ state, ui }: { state: BattleState; ui: BattleUiState }) {
   );
 }
 
+interface ActionDef {
+  key: string;
+  label: string;
+  onClick?: () => void;
+  primary?: boolean;
+  disabled?: boolean;
+  /** Мелкая подпись под названием (например, «скоро»). */
+  caption?: string;
+}
+
+/** Контекстное меню действий: главное действие первым, остальные — переносом. */
+function ActionMenu({ actions }: { actions: ActionDef[] }) {
+  return (
+    <div class="panel-actions wrap">
+      {actions.map((a) => (
+        <Button
+          key={a.key}
+          primary={a.primary}
+          disabled={a.disabled}
+          class={a.caption ? 'btn-captioned' : undefined}
+          onClick={() => {
+            if (a.disabled || !a.onClick) return;
+            haptic('light');
+            a.onClick();
+          }}
+        >
+          {a.caption ? (
+            <span class="btn-stack">
+              <span>{a.label}</span>
+              <span class="caption">{a.caption}</span>
+            </span>
+          ) : (
+            a.label
+          )}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Меню для юнита на клетке `atOrigin ? исходной : movedTo`.
+ * С врагом в досягаемости: Атаковать · Передвинуться · Ждать · Предметы (скоро); без врага — только передвижение и ожидание.
+ */
+function contextActions(ui: BattleUiState, atOrigin: boolean): ActionDef[] {
+  const a = ui.actions;
+  const out: ActionDef[] = [];
+  if (a.attack) out.push({ key: 'attack', label: 'Атаковать', primary: true, onClick: chooseAttack });
+  if (a.assist) out.push({ key: 'assist', label: 'Поддержать', onClick: chooseAssist });
+  if (atOrigin) {
+    if (a.move) out.push({ key: 'move', label: 'Передвинуться', primary: !a.attack, onClick: chooseMove });
+    out.push({ key: 'wait', label: 'Ждать', onClick: () => void waitHere() });
+  } else {
+    out.push({ key: 'wait', label: 'Ждать', primary: !a.attack, onClick: () => void waitHere() });
+    if (a.move) out.push({ key: 'move', label: 'Передвинуться', onClick: chooseMove });
+  }
+  if (a.attack) out.push({ key: 'items', label: 'Предметы', disabled: true, caption: 'скоро' });
+  out.push({ key: 'cancel', label: 'Отмена', onClick: cancel });
+  return out;
+}
+
 function EnemyInfo({ state, unitId }: { state: BattleState; unitId: string }) {
   const bu = state.units[unitId];
   const unit = state.roster[unitId];
@@ -218,7 +282,28 @@ export function BattleScreen() {
   const selectedUnit = ui.selectedId ? battle.roster[ui.selectedId] : undefined;
   const biome = biomeDef(battle.map.biomeId);
 
+  const mini = selected && selectedUnit ? <UnitMini state={battle} bu={selected} unit={selectedUnit} /> : null;
+  const cancelOnly = (hint: string) => (
+    <>
+      {mini}
+      <div class="hint compact">{hint}</div>
+      <div class="panel-actions">
+        <Button onClick={cancel}>Отмена</Button>
+      </div>
+    </>
+  );
+
   const panel = () => {
+    if (ui.dragging) {
+      return (
+        <>
+          {mini}
+          <div class={`hint compact ${ui.dragHover && !ui.dragValid ? 'danger' : ''}`}>
+            {ui.dragHover && !ui.dragValid ? 'Сюда нельзя' : 'Отпустите бойца на клетке'}
+          </div>
+        </>
+      );
+    }
     switch (ui.mode) {
       case 'busy':
         return <div class="hint">{isPlayer ? 'Анимация…' : 'Ход врага…'}</div>;
@@ -236,34 +321,33 @@ export function BattleScreen() {
       case 'unitSelected':
         return (
           <>
-            {selected && selectedUnit && <UnitMini state={battle} bu={selected} unit={selectedUnit} />}
-            <div class="muted small center-text">Выберите клетку, цель или союзника</div>
-            <div class="panel-actions">
-              <Button onClick={cancel}>Отмена</Button>
-            </div>
+            {mini}
+            <ActionMenu actions={contextActions(ui, true)} />
+            <div class="hint tiny">Тап по клетке или перетаскивание тоже передвигает бойца</div>
           </>
         );
       case 'movedPreview':
         return (
           <>
-            {selected && selectedUnit && <UnitMini state={battle} bu={selected} unit={selectedUnit} />}
-            <div class="panel-actions">
-              <Button onClick={cancel}>Отмена</Button>
-              <Button primary onClick={() => void waitHere()}>
-                Ждать
-              </Button>
-            </div>
+            {mini}
+            <ActionMenu actions={contextActions(ui, false)} />
           </>
         );
+      case 'moveTargeting':
+        return cancelOnly('Выберите клетку или перетащите бойца');
+      case 'attackTargeting':
+        return cancelOnly('Выберите цель');
+      case 'assistTargeting':
+        return cancelOnly('Выберите союзника');
       case 'forecast':
         return (
           <>
             <Forecast state={battle} ui={ui} />
             <div class="panel-actions">
-              <Button onClick={cancel}>Отмена</Button>
               <Button primary onClick={() => void confirm()}>
                 Атаковать
               </Button>
+              <Button onClick={cancel}>Отмена</Button>
             </div>
           </>
         );
@@ -272,30 +356,31 @@ export function BattleScreen() {
           <>
             <AssistPanel state={battle} ui={ui} />
             <div class="panel-actions">
-              <Button onClick={cancel}>Отмена</Button>
               <Button primary onClick={() => void confirm()}>
                 Применить
               </Button>
+              <Button onClick={cancel}>Отмена</Button>
             </div>
           </>
         );
       case 'wallPreview':
         return (
           <>
-            <b>Ударить по хлипкой стене</b>
+            {mini}
+            <b>Сломать хлипкую стену</b>
             <div class="muted small">Стена потеряет 1 HP. При 0 HP клетка станет проходимой.</div>
             <div class="panel-actions">
-              <Button onClick={cancel}>Отмена</Button>
               <Button primary onClick={() => void confirm()}>
-                Ударить
+                Сломать
               </Button>
+              <Button onClick={cancel}>Отмена</Button>
             </div>
           </>
         );
       default:
         return (
           <>
-            <div class="hint">{isPlayer ? 'Выберите бойца. Тап по врагу покажет его зону угрозы.' : 'Ход врага…'}</div>
+            <div class="hint">{isPlayer ? 'Выберите бойца: тап откроет меню действий, перетаскивание передвинет. Тап по врагу покажет его зону угрозы.' : 'Ход врага…'}</div>
             <div class="panel-actions">
               <Button
                 primary

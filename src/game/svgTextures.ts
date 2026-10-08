@@ -10,7 +10,7 @@ export const UNIT_TEX_SIZE = {
 export type UnitTexSize = keyof typeof UNIT_TEX_SIZE;
 
 export const TILE_TEX_PX = 128;
-export const MAP_POSES: readonly Pose[] = ['idle', 'run', 'hurt', 'dead'];
+export const MAP_POSES: readonly Pose[] = ['idle', 'run', 'hurt', 'dead', 'carried'];
 export const CINE_POSES: readonly Pose[] = ['idle', 'run', 'hurt', 'dead', 'happy'];
 export const TERRAINS: readonly TerrainId[] = ['plain', 'forest', 'mountain', 'water', 'wall', 'wall_breakable', 'cover'];
 
