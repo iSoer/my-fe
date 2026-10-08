@@ -21,9 +21,9 @@ export function MemorialScreen() {
             <p>Пока пусто. Это ненадолго.</p>
           </div>
         )}
-        {list.map((m) => (
+        {list.map((m, i) => (
           <div key={m.id} class="card grave">
-            <UnitAvatar unit={m.unit} size="md" dead />
+            <UnitAvatar unit={m.unit} size="md" dead animated={i < 12} />
             <div class="grow">
               <b>{displayName(m.unit)}</b>
               <div class="muted small">

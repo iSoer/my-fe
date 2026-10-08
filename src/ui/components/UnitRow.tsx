@@ -12,6 +12,8 @@ export function UnitRow({
   dim,
   right,
   tags,
+  animated = true,
+  friendly = false,
 }: {
   unit: UnitInstance;
   onClick?: () => void;
@@ -19,12 +21,14 @@ export function UnitRow({
   dim?: boolean;
   right?: ComponentChildren;
   tags?: ComponentChildren;
+  animated?: boolean;
+  friendly?: boolean;
 }) {
   const cls = unitClass(unit);
   const st = visibleStats(unit);
   return (
     <div class={`card unit-row ${onClick ? 'clickable' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick}>
-      <UnitAvatar unit={unit} size="md" />
+      <UnitAvatar unit={unit} size="md" animated={animated} friendly={friendly} />
       <div class="info">
         <div class="name">{displayName(unit)}</div>
         <div class="sub">

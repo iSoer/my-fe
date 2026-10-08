@@ -57,6 +57,7 @@ export function RecruitScreen() {
             <h3>Пленник</h3>
             <UnitRow
               unit={shelter.captive}
+              friendly
               onClick={() => setDetails({ unit: shelter.captive as UnitInstance, source: 'captive' })}
               tags={<span class="chip red">Бесплатно</span>}
             />

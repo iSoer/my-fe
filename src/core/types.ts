@@ -1,6 +1,6 @@
 /** Базовые типы игрового ядра. Никаких зависимостей от DOM/Phaser. */
 
-export type Species = 'cat' | 'dog';
+export type Species = 'cat' | 'dog' | 'mouse';
 export type Gender = 'm' | 'f';
 export type MoveType = 'infantry' | 'armor' | 'cavalry' | 'flier';
 export type WeaponKind =

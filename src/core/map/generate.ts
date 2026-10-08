@@ -1,6 +1,6 @@
 import type { Rng } from '../rng';
 import { createRng } from '../rng';
-import type { Difficulty, EnemyPlacement, MapDef, MoveType, ObjectiveKind, Pos, Rarity, ReinforcementWave, TerrainId, UnitInstance } from '../types';
+import type { Difficulty, EnemyPlacement, MapDef, MoveType, ObjectiveKind, Pos, Rarity, ReinforcementWave, Species, TerrainId, UnitInstance } from '../types';
 import { MAP_H, MAP_W, clamp, inBounds, posKey } from '../types';
 import { isPassable } from './pathing';
 import { generateUnit } from '../units';
@@ -153,7 +153,7 @@ function pickEnemyClass(rng: Rng, roles: { melee: number; ranged: number; healer
 function makeEnemy(rng: Rng, level: number, rarityRange: [Rarity, Rarity], factionId: string, classId: string, difficulty: Difficulty, isBoss: boolean, now?: number): UnitInstance {
   const faction = factionDef(factionId);
   const rarity = clamp(rng.int(rarityRange[0], rarityRange[1]) + (isBoss ? 1 : 0), 1, 5) as Rarity;
-  const species = rng.chance(faction.catRatio) ? 'cat' : 'dog';
+  const species = rng.weighted((Object.entries(faction.species) as [Species, number][]).map(([item, w]) => ({ item, w })));
   const u = generateUnit({
     seed: rng.int(0, 0x7fffffff),
     level,

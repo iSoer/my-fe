@@ -15,7 +15,7 @@ export const HL = {
   assist: 0x2ec4b6,
   danger: 0xff9f1c,
   threat: 0x9b5de5,
-  path: 0xffffff,
+  path: 0xe8f1ff,
 };
 
 export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';

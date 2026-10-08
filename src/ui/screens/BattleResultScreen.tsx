@@ -102,7 +102,7 @@ export function BattleResultScreen() {
               const lvl = lb.levelUps.find((l) => l.unitId === u.id);
               return (
                 <div key={u.id} class="unit-row">
-                  <UnitAvatar unit={u} size="sm" />
+                  <UnitAvatar unit={u} size="sm" pose="happy" />
                   <div class="info">
                     <div class="name">{displayName(u)}</div>
                     <div class="sub">
@@ -127,7 +127,7 @@ export function BattleResultScreen() {
           <div class="card stack">
             <h3>Пленник хочет к вам</h3>
             <div class="unit-row">
-              <UnitAvatar unit={lb.captive} size="md" />
+              <UnitAvatar unit={lb.captive} size="md" friendly pose="happy" />
               <div class="info">
                 <div class="name">{displayName(lb.captive)}</div>
                 <div class="sub">

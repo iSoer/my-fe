@@ -25,7 +25,7 @@ function RosterCard({ unit, selected, onClick }: { unit: UnitInstance; selected:
   return (
     <div class={`card clickable stack ${selected ? 'selected' : ''}`} style={{ gap: 6 }} onClick={onClick}>
       <div class="row">
-        <UnitAvatar unit={unit} size="sm" />
+        <UnitAvatar unit={unit} size="md" />
         <div class="grow" style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(unit)}</div>
           <RarityStars rarity={unit.rarity} />

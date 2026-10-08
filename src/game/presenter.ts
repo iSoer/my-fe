@@ -113,13 +113,24 @@ export class GamePresenter implements Presenter {
     const view = map.units.get(unitId);
     if (!view || path.length < 2) return;
     view.setAlpha(1);
+    view.setRunning(true);
     for (let i = 1; i < path.length; i++) {
       const p = path[i];
+      const prev = path[i - 1];
       if (!p) continue;
+      if (prev && p.x !== prev.x) view.setFacing(p.x > prev.x ? 1 : -1);
       const c = map.center(p);
       view.setDepth(10 + p.y * 0.01);
       await tween(map, { targets: view, x: c.x, y: c.y, duration: 120 / sp, ease: 'Linear' });
     }
+    view.setRunning(false);
+  }
+
+  /** Повернуть двух бойцов лицом друг к другу (по горизонтали). */
+  private faceEachOther(a: { x: number; setFacing(d: 1 | -1): void }, b: { x: number; setFacing(d: 1 | -1): void }): void {
+    if (a.x === b.x) return;
+    a.setFacing(b.x > a.x ? 1 : -1);
+    b.setFacing(a.x > b.x ? 1 : -1);
   }
 
   private useCinematic(ev: CombatEvent, before: BattleState): boolean {
@@ -133,9 +144,12 @@ export class GamePresenter implements Presenter {
     const aView = map.units.get(ev.attackerId);
     const dView = map.units.get(ev.defenderId);
     if (!aView || !dView) return;
+    this.faceEachOther(aView, dView);
     if (this.useCinematic(ev, before)) {
       await this.runCinematic(ev, before, after, map, sp);
       if (!map.sys.isActive() || !aView.scene || !dView.scene) return;
+      aView.setPose('idle');
+      dView.setPose('idle');
       // Дублируем итог на карте
       const dealtToD = ev.defenderHpBefore - ev.defenderHpAfter;
       const dealtToA = ev.attackerHpBefore - ev.attackerHpAfter;
@@ -167,8 +181,9 @@ export class GamePresenter implements Presenter {
         floatText(map, atk.x, atk.y - map.tile * 0.7, specialDef(strike.special).name, '#ffd166', sp, { size: map.tile * 0.26, rise: 20 });
         haptic('heavy');
       } else haptic('medium');
+      atk.setPose('run');
       await tween(map, { targets: atk, x: ox + (dx / len) * map.tile * 0.35, y: oy + (dy / len) * map.tile * 0.35, duration: 100 / sp, ease: 'Quad.easeIn' });
-      def.hitFlash(90 / sp);
+      def.hitFlash(160 / sp);
       map.cameras.main.shake(90 / sp, (strike.special ? 6 : 3) / map.scale.width);
       const color = strike.damage === 0 ? '#bbbbbb' : strike.special ? '#ffd166' : strike.effective ? '#ff6b6b' : '#ffffff';
       floatText(map, def.x, def.y - map.tile * 0.5, strike.damage === 0 ? 'Хлоп!' : String(strike.damage), color, sp, { size: map.tile * (strike.special ? 0.4 : 0.34) });
@@ -183,6 +198,7 @@ export class GamePresenter implements Presenter {
       def.setHp(strike.defenderHpAfter, defMax);
       atk.setHp(strike.attackerHpAfter, strike.attackerId === ev.attackerId ? aMax : dMax);
       await tween(map, { targets: atk, x: ox, y: oy, duration: 100 / sp, ease: 'Quad.easeOut' });
+      atk.setPose('idle');
       await wait(map, 90 / sp);
     }
   }
@@ -213,7 +229,7 @@ export class GamePresenter implements Presenter {
     const c = map.center(pos);
     if (side === 'player') haptic('error');
     if (view) {
-      view.hitFlash(100 / sp);
+      view.setDead();
       bloodBurst(map, view.x, view.y, 50, null, 1.1, sp);
       map.cameras.main.shake(160 / sp, 0.012);
       await tween(map, { targets: view, angle: side === 'player' ? -90 : 90, y: view.y + map.tile * 0.2, alpha: 0.9, duration: 350 / sp, ease: 'Bounce.easeOut' });

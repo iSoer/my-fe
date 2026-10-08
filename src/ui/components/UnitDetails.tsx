@@ -8,7 +8,7 @@ import { personalityText } from '@content/personalities';
 import { UnitAvatar } from './UnitAvatar';
 import { MoveBadge, RarityStars, WeaponBadge } from './Badges';
 import { StatsGrid } from './Stats';
-import { STAT_LABELS, speciesEmoji } from '../lib/format';
+import { STAT_LABELS, speciesName } from '../lib/format';
 
 /** Полная карточка бойца для шторок (ростер, приют, выбор отряда). */
 export function UnitDetails({ unit, compact = false }: { unit: UnitInstance; compact?: boolean }) {
@@ -19,11 +19,11 @@ export function UnitDetails({ unit, compact = false }: { unit: UnitInstance; com
   return (
     <div class="stack">
       <div class="row">
-        <UnitAvatar unit={unit} size="lg" />
+        <UnitAvatar unit={unit} size="xl" pose="happy" />
         <div class="grow stack" style={{ gap: 4 }}>
           <h3>{displayName(unit)}</h3>
           <div class="muted small">
-            {speciesEmoji(unit.species)} {breedDef(unit.breedId).name}, {unitClassName(unit)}
+            {speciesName(unit)} · {breedDef(unit.breedId).name}, {unitClassName(unit)}
           </div>
           <div class="row wrap">
             <RarityStars rarity={unit.rarity} />

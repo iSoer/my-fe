@@ -178,12 +178,16 @@ export function skillCost(skillId: string): number {
 
 /* ---------- Генерация ---------- */
 
+/** Веса видов для бойцов игрока: мыши редки, но бывают. */
+export const DEFAULT_SPECIES_WEIGHTS: Record<Species, number> = { cat: 45, dog: 45, mouse: 10 };
+
 export interface GenerateUnitOptions {
   seed: number;
   level: number;
   rarity?: Rarity;
   rarityWeights?: Record<Rarity, number>;
   species?: Species;
+  speciesWeights?: Record<Species, number>;
   classId?: string;
   isEnemy?: boolean;
   factionId?: string;
@@ -226,7 +230,9 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
     trait: root.fork('trait'),
   };
 
-  const species: Species = opts.species ?? (r.species.chance(0.5) ? 'cat' : 'dog');
+  const species: Species =
+    opts.species ??
+    r.species.weighted((Object.entries(opts.speciesWeights ?? DEFAULT_SPECIES_WEIGHTS) as [Species, number][]).map(([item, w]) => ({ item, w })));
   const breed = r.species.pick(BREEDS.filter((b) => b.species === species));
   const nameEntry = r.name.pick(NAMES[species]);
   const gender: Gender = nameEntry.gender;
@@ -256,9 +262,12 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
   if (species === 'cat') {
     base.spd += 1;
     base.hp -= 1;
-  } else {
+  } else if (species === 'dog') {
     base.hp += 1;
     base.spd -= 1;
+  } else {
+    base.spd += 2;
+    base.hp -= 2;
   }
   // Талант/Изъян
   let asset: Stat | undefined;

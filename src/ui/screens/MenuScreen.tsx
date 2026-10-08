@@ -2,12 +2,46 @@ import { useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { $save, beginRosterCreation, surrenderFromMenu } from '@state/save';
 import { navigate } from '@state/router';
-import { learnableNow, skillCost } from '@core/units';
+import { generateUnit, learnableNow, skillCost } from '@core/units';
+import { backdropSvg } from '@art/index';
+import type { UnitInstance } from '@core/types';
 import { Button } from '../components/Button';
 import { ResourceBar } from '../components/ResourceBar';
 import { ConfirmModal } from '../components/Sheet';
 import { UnitAvatar } from '../components/UnitAvatar';
 import { haptic } from '@platform/haptics';
+
+// Для широкой диорамы показываем середину сцены (забор и небо), а не только газон.
+const YARD_BG = backdropSvg('yard', 'plain', 'left').replace('preserveAspectRatio="xMidYMax slice"', 'preserveAspectRatio="xMidYMid slice"');
+/** Демо-тройка для меню без армии: кот, пёс и мышь. */
+const DEMO_CREW: UnitInstance[] = [
+  generateUnit({ seed: 1, level: 1, species: 'cat', classId: 'infantry_claw' }),
+  generateUnit({ seed: 2, level: 1, species: 'dog', classId: 'infantry_stick' }),
+  generateUnit({ seed: 3, level: 1, species: 'mouse', classId: 'infantry_slingshot' }),
+];
+const BLOOD_SVG = `<svg viewBox="0 0 390 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g fill="#c81e2e" opacity=".85">
+    <ellipse cx="70" cy="178" rx="26" ry="7" /><circle cx="52" cy="172" r="4" /><circle cx="94" cy="174" r="3" />
+    <ellipse cx="318" cy="186" rx="34" ry="8" /><circle cx="300" cy="178" r="3.5" /><circle cx="346" cy="180" r="2.6" /><circle cx="330" cy="172" r="2" />
+    <ellipse cx="200" cy="192" rx="18" ry="5" />
+  </g>
+</svg>`;
+
+function Diorama({ crew }: { crew: UnitInstance[] }) {
+  return (
+    <div class="diorama" aria-hidden="true">
+      <div class="bg" dangerouslySetInnerHTML={{ __html: YARD_BG }} />
+      <div class="blood" dangerouslySetInnerHTML={{ __html: BLOOD_SVG }} />
+      <div class="crew">
+        {crew.map((u, i) => (
+          <span key={u.id}>
+            <UnitAvatar unit={u} size="lg" pose={i === 1 ? 'happy' : 'idle'} friendly />
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function MenuScreen() {
   const save = useStore($save);
@@ -17,6 +51,10 @@ export function MenuScreen() {
   const [surrender, setSurrender] = useState(false);
 
   const pendingSkills = army ? army.units.filter((u) => learnableNow(u).some((id) => skillCost(id) <= u.sp)).length : 0;
+  // В диораме — сначала отряд, потом остальные бойцы; без армии — демо-тройка.
+  const crew: UnitInstance[] = army && army.units.length > 0
+    ? [...army.units.filter((u) => army.squadIds.includes(u.id)), ...army.units.filter((u) => !army.squadIds.includes(u.id))].slice(0, 3)
+    : DEMO_CREW;
 
   const onFight = () => {
     haptic('light');
@@ -48,18 +86,9 @@ export function MenuScreen() {
         <span class="muted small">{army ? `Армия: ${army.units.length} бойцов` : 'Армии нет'}</span>
       </div>
       <div class="menu-hero">
-        <div class="emoji">🐱🩸🐶</div>
+        <Diorama crew={crew} />
         <h1>Пушистая Резня</h1>
-        <p class="muted">Тактика про котиков и собачек</p>
-        {army && army.units.length > 0 && (
-          <div class="pool">
-            {army.units.slice(0, 3).map((u) => (
-              <span key={u.id}>
-                <UnitAvatar unit={u} size="md" />
-              </span>
-            ))}
-          </div>
-        )}
+        <p class="muted">Тактика про котиков, собачек и мышек</p>
       </div>
       <div class="menu-actions">
         {hasBattle ? (

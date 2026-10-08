@@ -11,6 +11,7 @@ export default defineConfig({
       '@state': fileURLToPath(new URL('./src/state', import.meta.url)),
       '@platform': fileURLToPath(new URL('./src/platform', import.meta.url)),
       '@i18n': fileURLToPath(new URL('./src/i18n', import.meta.url)),
+      '@art': fileURLToPath(new URL('./src/art', import.meta.url)),
     },
   },
   test: {

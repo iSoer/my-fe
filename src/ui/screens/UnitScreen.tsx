@@ -19,7 +19,7 @@ import { MoveBadge, RarityStars, WeaponBadge } from '../components/Badges';
 import { StatBar, StatsGrid } from '../components/Stats';
 import { BottomSheet, ConfirmModal } from '../components/Sheet';
 import { useToast } from '../components/Toast';
-import { STAT_LABELS, fmtGains, speciesEmoji } from '../lib/format';
+import { STAT_LABELS, fmtGains, speciesName } from '../lib/format';
 import { haptic } from '@platform/haptics';
 
 const SLOT_NAMES: Record<keyof UnitSkills, string> = {
@@ -115,10 +115,10 @@ export function UnitScreen({ unitId }: { unitId: string }) {
       <TopBar title={displayName(unit)} right={<ResourceBar />} onBack={() => navigate('/army', true)} />
       <div class="screen-body">
         <div class="card row">
-          <UnitAvatar unit={unit} size="lg" />
+          <UnitAvatar unit={unit} size="xl" />
           <div class="grow stack" style={{ gap: 4, minWidth: 0 }}>
             <div class="muted small">
-              {speciesEmoji(unit.species)} {breedDef(unit.breedId).name} · {unitClassName(unit)}
+              {speciesName(unit)} · {breedDef(unit.breedId).name} · {unitClassName(unit)}
             </div>
             <div class="row wrap">
               <RarityStars rarity={unit.rarity} />

@@ -39,6 +39,16 @@ export const BREEDS: readonly BreedDef[] = [
   { id: 'dog_jackrussell', species: 'dog', name: 'Джек-рассел', build: 0 },
   { id: 'dog_beagle', species: 'dog', name: 'Бигль', build: 1 },
   { id: 'dog_doberman', species: 'dog', name: 'Доберман', build: 2 },
+  { id: 'mouse_house', species: 'mouse', name: 'Домовая мышь', build: 0 },
+  { id: 'mouse_field', species: 'mouse', name: 'Полёвка', build: 1 },
+  { id: 'mouse_wood', species: 'mouse', name: 'Лесная мышь', build: 0 },
+  { id: 'mouse_lab', species: 'mouse', name: 'Белая лабораторная', build: 0 },
+  { id: 'mouse_rat', species: 'mouse', name: 'Крыса', build: 2 },
+  { id: 'mouse_hamster', species: 'mouse', name: 'Хомяк', build: 2 },
+  { id: 'mouse_gerbil', species: 'mouse', name: 'Песчанка', build: 1 },
+  { id: 'mouse_dormouse', species: 'mouse', name: 'Соня', build: 1 },
+  { id: 'mouse_jerboa', species: 'mouse', name: 'Тушканчик', build: 0 },
+  { id: 'mouse_harvest', species: 'mouse', name: 'Мышь-малютка', build: 0 },
 ];
 
 const MAP = new Map(BREEDS.map((b) => [b.id, b]));

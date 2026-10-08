@@ -16,6 +16,7 @@ pnpm typecheck        # tsc --noEmit
 pnpm lint             # eslint
 pnpm build            # сборка в dist/ (+ 404.html)
 pnpm smoke            # headless-смоук (Playwright): нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`
+# галерея арта: pnpm dev → http://localhost:5173/tools/gallery/index.html
 ```
 
 Для сборки под GitHub Pages задайте базовый путь: `VITE_BASE_PATH=/<repo>/ pnpm build`. Workflow `.github/workflows/deploy.yml` делает это автоматически при push в `main`.
@@ -27,6 +28,7 @@ src/core      — чистое игровое ядро (RNG, персонажи,
 src/content   — декларативный контент: классы, оружие, навыки, черты, имена, биомы, баланс
 src/state     — nanostores: сейв и действия, hash-роутер, контроллер боя
 src/platform  — Telegram WebApp адаптер, haptics, localStorage + CloudStorage
+src/art       — SVG-арт: миниатюры котов/псов/мышей, фоны кинематика и тайлы по биому и клетке
 src/game      — Phaser: сцена карты, кинематик атаки, презентер событий
 src/ui        — Preact: экраны и HUD
 tests         — Vitest

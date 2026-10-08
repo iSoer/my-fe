@@ -343,79 +343,198 @@ p {
 }
 
 /* ---------- Аватар ---------- */
-.avatar {
+/* ---------- Миниатюры (SVG в стиле cat-chase) ---------- */
+.critter-svg {
   position: relative;
-  border-radius: 50%;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 -6px 12px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
+  display: block;
+  pointer-events: none;
 }
-.avatar.sm {
-  width: 40px;
-  height: 40px;
-}
-.avatar.md {
-  width: 60px;
-  height: 60px;
-}
-.avatar.lg {
-  width: 96px;
-  height: 96px;
-}
-.avatar.dead {
-  filter: grayscale(1) brightness(0.7);
-}
-.avatar .species {
-  font-size: 1.25em;
-  line-height: 1;
+.critter-svg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   position: relative;
   z-index: 1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
-.avatar.sm .species {
-  font-size: 20px;
+.critter-svg--sm {
+  width: 40px;
+  height: 46px;
 }
-.avatar.md .species {
-  font-size: 32px;
+.critter-svg--md {
+  width: 64px;
+  height: 74px;
 }
-.avatar.lg .species {
-  font-size: 52px;
+.critter-svg--lg {
+  width: 96px;
+  height: 112px;
 }
-.avatar .eyes {
+.critter-svg--xl {
+  width: 140px;
+  height: 164px;
+}
+.critter-svg--md::after,
+.critter-svg--lg::after,
+.critter-svg--xl::after {
+  content: '';
   position: absolute;
-  bottom: 18%;
   left: 50%;
+  bottom: 2%;
+  width: 62%;
+  height: 10%;
   transform: translateX(-50%);
-  display: flex;
-  gap: 18%;
-  z-index: 2;
-}
-.avatar .eyes i {
-  display: block;
-  width: 12%;
-  height: 12%;
-  min-width: 4px;
-  min-height: 4px;
   border-radius: 50%;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  filter: blur(1.5px);
+  z-index: 0;
 }
-.avatar .acc {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 14%;
-  z-index: 2;
+.critter-svg.is-dead {
+  filter: grayscale(1) brightness(0.85);
 }
-.avatar .boss {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 3;
-  font-size: 14px;
+.critter-svg .rig {
+  transform-box: view-box;
+  transform-origin: 60px 86px;
+}
+.critter-svg .tail {
+  transform-box: view-box;
+  transform-origin: 38px 92px;
+  animation: tail-wag 0.7s ease-in-out infinite alternate;
+}
+.critter-svg--dog .tail {
+  transform-origin: 34px 86px;
+  animation-name: dog-tail-wag;
+}
+.critter-svg--mouse .tail {
+  transform-origin: 40px 94px;
+  animation-duration: 1.1s;
+}
+.critter-svg .leg {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.critter-svg .ear {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+}
+.critter-svg--dog .ear {
+  transform-origin: top center;
+}
+.critter-svg .eyes-open {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blink 4.5s linear infinite;
+}
+.critter-svg .eyes-happy {
+  display: none;
+}
+.critter-svg.is-happy .eyes-open {
+  display: none;
+}
+.critter-svg.is-happy .eyes-happy {
+  display: block;
+}
+.critter-svg.is-idle .rig,
+.critter-svg.is-happy .rig {
+  animation: idle-bob 2.6s ease-in-out infinite alternate;
+}
+.critter-svg.is-running .rig {
+  animation: run-bob 0.3s ease-in-out infinite alternate;
+}
+.critter-svg.is-running .leg-front {
+  animation: step-front 0.3s ease-in-out infinite alternate;
+}
+.critter-svg.is-running .leg-back {
+  animation: step-back 0.3s ease-in-out infinite alternate;
+}
+.critter-svg.is-running .ear {
+  animation: ear-flap 0.3s ease-in-out infinite alternate;
+}
+.critter-svg--dog.is-running .ear {
+  animation-name: floppy-ear;
+}
+.critter-svg.is-dead *,
+.critter-svg.is-static * {
+  animation: none !important;
+}
+@keyframes tail-wag {
+  from {
+    transform: rotate(-10deg);
+  }
+  to {
+    transform: rotate(14deg);
+  }
+}
+@keyframes dog-tail-wag {
+  from {
+    transform: rotate(-18deg);
+  }
+  to {
+    transform: rotate(16deg);
+  }
+}
+@keyframes blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes idle-bob {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(-2px) rotate(1deg);
+  }
+}
+@keyframes run-bob {
+  from {
+    transform: translateY(0) rotate(7deg);
+  }
+  to {
+    transform: translateY(-7px) rotate(2deg);
+  }
+}
+@keyframes step-front {
+  from {
+    transform: translateX(6px);
+  }
+  to {
+    transform: translateX(-6px);
+  }
+}
+@keyframes step-back {
+  from {
+    transform: translateX(-6px);
+  }
+  to {
+    transform: translateX(6px);
+  }
+}
+@keyframes ear-flap {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(4deg);
+  }
+}
+@keyframes floppy-ear {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(7deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .critter-svg * {
+    animation: none !important;
+  }
 }
 
 /* ---------- Юнит в списке ---------- */
@@ -478,10 +597,48 @@ p {
   text-align: center;
   padding-top: 32px;
 }
-.menu-hero .emoji {
-  font-size: 56px;
-  line-height: 1;
-  margin-bottom: 8px;
+.diorama {
+  position: relative;
+  height: 200px;
+  margin: 0 -16px 10px;
+  overflow: hidden;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.35);
+}
+.diorama .bg {
+  position: absolute;
+  inset: 0;
+}
+.diorama .bg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.diorama .blood {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.diorama .crew {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 4px;
+}
+.diorama .crew .critter-svg {
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35));
+}
+.diorama .crew .critter-svg::after {
+  display: none;
+}
+.diorama .crew > :nth-child(1) {
+  transform: translateY(6px) scale(0.9);
+}
+.diorama .crew > :nth-child(3) {
+  transform: translateY(6px) scale(0.9) scaleX(-1);
 }
 .menu-hero h1 {
   font-size: 32px;
@@ -551,9 +708,23 @@ p {
   gap: 40px;
   background: radial-gradient(ellipse at 50% 30%, rgba(230, 57, 70, 0.2), transparent 60%), var(--bg);
 }
-.splash-emoji {
-  font-size: 56px;
+.splash-trio {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
   margin-bottom: 12px;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45));
+}
+.splash-trio .critter-svg::after {
+  display: none;
+}
+.splash-trio > :nth-child(1),
+.splash-trio > :nth-child(3) {
+  transform: translateY(8px) scale(0.85);
+}
+.splash-trio > :nth-child(3) {
+  transform: translateY(8px) scale(0.85) scaleX(-1);
 }
 .splash-hint {
   color: var(--muted);
@@ -961,7 +1132,7 @@ p {
   gap: 12px;
   align-items: flex-start;
 }
-.grave .avatar {
+.grave .critter-svg {
   filter: grayscale(1) brightness(0.75);
 }
 

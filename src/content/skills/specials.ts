@@ -12,6 +12,7 @@ export const SPECIALS: readonly SpecialDef[] = [
   { id: 'sp_cowl', name: 'Хвост-щит', desc: '−30 % урона от дальней атаки.', cd: 3, kind: 'defense', spCost: 200, stage: 'v1', defense: { reduction: 0.3, vsRange: 'ranged' } },
   { id: 'sp_miracle', name: 'Девять жизней', desc: 'Пережить смертельный удар с 1 HP (если HP > 1). Только коты.', cd: 5, kind: 'defense', spCost: 200, stage: 'v1', onlySpecies: 'cat', miracle: true },
   { id: 'sp_loyalty', name: 'Верность', desc: '−30 % урона от любой атаки и лечение на 30 % этого урона. Только псы.', cd: 4, kind: 'defense', spCost: 200, stage: 'v1', onlySpecies: 'dog', defense: { reduction: 0.3, vsRange: 'any', healPctOfDamage: 30 } },
+  { id: 'sp_squeak', name: 'Шмыг', desc: '−40 % урона от любой атаки. Только мыши.', cd: 3, kind: 'defense', spCost: 200, stage: 'v1', onlySpecies: 'mouse', defense: { reduction: 0.4, vsRange: 'any' } },
   { id: 'sp_imbue', name: 'Мурчание исцеления', desc: '+10 к лечению.', cd: 1, kind: 'heal', spCost: 200, stage: 'mvp', staffOnly: true, heal: { bonusHeal: 10 } },
   { id: 'sp_heavenly', name: 'Общий лай', desc: 'При лечении +10 HP всем союзникам.', cd: 2, kind: 'heal', spCost: 200, stage: 'v1', staffOnly: true, heal: { allAlliesHeal: 10 } },
 ];

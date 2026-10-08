@@ -58,6 +58,8 @@ export const TRAITS: readonly TraitDef[] = [
   },
   { id: 't_homebody', name: 'Домашний', desc: '−2 Atk, +3 HP, +20 % XP.', hooks: { statBonus: { atk: -2, hp: 3 }, xpMultiplier: 1.2 } },
   { id: 't_stray', name: 'Бродяга', desc: 'Заросли не замедляют.', hooks: { ignoreForestSlow: true } },
+  { id: 't_tiny', name: 'Мелкий', desc: '+2 Spd, −1 Def. Только мыши.', onlySpecies: 'mouse', hooks: { statBonus: { spd: 2, def: -1 } } },
+  { id: 't_cheese', name: 'Сырный нюх', desc: '+15 % Вкусняшек с боя. Только мыши.', onlySpecies: 'mouse', hooks: { treatsMultiplier: 1.15 } },
 ];
 
 const MAP = new Map(TRAITS.map((t) => [t.id, t]));

@@ -9,7 +9,8 @@ import { computeLayout, pixelToGrid, tileCenter, tileOrigin, type BoardLayout } 
 import { ensureTextures } from './textures';
 import { HL, TERRAIN_GLYPH, textStyle } from './style';
 import { UnitView } from './UnitView';
-import { bloodDecal } from './fx';
+import { bloodDecal, sceneAlive } from './fx';
+import { ensureTileTextures, ensureUnitTextures, hasTexture, tileTexKey, withTimeout } from './svgTextures';
 
 export const MAP_SCENE_KEY = 'Map';
 
@@ -22,6 +23,7 @@ export class MapScene extends Phaser.Scene {
   private resolveReady: () => void = () => {};
 
   private tilesG!: Phaser.GameObjects.Graphics;
+  private tileLayer!: Phaser.GameObjects.Container;
   private glyphs: Phaser.GameObjects.Text[] = [];
   private wallTexts = new Map<string, Phaser.GameObjects.Text>();
   private decalLayer!: Phaser.GameObjects.Container;
@@ -47,7 +49,8 @@ export class MapScene extends Phaser.Scene {
 
   create(): void {
     ensureTextures(this);
-    this.tilesG = this.add.graphics().setDepth(0);
+    this.tileLayer = this.add.container(0, 0).setDepth(0);
+    this.tilesG = this.add.graphics().setDepth(0.2);
     this.decalLayer = this.add.container(0, 0).setDepth(1);
     this.hlG = this.add.graphics().setDepth(2);
     this.pathG = this.add.graphics().setDepth(3);
@@ -70,10 +73,28 @@ export class MapScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup, this);
     this.events.once(Phaser.Scenes.Events.DESTROY, this.cleanup, this);
 
+    // Сначала растеризуем арт (тайлы биома и миниатюры всех бойцов), чтобы первый кадр уже был с графикой.
     const st = $save.get().battle;
-    if (st) this.syncFromState(st);
-    this.pendingSync = false;
-    this.resolveReady();
+    void withTimeout(this.preloadArt(st), 2500).then(() => {
+      if (!sceneAlive(this)) return;
+      const cur = $save.get().battle;
+      this.lastMapRef = null;
+      if (cur) this.syncFromState(cur);
+      this.pendingSync = false;
+      this.resolveReady();
+    });
+  }
+
+  /** Текстуры тайлов биома и миниатюр живых юнитов (размер карты). */
+  private preloadArt(st: BattleState | undefined): Promise<unknown> {
+    if (!st) return Promise.resolve();
+    const jobs: Promise<unknown>[] = [ensureTileTextures(this, st.map.biomeId)];
+    for (const bu of Object.values(st.units)) {
+      if (!bu.alive) continue;
+      const unit = st.roster[bu.unitId];
+      if (unit) jobs.push(ensureUnitTextures(this, unit, 'map'));
+    }
+    return Promise.all(jobs);
   }
 
   override update(): void {
@@ -219,6 +240,7 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(biome.bg);
     const g = this.tilesG;
     g.clear();
+    this.tileLayer.removeAll(true);
     for (const t of this.glyphs) t.destroy();
     this.glyphs = [];
     for (const t of this.wallTexts.values()) t.destroy();
@@ -229,11 +251,18 @@ export class MapScene extends Phaser.Scene {
         const pos = { x, y };
         const terrain: TerrainId = terrainAt(st, pos);
         const o = tileOrigin(l, pos);
-        g.fillStyle(biome.colors[terrain], 1);
-        g.fillRect(o.x, o.y, l.tile, l.tile);
+        const texKey = tileTexKey(st.map.biomeId, terrain);
+        const hasArt = hasTexture(this, texKey);
+        if (hasArt) {
+          const img = this.add.image(o.x, o.y, texKey).setOrigin(0, 0).setDisplaySize(l.tile, l.tile);
+          this.tileLayer.add(img);
+        } else {
+          g.fillStyle(biome.colors[terrain], 1);
+          g.fillRect(o.x, o.y, l.tile, l.tile);
+        }
         g.lineStyle(1, 0x000000, 0.18);
         g.strokeRect(o.x + 0.5, o.y + 0.5, l.tile - 1, l.tile - 1);
-        const glyph = TERRAIN_GLYPH[terrain];
+        const glyph = hasArt ? undefined : TERRAIN_GLYPH[terrain];
         if (glyph) {
           const c = tileCenter(l, pos);
           const txt = this.add.text(c.x, c.y, glyph, textStyle(l.tile * 0.42, '#ffffff', true, 0)).setOrigin(0.5).setAlpha(0.45).setDepth(0.5);
@@ -306,6 +335,62 @@ export class MapScene extends Phaser.Scene {
     }
   }
 
+  /** Стрелка движения в стиле FEH: от текущей клетки через центры клеток пути до клетки назначения. */
+  private drawPathArrow(g: Phaser.GameObjects.Graphics, path: Pos[]): void {
+    const t = this.tile;
+    const pts = path.map((p) => this.center(p));
+    const n = pts.length;
+    const last = pts[n - 1];
+    const prev = pts[n - 2];
+    if (!last || !prev) return;
+    const dx = Math.sign(last.x - prev.x);
+    const dy = Math.sign(last.y - prev.y);
+    const headLen = t * 0.34;
+    const headHalf = t * 0.2;
+    const tip = { x: last.x + dx * t * 0.16, y: last.y + dy * t * 0.16 };
+    const base = { x: tip.x - dx * headLen, y: tip.y - dy * headLen };
+    const body = [...pts.slice(0, n - 1), base];
+    const nx = -dy;
+    const ny = dx;
+
+    const pass = (width: number, color: number, alpha: number, pad: number): void => {
+      g.lineStyle(width, color, alpha);
+      g.beginPath();
+      const first = body[0];
+      if (!first) return;
+      g.moveTo(first.x, first.y);
+      for (let i = 1; i < body.length; i++) {
+        const b = body[i];
+        if (b) g.lineTo(b.x, b.y);
+      }
+      g.strokePath();
+      g.fillStyle(color, alpha);
+      // скругляем стыки и начало
+      for (let i = 0; i < body.length - 1; i++) {
+        const b = body[i];
+        if (b) g.fillCircle(b.x, b.y, width / 2);
+      }
+      // наконечник
+      const hl = headLen + pad;
+      const hh = headHalf + pad;
+      const tipX = tip.x + dx * pad;
+      const tipY = tip.y + dy * pad;
+      const bx = tipX - dx * hl;
+      const by = tipY - dy * hl;
+      g.fillTriangle(tipX, tipY, bx + nx * hh, by + ny * hh, bx - nx * hh, by - ny * hh);
+    };
+    pass(Math.max(6, t * 0.3), 0x0d1b2a, 0.85, Math.max(2, t * 0.05)); // контур
+    pass(Math.max(3, t * 0.17), HL.path, 0.95, 0); // заливка
+    // маркер старта
+    const start = pts[0];
+    if (start) {
+      g.lineStyle(Math.max(2, t * 0.05), 0x0d1b2a, 0.85);
+      g.strokeCircle(start.x, start.y, t * 0.22);
+      g.lineStyle(Math.max(1, t * 0.03), HL.path, 0.95);
+      g.strokeCircle(start.x, start.y, t * 0.22);
+    }
+  }
+
   private drawHighlights(ui: BattleUiState): void {
     if (!this.hlG) return;
     const g = this.hlG;
@@ -325,13 +410,7 @@ export class MapScene extends Phaser.Scene {
       if (ui.attackTiles) for (const k of ui.attackTiles) this.fillTile(g, k, HL.attack, 0.4);
       if (ui.assistTiles) for (const k of ui.assistTiles) this.fillTile(g, k, HL.assist, 0.4);
     }
-    if (ui.path && ui.path.length > 1) {
-      pg.fillStyle(HL.path, 0.85);
-      for (const p of ui.path) {
-        const c = this.center(p);
-        pg.fillCircle(c.x, c.y, Math.max(3, this.tile * 0.08));
-      }
-    }
+    if (ui.path && ui.path.length > 1) this.drawPathArrow(pg, ui.path);
 
     // Призрак на клетке назначения
     const st = $save.get().battle;
@@ -346,7 +425,7 @@ export class MapScene extends Phaser.Scene {
         if (unit && bu && !(bu.pos.x === ui.movedTo.x && bu.pos.y === ui.movedTo.y)) {
           this.ghost = new UnitView(this, unit, bu.side, { size: this.tile, showHp: false, showBadges: false });
           const c = this.center(ui.movedTo);
-          this.ghost.setPosition(c.x, c.y).setAlpha(0.55).setDepth(11);
+          this.ghost.setPosition(c.x, c.y).setAlpha(0.5).setDepth(11);
         }
       }
     }

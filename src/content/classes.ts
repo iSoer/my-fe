@@ -60,9 +60,10 @@ export function classDef(id: string): ClassDef {
   return c;
 }
 
-/** Броня у котов — коробка, у псов — кастрюля. */
+/** Броня у котов — коробка, у псов — кастрюля, у мышей — напёрсток. */
 export function className(cls: ClassDef, species: Species, gender: Gender): string {
   if (cls.moveType === 'armor' && species === 'dog') return gender === 'm' ? 'Кастрюльный страж' : 'Кастрюльная стражница';
+  if (cls.moveType === 'armor' && species === 'mouse') return gender === 'm' ? 'Напёрсточный рыцарь' : 'Напёрсточная рыцарша';
   return cls.name[gender];
 }
 

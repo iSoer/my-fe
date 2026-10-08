@@ -9,6 +9,7 @@ import { Button } from '../components/Button';
 import { TopBar } from '../components/TopBar';
 import { ResourceBar } from '../components/ResourceBar';
 import { UnitRow } from '../components/UnitRow';
+import { SPECIES_ORDER } from '../lib/format';
 
 type SortKey = 'level' | 'class' | 'species' | 'recent';
 
@@ -33,7 +34,7 @@ function sortUnits(units: UnitInstance[], key: SortKey): UnitInstance[] {
     case 'class':
       return arr.sort((a, b) => a.classId.localeCompare(b.classId) || b.level - a.level);
     case 'species':
-      return arr.sort((a, b) => a.species.localeCompare(b.species) || b.level - a.level);
+      return arr.sort((a, b) => SPECIES_ORDER[a.species] - SPECIES_ORDER[b.species] || b.level - a.level);
     case 'recent':
       return arr.sort((a, b) => b.createdAt - a.createdAt);
   }
@@ -94,13 +95,14 @@ export function ArmyScreen() {
             </Button>
           ))}
         </div>
-        {units.map((u) => {
+        {units.map((u, i) => {
           const inSquad = army.squadIds.includes(u.id);
           const canLearn = learnableNow(u).some((id) => skillCost(id) <= u.sp);
           return (
             <UnitRow
               key={u.id}
               unit={u}
+              animated={i < 12}
               onClick={() => navigate(`/army/${u.id}`)}
               tags={
                 <>

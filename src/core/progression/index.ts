@@ -8,6 +8,7 @@ import type {
   Profile,
   SaveGame,
   Shelter,
+  Species,
   Stats,
   UnitInstance,
 } from '../types';
@@ -171,7 +172,7 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
       seed: rng.int(0, 0x7fffffff),
       level: Math.max(1, avg + rng.int(-2, 1)),
       rarityWeights: gloryTier(save.profile.glory).rarityWeights,
-      species: rng.chance(faction.catRatio) ? 'cat' : 'dog',
+      species: rng.weighted((Object.entries(faction.species) as [Species, number][]).map(([item, w]) => ({ item, w }))),
       now,
     });
   }

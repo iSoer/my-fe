@@ -14,12 +14,23 @@ import { MemorialScreen } from './screens/MemorialScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { Button } from './components/Button';
 import { fmtDate } from './lib/format';
+import { critterSvg, furArt } from '@art/index';
+
+const SPLASH_TRIO = [
+  critterSvg({ species: 'cat', fur: furArt(0), iris: '#2ecc71', pattern: 1, eyes: 0, accessory: 1, weapon: 'claw', weaponColor: '#e63946', pose: 'happy' }),
+  critterSvg({ species: 'dog', fur: furArt(4), iris: '#8e5a2a', pattern: 0, eyes: 4, accessory: 3, weapon: 'stick', weaponColor: '#2ec4b6', pose: 'happy' }),
+  critterSvg({ species: 'mouse', fur: furArt(1), iris: '#3498db', pattern: 0, eyes: 0, accessory: 6, weapon: 'slingshot', weaponColor: '#adb5bd', pose: 'happy' }),
+];
 
 function Splash({ onStart, ready }: { onStart: () => void; ready: boolean }) {
   return (
     <div class="screen splash" onClick={ready ? onStart : undefined}>
       <div class="splash-logo">
-        <div class="splash-emoji">🐱🩸🐶</div>
+        <div class="splash-trio" aria-hidden="true">
+          {SPLASH_TRIO.map((svg, i) => (
+            <div key={i} class="critter-svg critter-svg--lg is-static" dangerouslySetInnerHTML={{ __html: svg }} />
+          ))}
+        </div>
         <h1>Пушистая Резня</h1>
         <p class="muted">Тактика про котиков и собачек. Милая и кровавая.</p>
       </div>

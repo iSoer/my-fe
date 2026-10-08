@@ -15,9 +15,20 @@ export const COLOR_CSS: Record<Color, string> = {
 
 export const MOVE_EMOJI: Record<MoveType, string> = { infantry: '🐾', armor: '📦', cavalry: '🤖', flier: '🎈' };
 
-export function speciesEmoji(s: Species): string {
-  return s === 'cat' ? '🐱' : '🐶';
+/** Название вида с учётом пола: Кот/Кошка, Пёс/Собака, Мышь. */
+export function speciesName(unit: { species: Species; gender: Gender }): string {
+  switch (unit.species) {
+    case 'cat':
+      return unit.gender === 'm' ? 'Кот' : 'Кошка';
+    case 'dog':
+      return unit.gender === 'm' ? 'Пёс' : 'Собака';
+    default:
+      return 'Мышь';
+  }
 }
+
+export const SPECIES_LABEL: Record<Species, string> = { cat: 'Коты', dog: 'Псы', mouse: 'Мыши' };
+export const SPECIES_ORDER: Record<Species, number> = { cat: 0, dog: 1, mouse: 2 };
 
 export function hex(n: number): string {
   return `#${n.toString(16).padStart(6, '0')}`;
