@@ -97,6 +97,25 @@ describe('редьюсер боя', () => {
     expect(livingUnits(s, 'enemy').length).toBe(1);
   });
 
+  it('боевые бонусы (черта, Шерсть к шерсти) не ломают статы', () => {
+    const b = makeBattle(
+      [
+        { classId: 'infantry_claw', pos: { x: 2, y: 4 }, baseStats: flat, traitId: 't_berserk', skills: { c: 'c_spur_atk' } },
+        { classId: 'infantry_claw', pos: { x: 3, y: 4 }, baseStats: flat, traitId: 't_biter' },
+      ],
+      [{ classId: 'infantry_claw', pos: { x: 2, y: 3 }, baseStats: { ...flat, hp: 40 }, traitId: 't_loyal', species: 'dog' }],
+    );
+    const p = b.players[1]!.id;
+    b.state.units[b.players[0]!.id]!.hp = 5; // берсерк активен
+    const { state } = applyAction(b.state, { type: 'attack', unitId: b.players[0]!.id, to: { x: 2, y: 4 }, targetId: b.enemies[0]!.id });
+    for (const u of Object.values(state.units)) expect(Number.isInteger(u.hp)).toBe(true);
+    const r2 = applyAction(state, { type: 'attack', unitId: p, to: { x: 3, y: 3 }, targetId: b.enemies[0]!.id });
+    for (const u of Object.values(r2.state.units)) expect(Number.isInteger(u.hp)).toBe(true);
+    // Шерсть к шерсти соседа даёт +3 Atk второму бойцу
+    const enemy = r2.state.units[b.enemies[0]!.id]!;
+    expect(enemy.hp).toBeLessThan(40);
+  });
+
   it('повышение уровня в бою увеличивает maxHp', () => {
     const b = makeBattle(
       [{ classId: 'infantry_claw', pos: { x: 2, y: 4 }, level: 1, baseStats: { ...flat, atk: 50 } }],
@@ -157,8 +176,14 @@ describe('полные бои: ИИ не падает и бой завершае
         const end = autoPlay(state, 40);
         expect(['victory', 'defeat', undefined]).toContain(end.result);
         expect(end.turn).toBeLessThanOrEqual(41);
-        // мёртвые не воскресают
-        for (const u of Object.values(end.units)) if (!u.alive) expect(u.hp).toBe(0);
+        // мёртвые не воскресают, HP всегда конечные целые в [0, maxHp]
+        for (const u of Object.values(end.units)) {
+          if (!u.alive) expect(u.hp).toBe(0);
+          expect(Number.isInteger(u.hp)).toBe(true);
+          expect(Number.isInteger(u.maxHp)).toBe(true);
+          expect(u.hp).toBeGreaterThanOrEqual(0);
+          expect(u.hp).toBeLessThanOrEqual(u.maxHp);
+        }
       }
     });
   }

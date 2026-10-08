@@ -21,7 +21,7 @@ import {
   type BattleUiState,
 } from '@state/battleUi';
 import { navigate } from '@state/router';
-import { mountBattleGame } from '@game/index';
+import type { BattleGameHandle } from '@game/index';
 import { Button } from '../components/Button';
 import { UnitAvatar } from '../components/UnitAvatar';
 import { WeaponBadge } from '../components/Badges';
@@ -186,13 +186,25 @@ export function BattleScreen() {
       return;
     }
     const el = canvasRef.current;
-    const handle = el ? mountBattleGame(el) : null;
+    let handle: BattleGameHandle | null = null;
+    let cancelled = false;
     setOnBattleEnded(() => {
       finishBattle();
       navigate('/battle/result', true);
     });
-    enterBattleScreen();
+    // Phaser грузится лениво — только на экране боя (SPEC 15).
+    import('@game/index')
+      .then((m) => {
+        if (cancelled) return;
+        if (el) handle = m.mountBattleGame(el);
+        enterBattleScreen();
+      })
+      .catch((e: unknown) => {
+        console.error('game load failed', e);
+        if (!cancelled) enterBattleScreen();
+      });
     return () => {
+      cancelled = true;
       setOnBattleEnded(null);
       handle?.destroy();
       $pauseOpen.set(false);

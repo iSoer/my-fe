@@ -836,7 +836,7 @@ p {
   background: var(--panel);
   border-top: 1px solid var(--border);
   padding: 10px 12px calc(10px + var(--tg-safe-bottom));
-  min-height: 150px;
+  min-height: 200px;
   display: flex;
   flex-direction: column;
   gap: 8px;

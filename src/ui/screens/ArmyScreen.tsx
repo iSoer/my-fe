@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import type { UnitInstance } from '@core/types';
 import { SQUAD_SIZE, BARRACKS_CAP } from '@core/types';
-import { learnableNow, skillCost, unitClass } from '@core/units';
+import { learnableNow, skillCost } from '@core/units';
 import { $save, beginRosterCreation } from '@state/save';
 import { navigate } from '@state/router';
 import { Button } from '../components/Button';
@@ -97,7 +97,6 @@ export function ArmyScreen() {
         {units.map((u) => {
           const inSquad = army.squadIds.includes(u.id);
           const canLearn = learnableNow(u).some((id) => skillCost(id) <= u.sp);
-          void unitClass(u);
           return (
             <UnitRow
               key={u.id}

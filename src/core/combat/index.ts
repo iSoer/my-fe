@@ -1,5 +1,5 @@
 import type { BattleState, BattleUnit, Effect, Pos, Stats, Strike, Triangle, UnitInstance } from '../types';
-import { STATS, addStats, manhattan } from '../types';
+import { STATS, addStats, emptyStats, manhattan } from '../types';
 import type { CombatCtx, CombatUnitView, StrikeInfo } from '../skills/types';
 import { counterAnyRange, specialMaxCd, unitKit, wrathfulStaff } from '../skills/engine';
 import { visibleStats } from '../units';
@@ -62,10 +62,10 @@ function makeView(state: BattleState, bu: BattleUnit, isInitiator: boolean): Com
 
 function applyCombatMods(state: BattleState, self: CombatUnitView, foe: CombatUnitView): void {
   const ctx: CombatCtx = { state, self, foe };
-  let mod: Partial<Stats> = {};
+  let mod: Stats = emptyStats();
   for (const h of unitKit(self.unit).hooks) {
     const m = h.combatStatMod?.(ctx);
-    if (m) mod = addStats(mod as Stats, m) as Partial<Stats>;
+    if (m) mod = addStats(mod, m);
   }
   for (const ally of livingUnits(state, self.bu.side)) {
     if (ally.unitId === self.bu.unitId) continue;
@@ -73,7 +73,7 @@ function applyCombatMods(state: BattleState, self: CombatUnitView, foe: CombatUn
     if (!allyUnit) continue;
     for (const h of unitKit(allyUnit).hooks) {
       const a = h.allyCombatStatMod;
-      if (a && manhattan(ally.pos, self.bu.pos) <= a.range) mod = addStats(mod as Stats, a.stats) as Partial<Stats>;
+      if (a && manhattan(ally.pos, self.bu.pos) <= a.range) mod = addStats(mod, a.stats);
     }
   }
   self.stats = addStats(self.stats, mod);

@@ -55,7 +55,9 @@ export class CinematicScene extends Phaser.Scene {
 
   create(): void {
     ensureTextures(this);
-    void this.run();
+    // Во время create() сцена ещё в статусе CREATING и sys.isActive() === false:
+    // хелперы tween/wait пропустили бы первое затемнение. Стартуем на следующем тике.
+    this.time.delayedCall(0, () => void this.run());
   }
 
   private skip = (): void => {
@@ -74,18 +76,22 @@ export class CinematicScene extends Phaser.Scene {
     const size = Math.min(w, h) * 0.24;
 
     // Фон
+    // Фон рисуем с большим запасом: канвас может изменить размер во время сцены
+    // (нижняя DOM-панель меняет высоту), и карта не должна просвечивать.
     const bg = this.add.graphics().setDepth(0);
-    bg.fillStyle(0x0b0b10, 1);
-    bg.fillRect(0, 0, w, h);
     const sky = Phaser.Display.Color.IntegerToColor(biome.bg);
     const dark = sky.clone().darken(45).color;
+    const groundCol = Phaser.Display.Color.IntegerToColor(biome.colors.plain);
+    const groundDark = groundCol.clone().darken(35).color;
+    bg.fillStyle(dark, 1);
+    bg.fillRect(-w, -h * 2, w * 3, h * 2 + h * 0.18);
     bg.fillGradientStyle(dark, dark, biome.bg, biome.bg, 1);
-    bg.fillRect(0, h * 0.18, w, groundY - h * 0.18);
+    bg.fillRect(-w, h * 0.18, w * 3, groundY - h * 0.18);
     bg.fillStyle(biome.colors.plain, 1);
-    bg.fillRect(0, groundY, w, h * 0.2);
-    bg.fillStyle(0x000000, 0.35);
-    bg.fillRect(0, groundY + h * 0.2, w, h);
-    const fade = this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 1).setDepth(50);
+    bg.fillRect(-w, groundY, w * 3, h * 0.2);
+    bg.fillGradientStyle(biome.colors.plain, biome.colors.plain, groundDark, groundDark, 1);
+    bg.fillRect(-w, groundY + h * 0.2, w * 3, h * 2);
+    const fade = this.add.rectangle(w / 2, h / 2, w * 3, h * 5, 0x000000, 1).setDepth(50);
 
     const aBu = before.units[event.attackerId];
     const dBu = before.units[event.defenderId];

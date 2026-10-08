@@ -156,6 +156,7 @@ function showForecast(st: BattleState, bu: BattleUnit, from: Pos, targetId: stri
   const forecast = simulateCombat(st, bu.unitId, targetId, from);
   patch({ mode: 'forecast', movedTo: from, path: ui.reach ? pathFor(ui.reach, from) : [from], targetId, forecast, assistPlan: undefined, wallPos: undefined });
   haptic('select');
+  if (!$save.get().settings.confirmAttack) void confirm();
 }
 
 function showAssist(st: BattleState, bu: BattleUnit, from: Pos, targetId: string): boolean {

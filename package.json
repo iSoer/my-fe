@@ -13,7 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "smoke:combat": "node tools/smoke-combat.mjs"
   },
   "dependencies": {
     "@nanostores/preact": "^1.1.1",
@@ -30,6 +31,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.5",
     "fast-check": "^4.10.2",
+    "playwright-core": "^1.63.0",
     "prettier": "^3.9.9",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.1",

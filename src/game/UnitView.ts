@@ -88,9 +88,15 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.moveGlyph.setVisible(this.showBadges);
   }
 
+  /** Вид уничтожен (Phaser обнуляет scene в destroy). */
+  get alive(): boolean {
+    return !!this.scene;
+  }
+
   setHp(hp: number, maxHp: number): void {
     this.hp = Math.max(0, hp);
     this.maxHp = Math.max(1, maxHp);
+    if (!this.scene) return;
     this.redrawHp();
   }
 
@@ -99,6 +105,7 @@ export class UnitView extends Phaser.GameObjects.Container {
   }
 
   setCd(cd: number): void {
+    if (!this.scene) return;
     this.cdText.setText(String(cd));
     this.cdText.setColor(cd <= 0 ? '#ffd166' : '#ffffff');
     this.cdBg.setTint(cd <= 0 ? 0x7a5c00 : 0x222222);
@@ -110,6 +117,7 @@ export class UnitView extends Phaser.GameObjects.Container {
 
   /** Короткая белая вспышка при попадании. */
   hitFlash(duration: number): void {
+    if (!this.scene) return;
     this.disc.setTintFill(0xffffff);
     this.emoji.setAlpha(0.2);
     this.scene.time.delayedCall(duration, () => {
@@ -120,6 +128,7 @@ export class UnitView extends Phaser.GameObjects.Container {
   }
 
   private redrawHp(): void {
+    if (!this.scene) return;
     const g = this.hpBar;
     g.clear();
     if (!this.showHp) return;

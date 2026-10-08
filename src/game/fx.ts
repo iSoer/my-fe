@@ -1,17 +1,24 @@
-import type Phaser from 'phaser';
+import Phaser from 'phaser';
 import { TEX } from './textures';
 import { BLOOD_COLORS, FONT, textStyle } from './style';
 
+/** Сцена пригодна для твинов/таймеров: создаётся или работает. */
+export function sceneAlive(scene: Phaser.Scene): boolean {
+  if (!scene.sys) return false;
+  const status = scene.sys.settings.status;
+  return scene.sys.isActive() || status === Phaser.Scenes.CREATING || status === Phaser.Scenes.START || status === Phaser.Scenes.INIT;
+}
+
 export function wait(scene: Phaser.Scene, ms: number): Promise<void> {
   return new Promise((resolve) => {
-    if (ms <= 0 || !scene.sys || !scene.sys.isActive()) return resolve();
+    if (ms <= 0 || !sceneAlive(scene)) return resolve();
     scene.time.delayedCall(Math.max(1, Math.round(ms)), () => resolve());
   });
 }
 
 export function tween(scene: Phaser.Scene, config: Phaser.Types.Tweens.TweenBuilderConfig): Promise<void> {
   return new Promise((resolve) => {
-    if (!scene.sys || !scene.sys.isActive()) return resolve();
+    if (!sceneAlive(scene)) return resolve();
     scene.tweens.add({ ...config, onComplete: () => resolve() });
   });
 }
@@ -26,7 +33,7 @@ export interface FloatTextOptions {
 
 /** Всплывающий текст (урон, лечение, статусы). Не блокирует. */
 export function floatText(scene: Phaser.Scene, x: number, y: number, text: string, color: string, speed: number, opts: FloatTextOptions = {}): void {
-  if (!scene.sys || !scene.sys.isActive()) return;
+  if (!sceneAlive(scene)) return;
   const t = scene.add.text(x, y, text, textStyle(opts.size ?? 18, color, true, opts.stroke ?? 4)).setOrigin(0.5).setDepth(25);
   const dur = (opts.duration ?? 700) / speed;
   t.setScale(0.6);
@@ -45,7 +52,7 @@ export function floatText(scene: Phaser.Scene, x: number, y: number, text: strin
 
 /** Брызги крови. angle — направление разлёта в градусах (Phaser: 0 вправо, 90 вниз). */
 export function bloodBurst(scene: Phaser.Scene, x: number, y: number, count: number, angle: { min: number; max: number } | null, scale = 1, speedMul = 1): void {
-  if (!scene.sys || !scene.sys.isActive()) return;
+  if (!sceneAlive(scene)) return;
   const emitter = scene.add.particles(x, y, TEX.dot, {
     speed: { min: 80 * scale, max: 240 * scale },
     angle: angle ?? { min: 0, max: 360 },
@@ -76,7 +83,7 @@ export function bloodDecal(scene: Phaser.Scene, x: number, y: number, size: numb
 
 /** Милый призрак улетает вверх. */
 export function ghostRise(scene: Phaser.Scene, x: number, y: number, size: number, speed: number): Promise<void> {
-  if (!scene.sys || !scene.sys.isActive()) return Promise.resolve();
+  if (!sceneAlive(scene)) return Promise.resolve();
   const ghost = scene.add.text(x, y, '👻', textStyle(size * 0.6, '#fff', false, 0)).setOrigin(0.5).setDepth(26).setAlpha(0.95);
   const halo = scene.add.text(x, y - size * 0.4, '✨', textStyle(size * 0.3, '#fff', false, 0)).setOrigin(0.5).setDepth(26);
   scene.tweens.add({ targets: halo, y: y - size * 1.4, alpha: 0, duration: 600 / speed });
@@ -88,7 +95,7 @@ export function ghostRise(scene: Phaser.Scene, x: number, y: number, size: numbe
 
 /** Полноэкранная плашка «ВАША ФАЗА» и т. п. */
 export async function banner(scene: Phaser.Scene, text: string, color: number, speed: number, hold = 450): Promise<void> {
-  if (!scene.sys || !scene.sys.isActive()) return;
+  if (!sceneAlive(scene)) return;
   const w = scene.scale.width;
   const h = scene.scale.height;
   const bandH = Math.min(72, h * 0.12);
@@ -106,7 +113,7 @@ export async function banner(scene: Phaser.Scene, text: string, color: number, s
 
 /** «Штамп» — текст с ударом (ПАЛ, ПОБЕДА...). */
 export async function stamp(scene: Phaser.Scene, x: number, y: number, text: string, color: string, size: number, speed: number, hold = 500): Promise<void> {
-  if (!scene.sys || !scene.sys.isActive()) return;
+  if (!sceneAlive(scene)) return;
   const t = scene.add.text(x, y, text, textStyle(size, color, true, 6)).setOrigin(0.5).setDepth(32).setScale(2.2).setAlpha(0);
   await tween(scene, { targets: t, scale: 1, alpha: 1, duration: 160 / speed, ease: 'Back.easeIn' });
   scene.cameras.main.shake(120 / speed, 0.01);

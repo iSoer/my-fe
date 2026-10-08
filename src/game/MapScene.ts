@@ -95,10 +95,25 @@ export class MapScene extends Phaser.Scene {
   private onResize(): void {
     this.relayout();
     const st = $save.get().battle;
-    if (st) {
-      this.lastMapRef = null;
-      this.syncFromState(st);
+    if (!st) return;
+    if (this.playing) {
+      // Во время проигрывания событий нельзя пересоздавать/уничтожать виды юнитов:
+      // презентер держит на них ссылки. Перерисовываем поле и двигаем существующие виды.
+      this.pendingSync = true;
+      this.lastMapRef = st.map;
+      this.drawTiles(st);
+      this.syncDecals(st);
+      for (const bu of Object.values(st.units)) {
+        const v = this.units.get(bu.unitId);
+        if (!v || !v.scene) continue;
+        const c = this.center(bu.pos);
+        v.setPosition(c.x, c.y);
+      }
+      this.drawHighlights($battleUi.get());
+      return;
     }
+    this.lastMapRef = null;
+    this.syncFromState(st);
     this.drawHighlights($battleUi.get());
   }
 

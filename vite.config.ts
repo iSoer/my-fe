@@ -24,8 +24,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          phaser: ['phaser'],
+        // Phaser — отдельный ленивый чанк. CJS-хелперы Rollup выносим в крошечный общий чанк,
+        // иначе они попадают в чанк Phaser и основной бандл начинает тянуть его статически.
+        manualChunks: (id) => {
+          if (id.includes('commonjsHelpers')) return 'helpers';
+          if (id.includes('node_modules/phaser/')) return 'phaser';
+          return undefined;
         },
       },
     },

@@ -352,6 +352,14 @@ export function dispatchBattle(action: BattleAction): { state: BattleState; even
   return { state, events };
 }
 
+/** Сдаться из меню: отступление + подведение итогов. */
+export function surrenderFromMenu(): BattleSummary | null {
+  const s = $save.get();
+  if (!s.battle) return s.lastBattle ?? null;
+  if (!s.battle.result) dispatchBattle({ type: 'retreat' });
+  return finishBattle();
+}
+
 /** Завершить бой: применить итоги к армии/профилю, убрать battle, записать lastBattle. */
 export function finishBattle(): BattleSummary | null {
   const s = $save.get();

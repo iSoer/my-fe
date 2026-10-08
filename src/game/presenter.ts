@@ -135,6 +135,7 @@ export class GamePresenter implements Presenter {
     if (!aView || !dView) return;
     if (this.useCinematic(ev, before)) {
       await this.runCinematic(ev, before, after, map, sp);
+      if (!map.sys.isActive() || !aView.scene || !dView.scene) return;
       // Дублируем итог на карте
       const dealtToD = ev.defenderHpBefore - ev.defenderHpAfter;
       const dealtToA = ev.attackerHpBefore - ev.attackerHpAfter;

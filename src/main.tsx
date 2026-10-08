@@ -3,7 +3,8 @@ import './ui/styles.css';
 import { App } from './ui/App';
 import { initTelegram, setBackButton, setClosingConfirmation } from '@platform/telegram';
 import { $route, back, initRouter } from '@state/router';
-import { $battle, initSave } from '@state/save';
+import { $battle, $save, initSave } from '@state/save';
+import { $battleUi } from '@state/battleUi';
 import { $pauseOpen } from './ui/lib/pause';
 
 function showFatal(message: string, stack: string): void {
@@ -54,6 +55,8 @@ async function boot(): Promise<void> {
   initRouter();
   const root = document.getElementById('app');
   if (!root) throw new Error('#app не найден');
+  // Отладочный хук для смоук-тестов и консоли (игра одиночная, секретов нет).
+  (window as unknown as { __pf?: unknown }).__pf = { save: $save, ui: $battleUi };
   render(<App />, root);
   $route.subscribe(syncBackButton);
   $battle.subscribe((b) => setClosingConfirmation(!!b && !b.result));

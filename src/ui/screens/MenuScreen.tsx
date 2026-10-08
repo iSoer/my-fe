@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
-import { $save, beginRosterCreation, dispatchBattle, finishBattle } from '@state/save';
+import { $save, beginRosterCreation, surrenderFromMenu } from '@state/save';
 import { navigate } from '@state/router';
 import { learnableNow, skillCost } from '@core/units';
 import { Button } from '../components/Button';
@@ -37,12 +37,7 @@ export function MenuScreen() {
   };
   const doSurrender = () => {
     setSurrender(false);
-    try {
-      dispatchBattle({ type: 'retreat' });
-    } catch {
-      /* бой уже завершён */
-    }
-    finishBattle();
+    surrenderFromMenu();
     navigate('/battle/result');
   };
 
