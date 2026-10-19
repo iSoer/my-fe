@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import type { Settings } from '@core/types';
 import { $save, exportSaveCode, importSaveCode, resetProgress, updateSettings } from '@state/save';
@@ -8,6 +8,8 @@ import { TopBar } from '../components/TopBar';
 import { Modal } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { haptic } from '@platform/haptics';
+import { $installPrompt, $isStandalone, $online, $updateReady, applyUpdate, installMode, promptInstall, storageEstimate } from '@platform/pwa';
+import { isTelegram } from '@platform/telegram';
 
 function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return <span role="switch" aria-checked={on} class={`switch ${on ? 'on' : ''}`} onClick={() => onChange(!on)} />;
@@ -21,6 +23,76 @@ function Seg<T extends string | number>({ value, options, onChange }: { value: T
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function fmtMb(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+function AppCard() {
+  // installMode() читает атомы — подписываемся, чтобы перерисоваться при их смене.
+  useStore($installPrompt);
+  const standalone = useStore($isStandalone);
+  const online = useStore($online);
+  const updateReady = useStore($updateReady);
+  const [storage, setStorage] = useState<Awaited<ReturnType<typeof storageEstimate>>>(null);
+  const [iosHelp, setIosHelp] = useState(false);
+  useEffect(() => {
+    void storageEstimate().then(setStorage);
+  }, []);
+  const mode = installMode();
+  const offline = typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller;
+
+  return (
+    <div class="card stack pop-in" style={{ animationDelay: '150ms' }}>
+      <div class="section-title">📲 Приложение</div>
+      <div class="stats-table">
+        <span class="k">Офлайн-режим</span>
+        <span class="v">{offline ? 'готов' : 'нет'}</span>
+        <span class="k">Сеть</span>
+        <span class="v">{online ? 'есть' : 'нет'}</span>
+        {storage && (
+          <>
+            <span class="k">Занято</span>
+            <span class="v">
+              {fmtMb(storage.usage)}
+              {storage.persisted ? ' · защищено' : ''}
+            </span>
+          </>
+        )}
+        {!isTelegram && (
+          <>
+            <span class="k">Установлено</span>
+            <span class="v">{standalone ? 'да' : 'нет'}</span>
+          </>
+        )}
+      </div>
+      {updateReady && (
+        <Button block primary icon="⬆️" onClick={applyUpdate}>
+          Обновить до новой версии
+        </Button>
+      )}
+      {mode === 'prompt' && (
+        <Button block icon="📲" onClick={() => void promptInstall()}>
+          Установить на телефон
+        </Button>
+      )}
+      {mode === 'ios' && (
+        <>
+          <Button block icon="📲" onClick={() => setIosHelp(!iosHelp)}>
+            Как установить на iPhone
+          </Button>
+          {iosHelp && (
+            <ol class="pwa-steps muted small">
+              <li>Откройте игру в Safari.</li>
+              <li>Нажмите «Поделиться» (квадрат со стрелкой).</li>
+              <li>Выберите «На экран „Домой“».</li>
+            </ol>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -171,6 +243,8 @@ export function SettingsScreen() {
             Сбросить прогресс
           </Button>
         </div>
+
+        <AppCard />
 
         <div class="card stack pop-in" style={{ animationDelay: '180ms' }}>
           <div class="section-title">📊 Статистика</div>

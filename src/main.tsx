@@ -1,9 +1,11 @@
 import { render } from 'preact';
 import './ui/styles.css';
 import { App } from './ui/App';
+import { getSerwist } from 'virtual:serwist';
 import { initTelegram, setBackButton, setClosingConfirmation } from '@platform/telegram';
+import { initPwa } from '@platform/pwa';
 import { $route, back, initRouter } from '@state/router';
-import { $battle, $save, initSave } from '@state/save';
+import { $battle, $save, flushPersist, initSave } from '@state/save';
 import { $battleUi } from '@state/battleUi';
 import { $boardLayout } from '@state/boardLayout';
 import { $pauseOpen } from './ui/lib/pause';
@@ -54,6 +56,7 @@ function syncBackButton(): void {
 async function boot(): Promise<void> {
   initTelegram();
   initRouter();
+  if (import.meta.env.PROD) initPwa({ getSerwist, beforeReload: flushPersist });
   const root = document.getElementById('app');
   if (!root) throw new Error('#app не найден');
   // Отладочный хук для смоук-тестов и консоли (игра одиночная, секретов нет).

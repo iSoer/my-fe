@@ -4,7 +4,7 @@
 
 ## Стек
 
-Vite 7 · TypeScript 5 (strict) · Preact 10 + nanostores · Phaser 3.90 · zod · lz-string · Vitest + fast-check · pnpm.
+Vite 7 · TypeScript 5 (strict) · Preact 10 + nanostores · Phaser 3.90 · zod · lz-string · Serwist (PWA) · Vitest + fast-check · pnpm.
 
 ## Команды
 
@@ -12,9 +12,11 @@ Vite 7 · TypeScript 5 (strict) · Preact 10 + nanostores · Phaser 3.90 · zod 
 pnpm install          # зависимости
 pnpm dev              # dev-сервер (http://localhost:5173, работает и вне Telegram с моком)
 pnpm test             # тесты ядра
-pnpm typecheck        # tsc --noEmit
+pnpm typecheck        # tsc --noEmit (приложение + Service Worker)
 pnpm lint             # eslint
-pnpm build            # сборка в dist/ (+ 404.html)
+pnpm build            # сборка в dist/ (+ 404.html, sw.js, проверка precache)
+pnpm smoke:pwa        # офлайн-смоук PWA поверх собранного dist (сам поднимает preview)
+pnpm icons            # перегенерировать иконки PWA в public/ из процедурного арта
 pnpm smoke            # headless-смоук (Playwright): нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`
 # галерея арта: pnpm dev → http://localhost:5173/tools/gallery/index.html
 ```
@@ -27,7 +29,8 @@ pnpm smoke            # headless-смоук (Playwright): нужен запущ�
 src/core      — чистое игровое ядро (RNG, персонажи, карты, бой, ИИ, прогрессия, сейв)
 src/content   — декларативный контент: классы, оружие, навыки, черты, имена, биомы, баланс
 src/state     — nanostores: сейв и действия, hash-роутер, контроллер боя
-src/platform  — Telegram WebApp адаптер, haptics, localStorage + CloudStorage
+src/platform  — Telegram WebApp адаптер, haptics, localStorage + CloudStorage, PWA (Serwist)
+src/sw.ts     — Service Worker (precache всего приложения)
 src/art       — SVG-арт: миниатюры котов/псов/мышей, фоны кинематика и тайлы по биому и клетке
 src/game      — Phaser: сцена карты, кинематик атаки, презентер событий
 src/ui        — Preact: экраны и HUD
@@ -41,6 +44,18 @@ tests         — Vitest
 3. После первого успешного workflow откройте бота и нажмите кнопку меню.
 
 Вне Telegram игра тоже работает (сейв в localStorage под ключом `local`).
+
+## PWA и офлайн
+
+Игру можно установить на телефон, и после первого открытия она работает без сети: всё приложение, включая ленивый чанк Phaser, лежит в precache Service Worker. Подробности — в [PWA_SPEC.md](./PWA_SPEC.md).
+
+- **Android (Chrome):** Настройки → «📲 Установить на телефон» или пункт «Установить приложение» в меню браузера.
+- **iPhone (Safari):** «Поделиться» → «На экран „Домой“». Установленное приложение на iOS хранит данные **отдельно** от Safari, поэтому перенесите прогресс через экспорт/импорт кода сейва в настройках.
+- **Обновления:** новая версия скачивается в фоне, затем появляется плашка «Доступна новая версия». В бою и на экране итогов она не показывается, и страница там не перезагружается.
+- **Внутри Telegram** кнопки установки нет, SW регистрируется по возможности (если WebView его поддерживает).
+- **Проверка офлайна:** `VITE_BASE_PATH=/my-fe/ pnpm build && pnpm smoke:pwa`. Вручную: `pnpm preview`, затем DevTools → Application → Service Workers → Offline и перезагрузка.
+- **Сброс при отладке:** DevTools → Application → Storage → Clear site data (снимает SW и кэши). В `pnpm dev` SW отключён.
+- Все GitHub Pages пользователя живут на одном origin `*.github.io`, поэтому кэши идут с префиксом `pawfield`, а scope SW ограничен `/<repo>/`.
 
 ## Сейвы
 
@@ -57,4 +72,4 @@ tests         — Vitest
 - Сейвы: localStorage + Telegram CloudStorage, автосейв после каждого действия, восстановление боя.
 - Проверки: 55 тестов ядра (включая property-based и автобои), typecheck, lint, два headless-смоука.
 
-Не сделано (дальше по SPEC.md): звук, финальный арт вместо плейсхолдеров (эмодзи и плашки), Дружба бойцов, цели «Выжить»/«Защитить тайник», достижения, PWA-кэш, английская локализация, балансовый прогон.
+Не сделано (дальше по SPEC.md): звук, финальный арт вместо плейсхолдеров (эмодзи и плашки), Дружба бойцов, цели «Выжить»/«Защитить тайник», достижения, английская локализация, балансовый прогон.

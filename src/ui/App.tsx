@@ -12,6 +12,7 @@ import { BattleResultScreen } from './screens/BattleResultScreen';
 import { MemorialScreen } from './screens/MemorialScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { Button } from './components/Button';
+import { PwaBanners } from './components/PwaBanners';
 import { fmtDate } from './lib/format';
 import { critterSvg, furArt } from '@art/index';
 
@@ -121,5 +122,10 @@ export function App() {
       </>
     );
   }
-  return <Router />;
+  return (
+    <>
+      <Router />
+      <PwaBanners />
+    </>
+  );
 }

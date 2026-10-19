@@ -47,8 +47,9 @@
   --c-blue: #4f8fd1;
   --c-green: #4cc9a8;
   --c-grey: #b8b8c6;
-  --tg-safe-top: 0px;
-  --tg-safe-bottom: 0px;
+  /* Вне Telegram (PWA в standalone, status-bar black-translucent) — системные отступы; в Telegram переопределяются инлайном. */
+  --tg-safe-top: env(safe-area-inset-top, 0px);
+  --tg-safe-bottom: env(safe-area-inset-bottom, 0px);
   --radius: 4px;
   --radius-lg: 6px;
   --tap: 44px;
@@ -1573,6 +1574,39 @@ p {
     opacity: 1;
     transform: skewX(-10deg) translateX(0);
   }
+}
+
+/* ---------- PWA: плашка обновления ---------- */
+.pwa-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + var(--tg-safe-bottom));
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  background: var(--paper);
+  color: var(--text-paper);
+  box-shadow: 5px 5px 0 var(--red);
+  animation: pwa-in 0.32s var(--ease-out) both;
+}
+@keyframes pwa-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+.pwa-banner .msg {
+  flex: 1;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.pwa-steps {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.5;
 }
 
 /* ---------- Сегментированный выбор ---------- */

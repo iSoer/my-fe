@@ -29,7 +29,8 @@
       "@i18n/*": ["src/i18n/*"],
       "@art/*": ["src/art/*"]
     },
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node", "@serwist/vite/typings"]
   },
-  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"],
+  "exclude": ["src/sw.ts"]
 }

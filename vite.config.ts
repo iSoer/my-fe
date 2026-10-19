@@ -1,12 +1,28 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
+import { serwist } from '@serwist/vite';
 import { fileURLToPath, URL } from 'node:url';
 
 const base = process.env.VITE_BASE_PATH ?? '/';
 
 export default defineConfig({
   base,
-  plugins: [preact()],
+  plugins: [
+    preact(),
+    // base и scope плагин берёт из base Vite (VITE_BASE_PATH).
+    serwist({
+      swSrc: 'src/sw.ts',
+      swDest: 'sw.js',
+      globDirectory: 'dist',
+      globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,json}'],
+      globIgnores: ['404.html'],
+      injectionPoint: 'self.__SW_MANIFEST',
+      rollupFormat: 'iife',
+      // phaser-*.js ~1,2 МБ — с запасом на рост.
+      maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      disable: process.env.NODE_ENV === 'development',
+    }),
+  ],
   resolve: {
     alias: {
       '@core': fileURLToPath(new URL('./src/core', import.meta.url)),

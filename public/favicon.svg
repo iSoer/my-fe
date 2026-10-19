@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="64" height="64">
+  <rect width="100" height="100" fill="#0d0b10" />
+  <path d="M-10 78 L110 30 L110 46 L-10 94 Z" fill="#e63946" />
+  <svg x="4" y="4" width="92" height="92" viewBox="0 -4 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" overflow="visible">
+  <g class="rig" >
+    
+    <g class="tail"><path d="M38 92 C 14 94, 8 72, 22 62" fill="none" stroke="#c7843f" stroke-width="12" stroke-linecap="round" opacity=".35" /><path d="M38 92 C 14 94, 8 72, 22 62" fill="none" stroke="#ffbe6f" stroke-width="9" stroke-linecap="round" /></g>
+    <g class="legs">
+    <ellipse class="leg leg-back" cx="44" cy="102" rx="9" ry="6.5" fill="#ffbe6f" stroke="#c7843f" stroke-width="1.5" />
+    <ellipse class="leg leg-front" cx="76" cy="102" rx="9" ry="6.5" fill="#ffbe6f" stroke="#c7843f" stroke-width="1.5" /></g>
+    <ellipse cx="60" cy="86" rx="27" ry="18" fill="#ffbe6f" stroke="#c7843f" stroke-width="1.5" /><ellipse cx="60" cy="90" rx="15" ry="10" fill="#ffeedb" /><g fill="none" stroke="#c7843f" stroke-width="3" stroke-linecap="round" opacity=".55"><path d="M40 78 q4 4 2 10" /><path d="M78 78 q-4 4 -2 10" /></g>
+    
+    <g class="head">
+    <g class="ear ear-l" ><path d="M30 34 L24 8 L52 22 Z" fill="#ffbe6f" stroke="#c7843f" stroke-width="1.5" stroke-linejoin="round" /><path d="M32 30 L28 14 L46 23 Z" fill="#ffb0bd" /></g>
+      <g class="ear ear-r" ><path d="M90 34 L96 8 L68 22 Z" fill="#ffbe6f" stroke="#c7843f" stroke-width="1.5" stroke-linejoin="round" /><path d="M88 30 L92 14 L74 23 Z" fill="#ffb0bd" /></g>
+    <circle cx="60" cy="50" r="34" fill="#ffbe6f" stroke="#c7843f" stroke-width="1.5" />
+    <g fill="none" stroke="#c7843f" stroke-width="3" stroke-linecap="round" opacity=".7"><path d="M52 20 v9" /><path d="M60 17 v10" /><path d="M68 20 v9" /></g>
+    <ellipse cx="34" cy="60" rx="8" ry="4.5" fill="#ff9fb8" opacity="0.75" />
+    <ellipse cx="86" cy="60" rx="8" ry="4.5" fill="#ff9fb8" opacity="0.75" />
+    <g fill="none" stroke="#2e1f33" stroke-width="3.2" stroke-linecap="round">
+      <path d="M37 54 q8 -10 16 0" /><path d="M67 54 q8 -10 16 0" /></g>
+    <path d="M56.5 62 h7 l-3.5 4.5 z" fill="#ff8fa8" /><path d="M50 66 q5 7 10 0 q5 7 10 0" fill="none" stroke="#2e1f33" stroke-width="1.8" stroke-linecap="round" />
+    <g stroke="#c7843f" stroke-width="1.4" stroke-linecap="round" opacity=".8">
+    <path d="M22 60 h-12" /><path d="M23 66 l-11 3" />
+    <path d="M98 60 h12" /><path d="M97 66 l11 3" /></g>
+    <path d="M42 74 q18 12 36 0 l-6 10 q-12 6 -24 0 z" fill="#e5536f" stroke="#b83a52" stroke-width="1.2" stroke-linejoin="round" />
+    
+    
+    
+  </g>
+    <g class="claws" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".9"><path d="M84 96 l6 -6 M88 100 l7 -5 M80 93 l5 -7" /></g>
+  </g>
+</svg>
+</svg>
