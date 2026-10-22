@@ -1,14 +1,27 @@
 import { defineConfig } from 'vite';
-import preact from '@preact/preset-vite';
+import react from '@vitejs/plugin-react';
 import { serwist } from '@serwist/vite';
 import { fileURLToPath, URL } from 'node:url';
 
 const base = process.env.VITE_BASE_PATH ?? '/';
 
+const src = (dir: string) => fileURLToPath(new URL(`./src/${dir}`, import.meta.url));
+
+/**
+ * Алиасы как в next-instapok, чтобы синхронизированный код игры собирался без правок:
+ * @game → src/game, @shared → src/shared, @/server → src/model (генератор персонажа — чистый, работает в браузере).
+ */
+export const ALIASES = [
+  { find: /^@game\//, replacement: `${src('game')}/` },
+  { find: /^@shared\//, replacement: `${src('shared')}/` },
+  { find: /^@\/server\//, replacement: `${src('model')}/` },
+  { find: /^@host\//, replacement: `${src('host')}/` },
+];
+
 export default defineConfig({
   base,
   plugins: [
-    preact(),
+    react(),
     // base и scope плагин берёт из base Vite (VITE_BASE_PATH).
     serwist({
       swSrc: 'src/sw.ts',
@@ -24,16 +37,7 @@ export default defineConfig({
     }),
   ],
   resolve: {
-    alias: {
-      '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
-      '@content': fileURLToPath(new URL('./src/content', import.meta.url)),
-      '@ui': fileURLToPath(new URL('./src/ui', import.meta.url)),
-      '@game': fileURLToPath(new URL('./src/game', import.meta.url)),
-      '@state': fileURLToPath(new URL('./src/state', import.meta.url)),
-      '@platform': fileURLToPath(new URL('./src/platform', import.meta.url)),
-      '@i18n': fileURLToPath(new URL('./src/i18n', import.meta.url)),
-      '@art': fileURLToPath(new URL('./src/art', import.meta.url)),
-    },
+    alias: ALIASES,
   },
   build: {
     target: 'es2022',

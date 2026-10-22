@@ -12,7 +12,7 @@ const vite = await createServer({
   logLevel: 'error',
   optimizeDeps: { noDiscovery: true, include: [] },
 });
-const art = await vite.ssrLoadModule('/src/art/index.ts');
+const art = await vite.ssrLoadModule('/src/game/art/index.ts');
 await vite.close();
 
 const cat = art.critterSvg({

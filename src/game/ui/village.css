@@ -1,0 +1,159 @@
+/* Деревня, Лавка и рюкзак. Как и остальной CSS игры — только внутри .pawfield. */
+.pawfield {
+  .vl-root {
+    position: relative;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    background: #2f6d2c;
+  }
+  .vl-canvas {
+    position: absolute;
+    inset: 0;
+  }
+  .vl-hud {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+    padding: calc(10px + var(--tg-safe-top, 0px)) 12px calc(14px + var(--tg-safe-bottom, 0px));
+  }
+  .vl-top,
+  .vl-bottom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .vl-top > *,
+  .vl-bottom > * {
+    pointer-events: auto;
+  }
+  .vl-top .resources {
+    background: rgba(13, 11, 16, 0.72);
+    border-radius: 10px;
+    padding: 4px 10px;
+  }
+  .vl-top .icon-btn {
+    background: rgba(13, 11, 16, 0.72);
+  }
+  .vl-grow {
+    flex: 1;
+  }
+  .vl-bottom {
+    max-width: 520px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .vl-hint {
+    margin: 0 auto;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: rgba(13, 11, 16, 0.6);
+    color: var(--muted-ink);
+    font-size: 12px;
+    text-align: center;
+    pointer-events: none;
+  }
+  .npc-head {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .npc-head .critter-svg {
+    flex-shrink: 0;
+  }
+  .npc-say {
+    font-style: italic;
+  }
+  .npc-line {
+    margin: 0;
+  }
+
+  .store-item,
+  .pack-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .store-ico {
+    font-size: 26px;
+    width: 34px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .pack-count {
+    min-width: 18px;
+    text-align: center;
+  }
+  .squad-toggle {
+    cursor: pointer;
+    border: none;
+    font: inherit;
+  }
+
+  /* Рюкзак в бою */
+  .bf-items {
+    position: absolute;
+    left: 50%;
+    bottom: calc(160px + var(--tg-safe-bottom, 0px));
+    transform: translateX(-50%);
+    width: min(420px, calc(100% - 24px));
+    max-height: 50%;
+    overflow-y: auto;
+    background: var(--paper);
+    color: var(--text-paper);
+    border: 3px solid var(--ink);
+    box-shadow: 6px 6px 0 var(--red);
+    padding: 10px 12px;
+    pointer-events: auto;
+    z-index: 30;
+  }
+  .bf-items-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .bf-items-close {
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .bf-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+  }
+  .bf-item-txt small {
+    display: block;
+    color: var(--muted-paper);
+  }
+  .bf-item-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .bf-item-target {
+    border: 2px solid var(--ink);
+    background: var(--paper-2);
+    padding: 4px 10px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .bf-item-target small {
+    display: block;
+    font-weight: 400;
+    color: var(--muted-paper);
+  }
+  .bf-loot-risk {
+    margin-left: 4px;
+    font-size: 9px;
+    opacity: 0.8;
+    text-transform: uppercase;
+  }
+}

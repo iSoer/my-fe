@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Пушистая Резня — тактическая игра про котиков и собачек (Telegram Mini App)",
+  "description": "Пушистая Резня — тактическая игра про котиков и собачек (Telegram Mini App + PWA)",
   "scripts": {
     "dev": "vite",
     "build": "pnpm typecheck && vite build && cp dist/index.html dist/404.html && node tools/check-sw.mjs",
@@ -14,24 +14,28 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sw.json",
-    "smoke:combat": "node tools/smoke-combat.mjs",
     "icons": "node tools/gen-icons.mjs",
-    "smoke:pwa": "node tools/smoke-pwa.mjs"
+    "smoke:pwa": "node tools/smoke-pwa.mjs",
+    "sync:game": "node tools/sync-game.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "smoke:tg": "node tools/smoke-telegram.mjs"
   },
   "dependencies": {
-    "@nanostores/preact": "^1.1.1",
-    "@preact/signals": "^2.11.3",
+    "@nanostores/react": "^2.0.1",
     "lz-string": "^1.5.0",
     "nanostores": "^1.5.5",
     "phaser": "^3.90.0",
-    "preact": "^10.29.8",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@preact/preset-vite": "^2.10.6",
     "@serwist/vite": "^9.5.13",
     "@serwist/window": "^9.5.13",
     "@types/node": "^22.15.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.5",
     "fast-check": "^4.10.2",

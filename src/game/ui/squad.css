@@ -1,0 +1,144 @@
+/* Вылазка, шаг 2: сетка врагов по 3 и слоты отряда. Только внутри .pawfield. */
+.pawfield {
+  .foe-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .foe-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 14px 4px 8px;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    color: var(--text-paper);
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--red);
+    min-width: 0;
+  }
+  .foe-card.boss {
+    box-shadow: 3px 3px 0 var(--gold);
+    border-color: var(--gold-text);
+  }
+  .foe-card.dim {
+    opacity: 0.72;
+    box-shadow: 3px 3px 0 var(--grey);
+  }
+  .foe-card:active {
+    transform: translate(1px, 1px);
+  }
+  .foe-lvl {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 11px;
+    font-weight: 900;
+    font-style: italic;
+    padding: 1px 6px;
+  }
+  .foe-boss {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 16px;
+  }
+  .foe-name {
+    font-size: 12px;
+    line-height: 1.15;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+  .foe-role,
+  .foe-note {
+    font-size: 11px;
+    color: var(--muted-paper);
+    line-height: 1.2;
+  }
+  .foe-stats {
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .foe-card .critter-svg--md {
+    width: 56px;
+    height: 64px;
+  }
+
+  .squad-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .squad-slot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 12px 6px 10px;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    color: var(--text-paper);
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--teal);
+    min-width: 0;
+  }
+  .squad-slot.empty {
+    justify-content: center;
+    min-height: 170px;
+    border-style: dashed;
+    background: var(--paper-2);
+    box-shadow: none;
+    color: var(--muted-paper);
+  }
+  .squad-plus {
+    font-size: 34px;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .squad-num {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    background: var(--teal-text);
+    color: #fff;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 1px 7px;
+  }
+  .squad-name {
+    font-size: 14px;
+    line-height: 1.15;
+    word-break: break-word;
+  }
+  .squad-stats {
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .squad-swap {
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--red-deep);
+  }
+}
+
+/* Главная кнопка шага вылазки всегда под пальцем: прилипает к низу прокрутки */
+.pawfield .sticky-cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding: 10px 0 2px;
+  background: linear-gradient(to top, var(--ink) 70%, transparent);
+}
