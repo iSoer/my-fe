@@ -1,0 +1,145 @@
+/* Телефоны и читаемость: поверх styles.css / battle.css, только внутри .pawfield. */
+.pawfield {
+  /* Колонка экрана прокручивается — карточки не должны сжиматься по высоте (иначе обрезается содержимое). */
+  .screen-body > * {
+    flex-shrink: 0;
+  }
+
+  /* Мелкий текст крупнее: подписи, чипы и описания читаются на телефоне без зума */
+  .small {
+    font-size: 13px;
+  }
+  .chip {
+    font-size: 12px;
+  }
+  .skill-item .desc {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .muted {
+    line-height: 1.4;
+  }
+
+  /* Казарма: на узком экране — по одной карточке в ряд, имя и класс целиком */
+  @media (max-width: 560px) {
+    .slot-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .slot-card {
+      min-height: 0;
+    }
+    .slot-card.filled .slot-name,
+    .slot-card.filled .slot-class {
+      white-space: normal;
+      overflow: visible;
+    }
+    .slot-card.filled .slot-name {
+      font-size: 16px;
+    }
+    .slot-card.filled .mini-stats {
+      font-size: 12px;
+    }
+  }
+
+  /* Бой: клин портрета не заходит на текст, длинное имя — в две строки */
+  .bf-card.bf-unit::before {
+    transform-origin: top left;
+  }
+  .bf-unit .bf-unit-name {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.1;
+  }
+  .bf-role {
+    font-size: 12px;
+    opacity: 0.85;
+  }
+
+  /* Пояснение класса */
+  .class-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .class-role {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .class-role-ico {
+    font-size: 20px;
+    line-height: 1;
+  }
+  .class-role-name {
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    font-size: 13px;
+    padding: 2px 8px;
+    background: var(--ink);
+    color: var(--paper);
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  }
+  .class-summary {
+    font-size: 14px;
+  }
+  .class-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    font-size: 13px;
+  }
+  .class-facts dt {
+    color: var(--muted-paper);
+    white-space: nowrap;
+  }
+  .class-facts dd {
+    margin: 0;
+  }
+  .bonus-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .bonus-chip {
+    font-weight: 800;
+    font-size: 12px;
+    padding: 1px 6px;
+    background: var(--paper-3);
+  }
+  .bonus-chip.up {
+    color: var(--teal-text);
+  }
+  .bonus-chip.down {
+    color: var(--red-deep);
+  }
+  .class-pick {
+    border-left: 4px solid var(--ink);
+  }
+  .class-pick.current {
+    border-left-color: var(--red);
+  }
+  .class-pick .class-pick-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .class-pick details summary {
+    cursor: pointer;
+    color: var(--muted-paper);
+    font-size: 13px;
+    padding: 4px 0;
+    list-style: none;
+  }
+  .class-pick details summary::-webkit-details-marker {
+    display: none;
+  }
+  .class-legend {
+    font-size: 13px;
+  }
+}

@@ -1,95 +1,108 @@
-// Headless smoke test: splash → menu → roster → battle setup → battle → one action.
+// Headless smoke test игрового цикла: главный экран → новая игра → деревня → Лавка → вылазка (2 шага) → бой с предметом →
+// сдача → итоги → деревня → «Продолжить» после перезагрузки. Нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`.
+//   node tools/smoke.mjs [url] [путь к Chromium]
 import { chromium } from 'playwright-core';
 
 const base = process.argv[2] ?? 'http://localhost:4173/my-fe/';
-const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const executablePath = process.argv[3] ?? process.env.CHROMIUM_PATH;
+const browser = await chromium.launch(executablePath ? { executablePath } : {});
+const ctx = await browser.newContext({
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 2,
+  isMobile: true,
+  hasTouch: true,
+});
 const page = await ctx.newPage();
-const confirmEndTurn = async () => {
-  await page.waitForTimeout(250);
-  const c = page.getByRole('button', { name: /^Завершить$/ });
-  if (await c.count()) await c.first().click();
-};
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-
-const geom = async () => {
-  const box = await page.locator('#battle-canvas canvas').boundingBox();
-  const lay = await page.evaluate(() => window.__pf?.layout?.get?.() ?? null);
-  const tile = lay?.tile ?? Math.min(box.width / 6, box.height / 8);
-  const ox = box.x + (lay?.ox ?? (box.width - tile * 6) / 2);
-  const oy = box.y + (lay?.oy ?? (box.height - tile * 8) / 2);
-  return { tile, ox, oy };
-};
+page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(`console: ${m.text()}`);
+});
+const pf = (fn, arg) => page.evaluate(fn, arg);
 const step = async (name, fn) => {
-  try { await fn(); console.log('✓', name); } catch (e) { console.log('✗', name, '—', e.message); await page.screenshot({ path: `/tmp/smoke-fail.png` }); throw e; }
+  try {
+    await fn();
+    console.log('✓', name);
+  } catch (e) {
+    console.log('✗', name, '—', e.message.split('\n')[0]);
+    await page.screenshot({ path: '/tmp/smoke-fail.png' });
+    await browser.close();
+    process.exit(1);
+  }
 };
 
-await step('open', async () => { await page.goto(base, { waitUntil: 'networkidle' }); await page.waitForTimeout(500); });
-await step('splash → menu', async () => {
-  const splash = page.getByText('Нажмите, чтобы начать');
-  if (await splash.count()) await splash.first().click();
-  await page.getByRole('button', { name: /В бой/ }).first().waitFor({ timeout: 5000 });
+await step('splash → главный экран', async () => {
+  await page.goto(base, { waitUntil: 'domcontentloaded' });
+  await pf(() => localStorage.clear());
+  await page.reload();
+  await page.getByText('Нажмите, чтобы начать').click({ timeout: 30000 });
+  await page.getByRole('button', { name: /Новая игра/ }).waitFor();
 });
-await step('В бой → создание армии', async () => {
-  await page.getByRole('button', { name: /В бой/ }).first().click();
-  await page.waitForURL(/army\/create/, { timeout: 5000 });
-  await page.waitForTimeout(300);
-});
-await step('выбрать 4 бойцов', async () => {
-  const cards = page.locator('[data-roster-card], .roster-card, .card');
-  const n = await cards.count();
-  if (n < 4) throw new Error(`карточек: ${n}`);
-  for (let i = 0; i < 4; i++) {
-    await cards.nth(i).click();
-    await page.waitForTimeout(150);
-    const take = page.getByRole('button', { name: /^Взять$/ });
-    if (await take.count()) await take.first().click();
-    await page.waitForTimeout(150);
-    const close = page.getByRole('button', { name: /Закрыть|✕|Назад/ });
-    if (await close.count() && !(await page.getByRole('button', { name: /Подтвердить/ }).first().isVisible().catch(() => false))) await close.first().click();
-  }
-});
-await step('подтвердить ростер → подготовка', async () => {
-  await page.getByRole('button', { name: /Подтвердить/ }).first().click();
-  await page.waitForURL(/battle\/setup/, { timeout: 5000 });
-});
-await step('начать бой', async () => {
-  await page.getByRole('button', { name: /Начать бой/ }).first().click();
-  await page.waitForURL(/#\/battle$/, { timeout: 5000 });
-  await page.waitForSelector('#battle-canvas canvas', { timeout: 10000 });
+await step('новая игра → деревня', async () => {
+  await page.getByRole('button', { name: /Новая игра/ }).click();
+  await page.locator('.vl-canvas canvas').waitFor({ timeout: 30000 });
   await page.waitForTimeout(1500);
 });
-await step('тап по своему юниту и «Завершить ход»', async () => {
-  // нижний ряд, вторая колонка (спавн 1,7); раскладку поля берём из отладочного хука
-  const { tile, ox, oy } = await geom();
-  await page.mouse.click(ox + tile * 1.5, oy + tile * 7.5);
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: '/tmp/smoke-selected.png' });
-  const cancel = page.getByRole('button', { name: /Отмена/ });
-  if (await cancel.count()) await cancel.first().click();
-  await page.waitForTimeout(200);
-  await page.getByRole('button', { name: /Завершить ход/ }).first().click();
-  await confirmEndTurn();
-  await page.waitForTimeout(6000);
-  await page.screenshot({ path: '/tmp/smoke-after-enemy.png' });
+await step('Лавка: покупка пластырей', async () => {
+  await pf(() => {
+    const s = window.__pf.save.get();
+    window.__pf.save.set({ ...s, profile: { ...s.profile, treats: 500 } });
+  });
+  await pf(() => window.__pf.village.walkTo('store'));
+  await page.getByRole('button', { name: /Лавка: оружие/ }).click({ timeout: 15000 });
+  await page.getByRole('tab', { name: 'Лечение' }).click();
+  await page.locator('.store-item button').first().click();
+  await page.locator('.store-item button').first().click();
+  const inv = await pf(() => window.__pf.save.get().inventory);
+  if (!inv.itm_bandage) throw new Error(`инвентарь: ${JSON.stringify(inv)}`);
+  await page.getByRole('button', { name: 'Назад' }).click();
+  await page.locator('.vl-canvas canvas').waitFor();
 });
-await step('пауза → отступить → итоги', async () => {
-  await page.getByRole('button', { name: /≡|Пауза/ }).first().click();
-  await page.waitForTimeout(300);
-  await page.getByRole('button', { name: /Отступить/ }).first().click();
-  await page.waitForTimeout(300);
-  const confirmBtn = page.getByRole('button', { name: /Отступить|Да|Подтвердить/ }).last();
-  await confirmBtn.click();
-  await page.waitForURL(/battle\/result/, { timeout: 8000 });
-  await page.screenshot({ path: '/tmp/smoke-result.png' });
+await step('ворота → вылазка 1/2 и 2/2', async () => {
+  await pf(() => window.__pf.village.talk('sorties'));
+  await page.getByRole('button', { name: /Собрать вылазку/ }).click();
+  await page.getByRole('button', { name: /^Далее/ }).click();
+  await page.locator('.foe-card').first().waitFor();
+  await page.locator('.pack-row button', { hasText: '+' }).first().click();
+  await page.getByRole('button', { name: /Начать бой/ }).click();
+  await page.locator('#battle-canvas canvas').waitFor({ timeout: 30000 });
+  await page.waitForTimeout(2500);
 });
-await step('в казарму', async () => {
-  await page.getByRole('button', { name: /В казарму/ }).first().click();
-  await page.waitForURL(/#\/army$/, { timeout: 5000 });
+await step('бой: предмет из рюкзака', async () => {
+  const pos = await pf(
+    () => Object.values(window.__pf.save.get().battle.units).find((u) => u.side === 'player').pos,
+  );
+  await pf((p) => window.__pf.battle.tapTile(p), pos);
+  await page.getByRole('button', { name: 'Предметы' }).click();
+  await page.locator('.bf-item-target').first().click();
+  await page.waitForTimeout(1200);
+  const pack = await pf(() => window.__pf.save.get().battle.pack);
+  if (Object.keys(pack).length !== 0) throw new Error(`рюкзак не потрачен: ${JSON.stringify(pack)}`);
+});
+await step('сдача → итоги → деревня', async () => {
+  await pf(() => {
+    location.hash = '#/';
+  });
+  await page.getByRole('button', { name: /Сдаться/ }).click();
+  await page.getByRole('button', { name: 'Сдаться' }).last().click();
+  await page.getByRole('button', { name: /В деревню/ }).click({ timeout: 15000 });
+  await page.locator('.vl-canvas canvas').waitFor();
+});
+await step('перезагрузка → «Продолжить»', async () => {
+  await page.reload();
+  await page.getByText('Нажмите, чтобы начать').click({ timeout: 30000 });
+  await pf(() => {
+    location.hash = '#/';
+  });
+  await page
+    .getByRole('button', { name: /^🏡 Продолжить|Продолжить/ })
+    .first()
+    .waitFor();
 });
 
-console.log(errors.length ? `ERRORS (${errors.length}):\n` + errors.join('\n') : 'no console/page errors');
 await browser.close();
-process.exit(errors.length ? 1 : 0);
+if (errors.length) {
+  console.log('Ошибки на странице:\n' + errors.join('\n'));
+  process.exit(1);
+}
+console.log('smoke ok');

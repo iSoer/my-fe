@@ -1,14 +1,22 @@
-import { render } from 'preact';
-import './ui/styles.css';
-import { App } from './ui/App';
+import { createRoot } from 'react-dom/client';
 import { getSerwist } from 'virtual:serwist';
-import { initTelegram, setBackButton, setClosingConfirmation } from '@platform/telegram';
-import { initPwa } from '@platform/pwa';
-import { $route, back, initRouter } from '@state/router';
-import { $battle, $save, flushPersist, initSave } from '@state/save';
-import { $battleUi } from '@state/battleUi';
-import { $boardLayout } from '@state/boardLayout';
-import { $pauseOpen } from './ui/lib/pause';
+import GameRoot from '@game/GameRoot';
+import { setGameHost } from '@game/platform/host';
+import { setStorageNamespace } from '@game/platform/storage';
+import { $route, back, navigate } from '@game/state/router';
+import { $battle, flushPersist } from '@game/state/save';
+import { $pauseOpen } from '@game/ui/lib/pause';
+import '@game/ui/styles.css';
+import { initTelegram, setBackButton, setClosingConfirmation, userNamespace } from '@host/telegram';
+import { initPwa } from '@host/pwa';
+import { chooseCloud, reconcileCloudSave, startCloudMirror } from '@host/sync';
+import { PwaBanners } from '@host/PwaBanners';
+import { AppCard } from '@host/AppCard';
+import { ConflictScreen } from '@host/ConflictScreen';
+import '@host/host.css';
+
+// my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Сама игра (src/game) синхронизируется из next-instapok
+// (tools/sync-game.mjs) и одинакова в обоих проектах; платформа подключается здесь через setGameHost и сторы игры.
 
 function showFatal(message: string, stack: string): void {
   const root = document.getElementById('app');
@@ -45,26 +53,44 @@ window.addEventListener('unhandledrejection', (e) => {
   showFatal(r instanceof Error ? r.message : String(r), r instanceof Error ? (r.stack ?? '') : '');
 });
 
+/** Кнопка «Назад» Telegram: в бою — пауза, из деревни — в главное меню, на меню и итогах скрыта. */
 function syncBackButton(): void {
   const route = $route.get();
-  if (route.name === 'menu') setBackButton(false);
+  if (route.name === 'menu' || route.name === 'battleResult') setBackButton(false);
   else if (route.name === 'battle') setBackButton(true, () => $pauseOpen.set(!$pauseOpen.get()));
-  else if (route.name === 'battleResult') setBackButton(false);
+  else if (route.name === 'village') setBackButton(true, () => navigate('/'));
   else setBackButton(true, () => back());
 }
 
 async function boot(): Promise<void> {
   initTelegram();
-  initRouter();
+  // Сейвы разных пользователей Telegram на одном устройстве не смешиваются
+  setStorageNamespace(userNamespace());
   if (import.meta.env.PROD) initPwa({ getSerwist, beforeReload: flushPersist });
-  const root = document.getElementById('app');
-  if (!root) throw new Error('#app не найден');
-  // Отладочный хук для смоук-тестов и консоли (игра одиночная, секретов нет).
-  (window as unknown as { __pf?: unknown }).__pf = { save: $save, ui: $battleUi, layout: $boardLayout };
-  render(<App />, root);
-  $route.subscribe(syncBackButton);
-  $battle.subscribe((b) => setClosingConfirmation(!!b && !b.result));
-  await initSave();
+  setGameHost({ Overlay: PwaBanners, SettingsSection: AppCard });
+
+  const el = document.getElementById('app');
+  if (!el) throw new Error('#app не найден');
+  const root = createRoot(el);
+
+  const start = (): void => {
+    root.render(<GameRoot />);
+    startCloudMirror();
+    $route.subscribe(syncBackButton);
+    $battle.subscribe((b) => setClosingConfirmation(!!b && !b.result));
+  };
+
+  const conflict = await reconcileCloudSave();
+  if (!conflict) return start();
+  root.render(
+    <ConflictScreen
+      conflict={conflict}
+      onPick={(choice) => {
+        if (choice === 'cloud') chooseCloud(conflict);
+        start();
+      }}
+    />,
+  );
 }
 
 void boot();

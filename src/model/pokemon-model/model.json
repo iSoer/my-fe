@@ -1,0 +1,7090 @@
+{
+  "version": 1,
+  "fittedAt": "2026-10-21T15:41:25.672Z",
+  "sourceCounts": {
+    "pokemon": 1025,
+    "forms": 254,
+    "abilities": 284,
+    "lines2": 202,
+    "lines3": 80
+  },
+  "forbiddenBst": [
+    [
+      601,
+      639
+    ]
+  ],
+  "classes": {
+    "stage1of2": {
+      "count": 202,
+      "bst": {
+        "min": 210,
+        "max": 410,
+        "mean": 305.4604,
+        "sd": 42.50842
+      },
+      "stat": {
+        "min": 10,
+        "max": 130
+      },
+      "experience": [
+        {
+          "value": 0.2,
+          "p": 0.95545
+        },
+        {
+          "value": 0.35,
+          "p": 0.0297
+        },
+        {
+          "value": 0.45,
+          "p": 0.01485
+        }
+      ],
+      "abilityCount": [
+        0.06436,
+        0.26238,
+        0.67327
+      ]
+    },
+    "stage2of2": {
+      "count": 202,
+      "bst": {
+        "min": 400,
+        "max": 555,
+        "mean": 477.14851,
+        "sd": 34.75555
+      },
+      "stat": {
+        "min": 20,
+        "max": 185
+      },
+      "experience": [
+        {
+          "value": 0.2,
+          "p": 0.0099
+        },
+        {
+          "value": 0.35,
+          "p": 0.93564
+        },
+        {
+          "value": 0.45,
+          "p": 0.0495
+        },
+        {
+          "value": 0.5,
+          "p": 0.00495
+        }
+      ],
+      "abilityCount": [
+        0.05941,
+        0.26733,
+        0.67327
+      ]
+    },
+    "stage1of3": {
+      "count": 80,
+      "bst": {
+        "min": 190,
+        "max": 325,
+        "mean": 287.2375,
+        "sd": 33.08112
+      },
+      "stat": {
+        "min": 15,
+        "max": 105
+      },
+      "experience": [
+        {
+          "value": 0.2,
+          "p": 1
+        }
+      ],
+      "abilityCount": [
+        0.0125,
+        0.475,
+        0.5125
+      ]
+    },
+    "stage2of3": {
+      "count": 80,
+      "bst": {
+        "min": 260,
+        "max": 445,
+        "mean": 386.5875,
+        "sd": 37.06057
+      },
+      "stat": {
+        "min": 20,
+        "max": 140
+      },
+      "experience": [
+        {
+          "value": 0.35,
+          "p": 1
+        }
+      ],
+      "abilityCount": [
+        0.0125,
+        0.4875,
+        0.5
+      ]
+    },
+    "stage3of3": {
+      "count": 74,
+      "bst": {
+        "min": 445,
+        "max": 545,
+        "mean": 512.41892,
+        "sd": 22.21625
+      },
+      "stat": {
+        "min": 25,
+        "max": 180
+      },
+      "experience": [
+        {
+          "value": 0.35,
+          "p": 0.01351
+        },
+        {
+          "value": 0.45,
+          "p": 0.78378
+        },
+        {
+          "value": 0.5,
+          "p": 0.2027
+        }
+      ],
+      "abilityCount": [
+        0.01351,
+        0.47297,
+        0.51351
+      ]
+    },
+    "single": {
+      "count": 266,
+      "bst": {
+        "min": 190,
+        "max": 555,
+        "mean": 434.12406,
+        "sd": 97.2762
+      },
+      "stat": {
+        "min": 5,
+        "max": 255
+      },
+      "experience": [
+        {
+          "value": 0.2,
+          "p": 0.22053
+        },
+        {
+          "value": 0.35,
+          "p": 0.62357
+        },
+        {
+          "value": 0.45,
+          "p": 0.07985
+        },
+        {
+          "value": 0.5,
+          "p": 0.07605
+        }
+      ],
+      "abilityCount": [
+        0.20301,
+        0.28947,
+        0.50752
+      ]
+    },
+    "semiLegendary": {
+      "count": 91,
+      "bst": {
+        "min": 570,
+        "max": 600,
+        "mean": 583.95604,
+        "sd": 12.46142
+      },
+      "stat": {
+        "min": 10,
+        "max": 225
+      },
+      "experience": [
+        {
+          "value": 0.2,
+          "p": 0.01099
+        },
+        {
+          "value": 0.45,
+          "p": 0.64835
+        },
+        {
+          "value": 0.5,
+          "p": 0.34066
+        }
+      ],
+      "abilityCount": [
+        0.75824,
+        0.23077,
+        0.01099
+      ]
+    },
+    "pseudoLegendary": {
+      "count": 6,
+      "bst": {
+        "min": 600,
+        "max": 600,
+        "mean": 600,
+        "sd": 0
+      },
+      "stat": {
+        "min": 70,
+        "max": 150
+      },
+      "experience": [
+        {
+          "value": 0.45,
+          "p": 0.66667
+        },
+        {
+          "value": 0.5,
+          "p": 0.33333
+        }
+      ],
+      "abilityCount": [
+        0,
+        0.5,
+        0.5
+      ]
+    },
+    "legendary": {
+      "count": 24,
+      "bst": {
+        "min": 660,
+        "max": 715,
+        "mean": 677.08333,
+        "sd": 11.97068
+      },
+      "stat": {
+        "min": 65,
+        "max": 160
+      },
+      "experience": [
+        {
+          "value": 0.35,
+          "p": 0.04167
+        },
+        {
+          "value": 0.45,
+          "p": 0.75
+        },
+        {
+          "value": 0.5,
+          "p": 0.20833
+        }
+      ],
+      "abilityCount": [
+        0.75,
+        0.25,
+        0
+      ]
+    }
+  },
+  "evolution": {
+    "steps": {
+      "1to2of2": {
+        "count": 202,
+        "bstRatio": {
+          "median": 1.54591,
+          "sd": 0.194
+        },
+        "statRatio": {
+          "hp": 1.55556,
+          "attack": 1.59412,
+          "defense": 1.51683,
+          "specialAttack": 1.6,
+          "specialDefense": 1.5608,
+          "speed": 1.46999
+        },
+        "heightRatio": 2.21111,
+        "weightRatio": 4.13733,
+        "profileDriftSd": 0.03069,
+        "addSecondTypeP": 0.2
+      },
+      "1to2of3": {
+        "count": 80,
+        "bstRatio": {
+          "median": 1.32787,
+          "sd": 0.10514
+        },
+        "statRatio": {
+          "hp": 1.33333,
+          "attack": 1.3125,
+          "defense": 1.36932,
+          "specialAttack": 1.33333,
+          "specialDefense": 1.36603,
+          "speed": 1.3306
+        },
+        "heightRatio": 2,
+        "weightRatio": 3.08203,
+        "profileDriftSd": 0.02169,
+        "addSecondTypeP": 0.18519
+      },
+      "2to3of3": {
+        "count": 80,
+        "bstRatio": {
+          "median": 1.31852,
+          "sd": 0.12087
+        },
+        "statRatio": {
+          "hp": 1.3257,
+          "attack": 1.36364,
+          "defense": 1.31258,
+          "specialAttack": 1.33616,
+          "specialDefense": 1.34524,
+          "speed": 1.27922
+        },
+        "heightRatio": 1.81667,
+        "weightRatio": 2.76213,
+        "profileDriftSd": 0.02438,
+        "addSecondTypeP": 0.38636
+      }
+    },
+    "sameAbilities": 0.77305,
+    "profileCorrelation": 0.95341
+  },
+  "types": {
+    "normal": {
+      "primary": 0.11512,
+      "secondaryP": 0.36441,
+      "secondary": {
+        "water": 0.02326,
+        "grass": 0.04651,
+        "fighting": 0.04651,
+        "ground": 0.02326,
+        "flying": 0.62791,
+        "psychic": 0.11628,
+        "dragon": 0.02326,
+        "fairy": 0.09302
+      },
+      "bstShift": -24.84713,
+      "profileShift": {
+        "hp": 0.0263,
+        "attack": 0.00269,
+        "defense": -0.02103,
+        "specialAttack": -0.01737,
+        "specialDefense": -0.00632,
+        "speed": 0.01572
+      },
+      "weightShift": -0.01127
+    },
+    "fire": {
+      "primary": 0.06439,
+      "secondaryP": 0.45455,
+      "secondary": {
+        "normal": 0.06667,
+        "water": 0.03333,
+        "fighting": 0.2,
+        "poison": 0.03333,
+        "ground": 0.06667,
+        "flying": 0.2,
+        "psychic": 0.06667,
+        "bug": 0.06667,
+        "rock": 0.03333,
+        "ghost": 0.1,
+        "dragon": 0.06667,
+        "dark": 0.03333,
+        "steel": 0.03333
+      },
+      "bstShift": 21.81934,
+      "profileShift": {
+        "hp": -0.00855,
+        "attack": -0.00099,
+        "defense": -0.01996,
+        "specialAttack": 0.02925,
+        "specialDefense": -0.00705,
+        "speed": 0.00731
+      },
+      "weightShift": 0.10452
+    },
+    "water": {
+      "primary": 0.13073,
+      "secondaryP": 0.44776,
+      "secondary": {
+        "electric": 0.03333,
+        "grass": 0.05,
+        "ice": 0.06667,
+        "fighting": 0.05,
+        "poison": 0.05,
+        "ground": 0.15,
+        "flying": 0.11667,
+        "psychic": 0.1,
+        "bug": 0.03333,
+        "rock": 0.08333,
+        "ghost": 0.05,
+        "dragon": 0.06667,
+        "dark": 0.06667,
+        "steel": 0.01667,
+        "fairy": 0.06667
+      },
+      "bstShift": -8.57644,
+      "profileShift": {
+        "hp": 0.00059,
+        "attack": -0.0094,
+        "defense": 0.00219,
+        "specialAttack": 0.00465,
+        "specialDefense": -0.00096,
+        "speed": 0.00293
+      },
+      "weightShift": -0.0186
+    },
+    "electric": {
+      "primary": 0.05756,
+      "secondaryP": 0.40678,
+      "secondary": {
+        "normal": 0.08333,
+        "ice": 0.04167,
+        "fighting": 0.08333,
+        "poison": 0.08333,
+        "ground": 0.04167,
+        "flying": 0.20833,
+        "ghost": 0.04167,
+        "dragon": 0.125,
+        "dark": 0.04167,
+        "steel": 0.16667,
+        "fairy": 0.08333
+      },
+      "bstShift": 14.54505,
+      "profileShift": {
+        "hp": -0.00955,
+        "attack": -0.012,
+        "defense": -0.0247,
+        "specialAttack": 0.02724,
+        "specialDefense": -0.01071,
+        "speed": 0.02972
+      },
+      "weightShift": 0.02866
+    },
+    "grass": {
+      "primary": 0.10049,
+      "secondaryP": 0.54369,
+      "secondary": {
+        "normal": 0.05357,
+        "fire": 0.01786,
+        "ice": 0.03571,
+        "fighting": 0.05357,
+        "poison": 0.25,
+        "ground": 0.01786,
+        "flying": 0.10714,
+        "psychic": 0.05357,
+        "ghost": 0.08929,
+        "dragon": 0.08929,
+        "dark": 0.08929,
+        "steel": 0.05357,
+        "fairy": 0.08929
+      },
+      "bstShift": -11.9073,
+      "profileShift": {
+        "hp": -0.00548,
+        "attack": -0.00304,
+        "defense": 0.00304,
+        "specialAttack": 0.01059,
+        "specialDefense": 0.01051,
+        "speed": -0.01562
+      },
+      "weightShift": -0.28157
+    },
+    "ice": {
+      "primary": 0.03024,
+      "secondaryP": 0.48387,
+      "secondary": {
+        "water": 0.26667,
+        "ground": 0.2,
+        "flying": 0.13333,
+        "psychic": 0.2,
+        "bug": 0.13333,
+        "ghost": 0.06667
+      },
+      "bstShift": 25.959,
+      "profileShift": {
+        "hp": 0.01294,
+        "attack": 0.00028,
+        "defense": -0.00428,
+        "specialAttack": 0.00413,
+        "specialDefense": 0.00074,
+        "speed": -0.01381
+      },
+      "weightShift": 0.47068
+    },
+    "fighting": {
+      "primary": 0.03902,
+      "secondaryP": 0.3,
+      "secondary": {
+        "electric": 0.08333,
+        "ice": 0.08333,
+        "poison": 0.08333,
+        "flying": 0.08333,
+        "psychic": 0.16667,
+        "ghost": 0.16667,
+        "dragon": 0.08333,
+        "dark": 0.16667,
+        "steel": 0.08333
+      },
+      "bstShift": 39.45016,
+      "profileShift": {
+        "hp": 0.00285,
+        "attack": 0.04376,
+        "defense": -0.00685,
+        "specialAttack": -0.02707,
+        "specialDefense": -0.01453,
+        "speed": 0.00184
+      },
+      "weightShift": 0.19002
+    },
+    "poison": {
+      "primary": 0.04098,
+      "secondaryP": 0.61905,
+      "secondary": {
+        "normal": 0.07692,
+        "fire": 0.07692,
+        "water": 0.11538,
+        "fighting": 0.11538,
+        "ground": 0.11538,
+        "flying": 0.11538,
+        "psychic": 0.03846,
+        "bug": 0.03846,
+        "ghost": 0.03846,
+        "dragon": 0.11538,
+        "dark": 0.11538,
+        "fairy": 0.03846
+      },
+      "bstShift": -14.84346,
+      "profileShift": {
+        "hp": -0.00425,
+        "attack": -0.00595,
+        "defense": -0.00824,
+        "specialAttack": 0.00795,
+        "specialDefense": 0.00325,
+        "speed": 0.00724
+      },
+      "weightShift": -0.44376
+    },
+    "ground": {
+      "primary": 0.03902,
+      "secondaryP": 0.575,
+      "secondary": {
+        "normal": 0.04348,
+        "electric": 0.04348,
+        "grass": 0.08696,
+        "fighting": 0.04348,
+        "flying": 0.13043,
+        "psychic": 0.08696,
+        "rock": 0.13043,
+        "ghost": 0.13043,
+        "dragon": 0.08696,
+        "dark": 0.13043,
+        "steel": 0.08696
+      },
+      "bstShift": 3.99317,
+      "profileShift": {
+        "hp": 0.01252,
+        "attack": 0.02491,
+        "defense": 0.02811,
+        "specialAttack": -0.02982,
+        "specialDefense": -0.01406,
+        "speed": -0.02165
+      },
+      "weightShift": 0.45887
+    },
+    "flying": {
+      "primary": 0.00878,
+      "secondaryP": 0.66667,
+      "secondary": {
+        "water": 0.16667,
+        "fighting": 0.16667,
+        "dragon": 0.33333,
+        "dark": 0.16667,
+        "steel": 0.16667
+      },
+      "bstShift": 7.46913,
+      "profileShift": {
+        "hp": -0.00296,
+        "attack": -0.00548,
+        "defense": -0.02007,
+        "specialAttack": -0.00066,
+        "specialDefense": -0.00662,
+        "speed": 0.03579
+      },
+      "weightShift": -0.33685
+    },
+    "psychic": {
+      "primary": 0.05854,
+      "secondaryP": 0.35,
+      "secondary": {
+        "normal": 0.04762,
+        "fire": 0.04762,
+        "grass": 0.09524,
+        "fighting": 0.04762,
+        "flying": 0.28571,
+        "ghost": 0.09524,
+        "steel": 0.04762,
+        "fairy": 0.33333
+      },
+      "bstShift": 29.76415,
+      "profileShift": {
+        "hp": -0.00223,
+        "attack": -0.03737,
+        "defense": -0.01033,
+        "specialAttack": 0.0307,
+        "specialDefense": 0.02154,
+        "speed": -0.0023
+      },
+      "weightShift": -0.0252
+    },
+    "bug": {
+      "primary": 0.08098,
+      "secondaryP": 0.72289,
+      "secondary": {
+        "fire": 0.03333,
+        "water": 0.05,
+        "electric": 0.06667,
+        "grass": 0.1,
+        "fighting": 0.06667,
+        "poison": 0.18333,
+        "ground": 0.01667,
+        "flying": 0.21667,
+        "psychic": 0.05,
+        "rock": 0.06667,
+        "ghost": 0.01667,
+        "dark": 0.01667,
+        "steel": 0.08333,
+        "fairy": 0.03333
+      },
+      "bstShift": -52.81726,
+      "profileShift": {
+        "hp": -0.01045,
+        "attack": -0.002,
+        "defense": 0.01796,
+        "specialAttack": -0.01443,
+        "specialDefense": 0.00625,
+        "speed": 0.00266
+      },
+      "weightShift": -0.06906
+    },
+    "rock": {
+      "primary": 0.05659,
+      "secondaryP": 0.7069,
+      "secondary": {
+        "fire": 0.04878,
+        "water": 0.14634,
+        "electric": 0.02439,
+        "grass": 0.04878,
+        "ice": 0.04878,
+        "fighting": 0.02439,
+        "poison": 0.07317,
+        "ground": 0.14634,
+        "flying": 0.09756,
+        "psychic": 0.07317,
+        "bug": 0.04878,
+        "dragon": 0.04878,
+        "dark": 0.02439,
+        "steel": 0.09756,
+        "fairy": 0.04878
+      },
+      "bstShift": 14.43479,
+      "profileShift": {
+        "hp": -0.00908,
+        "attack": 0.01777,
+        "defense": 0.06634,
+        "specialAttack": -0.03042,
+        "specialDefense": -0.00268,
+        "speed": -0.04192
+      },
+      "weightShift": 0.74577
+    },
+    "ghost": {
+      "primary": 0.03415,
+      "secondaryP": 0.54286,
+      "secondary": {
+        "fire": 0.15789,
+        "grass": 0.26316,
+        "poison": 0.15789,
+        "ground": 0.10526,
+        "flying": 0.10526,
+        "dragon": 0.05263,
+        "dark": 0.05263,
+        "fairy": 0.10526
+      },
+      "bstShift": 19.77471,
+      "profileShift": {
+        "hp": -0.02006,
+        "attack": -0.00551,
+        "defense": 0.00565,
+        "specialAttack": 0.01947,
+        "specialDefense": 0.01209,
+        "speed": -0.01163
+      },
+      "weightShift": -0.75645
+    },
+    "dragon": {
+      "primary": 0.0361,
+      "secondaryP": 0.64865,
+      "secondary": {
+        "normal": 0.04167,
+        "fire": 0.04167,
+        "water": 0.04167,
+        "electric": 0.04167,
+        "ice": 0.16667,
+        "fighting": 0.08333,
+        "ground": 0.16667,
+        "flying": 0.16667,
+        "psychic": 0.08333,
+        "ghost": 0.125,
+        "dark": 0.04167
+      },
+      "bstShift": 77.07031,
+      "profileShift": {
+        "hp": 0.00038,
+        "attack": 0.00837,
+        "defense": -0.00352,
+        "specialAttack": 0.00684,
+        "specialDefense": -0.00908,
+        "speed": -0.003
+      },
+      "weightShift": 0.06144
+    },
+    "dark": {
+      "primary": 0.0439,
+      "secondaryP": 0.71111,
+      "secondary": {
+        "normal": 0.03125,
+        "fire": 0.09375,
+        "grass": 0.0625,
+        "ice": 0.09375,
+        "fighting": 0.0625,
+        "poison": 0.03125,
+        "ground": 0.03125,
+        "flying": 0.1875,
+        "psychic": 0.0625,
+        "ghost": 0.03125,
+        "dragon": 0.125,
+        "steel": 0.09375,
+        "fairy": 0.09375
+      },
+      "bstShift": 31.90737,
+      "profileShift": {
+        "hp": -0.00007,
+        "attack": 0.02401,
+        "defense": -0.01615,
+        "specialAttack": -0.00387,
+        "specialDefense": -0.015,
+        "speed": 0.01107
+      },
+      "weightShift": 0.12269
+    },
+    "steel": {
+      "primary": 0.03512,
+      "secondaryP": 0.72222,
+      "secondary": {
+        "fighting": 0.03846,
+        "poison": 0.07692,
+        "ground": 0.03846,
+        "flying": 0.07692,
+        "psychic": 0.26923,
+        "rock": 0.11538,
+        "ghost": 0.15385,
+        "dragon": 0.11538,
+        "fairy": 0.11538
+      },
+      "bstShift": 52.03625,
+      "profileShift": {
+        "hp": -0.01754,
+        "attack": 0.00871,
+        "defense": 0.05783,
+        "specialAttack": -0.01753,
+        "specialDefense": 0.00263,
+        "speed": -0.03409
+      },
+      "weightShift": 0.69301
+    },
+    "fairy": {
+      "primary": 0.02829,
+      "secondaryP": 0.27586,
+      "secondary": {
+        "fighting": 0.125,
+        "flying": 0.375,
+        "psychic": 0.125,
+        "steel": 0.375
+      },
+      "bstShift": 1.21942,
+      "profileShift": {
+        "hp": -0.00023,
+        "attack": -0.03282,
+        "defense": -0.00712,
+        "specialAttack": 0.01638,
+        "specialDefense": 0.03172,
+        "speed": -0.00793
+      },
+      "weightShift": -0.41639
+    }
+  },
+  "profile": {
+    "mean": {
+      "hp": 0.16485,
+      "attack": 0.1804,
+      "defense": 0.16979,
+      "specialAttack": 0.16234,
+      "specialDefense": 0.16397,
+      "speed": 0.15866
+    },
+    "archetypes": {
+      "physical": {
+        "weight": 0.19415,
+        "center": {
+          "hp": 0.00217,
+          "attack": 0.051,
+          "defense": 0.0209,
+          "specialAttack": -0.02796,
+          "specialDefense": -0.02019,
+          "speed": -0.02592
+        },
+        "cov": [
+          [
+            0.0008114,
+            -0.0002219,
+            -0.0002165,
+            -0.0001227,
+            -0.0000427,
+            -0.0002075
+          ],
+          [
+            -0.0002219,
+            0.0008079,
+            -0.0003733,
+            -0.0000788,
+            -0.0001752,
+            0.0000413
+          ],
+          [
+            -0.0002165,
+            -0.0003733,
+            0.0016192,
+            -0.0003496,
+            -0.0003686,
+            -0.0003112
+          ],
+          [
+            -0.0001227,
+            -0.0000788,
+            -0.0003496,
+            0.000931,
+            -0.0000178,
+            -0.0003621
+          ],
+          [
+            -0.0000427,
+            -0.0001752,
+            -0.0003686,
+            -0.0000178,
+            0.0008412,
+            -0.0002369
+          ],
+          [
+            -0.0002075,
+            0.0000413,
+            -0.0003112,
+            -0.0003621,
+            -0.0002369,
+            0.0010765
+          ]
+        ]
+      },
+      "special": {
+        "weight": 0.15902,
+        "center": {
+          "hp": -0.01619,
+          "attack": -0.04098,
+          "defense": -0.02898,
+          "specialAttack": 0.05278,
+          "specialDefense": 0.02199,
+          "speed": 0.01137
+        },
+        "cov": [
+          [
+            0.0006374,
+            -0.0000651,
+            -0.0000703,
+            -0.0001627,
+            -0.0000951,
+            -0.0002443
+          ],
+          [
+            -0.0000651,
+            0.0006023,
+            0.0000202,
+            0.0000147,
+            -0.0002385,
+            -0.0003336
+          ],
+          [
+            -0.0000703,
+            0.0000202,
+            0.0009411,
+            0.0000147,
+            -0.000232,
+            -0.0006738
+          ],
+          [
+            -0.0001627,
+            0.0000147,
+            0.0000147,
+            0.0012842,
+            -0.0007826,
+            -0.0003684
+          ],
+          [
+            -0.0000951,
+            -0.0002385,
+            -0.000232,
+            -0.0007826,
+            0.0014704,
+            -0.0001222
+          ],
+          [
+            -0.0002443,
+            -0.0003336,
+            -0.0006738,
+            -0.0003684,
+            -0.0001222,
+            0.0017423
+          ]
+        ]
+      },
+      "tank": {
+        "weight": 0.1122,
+        "center": {
+          "hp": -0.01964,
+          "attack": -0.03372,
+          "defense": 0.06433,
+          "specialAttack": -0.01341,
+          "specialDefense": 0.05338,
+          "speed": -0.05094
+        },
+        "cov": [
+          [
+            0.0009679,
+            -0.0000614,
+            -0.0006059,
+            0.0002645,
+            -0.0004698,
+            -0.0000952
+          ],
+          [
+            -0.0000614,
+            0.0012516,
+            -0.0001916,
+            0.0001589,
+            -0.0008809,
+            -0.0002765
+          ],
+          [
+            -0.0006059,
+            -0.0001916,
+            0.0022372,
+            -0.0008989,
+            -0.0002473,
+            -0.0002935
+          ],
+          [
+            0.0002645,
+            0.0001589,
+            -0.0008989,
+            0.0015657,
+            -0.0007137,
+            -0.0003766
+          ],
+          [
+            -0.0004698,
+            -0.0008809,
+            -0.0002473,
+            -0.0007137,
+            0.0027356,
+            -0.0004239
+          ],
+          [
+            -0.0000952,
+            -0.0002765,
+            -0.0002935,
+            -0.0003766,
+            -0.0004239,
+            0.0014657
+          ]
+        ]
+      },
+      "fast": {
+        "weight": 0.20683,
+        "center": {
+          "hp": -0.01839,
+          "attack": 0.01049,
+          "defense": -0.02716,
+          "specialAttack": -0.01426,
+          "specialDefense": -0.02251,
+          "speed": 0.07184
+        },
+        "cov": [
+          [
+            0.0008257,
+            -0.0000758,
+            -0.0000636,
+            -0.0001415,
+            -0.0001057,
+            -0.0004391
+          ],
+          [
+            -0.0000758,
+            0.0015002,
+            -0.0004729,
+            -0.0000765,
+            -0.0003959,
+            -0.0004791
+          ],
+          [
+            -0.0000636,
+            -0.0004729,
+            0.0009653,
+            -0.0003642,
+            0.0001266,
+            -0.0001911
+          ],
+          [
+            -0.0001415,
+            -0.0000765,
+            -0.0003642,
+            0.001162,
+            -0.0004029,
+            -0.0001769
+          ],
+          [
+            -0.0001057,
+            -0.0003959,
+            0.0001266,
+            -0.0004029,
+            0.0007847,
+            -0.0000067
+          ],
+          [
+            -0.0004391,
+            -0.0004791,
+            -0.0001911,
+            -0.0001769,
+            -0.0000067,
+            0.0012928
+          ]
+        ]
+      },
+      "hpWall": {
+        "weight": 0.08488,
+        "center": {
+          "hp": 0.10146,
+          "attack": -0.01167,
+          "defense": -0.01236,
+          "specialAttack": -0.0109,
+          "specialDefense": -0.0074,
+          "speed": -0.05912
+        },
+        "cov": [
+          [
+            0.0041644,
+            -0.0012261,
+            -0.0016784,
+            -0.001062,
+            -0.0001026,
+            -0.0000954
+          ],
+          [
+            -0.0012261,
+            0.0019716,
+            0.0003621,
+            0.0000495,
+            -0.0009251,
+            -0.000232
+          ],
+          [
+            -0.0016784,
+            0.0003621,
+            0.0021234,
+            -0.0002791,
+            -0.0001387,
+            -0.0003893
+          ],
+          [
+            -0.001062,
+            0.0000495,
+            -0.0002791,
+            0.0015291,
+            -0.0001622,
+            -0.0000752
+          ],
+          [
+            -0.0001026,
+            -0.0009251,
+            -0.0001387,
+            -0.0001622,
+            0.001646,
+            -0.0003174
+          ],
+          [
+            -0.0000954,
+            -0.000232,
+            -0.0003893,
+            -0.0000752,
+            -0.0003174,
+            0.0011092
+          ]
+        ]
+      },
+      "balanced": {
+        "weight": 0.24293,
+        "center": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "specialAttack": 0,
+          "specialDefense": 0,
+          "speed": 0
+        },
+        "cov": [
+          [
+            0.0005459,
+            -0.0000164,
+            -0.0001227,
+            -0.0001596,
+            -0.0000948,
+            -0.0001525
+          ],
+          [
+            -0.0000164,
+            0.0005955,
+            -0.0003552,
+            0.000129,
+            -0.0001925,
+            -0.0001604
+          ],
+          [
+            -0.0001227,
+            -0.0003552,
+            0.0007019,
+            -0.0002352,
+            -0.0000046,
+            0.0000157
+          ],
+          [
+            -0.0001596,
+            0.000129,
+            -0.0002352,
+            0.0009054,
+            -0.0003159,
+            -0.0003238
+          ],
+          [
+            -0.0000948,
+            -0.0001925,
+            -0.0000046,
+            -0.0003159,
+            0.0006751,
+            -0.0000673
+          ],
+          [
+            -0.0001525,
+            -0.0001604,
+            0.0000157,
+            -0.0003238,
+            -0.0000673,
+            0.0006882
+          ]
+        ]
+      }
+    }
+  },
+  "size": {
+    "height": {
+      "intercept": 0.26833,
+      "slope": 0.0045358,
+      "sd": 0.54144
+    },
+    "weight": {
+      "intercept": 1.58158,
+      "slope": 1.7533,
+      "sd": 0.85494
+    },
+    "heightRange": {
+      "min": 1,
+      "max": 200
+    },
+    "weightRange": {
+      "min": 1,
+      "max": 9999
+    }
+  },
+  "abilities": {
+    "adaptability": {
+      "count": 11,
+      "types": {
+        "normal": 4,
+        "water": 6,
+        "dark": 1,
+        "poison": 2,
+        "dragon": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 3,
+        "hidden": 7
+      },
+      "shift": {
+        "hp": -0.01266,
+        "attack": 0.02226,
+        "defense": -0.00955,
+        "specialAttack": -0.00016,
+        "specialDefense": 0.003,
+        "speed": -0.00288
+      },
+      "universal": false,
+      "meanBst": 391.9
+    },
+    "aftermath": {
+      "count": 8,
+      "types": {
+        "electric": 2,
+        "ghost": 2,
+        "flying": 2,
+        "poison": 4,
+        "dark": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 2,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": 0.03389,
+        "attack": -0.02163,
+        "defense": -0.01697,
+        "specialAttack": -0.02428,
+        "specialDefense": -0.01496,
+        "speed": 0.04395
+      },
+      "universal": false,
+      "meanBst": 409.6
+    },
+    "air-lock": {
+      "count": 1,
+      "types": {
+        "dragon": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 680
+    },
+    "analytic": {
+      "count": 12,
+      "types": {
+        "electric": 3,
+        "steel": 3,
+        "water": 2,
+        "psychic": 3,
+        "normal": 5
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 12
+      },
+      "shift": {
+        "hp": -0.03513,
+        "attack": -0.01871,
+        "defense": 0.01189,
+        "specialAttack": 0.05702,
+        "specialDefense": 0.00291,
+        "speed": -0.01799
+      },
+      "universal": false,
+      "meanBst": 427.1
+    },
+    "anger-point": {
+      "count": 9,
+      "types": {
+        "fighting": 4,
+        "normal": 1,
+        "fire": 1,
+        "ground": 4,
+        "dark": 3,
+        "ice": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 3,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": -0.01126,
+        "attack": 0.03022,
+        "defense": -0.02073,
+        "specialAttack": -0.01237,
+        "specialDefense": -0.01053,
+        "speed": 0.02467
+      },
+      "universal": false,
+      "meanBst": 409.8
+    },
+    "anger-shell": {
+      "count": 1,
+      "types": {
+        "rock": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 450
+    },
+    "anticipation": {
+      "count": 11,
+      "types": {
+        "normal": 1,
+        "water": 2,
+        "ground": 2,
+        "bug": 1,
+        "grass": 2,
+        "poison": 2,
+        "fighting": 2,
+        "steel": 1,
+        "psychic": 4,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 5,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": -0.00715,
+        "attack": -0.00786,
+        "defense": -0.00095,
+        "specialAttack": 0.01931,
+        "specialDefense": 0.00719,
+        "speed": -0.01054
+      },
+      "universal": false,
+      "meanBst": 380.4
+    },
+    "arena-trap": {
+      "count": 3,
+      "types": {
+        "ground": 3
+      },
+      "slots": {
+        "first": 0,
+        "second": 3,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 326.7
+    },
+    "armor-tail": {
+      "count": 1,
+      "types": {
+        "normal": 1,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 520
+    },
+    "aroma-veil": {
+      "count": 6,
+      "types": {
+        "fairy": 5,
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 383.2
+    },
+    "aura-break": {
+      "count": 1,
+      "types": {
+        "dragon": 1,
+        "ground": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 600
+    },
+    "bad-dreams": {
+      "count": 1,
+      "types": {
+        "dark": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 600
+    },
+    "ball-fetch": {
+      "count": 1,
+      "types": {
+        "electric": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 270
+    },
+    "battery": {
+      "count": 1,
+      "types": {
+        "bug": 1,
+        "electric": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 400
+    },
+    "battle-armor": {
+      "count": 11,
+      "types": {
+        "ground": 2,
+        "rock": 4,
+        "water": 2,
+        "bug": 3,
+        "poison": 2,
+        "dark": 1,
+        "normal": 1,
+        "steel": 1,
+        "fighting": 1
+      },
+      "slots": {
+        "first": 7,
+        "second": 2,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.02665,
+        "attack": 0.01545,
+        "defense": 0.03226,
+        "specialAttack": -0.01373,
+        "specialDefense": -0.00743,
+        "speed": 0.00011
+      },
+      "universal": false,
+      "meanBst": 429
+    },
+    "beads-of-ruin": {
+      "count": 1,
+      "types": {
+        "dark": 1,
+        "fire": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 570
+    },
+    "beast-boost": {
+      "count": 11,
+      "types": {
+        "rock": 2,
+        "poison": 3,
+        "bug": 2,
+        "fighting": 2,
+        "electric": 1,
+        "steel": 3,
+        "flying": 1,
+        "grass": 1,
+        "dark": 1,
+        "dragon": 2,
+        "fire": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 11,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.00696,
+        "attack": 0.01145,
+        "defense": -0.01796,
+        "specialAttack": 0.02951,
+        "specialDefense": -0.03058,
+        "speed": 0.00063
+      },
+      "universal": true,
+      "meanBst": 553.6
+    },
+    "berserk": {
+      "count": 1,
+      "types": {
+        "normal": 1,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 485
+    },
+    "big-pecks": {
+      "count": 15,
+      "types": {
+        "normal": 8,
+        "flying": 15,
+        "water": 2,
+        "dark": 3
+      },
+      "slots": {
+        "first": 7,
+        "second": 2,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": 0.00408,
+        "attack": 0.00013,
+        "defense": 0.01097,
+        "specialAttack": -0.01377,
+        "specialDefense": -0.01438,
+        "speed": 0.01298
+      },
+      "universal": false,
+      "meanBst": 375.4
+    },
+    "blaze": {
+      "count": 29,
+      "types": {
+        "fire": 29,
+        "flying": 1,
+        "fighting": 6,
+        "psychic": 1,
+        "dark": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 27,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.0022,
+        "attack": 0.00035,
+        "defense": -0.00827,
+        "specialAttack": 0.00214,
+        "specialDefense": -0.00926,
+        "speed": 0.01284
+      },
+      "universal": false,
+      "meanBst": 416.8
+    },
+    "bulletproof": {
+      "count": 10,
+      "types": {
+        "grass": 4,
+        "fighting": 3,
+        "dragon": 4,
+        "normal": 3,
+        "ground": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 1,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": -0.01118,
+        "attack": -0.00355,
+        "defense": 0.05614,
+        "specialAttack": -0.0174,
+        "specialDefense": -0.00389,
+        "speed": -0.02012
+      },
+      "universal": false,
+      "meanBst": 413.8
+    },
+    "cheek-pouch": {
+      "count": 6,
+      "types": {
+        "normal": 5,
+        "ground": 1,
+        "electric": 1,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 3,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 382.7
+    },
+    "chilling-neigh": {
+      "count": 1,
+      "types": {
+        "ice": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 580
+    },
+    "chlorophyll": {
+      "count": 37,
+      "types": {
+        "grass": 37,
+        "poison": 9,
+        "psychic": 2,
+        "flying": 4,
+        "dark": 2,
+        "bug": 3,
+        "fairy": 2,
+        "normal": 2,
+        "fire": 1
+      },
+      "slots": {
+        "first": 27,
+        "second": 4,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.00005,
+        "attack": -0.00701,
+        "defense": 0.00183,
+        "specialAttack": 0.0143,
+        "specialDefense": -0.00989,
+        "speed": 0.00073
+      },
+      "universal": false,
+      "meanBst": 396.6
+    },
+    "clear-body": {
+      "count": 19,
+      "types": {
+        "water": 2,
+        "poison": 2,
+        "steel": 7,
+        "psychic": 3,
+        "rock": 6,
+        "ice": 1,
+        "fairy": 2,
+        "dragon": 3,
+        "ghost": 3
+      },
+      "slots": {
+        "first": 13,
+        "second": 0,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": -0.01679,
+        "attack": -0.01342,
+        "defense": 0.0124,
+        "specialAttack": -0.01803,
+        "specialDefense": 0.03329,
+        "speed": 0.00256
+      },
+      "universal": false,
+      "meanBst": 457.1
+    },
+    "cloud-nine": {
+      "count": 7,
+      "types": {
+        "water": 2,
+        "normal": 4,
+        "flying": 2,
+        "dragon": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 2,
+        "hidden": 3
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 429.3
+    },
+    "color-change": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 440
+    },
+    "comatose": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 480
+    },
+    "commander": {
+      "count": 1,
+      "types": {
+        "dragon": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 475
+    },
+    "competitive": {
+      "count": 13,
+      "types": {
+        "normal": 3,
+        "fairy": 3,
+        "water": 4,
+        "steel": 1,
+        "psychic": 3,
+        "electric": 3,
+        "flying": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 7,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.04314,
+        "attack": -0.02059,
+        "defense": -0.0213,
+        "specialAttack": 0.01936,
+        "specialDefense": -0.00357,
+        "speed": -0.01704
+      },
+      "universal": true,
+      "meanBst": 394.9
+    },
+    "compound-eyes": {
+      "count": 12,
+      "types": {
+        "bug": 12,
+        "flying": 3,
+        "poison": 2,
+        "ground": 1,
+        "electric": 2,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 6,
+        "second": 5,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.00311,
+        "attack": -0.02911,
+        "defense": -0.00344,
+        "specialAttack": 0.00671,
+        "specialDefense": 0.0083,
+        "speed": 0.01443
+      },
+      "universal": false,
+      "meanBst": 327.3
+    },
+    "contrary": {
+      "count": 10,
+      "types": {
+        "bug": 1,
+        "rock": 1,
+        "normal": 1,
+        "grass": 5,
+        "dark": 2,
+        "psychic": 2,
+        "fairy": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.01987,
+        "attack": -0.01391,
+        "defense": 0.02876,
+        "specialAttack": -0.01787,
+        "specialDefense": 0.02387,
+        "speed": -0.00097
+      },
+      "universal": false,
+      "meanBst": 419.4
+    },
+    "corrosion": {
+      "count": 4,
+      "types": {
+        "poison": 4,
+        "fire": 2,
+        "rock": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 418.8
+    },
+    "costar": {
+      "count": 1,
+      "types": {
+        "flying": 1,
+        "fighting": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 500
+    },
+    "cotton-down": {
+      "count": 2,
+      "types": {
+        "grass": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 355
+    },
+    "cud-chew": {
+      "count": 1,
+      "types": {
+        "normal": 1,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 520
+    },
+    "cursed-body": {
+      "count": 11,
+      "types": {
+        "ghost": 11,
+        "poison": 1,
+        "ice": 1,
+        "water": 2,
+        "dragon": 3
+      },
+      "slots": {
+        "first": 1,
+        "second": 2,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": -0.008,
+        "attack": -0.00072,
+        "defense": -0.04028,
+        "specialAttack": 0.0194,
+        "specialDefense": -0.00873,
+        "speed": 0.03834
+      },
+      "universal": false,
+      "meanBst": 421.9
+    },
+    "cute-charm": {
+      "count": 15,
+      "types": {
+        "fairy": 8,
+        "normal": 9,
+        "water": 1,
+        "fighting": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 13,
+        "second": 0,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.0459,
+        "attack": -0.01037,
+        "defense": -0.02365,
+        "specialAttack": 0.01083,
+        "specialDefense": -0.00983,
+        "speed": -0.01287
+      },
+      "universal": false,
+      "meanBst": 388.9
+    },
+    "damp": {
+      "count": 20,
+      "types": {
+        "bug": 2,
+        "grass": 2,
+        "water": 16,
+        "fighting": 1,
+        "ground": 4,
+        "dragon": 1,
+        "ghost": 2,
+        "electric": 2
+      },
+      "slots": {
+        "first": 4,
+        "second": 4,
+        "hidden": 9
+      },
+      "shift": {
+        "hp": 0.00792,
+        "attack": -0.00182,
+        "defense": 0.00321,
+        "specialAttack": 0.00659,
+        "specialDefense": 0.00058,
+        "speed": -0.01648
+      },
+      "universal": false,
+      "meanBst": 397.6
+    },
+    "dancer": {
+      "count": 1,
+      "types": {
+        "fire": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 476
+    },
+    "dark-aura": {
+      "count": 1,
+      "types": {
+        "dark": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 680
+    },
+    "dauntless-shield": {
+      "count": 1,
+      "types": {
+        "fighting": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 660
+    },
+    "dazzling": {
+      "count": 1,
+      "types": {
+        "water": 1,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 475
+    },
+    "defeatist": {
+      "count": 2,
+      "types": {
+        "rock": 2,
+        "flying": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 484
+    },
+    "defiant": {
+      "count": 15,
+      "types": {
+        "fighting": 5,
+        "normal": 4,
+        "flying": 4,
+        "dark": 4,
+        "steel": 3,
+        "electric": 1,
+        "ghost": 1,
+        "grass": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 0,
+        "hidden": 7
+      },
+      "shift": {
+        "hp": -0.01005,
+        "attack": 0.02717,
+        "defense": 0.0004,
+        "specialAttack": -0.01905,
+        "specialDefense": -0.01032,
+        "speed": 0.01185
+      },
+      "universal": true,
+      "meanBst": 480.3
+    },
+    "disguise": {
+      "count": 1,
+      "types": {
+        "ghost": 1,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 476
+    },
+    "download": {
+      "count": 4,
+      "types": {
+        "normal": 3,
+        "bug": 1,
+        "steel": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 3,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 511.3
+    },
+    "dragons-maw": {
+      "count": 1,
+      "types": {
+        "dragon": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 580
+    },
+    "drizzle": {
+      "count": 3,
+      "types": {
+        "water": 3,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 1,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 536.7
+    },
+    "drought": {
+      "count": 4,
+      "types": {
+        "fire": 3,
+        "ground": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 486
+    },
+    "dry-skin": {
+      "count": 7,
+      "types": {
+        "bug": 2,
+        "grass": 2,
+        "ice": 1,
+        "psychic": 1,
+        "poison": 2,
+        "fighting": 2,
+        "electric": 2,
+        "normal": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 4,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": true,
+      "meanBst": 386.4
+    },
+    "early-bird": {
+      "count": 16,
+      "types": {
+        "normal": 6,
+        "flying": 6,
+        "bug": 2,
+        "psychic": 3,
+        "grass": 6,
+        "dark": 3,
+        "fire": 2
+      },
+      "slots": {
+        "first": 5,
+        "second": 9,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.01188,
+        "attack": -0.00673,
+        "defense": -0.01656,
+        "specialAttack": 0.01451,
+        "specialDefense": 0.00758,
+        "speed": 0.01309
+      },
+      "universal": false,
+      "meanBst": 361.2
+    },
+    "earth-eater": {
+      "count": 1,
+      "types": {
+        "steel": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 480
+    },
+    "effect-spore": {
+      "count": 11,
+      "types": {
+        "grass": 11,
+        "poison": 3,
+        "bug": 2,
+        "fighting": 1,
+        "fairy": 2
+      },
+      "slots": {
+        "first": 6,
+        "second": 2,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.00555,
+        "attack": -0.00082,
+        "defense": 0.01618,
+        "specialAttack": 0.00841,
+        "specialDefense": 0.03328,
+        "speed": -0.06259
+      },
+      "universal": false,
+      "meanBst": 372.1
+    },
+    "electric-surge": {
+      "count": 2,
+      "types": {
+        "electric": 2,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 502.5
+    },
+    "electromorphosis": {
+      "count": 1,
+      "types": {
+        "electric": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 495
+    },
+    "emergency-exit": {
+      "count": 1,
+      "types": {
+        "bug": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 530
+    },
+    "fairy-aura": {
+      "count": 1,
+      "types": {
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 680
+    },
+    "filter": {
+      "count": 3,
+      "types": {
+        "psychic": 2,
+        "fairy": 2,
+        "steel": 1,
+        "poison": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 423.3
+    },
+    "flame-body": {
+      "count": 21,
+      "types": {
+        "fire": 21,
+        "flying": 3,
+        "rock": 3,
+        "steel": 1,
+        "ghost": 3,
+        "bug": 4
+      },
+      "slots": {
+        "first": 7,
+        "second": 7,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": -0.00004,
+        "attack": -0.01208,
+        "defense": -0.00363,
+        "specialAttack": 0.01823,
+        "specialDefense": 0.0053,
+        "speed": -0.00778
+      },
+      "universal": false,
+      "meanBst": 434.8
+    },
+    "flare-boost": {
+      "count": 2,
+      "types": {
+        "ghost": 2,
+        "flying": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 2
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 423
+    },
+    "flash-fire": {
+      "count": 25,
+      "types": {
+        "fire": 24,
+        "dark": 2,
+        "steel": 1,
+        "ghost": 4,
+        "rock": 3,
+        "bug": 2,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 12,
+        "second": 7,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": -0.00326,
+        "attack": -0.009,
+        "defense": -0.00866,
+        "specialAttack": 0.01123,
+        "specialDefense": 0.01086,
+        "speed": -0.00116
+      },
+      "universal": false,
+      "meanBst": 430.6
+    },
+    "flower-gift": {
+      "count": 1,
+      "types": {
+        "grass": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 450
+    },
+    "flower-veil": {
+      "count": 4,
+      "types": {
+        "fairy": 4
+      },
+      "slots": {
+        "first": 4,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 427.8
+    },
+    "fluffy": {
+      "count": 6,
+      "types": {
+        "normal": 4,
+        "fighting": 2,
+        "ghost": 2
+      },
+      "slots": {
+        "first": 4,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 396.3
+    },
+    "forecast": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 420
+    },
+    "forewarn": {
+      "count": 6,
+      "types": {
+        "psychic": 6,
+        "ice": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 4,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 391.7
+    },
+    "friend-guard": {
+      "count": 9,
+      "types": {
+        "fairy": 4,
+        "normal": 4,
+        "bug": 3,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 7
+      },
+      "shift": {
+        "hp": 0.10774,
+        "attack": -0.04247,
+        "defense": -0.03133,
+        "specialAttack": 0.00255,
+        "specialDefense": -0.00822,
+        "speed": -0.02827
+      },
+      "universal": false,
+      "meanBst": 281.7
+    },
+    "frisk": {
+      "count": 28,
+      "types": {
+        "normal": 5,
+        "fairy": 4,
+        "bug": 3,
+        "flying": 4,
+        "ghost": 9,
+        "psychic": 8,
+        "grass": 4,
+        "dragon": 2,
+        "dark": 3,
+        "poison": 1
+      },
+      "slots": {
+        "first": 5,
+        "second": 14,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": -0.00449,
+        "attack": -0.0009,
+        "defense": 0.00132,
+        "specialAttack": 0.00349,
+        "specialDefense": -0.00027,
+        "speed": 0.00085
+      },
+      "universal": true,
+      "meanBst": 410.3
+    },
+    "full-metal-body": {
+      "count": 1,
+      "types": {
+        "psychic": 1,
+        "steel": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 680
+    },
+    "fur-coat": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 472
+    },
+    "gale-wings": {
+      "count": 3,
+      "types": {
+        "normal": 1,
+        "flying": 3,
+        "fire": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 386.3
+    },
+    "gluttony": {
+      "count": 27,
+      "types": {
+        "grass": 9,
+        "poison": 5,
+        "normal": 8,
+        "bug": 1,
+        "rock": 1,
+        "psychic": 2,
+        "fire": 3,
+        "water": 2,
+        "dragon": 4
+      },
+      "slots": {
+        "first": 7,
+        "second": 9,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": 0.01815,
+        "attack": -0.00281,
+        "defense": 0.00588,
+        "specialAttack": -0.00266,
+        "specialDefense": 0.00485,
+        "speed": -0.02342
+      },
+      "universal": true,
+      "meanBst": 406
+    },
+    "good-as-gold": {
+      "count": 1,
+      "types": {
+        "steel": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 550
+    },
+    "gooey": {
+      "count": 5,
+      "types": {
+        "dragon": 3,
+        "water": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 3
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 404.4
+    },
+    "grass-pelt": {
+      "count": 2,
+      "types": {
+        "grass": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 440.5
+    },
+    "grassy-surge": {
+      "count": 4,
+      "types": {
+        "grass": 4,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 457.5
+    },
+    "grim-neigh": {
+      "count": 1,
+      "types": {
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 580
+    },
+    "guard-dog": {
+      "count": 2,
+      "types": {
+        "dark": 1,
+        "poison": 1,
+        "fighting": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 530
+    },
+    "gulp-missile": {
+      "count": 1,
+      "types": {
+        "flying": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 475
+    },
+    "guts": {
+      "count": 24,
+      "types": {
+        "normal": 8,
+        "fighting": 11,
+        "fire": 1,
+        "bug": 1,
+        "rock": 1,
+        "ground": 2,
+        "flying": 3,
+        "electric": 3,
+        "dark": 1
+      },
+      "slots": {
+        "first": 13,
+        "second": 6,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": 0.01964,
+        "attack": 0.03317,
+        "defense": -0.00543,
+        "specialAttack": -0.02712,
+        "specialDefense": -0.00817,
+        "speed": -0.01209
+      },
+      "universal": false,
+      "meanBst": 402.8
+    },
+    "hadron-engine": {
+      "count": 1,
+      "types": {
+        "electric": 1,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 670
+    },
+    "harvest": {
+      "count": 8,
+      "types": {
+        "grass": 8,
+        "psychic": 2,
+        "flying": 1,
+        "ghost": 2,
+        "normal": 3
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.00699,
+        "attack": -0.00824,
+        "defense": 0.01059,
+        "specialAttack": 0.02404,
+        "specialDefense": 0.01087,
+        "speed": -0.04425
+      },
+      "universal": false,
+      "meanBst": 402.8
+    },
+    "healer": {
+      "count": 10,
+      "types": {
+        "normal": 3,
+        "grass": 1,
+        "water": 1,
+        "fairy": 3,
+        "psychic": 3
+      },
+      "slots": {
+        "first": 7,
+        "second": 0,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.09189,
+        "attack": -0.04302,
+        "defense": -0.01456,
+        "specialAttack": 0.00241,
+        "specialDefense": 0.01965,
+        "speed": -0.05637
+      },
+      "universal": true,
+      "meanBst": 434.3
+    },
+    "heatproof": {
+      "count": 5,
+      "types": {
+        "steel": 2,
+        "psychic": 2,
+        "rock": 1,
+        "grass": 2,
+        "ghost": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 3,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 371.2
+    },
+    "heavy-metal": {
+      "count": 8,
+      "types": {
+        "steel": 8,
+        "rock": 3,
+        "psychic": 2,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": 0.01651,
+        "attack": 0.01003,
+        "defense": 0.02953,
+        "specialAttack": -0.01214,
+        "specialDefense": -0.01094,
+        "speed": -0.033
+      },
+      "universal": false,
+      "meanBst": 431.9
+    },
+    "honey-gather": {
+      "count": 4,
+      "types": {
+        "normal": 1,
+        "bug": 3,
+        "flying": 1,
+        "fairy": 2
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 335.5
+    },
+    "hospitality": {
+      "count": 2,
+      "types": {
+        "grass": 2,
+        "ghost": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 408
+    },
+    "huge-power": {
+      "count": 5,
+      "types": {
+        "water": 2,
+        "fairy": 3,
+        "normal": 3,
+        "ground": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 3,
+        "hidden": 2
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 304
+    },
+    "hunger-switch": {
+      "count": 1,
+      "types": {
+        "electric": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 436
+    },
+    "hustle": {
+      "count": 21,
+      "types": {
+        "normal": 4,
+        "poison": 4,
+        "fairy": 3,
+        "flying": 6,
+        "water": 2,
+        "rock": 1,
+        "ice": 1,
+        "bug": 2,
+        "fire": 1,
+        "steel": 1,
+        "dark": 2,
+        "dragon": 4,
+        "grass": 1,
+        "electric": 1
+      },
+      "slots": {
+        "first": 8,
+        "second": 4,
+        "hidden": 8
+      },
+      "shift": {
+        "hp": -0.00646,
+        "attack": 0.00884,
+        "defense": 0.00788,
+        "specialAttack": -0.01631,
+        "specialDefense": -0.00287,
+        "speed": 0.00891
+      },
+      "universal": true,
+      "meanBst": 366.6
+    },
+    "hydration": {
+      "count": 22,
+      "types": {
+        "water": 16,
+        "ice": 3,
+        "psychic": 1,
+        "flying": 3,
+        "ground": 3,
+        "bug": 2,
+        "dragon": 3
+      },
+      "slots": {
+        "first": 4,
+        "second": 9,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": 0.01693,
+        "attack": -0.02594,
+        "defense": -0.02491,
+        "specialAttack": 0.0082,
+        "specialDefense": 0.01221,
+        "speed": 0.01351
+      },
+      "universal": false,
+      "meanBst": 416.5
+    },
+    "hyper-cutter": {
+      "count": 11,
+      "types": {
+        "water": 4,
+        "bug": 1,
+        "ground": 3,
+        "flying": 2,
+        "steel": 1,
+        "fairy": 1,
+        "dark": 1,
+        "fighting": 2,
+        "ice": 1
+      },
+      "slots": {
+        "first": 11,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.02637,
+        "attack": 0.06728,
+        "defense": 0.0325,
+        "specialAttack": -0.02767,
+        "specialDefense": -0.02953,
+        "speed": -0.01622
+      },
+      "universal": false,
+      "meanBst": 409.3
+    },
+    "ice-body": {
+      "count": 19,
+      "types": {
+        "water": 6,
+        "ice": 18,
+        "psychic": 1,
+        "dragon": 3
+      },
+      "slots": {
+        "first": 3,
+        "second": 8,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.00163,
+        "attack": -0.00745,
+        "defense": 0.0167,
+        "specialAttack": -0.00348,
+        "specialDefense": 0.01316,
+        "speed": -0.02055
+      },
+      "universal": false,
+      "meanBst": 438.7
+    },
+    "ice-face": {
+      "count": 1,
+      "types": {
+        "ice": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 470
+    },
+    "ice-scales": {
+      "count": 2,
+      "types": {
+        "ice": 2,
+        "bug": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 330
+    },
+    "illuminate": {
+      "count": 8,
+      "types": {
+        "water": 4,
+        "psychic": 1,
+        "electric": 2,
+        "bug": 1,
+        "normal": 1,
+        "grass": 2,
+        "fairy": 2
+      },
+      "slots": {
+        "first": 6,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.00448,
+        "attack": -0.0299,
+        "defense": -0.00497,
+        "specialAttack": 0.01197,
+        "specialDefense": 0.02314,
+        "speed": 0.00424
+      },
+      "universal": false,
+      "meanBst": 398.8
+    },
+    "illusion": {
+      "count": 2,
+      "types": {
+        "dark": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 420
+    },
+    "immunity": {
+      "count": 3,
+      "types": {
+        "normal": 2,
+        "ground": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 476
+    },
+    "imposter": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 288
+    },
+    "infiltrator": {
+      "count": 25,
+      "types": {
+        "poison": 4,
+        "flying": 9,
+        "grass": 7,
+        "bug": 1,
+        "ghost": 9,
+        "dark": 3,
+        "fairy": 2,
+        "fire": 3,
+        "psychic": 4,
+        "dragon": 5
+      },
+      "slots": {
+        "first": 0,
+        "second": 9,
+        "hidden": 8
+      },
+      "shift": {
+        "hp": -0.00778,
+        "attack": -0.01256,
+        "defense": -0.00898,
+        "specialAttack": -0.00774,
+        "specialDefense": -0.00727,
+        "speed": 0.04433
+      },
+      "universal": false,
+      "meanBst": 400.6
+    },
+    "innards-out": {
+      "count": 1,
+      "types": {
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 410
+    },
+    "inner-focus": {
+      "count": 35,
+      "types": {
+        "poison": 3,
+        "flying": 5,
+        "psychic": 8,
+        "normal": 5,
+        "fighting": 9,
+        "dragon": 1,
+        "dark": 4,
+        "ice": 3,
+        "electric": 1,
+        "fire": 2,
+        "water": 1,
+        "steel": 3,
+        "ground": 2,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 13,
+        "second": 11,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": -0.00825,
+        "attack": 0.0057,
+        "defense": -0.01251,
+        "specialAttack": -0.01051,
+        "specialDefense": 0.00988,
+        "speed": 0.0157
+      },
+      "universal": true,
+      "meanBst": 446.4
+    },
+    "insomnia": {
+      "count": 17,
+      "types": {
+        "psychic": 2,
+        "normal": 2,
+        "flying": 5,
+        "bug": 4,
+        "poison": 2,
+        "dark": 2,
+        "ice": 1,
+        "ghost": 4,
+        "grass": 4,
+        "fire": 1
+      },
+      "slots": {
+        "first": 10,
+        "second": 4,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.00553,
+        "attack": 0.01988,
+        "defense": -0.01392,
+        "specialAttack": 0.00094,
+        "specialDefense": -0.00142,
+        "speed": -0.01101
+      },
+      "universal": true,
+      "meanBst": 376.4
+    },
+    "intimidate": {
+      "count": 35,
+      "types": {
+        "poison": 4,
+        "fire": 5,
+        "normal": 8,
+        "water": 2,
+        "flying": 6,
+        "fairy": 3,
+        "fighting": 3,
+        "dark": 10,
+        "bug": 1,
+        "steel": 1,
+        "dragon": 1,
+        "electric": 3,
+        "ground": 3,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 24,
+        "second": 4,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": -0.00539,
+        "attack": 0.03529,
+        "defense": 0.00096,
+        "specialAttack": -0.02434,
+        "specialDefense": -0.00806,
+        "speed": 0.00154
+      },
+      "universal": true,
+      "meanBst": 429.8
+    },
+    "intrepid-sword": {
+      "count": 1,
+      "types": {
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 660
+    },
+    "iron-barbs": {
+      "count": 3,
+      "types": {
+        "grass": 2,
+        "steel": 3,
+        "electric": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 409.7
+    },
+    "iron-fist": {
+      "count": 18,
+      "types": {
+        "fighting": 12,
+        "bug": 1,
+        "flying": 1,
+        "fire": 3,
+        "ground": 2,
+        "ghost": 2,
+        "dark": 1,
+        "ice": 1,
+        "steel": 1,
+        "electric": 3
+      },
+      "slots": {
+        "first": 5,
+        "second": 3,
+        "hidden": 7
+      },
+      "shift": {
+        "hp": 0.01432,
+        "attack": 0.02509,
+        "defense": -0.0072,
+        "specialAttack": -0.01879,
+        "specialDefense": -0.00779,
+        "speed": -0.00563
+      },
+      "universal": false,
+      "meanBst": 412.9
+    },
+    "justified": {
+      "count": 9,
+      "types": {
+        "fire": 2,
+        "dark": 1,
+        "fighting": 6,
+        "steel": 2,
+        "psychic": 1,
+        "rock": 1,
+        "grass": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 0,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": -0.0106,
+        "attack": 0.00407,
+        "defense": -0.0257,
+        "specialAttack": 0.01176,
+        "specialDefense": -0.00002,
+        "speed": 0.02049
+      },
+      "universal": false,
+      "meanBst": 525.9
+    },
+    "keen-eye": {
+      "count": 39,
+      "types": {
+        "normal": 20,
+        "flying": 23,
+        "fighting": 1,
+        "dark": 6,
+        "ice": 1,
+        "steel": 1,
+        "water": 4,
+        "ghost": 1,
+        "poison": 4,
+        "bug": 1,
+        "psychic": 2,
+        "rock": 2
+      },
+      "slots": {
+        "first": 26,
+        "second": 8,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": -0.00821,
+        "attack": 0.00952,
+        "defense": -0.00332,
+        "specialAttack": -0.01719,
+        "specialDefense": -0.00751,
+        "speed": 0.02671
+      },
+      "universal": false,
+      "meanBst": 375.6
+    },
+    "klutz": {
+      "count": 12,
+      "types": {
+        "normal": 5,
+        "psychic": 2,
+        "flying": 2,
+        "ground": 2,
+        "ghost": 2,
+        "fighting": 2,
+        "electric": 1,
+        "poison": 1,
+        "fairy": 1,
+        "grass": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 8,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.00703,
+        "attack": 0.01017,
+        "defense": -0.00304,
+        "specialAttack": -0.01638,
+        "specialDefense": -0.00949,
+        "speed": 0.01171
+      },
+      "universal": false,
+      "meanBst": 375.6
+    },
+    "leaf-guard": {
+      "count": 20,
+      "types": {
+        "grass": 20,
+        "flying": 3,
+        "poison": 2,
+        "bug": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 8,
+        "second": 5,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": -0.00521,
+        "attack": -0.01764,
+        "defense": 0.01151,
+        "specialAttack": -0.00542,
+        "specialDefense": 0.00469,
+        "speed": 0.01206
+      },
+      "universal": false,
+      "meanBst": 397.7
+    },
+    "levitate": {
+      "count": 32,
+      "types": {
+        "ghost": 6,
+        "poison": 4,
+        "psychic": 15,
+        "ground": 4,
+        "dragon": 5,
+        "rock": 2,
+        "steel": 2,
+        "grass": 1,
+        "electric": 5,
+        "ice": 1,
+        "dark": 1,
+        "bug": 1
+      },
+      "slots": {
+        "first": 32,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.01649,
+        "attack": -0.01324,
+        "defense": 0.00384,
+        "specialAttack": 0.01063,
+        "specialDefense": 0.01359,
+        "speed": 0.00167
+      },
+      "universal": false,
+      "meanBst": 451.6
+    },
+    "libero": {
+      "count": 3,
+      "types": {
+        "fire": 3
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 420
+    },
+    "light-metal": {
+      "count": 6,
+      "types": {
+        "bug": 1,
+        "steel": 6,
+        "psychic": 3,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 489.2
+    },
+    "lightning-rod": {
+      "count": 17,
+      "types": {
+        "electric": 10,
+        "ground": 5,
+        "rock": 3,
+        "water": 2,
+        "steel": 1
+      },
+      "slots": {
+        "first": 6,
+        "second": 5,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.00809,
+        "attack": 0.01946,
+        "defense": 0.00358,
+        "specialAttack": -0.0176,
+        "specialDefense": -0.00756,
+        "speed": 0.01022
+      },
+      "universal": false,
+      "meanBst": 395.7
+    },
+    "limber": {
+      "count": 14,
+      "types": {
+        "normal": 5,
+        "fighting": 4,
+        "dark": 2,
+        "ground": 1,
+        "electric": 1,
+        "flying": 1,
+        "poison": 2,
+        "water": 2
+      },
+      "slots": {
+        "first": 9,
+        "second": 3,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.02163,
+        "attack": -0.01132,
+        "defense": 0.0081,
+        "specialAttack": -0.00509,
+        "specialDefense": 0.01653,
+        "speed": 0.0134
+      },
+      "universal": false,
+      "meanBst": 400.8
+    },
+    "lingering-aroma": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 489
+    },
+    "liquid-ooze": {
+      "count": 4,
+      "types": {
+        "water": 2,
+        "poison": 4
+      },
+      "slots": {
+        "first": 2,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 404.8
+    },
+    "liquid-voice": {
+      "count": 3,
+      "types": {
+        "water": 3,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 423.3
+    },
+    "long-reach": {
+      "count": 3,
+      "types": {
+        "grass": 3,
+        "flying": 2,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 423.3
+    },
+    "magic-bounce": {
+      "count": 6,
+      "types": {
+        "psychic": 6,
+        "flying": 2,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 5
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 410
+    },
+    "magic-guard": {
+      "count": 10,
+      "types": {
+        "fairy": 3,
+        "psychic": 7,
+        "flying": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 7,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.00038,
+        "attack": -0.03431,
+        "defense": -0.03693,
+        "specialAttack": 0.07879,
+        "specialDefense": -0.00208,
+        "speed": -0.00585
+      },
+      "universal": false,
+      "meanBst": 387.4
+    },
+    "magician": {
+      "count": 5,
+      "types": {
+        "fire": 3,
+        "psychic": 2,
+        "steel": 1,
+        "fairy": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 464
+    },
+    "magma-armor": {
+      "count": 3,
+      "types": {
+        "fire": 3,
+        "rock": 1,
+        "ground": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 380
+    },
+    "magnet-pull": {
+      "count": 6,
+      "types": {
+        "electric": 3,
+        "steel": 5,
+        "rock": 2
+      },
+      "slots": {
+        "first": 4,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 420.8
+    },
+    "marvel-scale": {
+      "count": 3,
+      "types": {
+        "dragon": 2,
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 420
+    },
+    "mega-launcher": {
+      "count": 2,
+      "types": {
+        "water": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 415
+    },
+    "merciless": {
+      "count": 2,
+      "types": {
+        "poison": 2,
+        "water": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 400
+    },
+    "minus": {
+      "count": 6,
+      "types": {
+        "electric": 3,
+        "steel": 3
+      },
+      "slots": {
+        "first": 1,
+        "second": 3,
+        "hidden": 2
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 405.8
+    },
+    "mirror-armor": {
+      "count": 1,
+      "types": {
+        "flying": 1,
+        "steel": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 495
+    },
+    "misty-surge": {
+      "count": 1,
+      "types": {
+        "water": 1,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 570
+    },
+    "mold-breaker": {
+      "count": 20,
+      "types": {
+        "bug": 1,
+        "rock": 2,
+        "ground": 2,
+        "steel": 4,
+        "fighting": 5,
+        "water": 3,
+        "dragon": 4,
+        "dark": 1,
+        "flying": 1,
+        "ghost": 1,
+        "fairy": 3,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 6,
+        "second": 6,
+        "hidden": 8
+      },
+      "shift": {
+        "hp": 0.01453,
+        "attack": 0.04712,
+        "defense": -0.02679,
+        "specialAttack": -0.03565,
+        "specialDefense": -0.01415,
+        "speed": 0.01495
+      },
+      "universal": true,
+      "meanBst": 443
+    },
+    "moody": {
+      "count": 8,
+      "types": {
+        "water": 3,
+        "normal": 3,
+        "ice": 2,
+        "grass": 1,
+        "fire": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 8
+      },
+      "shift": {
+        "hp": -0.00239,
+        "attack": 0.00404,
+        "defense": -0.01348,
+        "specialAttack": 0.00677,
+        "specialDefense": -0.00895,
+        "speed": 0.01401
+      },
+      "universal": false,
+      "meanBst": 369.5
+    },
+    "motor-drive": {
+      "count": 4,
+      "types": {
+        "electric": 4,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 440
+    },
+    "moxie": {
+      "count": 16,
+      "types": {
+        "bug": 2,
+        "water": 4,
+        "flying": 3,
+        "fighting": 4,
+        "dark": 7,
+        "dragon": 1,
+        "ground": 3,
+        "fire": 2,
+        "normal": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 5,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": -0.00124,
+        "attack": 0.02334,
+        "defense": -0.01052,
+        "specialAttack": -0.01293,
+        "specialDefense": -0.00446,
+        "speed": 0.0058
+      },
+      "universal": false,
+      "meanBst": 449.3
+    },
+    "multiscale": {
+      "count": 2,
+      "types": {
+        "dragon": 1,
+        "flying": 2,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 640
+    },
+    "multitype": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 720
+    },
+    "mummy": {
+      "count": 2,
+      "types": {
+        "ghost": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 393
+    },
+    "mycelium-might": {
+      "count": 2,
+      "types": {
+        "ground": 2,
+        "grass": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 425
+    },
+    "natural-cure": {
+      "count": 19,
+      "types": {
+        "normal": 4,
+        "water": 3,
+        "psychic": 2,
+        "rock": 1,
+        "grass": 7,
+        "poison": 3,
+        "flying": 2,
+        "dragon": 1,
+        "ghost": 2,
+        "fairy": 1,
+        "electric": 3,
+        "fighting": 2
+      },
+      "slots": {
+        "first": 12,
+        "second": 6,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": 0.03346,
+        "attack": -0.03433,
+        "defense": -0.03,
+        "specialAttack": -0.00766,
+        "specialDefense": 0.0293,
+        "speed": 0.00923
+      },
+      "universal": false,
+      "meanBst": 422.3
+    },
+    "neutralizing-gas": {
+      "count": 2,
+      "types": {
+        "poison": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 415
+    },
+    "no-guard": {
+      "count": 8,
+      "types": {
+        "fighting": 3,
+        "bug": 1,
+        "ground": 2,
+        "ghost": 4,
+        "steel": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 3,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.01679,
+        "attack": 0.04917,
+        "defense": 0.01791,
+        "specialAttack": -0.03074,
+        "specialDefense": -0.01901,
+        "speed": -0.03413
+      },
+      "universal": false,
+      "meanBst": 386.1
+    },
+    "normalize": {
+      "count": 2,
+      "types": {
+        "normal": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 330
+    },
+    "oblivious": {
+      "count": 25,
+      "types": {
+        "water": 12,
+        "psychic": 5,
+        "normal": 2,
+        "ice": 8,
+        "ground": 6,
+        "bug": 1,
+        "fire": 3,
+        "poison": 2,
+        "grass": 2
+      },
+      "slots": {
+        "first": 12,
+        "second": 8,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.03828,
+        "attack": -0.01868,
+        "defense": -0.01721,
+        "specialAttack": 0.00612,
+        "specialDefense": -0.00426,
+        "speed": -0.00425
+      },
+      "universal": false,
+      "meanBst": 393.4
+    },
+    "opportunist": {
+      "count": 1,
+      "types": {
+        "psychic": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 481
+    },
+    "orichalcum-pulse": {
+      "count": 1,
+      "types": {
+        "fighting": 1,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 670
+    },
+    "overcoat": {
+      "count": 22,
+      "types": {
+        "water": 2,
+        "ice": 1,
+        "bug": 9,
+        "steel": 4,
+        "dragon": 4,
+        "grass": 4,
+        "psychic": 3,
+        "dark": 2,
+        "flying": 2,
+        "fighting": 2,
+        "poison": 2
+      },
+      "slots": {
+        "first": 5,
+        "second": 2,
+        "hidden": 10
+      },
+      "shift": {
+        "hp": -0.00397,
+        "attack": -0.00148,
+        "defense": 0.04603,
+        "specialAttack": -0.00118,
+        "specialDefense": -0.00239,
+        "speed": -0.037
+      },
+      "universal": false,
+      "meanBst": 399.7
+    },
+    "overgrow": {
+      "count": 29,
+      "types": {
+        "grass": 29,
+        "poison": 3,
+        "ground": 1,
+        "fighting": 1,
+        "flying": 2,
+        "ghost": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 27,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.00356,
+        "attack": 0.0015,
+        "defense": -0.00072,
+        "specialAttack": -0.01079,
+        "specialDefense": -0.00815,
+        "speed": 0.02172
+      },
+      "universal": false,
+      "meanBst": 416.6
+    },
+    "own-tempo": {
+      "count": 28,
+      "types": {
+        "water": 6,
+        "psychic": 6,
+        "normal": 7,
+        "grass": 5,
+        "fire": 1,
+        "ground": 3,
+        "ice": 2,
+        "fairy": 4,
+        "electric": 1,
+        "steel": 3
+      },
+      "slots": {
+        "first": 10,
+        "second": 12,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": 0.01231,
+        "attack": -0.013,
+        "defense": 0.00666,
+        "specialAttack": -0.00657,
+        "specialDefense": 0.00558,
+        "speed": -0.00498
+      },
+      "universal": true,
+      "meanBst": 378.6
+    },
+    "perish-body": {
+      "count": 1,
+      "types": {
+        "ghost": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 510
+    },
+    "pickpocket": {
+      "count": 14,
+      "types": {
+        "dark": 7,
+        "ice": 2,
+        "grass": 3,
+        "rock": 2,
+        "water": 2,
+        "fairy": 6,
+        "poison": 1,
+        "normal": 1,
+        "steel": 3
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 12
+      },
+      "shift": {
+        "hp": 0.00121,
+        "attack": 0.0096,
+        "defense": -0.02353,
+        "specialAttack": -0.0188,
+        "specialDefense": -0.00534,
+        "speed": 0.03686
+      },
+      "universal": false,
+      "meanBst": 386
+    },
+    "pickup": {
+      "count": 19,
+      "types": {
+        "normal": 13,
+        "ground": 2,
+        "electric": 2,
+        "fairy": 1,
+        "ghost": 3,
+        "grass": 2,
+        "flying": 2
+      },
+      "slots": {
+        "first": 11,
+        "second": 6,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.00384,
+        "attack": 0.0038,
+        "defense": 0.00338,
+        "specialAttack": -0.03123,
+        "specialDefense": -0.00155,
+        "speed": 0.02945
+      },
+      "universal": false,
+      "meanBst": 350.4
+    },
+    "pixilate": {
+      "count": 1,
+      "types": {
+        "fairy": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 525
+    },
+    "plus": {
+      "count": 9,
+      "types": {
+        "electric": 6,
+        "steel": 3,
+        "fairy": 1,
+        "poison": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 1,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": 0.00257,
+        "attack": -0.01339,
+        "defense": -0.00733,
+        "specialAttack": 0.02062,
+        "specialDefense": 0.01071,
+        "speed": -0.01319
+      },
+      "universal": false,
+      "meanBst": 417
+    },
+    "poison-heal": {
+      "count": 3,
+      "types": {
+        "grass": 2,
+        "fighting": 1,
+        "ground": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 2,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 421.7
+    },
+    "poison-point": {
+      "count": 18,
+      "types": {
+        "poison": 17,
+        "ground": 3,
+        "water": 3,
+        "grass": 3,
+        "bug": 3,
+        "dragon": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 15,
+        "second": 3,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.00452,
+        "attack": -0.00263,
+        "defense": 0.00649,
+        "specialAttack": -0.0051,
+        "specialDefense": 0.00646,
+        "speed": -0.00069
+      },
+      "universal": false,
+      "meanBst": 401.2
+    },
+    "poison-puppeteer": {
+      "count": 1,
+      "types": {
+        "poison": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 600
+    },
+    "poison-touch": {
+      "count": 9,
+      "types": {
+        "poison": 8,
+        "fighting": 3,
+        "water": 2,
+        "ground": 1,
+        "dragon": 1,
+        "normal": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 4,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": 0.0095,
+        "attack": 0.02165,
+        "defense": -0.01546,
+        "specialAttack": -0.00315,
+        "specialDefense": 0.00542,
+        "speed": -0.01796
+      },
+      "universal": false,
+      "meanBst": 437
+    },
+    "power-spot": {
+      "count": 1,
+      "types": {
+        "rock": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 470
+    },
+    "prankster": {
+      "count": 18,
+      "types": {
+        "dark": 7,
+        "flying": 3,
+        "ghost": 1,
+        "bug": 2,
+        "fighting": 1,
+        "grass": 2,
+        "fairy": 6,
+        "electric": 1,
+        "psychic": 1,
+        "steel": 1,
+        "poison": 2,
+        "normal": 2
+      },
+      "slots": {
+        "first": 8,
+        "second": 0,
+        "hidden": 10
+      },
+      "shift": {
+        "hp": -0.01634,
+        "attack": -0.00377,
+        "defense": -0.01664,
+        "specialAttack": 0.01066,
+        "specialDefense": -0.01289,
+        "speed": 0.03899
+      },
+      "universal": false,
+      "meanBst": 412.9
+    },
+    "pressure": {
+      "count": 29,
+      "types": {
+        "rock": 1,
+        "flying": 8,
+        "ice": 3,
+        "electric": 2,
+        "fire": 3,
+        "psychic": 3,
+        "water": 4,
+        "ghost": 4,
+        "dark": 6,
+        "bug": 1,
+        "steel": 5,
+        "dragon": 5,
+        "poison": 2,
+        "fighting": 1
+      },
+      "slots": {
+        "first": 23,
+        "second": 1,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": 0.00426,
+        "attack": 0.00895,
+        "defense": -0.00349,
+        "specialAttack": -0.0057,
+        "specialDefense": 0.00295,
+        "speed": -0.00696
+      },
+      "universal": true,
+      "meanBst": 559.4
+    },
+    "prism-armor": {
+      "count": 1,
+      "types": {
+        "psychic": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 600
+    },
+    "propeller-tail": {
+      "count": 2,
+      "types": {
+        "water": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 385
+    },
+    "protean": {
+      "count": 7,
+      "types": {
+        "normal": 1,
+        "water": 3,
+        "dark": 2,
+        "grass": 3
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 419.9
+    },
+    "protosynthesis": {
+      "count": 10,
+      "types": {
+        "ground": 2,
+        "fighting": 2,
+        "fairy": 2,
+        "psychic": 1,
+        "grass": 1,
+        "dark": 2,
+        "ghost": 1,
+        "bug": 1,
+        "electric": 2,
+        "dragon": 4,
+        "water": 1,
+        "fire": 1
+      },
+      "slots": {
+        "first": 10,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.01036,
+        "attack": -0.00864,
+        "defense": -0.00493,
+        "specialAttack": -0.00808,
+        "specialDefense": 0.00333,
+        "speed": 0.00797
+      },
+      "universal": false,
+      "meanBst": 578
+    },
+    "psychic-surge": {
+      "count": 2,
+      "types": {
+        "psychic": 2,
+        "fairy": 1,
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 522.5
+    },
+    "punk-rock": {
+      "count": 1,
+      "types": {
+        "electric": 1,
+        "poison": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 502
+    },
+    "pure-power": {
+      "count": 2,
+      "types": {
+        "fighting": 2,
+        "psychic": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 345
+    },
+    "purifying-salt": {
+      "count": 3,
+      "types": {
+        "rock": 3
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 378.3
+    },
+    "quark-drive": {
+      "count": 10,
+      "types": {
+        "ground": 1,
+        "steel": 2,
+        "ice": 1,
+        "water": 1,
+        "fighting": 2,
+        "electric": 2,
+        "dark": 1,
+        "flying": 1,
+        "fire": 1,
+        "poison": 1,
+        "rock": 2,
+        "fairy": 1,
+        "grass": 1,
+        "psychic": 3
+      },
+      "slots": {
+        "first": 10,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.00266,
+        "attack": 0.00244,
+        "defense": -0.01202,
+        "specialAttack": 0.00365,
+        "specialDefense": -0.01653,
+        "speed": 0.02512
+      },
+      "universal": true,
+      "meanBst": 578
+    },
+    "queenly-majesty": {
+      "count": 1,
+      "types": {
+        "grass": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 510
+    },
+    "quick-feet": {
+      "count": 9,
+      "types": {
+        "electric": 1,
+        "fairy": 1,
+        "normal": 4,
+        "dark": 2,
+        "grass": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 5,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": -0.00163,
+        "attack": 0.01666,
+        "defense": 0.00497,
+        "specialAttack": -0.01498,
+        "specialDefense": -0.00417,
+        "speed": -0.00087
+      },
+      "universal": false,
+      "meanBst": 377.8
+    },
+    "rain-dish": {
+      "count": 13,
+      "types": {
+        "water": 11,
+        "poison": 2,
+        "grass": 5,
+        "flying": 2,
+        "bug": 1,
+        "fairy": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 3,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": -0.01276,
+        "attack": -0.03923,
+        "defense": -0.00867,
+        "specialAttack": 0.01576,
+        "specialDefense": 0.04386,
+        "speed": 0.00104
+      },
+      "universal": false,
+      "meanBst": 369.8
+    },
+    "rattled": {
+      "count": 17,
+      "types": {
+        "water": 4,
+        "bug": 1,
+        "flying": 1,
+        "rock": 2,
+        "normal": 3,
+        "fairy": 2,
+        "dark": 1,
+        "ice": 1,
+        "electric": 2,
+        "poison": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 2,
+        "second": 2,
+        "hidden": 9
+      },
+      "shift": {
+        "hp": 0.00038,
+        "attack": 0.01762,
+        "defense": 0.0101,
+        "specialAttack": -0.01138,
+        "specialDefense": -0.01,
+        "speed": -0.00672
+      },
+      "universal": true,
+      "meanBst": 320.1
+    },
+    "receiver": {
+      "count": 1,
+      "types": {
+        "fighting": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 490
+    },
+    "reckless": {
+      "count": 13,
+      "types": {
+        "fighting": 4,
+        "ground": 3,
+        "rock": 3,
+        "normal": 5,
+        "flying": 3,
+        "fire": 1,
+        "water": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 1,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": 0.00172,
+        "attack": 0.03725,
+        "defense": 0.00044,
+        "specialAttack": -0.02194,
+        "specialDefense": -0.0208,
+        "speed": 0.00332
+      },
+      "universal": false,
+      "meanBst": 442.2
+    },
+    "refrigerate": {
+      "count": 2,
+      "types": {
+        "rock": 2,
+        "ice": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 441.5
+    },
+    "regenerator": {
+      "count": 23,
+      "types": {
+        "water": 7,
+        "psychic": 6,
+        "grass": 7,
+        "rock": 2,
+        "fire": 1,
+        "flying": 1,
+        "normal": 2,
+        "poison": 4,
+        "fighting": 2,
+        "dragon": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 6,
+        "hidden": 13
+      },
+      "shift": {
+        "hp": 0.02075,
+        "attack": -0.01162,
+        "defense": 0.01943,
+        "specialAttack": 0.01603,
+        "specialDefense": 0.00288,
+        "speed": -0.04746
+      },
+      "universal": true,
+      "meanBst": 436.5
+    },
+    "ripen": {
+      "count": 3,
+      "types": {
+        "grass": 3,
+        "dragon": 3
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 410
+    },
+    "rivalry": {
+      "count": 18,
+      "types": {
+        "poison": 6,
+        "ground": 2,
+        "bug": 1,
+        "flying": 4,
+        "electric": 3,
+        "normal": 5,
+        "dragon": 3,
+        "fire": 2
+      },
+      "slots": {
+        "first": 8,
+        "second": 6,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.00234,
+        "attack": 0.03089,
+        "defense": 0.0023,
+        "specialAttack": -0.01306,
+        "specialDefense": -0.02318,
+        "speed": 0.00072
+      },
+      "universal": true,
+      "meanBst": 393.8
+    },
+    "rks-system": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 570
+    },
+    "rock-head": {
+      "count": 19,
+      "types": {
+        "rock": 14,
+        "ground": 9,
+        "flying": 1,
+        "steel": 4,
+        "water": 1,
+        "dragon": 3
+      },
+      "slots": {
+        "first": 10,
+        "second": 8,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.00384,
+        "attack": 0.02155,
+        "defense": 0.07303,
+        "specialAttack": -0.03431,
+        "specialDefense": -0.03213,
+        "speed": -0.0243
+      },
+      "universal": false,
+      "meanBst": 415.1
+    },
+    "rocky-payload": {
+      "count": 1,
+      "types": {
+        "flying": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 485
+    },
+    "rough-skin": {
+      "count": 6,
+      "types": {
+        "water": 2,
+        "dark": 2,
+        "dragon": 4,
+        "ground": 3
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 426.7
+    },
+    "run-away": {
+      "count": 30,
+      "types": {
+        "bug": 6,
+        "poison": 3,
+        "normal": 15,
+        "grass": 1,
+        "fire": 2,
+        "flying": 2,
+        "fairy": 1,
+        "dark": 4,
+        "ground": 1,
+        "electric": 1
+      },
+      "slots": {
+        "first": 17,
+        "second": 5,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.0064,
+        "attack": 0.00669,
+        "defense": 0.00566,
+        "specialAttack": -0.01983,
+        "specialDefense": -0.00098,
+        "speed": 0.01486
+      },
+      "universal": false,
+      "meanBst": 323.2
+    },
+    "sand-force": {
+      "count": 14,
+      "types": {
+        "ground": 8,
+        "rock": 5,
+        "water": 2,
+        "steel": 2,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 2,
+        "hidden": 9
+      },
+      "shift": {
+        "hp": -0.00372,
+        "attack": 0.01376,
+        "defense": -0.00672,
+        "specialAttack": -0.00623,
+        "specialDefense": 0.00324,
+        "speed": -0.00034
+      },
+      "universal": false,
+      "meanBst": 419
+    },
+    "sand-rush": {
+      "count": 10,
+      "types": {
+        "ground": 4,
+        "normal": 2,
+        "steel": 1,
+        "rock": 1,
+        "electric": 1,
+        "dragon": 2,
+        "water": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 3,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.00315,
+        "attack": 0.03441,
+        "defense": 0.00023,
+        "specialAttack": -0.04343,
+        "specialDefense": -0.01003,
+        "speed": 0.01568
+      },
+      "universal": false,
+      "meanBst": 444.1
+    },
+    "sand-spit": {
+      "count": 2,
+      "types": {
+        "ground": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 412.5
+    },
+    "sand-stream": {
+      "count": 4,
+      "types": {
+        "rock": 2,
+        "dark": 1,
+        "ground": 2
+      },
+      "slots": {
+        "first": 3,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 492.5
+    },
+    "sand-veil": {
+      "count": 27,
+      "types": {
+        "ground": 20,
+        "rock": 4,
+        "flying": 2,
+        "grass": 2,
+        "dark": 1,
+        "dragon": 3,
+        "electric": 3,
+        "normal": 2,
+        "ghost": 2,
+        "water": 2,
+        "steel": 1
+      },
+      "slots": {
+        "first": 9,
+        "second": 4,
+        "hidden": 8
+      },
+      "shift": {
+        "hp": -0.01749,
+        "attack": 0.01266,
+        "defense": 0.00729,
+        "specialAttack": -0.00494,
+        "specialDefense": -0.01499,
+        "speed": 0.01747
+      },
+      "universal": false,
+      "meanBst": 401.1
+    },
+    "sap-sipper": {
+      "count": 19,
+      "types": {
+        "water": 2,
+        "fairy": 3,
+        "normal": 10,
+        "psychic": 3,
+        "electric": 2,
+        "grass": 4,
+        "dragon": 4
+      },
+      "slots": {
+        "first": 5,
+        "second": 4,
+        "hidden": 10
+      },
+      "shift": {
+        "hp": 0.01595,
+        "attack": -0.00583,
+        "defense": -0.00709,
+        "specialAttack": -0.00424,
+        "specialDefense": 0.0091,
+        "speed": -0.00789
+      },
+      "universal": false,
+      "meanBst": 427.6
+    },
+    "schooling": {
+      "count": 1,
+      "types": {
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 175
+    },
+    "scrappy": {
+      "count": 12,
+      "types": {
+        "normal": 8,
+        "flying": 3,
+        "fighting": 4,
+        "dark": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 2,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": -0.00182,
+        "attack": 0.01932,
+        "defense": 0.00536,
+        "specialAttack": -0.01474,
+        "specialDefense": -0.01174,
+        "speed": 0.00361
+      },
+      "universal": false,
+      "meanBst": 439.6
+    },
+    "screen-cleaner": {
+      "count": 1,
+      "types": {
+        "ice": 1,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 520
+    },
+    "seed-sower": {
+      "count": 1,
+      "types": {
+        "grass": 1,
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 510
+    },
+    "serene-grace": {
+      "count": 12,
+      "types": {
+        "normal": 8,
+        "fairy": 3,
+        "flying": 2,
+        "steel": 1,
+        "psychic": 2,
+        "grass": 2
+      },
+      "slots": {
+        "first": 4,
+        "second": 6,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.07847,
+        "attack": -0.0591,
+        "defense": -0.02297,
+        "specialAttack": -0.00636,
+        "specialDefense": 0.03962,
+        "speed": -0.02966
+      },
+      "universal": false,
+      "meanBst": 445.8
+    },
+    "shadow-shield": {
+      "count": 1,
+      "types": {
+        "psychic": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 680
+    },
+    "shadow-tag": {
+      "count": 5,
+      "types": {
+        "psychic": 5
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 3
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 367
+    },
+    "sharpness": {
+      "count": 3,
+      "types": {
+        "psychic": 2,
+        "fighting": 1,
+        "bug": 1,
+        "rock": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 498.7
+    },
+    "shed-skin": {
+      "count": 20,
+      "types": {
+        "bug": 9,
+        "poison": 4,
+        "dragon": 3,
+        "rock": 1,
+        "ground": 3,
+        "dark": 2,
+        "fighting": 2,
+        "normal": 1
+      },
+      "slots": {
+        "first": 14,
+        "second": 5,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.01008,
+        "attack": -0.00723,
+        "defense": 0.02419,
+        "specialAttack": -0.01672,
+        "specialDefense": 0.00035,
+        "speed": -0.01067
+      },
+      "universal": false,
+      "meanBst": 326.1
+    },
+    "sheer-force": {
+      "count": 30,
+      "types": {
+        "poison": 2,
+        "ground": 5,
+        "water": 5,
+        "normal": 4,
+        "steel": 4,
+        "fighting": 5,
+        "fairy": 1,
+        "dragon": 2,
+        "rock": 3,
+        "fire": 1,
+        "flying": 4,
+        "bug": 1,
+        "ice": 2
+      },
+      "slots": {
+        "first": 3,
+        "second": 7,
+        "hidden": 13
+      },
+      "shift": {
+        "hp": 0.02552,
+        "attack": 0.05723,
+        "defense": -0.00228,
+        "specialAttack": -0.03416,
+        "specialDefense": -0.02672,
+        "speed": -0.01959
+      },
+      "universal": true,
+      "meanBst": 429.8
+    },
+    "shell-armor": {
+      "count": 25,
+      "types": {
+        "water": 15,
+        "ice": 2,
+        "rock": 6,
+        "fire": 2,
+        "dark": 1,
+        "grass": 3,
+        "ground": 1,
+        "bug": 4,
+        "steel": 1,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 14,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": -0.01264,
+        "attack": 0.02622,
+        "defense": 0.04933,
+        "specialAttack": -0.00489,
+        "specialDefense": -0.02226,
+        "speed": -0.03575
+      },
+      "universal": false,
+      "meanBst": 416.7
+    },
+    "shield-dust": {
+      "count": 11,
+      "types": {
+        "bug": 11,
+        "poison": 3,
+        "flying": 1,
+        "fairy": 2,
+        "ice": 2
+      },
+      "slots": {
+        "first": 9,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.01709,
+        "attack": -0.02326,
+        "defense": -0.02235,
+        "specialAttack": 0.01612,
+        "specialDefense": -0.02157,
+        "speed": 0.03396
+      },
+      "universal": false,
+      "meanBst": 314.5
+    },
+    "shields-down": {
+      "count": 1,
+      "types": {
+        "rock": 1,
+        "flying": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 440
+    },
+    "simple": {
+      "count": 5,
+      "types": {
+        "fire": 1,
+        "ground": 1,
+        "normal": 2,
+        "water": 1,
+        "psychic": 2,
+        "flying": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 1,
+        "hidden": 2
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 342.6
+    },
+    "skill-link": {
+      "count": 9,
+      "types": {
+        "water": 2,
+        "ice": 1,
+        "normal": 7,
+        "flying": 3
+      },
+      "slots": {
+        "first": 0,
+        "second": 5,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": -0.03799,
+        "attack": 0.03522,
+        "defense": 0.02736,
+        "specialAttack": -0.01904,
+        "specialDefense": -0.03365,
+        "speed": 0.0281
+      },
+      "universal": false,
+      "meanBst": 394.1
+    },
+    "slow-start": {
+      "count": 2,
+      "types": {
+        "normal": 1,
+        "steel": 1,
+        "poison": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 485
+    },
+    "slush-rush": {
+      "count": 5,
+      "types": {
+        "ice": 5,
+        "electric": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 3,
+        "hidden": 2
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 468.2
+    },
+    "sniper": {
+      "count": 17,
+      "types": {
+        "bug": 4,
+        "poison": 5,
+        "normal": 2,
+        "flying": 2,
+        "water": 10,
+        "dragon": 1,
+        "dark": 1,
+        "rock": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 9,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.02143,
+        "attack": 0.00951,
+        "defense": -0.00182,
+        "specialAttack": 0.0088,
+        "specialDefense": -0.01713,
+        "speed": 0.02206
+      },
+      "universal": false,
+      "meanBst": 394.1
+    },
+    "snow-cloak": {
+      "count": 11,
+      "types": {
+        "ice": 11,
+        "flying": 1,
+        "ground": 3,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 6,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.00526,
+        "attack": 0.00924,
+        "defense": -0.00799,
+        "specialAttack": 0.00088,
+        "specialDefense": -0.00826,
+        "speed": 0.00086
+      },
+      "universal": false,
+      "meanBst": 423.5
+    },
+    "snow-warning": {
+      "count": 5,
+      "types": {
+        "grass": 2,
+        "ice": 5,
+        "rock": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 449.2
+    },
+    "solar-power": {
+      "count": 8,
+      "types": {
+        "fire": 3,
+        "flying": 2,
+        "grass": 3,
+        "electric": 2,
+        "normal": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 3,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.00432,
+        "attack": -0.02446,
+        "defense": -0.01557,
+        "specialAttack": 0.0229,
+        "specialDefense": 0.0105,
+        "speed": 0.01095
+      },
+      "universal": false,
+      "meanBst": 385.4
+    },
+    "solid-rock": {
+      "count": 4,
+      "types": {
+        "fire": 1,
+        "ground": 2,
+        "rock": 3,
+        "water": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 461.3
+    },
+    "soul-heart": {
+      "count": 1,
+      "types": {
+        "steel": 1,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 600
+    },
+    "soundproof": {
+      "count": 15,
+      "types": {
+        "electric": 2,
+        "psychic": 2,
+        "fairy": 2,
+        "normal": 4,
+        "rock": 2,
+        "steel": 2,
+        "grass": 2,
+        "ice": 2,
+        "dragon": 3,
+        "fighting": 2
+      },
+      "slots": {
+        "first": 7,
+        "second": 3,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": -0.01747,
+        "attack": -0.02443,
+        "defense": 0.01519,
+        "specialAttack": 0.00531,
+        "specialDefense": 0.02455,
+        "speed": -0.00315
+      },
+      "universal": true,
+      "meanBst": 410.9
+    },
+    "speed-boost": {
+      "count": 13,
+      "types": {
+        "bug": 6,
+        "flying": 3,
+        "fire": 3,
+        "fighting": 2,
+        "water": 2,
+        "dark": 2,
+        "poison": 3,
+        "psychic": 2
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": -0.01536,
+        "attack": 0.01547,
+        "defense": -0.02207,
+        "specialAttack": 0.01399,
+        "specialDefense": -0.03622,
+        "speed": 0.04419
+      },
+      "universal": false,
+      "meanBst": 400.9
+    },
+    "stakeout": {
+      "count": 8,
+      "types": {
+        "normal": 2,
+        "dark": 4,
+        "bug": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": 0.00215,
+        "attack": 0.01235,
+        "defense": 0.00162,
+        "specialAttack": -0.01039,
+        "specialDefense": 0.01461,
+        "speed": -0.02034
+      },
+      "universal": false,
+      "meanBst": 353.8
+    },
+    "stall": {
+      "count": 1,
+      "types": {
+        "dark": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 380
+    },
+    "stalwart": {
+      "count": 2,
+      "types": {
+        "steel": 2,
+        "dragon": 2
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 2
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 567.5
+    },
+    "stamina": {
+      "count": 3,
+      "types": {
+        "ground": 2,
+        "steel": 1,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 495
+    },
+    "stance-change": {
+      "count": 1,
+      "types": {
+        "steel": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 500
+    },
+    "static": {
+      "count": 20,
+      "types": {
+        "electric": 20,
+        "flying": 2,
+        "ground": 1,
+        "poison": 1,
+        "ice": 1
+      },
+      "slots": {
+        "first": 13,
+        "second": 6,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.00172,
+        "attack": -0.01423,
+        "defense": -0.00994,
+        "specialAttack": 0.00864,
+        "specialDefense": 0.00221,
+        "speed": 0.0116
+      },
+      "universal": false,
+      "meanBst": 391.9
+    },
+    "steadfast": {
+      "count": 13,
+      "types": {
+        "fighting": 9,
+        "bug": 1,
+        "flying": 1,
+        "steel": 1,
+        "psychic": 1,
+        "rock": 2,
+        "normal": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 2,
+        "hidden": 7
+      },
+      "shift": {
+        "hp": -0.01134,
+        "attack": 0.01886,
+        "defense": -0.01432,
+        "specialAttack": -0.01181,
+        "specialDefense": 0.00757,
+        "speed": 0.01105
+      },
+      "universal": false,
+      "meanBst": 420.9
+    },
+    "steam-engine": {
+      "count": 3,
+      "types": {
+        "rock": 3,
+        "fire": 2
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 386.7
+    },
+    "steelworker": {
+      "count": 1,
+      "types": {
+        "ghost": 1,
+        "grass": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 517
+    },
+    "steely-spirit": {
+      "count": 1,
+      "types": {
+        "steel": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 440
+    },
+    "stench": {
+      "count": 9,
+      "types": {
+        "grass": 1,
+        "poison": 9,
+        "dark": 2
+      },
+      "slots": {
+        "first": 6,
+        "second": 0,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.01529,
+        "attack": 0.01531,
+        "defense": 0.02169,
+        "specialAttack": -0.02061,
+        "specialDefense": -0.00693,
+        "speed": -0.02476
+      },
+      "universal": false,
+      "meanBst": 406.8
+    },
+    "sticky-hold": {
+      "count": 10,
+      "types": {
+        "poison": 5,
+        "water": 2,
+        "ground": 1,
+        "bug": 1,
+        "grass": 2,
+        "dragon": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 6,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": 0.0428,
+        "attack": -0.00864,
+        "defense": -0.00425,
+        "specialAttack": 0.00002,
+        "specialDefense": 0.00328,
+        "speed": -0.0332
+      },
+      "universal": false,
+      "meanBst": 424.3
+    },
+    "storm-drain": {
+      "count": 8,
+      "types": {
+        "rock": 2,
+        "grass": 3,
+        "water": 5,
+        "ground": 1,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 4,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": 0.01573,
+        "attack": -0.03057,
+        "defense": -0.01888,
+        "specialAttack": 0.0242,
+        "specialDefense": 0.02866,
+        "speed": -0.01914
+      },
+      "universal": false,
+      "meanBst": 422
+    },
+    "strong-jaw": {
+      "count": 9,
+      "types": {
+        "rock": 3,
+        "dragon": 3,
+        "normal": 2,
+        "water": 4,
+        "psychic": 1,
+        "electric": 1
+      },
+      "slots": {
+        "first": 5,
+        "second": 4,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": 0.00314,
+        "attack": 0.04991,
+        "defense": -0.00362,
+        "specialAttack": -0.02545,
+        "specialDefense": -0.0268,
+        "speed": 0.00281
+      },
+      "universal": false,
+      "meanBst": 421.4
+    },
+    "sturdy": {
+      "count": 42,
+      "types": {
+        "rock": 28,
+        "ground": 6,
+        "electric": 4,
+        "steel": 14,
+        "bug": 5,
+        "flying": 1,
+        "water": 3,
+        "fighting": 1,
+        "dragon": 2,
+        "fairy": 1,
+        "ice": 2,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 20,
+        "second": 15,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": -0.01294,
+        "attack": -0.00055,
+        "defense": 0.07907,
+        "specialAttack": -0.02678,
+        "specialDefense": 0.00035,
+        "speed": -0.03916
+      },
+      "universal": false,
+      "meanBst": 428.3
+    },
+    "suction-cups": {
+      "count": 5,
+      "types": {
+        "water": 1,
+        "rock": 2,
+        "grass": 2,
+        "dark": 2,
+        "psychic": 2
+      },
+      "slots": {
+        "first": 3,
+        "second": 2,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 420
+    },
+    "super-luck": {
+      "count": 9,
+      "types": {
+        "fairy": 3,
+        "flying": 7,
+        "dark": 3,
+        "normal": 3
+      },
+      "slots": {
+        "first": 0,
+        "second": 6,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": -0.00833,
+        "attack": 0.00828,
+        "defense": 0.01432,
+        "specialAttack": 0.01265,
+        "specialDefense": -0.00751,
+        "speed": -0.0194
+      },
+      "universal": false,
+      "meanBst": 408.9
+    },
+    "supersweet-syrup": {
+      "count": 2,
+      "types": {
+        "grass": 2,
+        "dragon": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 512.5
+    },
+    "supreme-overlord": {
+      "count": 1,
+      "types": {
+        "dark": 1,
+        "steel": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 550
+    },
+    "swarm": {
+      "count": 31,
+      "types": {
+        "bug": 31,
+        "poison": 6,
+        "flying": 5,
+        "steel": 3,
+        "fighting": 1,
+        "grass": 2,
+        "electric": 2,
+        "fire": 2,
+        "psychic": 2,
+        "rock": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 23,
+        "second": 4,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.00755,
+        "attack": 0.01222,
+        "defense": -0.01298,
+        "specialAttack": -0.01214,
+        "specialDefense": 0.00744,
+        "speed": 0.01302
+      },
+      "universal": false,
+      "meanBst": 394.3
+    },
+    "sweet-veil": {
+      "count": 9,
+      "types": {
+        "fairy": 6,
+        "bug": 2,
+        "grass": 3
+      },
+      "slots": {
+        "first": 4,
+        "second": 0,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": -0.00239,
+        "attack": -0.01056,
+        "defense": -0.00585,
+        "specialAttack": -0.00357,
+        "specialDefense": -0.0058,
+        "speed": 0.02818
+      },
+      "universal": false,
+      "meanBst": 373.8
+    },
+    "swift-swim": {
+      "count": 44,
+      "types": {
+        "water": 40,
+        "fighting": 1,
+        "rock": 10,
+        "poison": 2,
+        "flying": 2,
+        "dragon": 1,
+        "grass": 3,
+        "bug": 3,
+        "ground": 2,
+        "ice": 1,
+        "ghost": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 30,
+        "second": 2,
+        "hidden": 10
+      },
+      "shift": {
+        "hp": -0.01185,
+        "attack": -0.00001,
+        "defense": -0.00248,
+        "specialAttack": -0.006,
+        "specialDefense": -0.00403,
+        "speed": 0.02437
+      },
+      "universal": false,
+      "meanBst": 401.6
+    },
+    "sword-of-ruin": {
+      "count": 1,
+      "types": {
+        "dark": 1,
+        "ice": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 570
+    },
+    "symbiosis": {
+      "count": 4,
+      "types": {
+        "fairy": 3,
+        "normal": 1,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 429
+    },
+    "synchronize": {
+      "count": 17,
+      "types": {
+        "psychic": 16,
+        "flying": 2,
+        "dark": 1,
+        "fairy": 3,
+        "normal": 1,
+        "bug": 1
+      },
+      "slots": {
+        "first": 12,
+        "second": 5,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.01395,
+        "attack": -0.02592,
+        "defense": -0.02344,
+        "specialAttack": 0.04873,
+        "specialDefense": 0.00551,
+        "speed": 0.00907
+      },
+      "universal": false,
+      "meanBst": 422.8
+    },
+    "tablets-of-ruin": {
+      "count": 1,
+      "types": {
+        "dark": 1,
+        "grass": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 570
+    },
+    "tangled-feet": {
+      "count": 9,
+      "types": {
+        "normal": 7,
+        "flying": 7,
+        "ice": 1,
+        "psychic": 1,
+        "fighting": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 6,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.02007,
+        "attack": 0.01361,
+        "defense": -0.00286,
+        "specialAttack": 0.00426,
+        "specialDefense": -0.01905,
+        "speed": 0.0241
+      },
+      "universal": false,
+      "meanBst": 405.6
+    },
+    "technician": {
+      "count": 20,
+      "types": {
+        "normal": 7,
+        "psychic": 2,
+        "fairy": 3,
+        "bug": 3,
+        "flying": 1,
+        "steel": 1,
+        "fighting": 5,
+        "grass": 2,
+        "poison": 3,
+        "ghost": 1,
+        "electric": 1
+      },
+      "slots": {
+        "first": 2,
+        "second": 8,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": -0.02479,
+        "attack": -0.00116,
+        "defense": -0.01004,
+        "specialAttack": -0.00577,
+        "specialDefense": 0.00886,
+        "speed": 0.03289
+      },
+      "universal": true,
+      "meanBst": 436.7
+    },
+    "telepathy": {
+      "count": 25,
+      "types": {
+        "psychic": 16,
+        "fairy": 7,
+        "fighting": 2,
+        "steel": 1,
+        "dragon": 5,
+        "water": 2,
+        "ghost": 1,
+        "flying": 2,
+        "normal": 1,
+        "electric": 1,
+        "grass": 1,
+        "bug": 4
+      },
+      "slots": {
+        "first": 2,
+        "second": 1,
+        "hidden": 10
+      },
+      "shift": {
+        "hp": 0.01302,
+        "attack": -0.02813,
+        "defense": -0.00074,
+        "specialAttack": 0.01064,
+        "specialDefense": 0.01533,
+        "speed": -0.01012
+      },
+      "universal": false,
+      "meanBst": 441.1
+    },
+    "tera-shift": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 450
+    },
+    "teravolt": {
+      "count": 1,
+      "types": {
+        "dragon": 1,
+        "electric": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 680
+    },
+    "thermal-exchange": {
+      "count": 3,
+      "types": {
+        "dragon": 3,
+        "ice": 3
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 447.7
+    },
+    "thick-fat": {
+      "count": 26,
+      "types": {
+        "water": 7,
+        "ice": 9,
+        "normal": 7,
+        "fairy": 3,
+        "ground": 3,
+        "fighting": 3,
+        "psychic": 2,
+        "fire": 2,
+        "grass": 1,
+        "dragon": 1
+      },
+      "slots": {
+        "first": 16,
+        "second": 2,
+        "hidden": 6
+      },
+      "shift": {
+        "hp": 0.0624,
+        "attack": -0.00582,
+        "defense": -0.00715,
+        "specialAttack": -0.02544,
+        "specialDefense": 0.00332,
+        "speed": -0.02731
+      },
+      "universal": true,
+      "meanBst": 396.6
+    },
+    "tinted-lens": {
+      "count": 11,
+      "types": {
+        "bug": 8,
+        "flying": 6,
+        "poison": 2,
+        "normal": 2,
+        "psychic": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 4,
+        "hidden": 3
+      },
+      "shift": {
+        "hp": 0.01136,
+        "attack": -0.02175,
+        "defense": -0.02184,
+        "specialAttack": 0.02031,
+        "specialDefense": -0.00183,
+        "speed": 0.01375
+      },
+      "universal": false,
+      "meanBst": 398.5
+    },
+    "torrent": {
+      "count": 29,
+      "types": {
+        "water": 29,
+        "ground": 2,
+        "steel": 1,
+        "dark": 1,
+        "fairy": 1,
+        "fighting": 1
+      },
+      "slots": {
+        "first": 27,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": {
+        "hp": -0.00771,
+        "attack": 0.00529,
+        "defense": -0.01395,
+        "specialAttack": 0.02043,
+        "specialDefense": -0.00275,
+        "speed": -0.0013
+      },
+      "universal": false,
+      "meanBst": 416.9
+    },
+    "tough-claws": {
+      "count": 3,
+      "types": {
+        "rock": 2,
+        "water": 2,
+        "steel": 1
+      },
+      "slots": {
+        "first": 2,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 415.3
+    },
+    "toxic-boost": {
+      "count": 1,
+      "types": {
+        "normal": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 458
+    },
+    "toxic-chain": {
+      "count": 3,
+      "types": {
+        "poison": 3,
+        "fighting": 1,
+        "psychic": 1,
+        "fairy": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 555
+    },
+    "toxic-debris": {
+      "count": 2,
+      "types": {
+        "rock": 2,
+        "poison": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 437.5
+    },
+    "trace": {
+      "count": 5,
+      "types": {
+        "normal": 2,
+        "psychic": 3,
+        "fairy": 3
+      },
+      "slots": {
+        "first": 2,
+        "second": 3,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 380.8
+    },
+    "transistor": {
+      "count": 1,
+      "types": {
+        "electric": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 580
+    },
+    "triage": {
+      "count": 1,
+      "types": {
+        "fairy": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 485
+    },
+    "truant": {
+      "count": 3,
+      "types": {
+        "normal": 2,
+        "bug": 1,
+        "steel": 1
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 478
+    },
+    "turboblaze": {
+      "count": 1,
+      "types": {
+        "dragon": 1,
+        "fire": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 680
+    },
+    "unaware": {
+      "count": 14,
+      "types": {
+        "fairy": 1,
+        "water": 5,
+        "ground": 3,
+        "normal": 2,
+        "psychic": 3,
+        "flying": 2,
+        "fire": 3,
+        "ghost": 1,
+        "poison": 1
+      },
+      "slots": {
+        "first": 4,
+        "second": 2,
+        "hidden": 4
+      },
+      "shift": {
+        "hp": 0.04887,
+        "attack": -0.00754,
+        "defense": 0.01749,
+        "specialAttack": -0.01644,
+        "specialDefense": -0.0045,
+        "speed": -0.03788
+      },
+      "universal": false,
+      "meanBst": 382.3
+    },
+    "unburden": {
+      "count": 17,
+      "types": {
+        "fighting": 3,
+        "grass": 3,
+        "ghost": 2,
+        "flying": 3,
+        "dark": 4,
+        "bug": 1,
+        "fairy": 2,
+        "poison": 3,
+        "normal": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 8,
+        "hidden": 2
+      },
+      "shift": {
+        "hp": -0.0007,
+        "attack": -0.01194,
+        "defense": -0.03892,
+        "specialAttack": 0.00772,
+        "specialDefense": -0.01021,
+        "speed": 0.05405
+      },
+      "universal": true,
+      "meanBst": 416.1
+    },
+    "unnerve": {
+      "count": 25,
+      "types": {
+        "poison": 2,
+        "normal": 7,
+        "rock": 2,
+        "flying": 6,
+        "psychic": 2,
+        "dark": 3,
+        "fire": 4,
+        "bug": 4,
+        "electric": 2,
+        "dragon": 3,
+        "fighting": 1,
+        "steel": 1,
+        "grass": 1,
+        "ground": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 7,
+        "hidden": 13
+      },
+      "shift": {
+        "hp": -0.00291,
+        "attack": 0.01352,
+        "defense": -0.01107,
+        "specialAttack": -0.00585,
+        "specialDefense": -0.00938,
+        "speed": 0.01569
+      },
+      "universal": true,
+      "meanBst": 444.4
+    },
+    "unseen-fist": {
+      "count": 1,
+      "types": {
+        "fighting": 1,
+        "dark": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 550
+    },
+    "vessel-of-ruin": {
+      "count": 1,
+      "types": {
+        "dark": 1,
+        "ground": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 570
+    },
+    "victory-star": {
+      "count": 1,
+      "types": {
+        "psychic": 1,
+        "fire": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 600
+    },
+    "vital-spirit": {
+      "count": 14,
+      "types": {
+        "fighting": 4,
+        "electric": 3,
+        "fire": 3,
+        "ice": 1,
+        "flying": 1,
+        "normal": 2,
+        "rock": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 6,
+        "second": 1,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": -0.01622,
+        "attack": 0.01114,
+        "defense": -0.02594,
+        "specialAttack": -0.00622,
+        "specialDefense": 0.00063,
+        "speed": 0.03661
+      },
+      "universal": true,
+      "meanBst": 401.4
+    },
+    "volt-absorb": {
+      "count": 12,
+      "types": {
+        "electric": 12,
+        "water": 2,
+        "dragon": 1,
+        "ice": 1,
+        "fighting": 2,
+        "flying": 2
+      },
+      "slots": {
+        "first": 8,
+        "second": 2,
+        "hidden": 1
+      },
+      "shift": {
+        "hp": 0.00985,
+        "attack": -0.0162,
+        "defense": -0.01418,
+        "specialAttack": -0.01007,
+        "specialDefense": 0.00201,
+        "speed": 0.02859
+      },
+      "universal": false,
+      "meanBst": 445.4
+    },
+    "wandering-spirit": {
+      "count": 1,
+      "types": {
+        "ground": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 483
+    },
+    "water-absorb": {
+      "count": 26,
+      "types": {
+        "water": 22,
+        "fighting": 1,
+        "ice": 2,
+        "electric": 2,
+        "ground": 5,
+        "flying": 2,
+        "grass": 3,
+        "dark": 1,
+        "ghost": 2,
+        "fire": 1,
+        "bug": 2,
+        "dragon": 1,
+        "poison": 1
+      },
+      "slots": {
+        "first": 12,
+        "second": 5,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": 0.02493,
+        "attack": -0.01461,
+        "defense": -0.01441,
+        "specialAttack": 0.00283,
+        "specialDefense": 0.02215,
+        "speed": -0.0209
+      },
+      "universal": false,
+      "meanBst": 425
+    },
+    "water-bubble": {
+      "count": 2,
+      "types": {
+        "water": 2,
+        "bug": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 361.5
+    },
+    "water-compaction": {
+      "count": 2,
+      "types": {
+        "ghost": 2,
+        "ground": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 400
+    },
+    "water-veil": {
+      "count": 13,
+      "types": {
+        "water": 13,
+        "flying": 2
+      },
+      "slots": {
+        "first": 3,
+        "second": 2,
+        "hidden": 5
+      },
+      "shift": {
+        "hp": 0.03052,
+        "attack": -0.00487,
+        "defense": -0.02359,
+        "specialAttack": -0.00827,
+        "specialDefense": 0.00011,
+        "speed": 0.0061
+      },
+      "universal": false,
+      "meanBst": 418.8
+    },
+    "weak-armor": {
+      "count": 23,
+      "types": {
+        "rock": 10,
+        "ground": 1,
+        "water": 4,
+        "fire": 4,
+        "steel": 1,
+        "flying": 3,
+        "bug": 2,
+        "poison": 1,
+        "ice": 3,
+        "dark": 2,
+        "ghost": 4,
+        "psychic": 1
+      },
+      "slots": {
+        "first": 3,
+        "second": 3,
+        "hidden": 15
+      },
+      "shift": {
+        "hp": -0.01661,
+        "attack": -0.01009,
+        "defense": 0.03259,
+        "specialAttack": 0.01368,
+        "specialDefense": -0.00162,
+        "speed": -0.01794
+      },
+      "universal": false,
+      "meanBst": 420.7
+    },
+    "well-baked-body": {
+      "count": 1,
+      "types": {
+        "fairy": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 477
+    },
+    "white-smoke": {
+      "count": 4,
+      "types": {
+        "fire": 4,
+        "bug": 2
+      },
+      "slots": {
+        "first": 1,
+        "second": 2,
+        "hidden": 1
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 446
+    },
+    "wimp-out": {
+      "count": 1,
+      "types": {
+        "bug": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 230
+    },
+    "wind-power": {
+      "count": 2,
+      "types": {
+        "electric": 2,
+        "flying": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 385
+    },
+    "wind-rider": {
+      "count": 3,
+      "types": {
+        "grass": 3,
+        "dark": 1,
+        "ghost": 2
+      },
+      "slots": {
+        "first": 2,
+        "second": 1,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 411.7
+    },
+    "wonder-guard": {
+      "count": 1,
+      "types": {
+        "bug": 1,
+        "ghost": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 236
+    },
+    "wonder-skin": {
+      "count": 5,
+      "types": {
+        "bug": 1,
+        "poison": 1,
+        "normal": 2,
+        "psychic": 2,
+        "flying": 1,
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 4
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 415
+    },
+    "zen-mode": {
+      "count": 1,
+      "types": {
+        "fire": 1
+      },
+      "slots": {
+        "first": 0,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 480
+    },
+    "zero-to-hero": {
+      "count": 1,
+      "types": {
+        "water": 1
+      },
+      "slots": {
+        "first": 1,
+        "second": 0,
+        "hidden": 0
+      },
+      "shift": null,
+      "universal": false,
+      "meanBst": 457
+    }
+  },
+  "forms": {
+    "mega": {
+      "count": 48,
+      "bstDelta": 100,
+      "sameTypes": 0.79167,
+      "sameAbilities": 0.04167
+    },
+    "primal": {
+      "count": 2,
+      "bstDelta": 100,
+      "sameTypes": 0.5,
+      "sameAbilities": 0
+    },
+    "gmax": {
+      "count": 32,
+      "bstDelta": 0,
+      "sameTypes": 1,
+      "sameAbilities": 1
+    },
+    "alola": {
+      "count": 19,
+      "bstDelta": 0,
+      "sameTypes": 0.05263,
+      "sameAbilities": 0.05263
+    },
+    "galar": {
+      "count": 18,
+      "bstDelta": 0,
+      "sameTypes": 0,
+      "sameAbilities": 0.16667
+    },
+    "hisui": {
+      "count": 16,
+      "bstDelta": 0,
+      "sameTypes": 0,
+      "sameAbilities": 0.375
+    },
+    "paldea": {
+      "count": 4,
+      "bstDelta": 0,
+      "sameTypes": 0,
+      "sameAbilities": 0
+    },
+    "totem": {
+      "count": 10,
+      "bstDelta": 0,
+      "sameTypes": 0.8,
+      "sameAbilities": 0.8
+    },
+    "other": {
+      "count": 39,
+      "bstDelta": 5,
+      "sameTypes": 0.51282,
+      "sameAbilities": 0.61538
+    }
+  },
+  "mega": {
+    "statDelta": {
+      "hp": 0,
+      "attack": 28.625,
+      "defense": 21.58333,
+      "specialAttack": 23.5,
+      "specialDefense": 14.6875,
+      "speed": 11.60417
+    },
+    "experienceDelta": [
+      {
+        "value": 35,
+        "p": 0.47917
+      },
+      {
+        "value": 45,
+        "p": 0.52083
+      }
+    ]
+  }
+}

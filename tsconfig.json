@@ -1,14 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "jsxImportSource": "preact",
     "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": false,
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": false,
     "useDefineForClassFields": true,
@@ -20,14 +18,10 @@
     "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
-      "@core/*": ["src/core/*"],
-      "@content/*": ["src/content/*"],
-      "@ui/*": ["src/ui/*"],
       "@game/*": ["src/game/*"],
-      "@state/*": ["src/state/*"],
-      "@platform/*": ["src/platform/*"],
-      "@i18n/*": ["src/i18n/*"],
-      "@art/*": ["src/art/*"]
+      "@shared/*": ["src/shared/*"],
+      "@/server/*": ["src/model/*"],
+      "@host/*": ["src/host/*"]
     },
     "types": ["vite/client", "node", "@serwist/vite/typings"]
   },

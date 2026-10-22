@@ -1,3 +1,9 @@
 dist
 node_modules
 coverage
+# Синхронизируется из next-instapok (tools/sync-game.mjs) — там свой стиль, не переформатировать
+src/game
+src/shared
+src/model
+tests/game
+docs/game.md

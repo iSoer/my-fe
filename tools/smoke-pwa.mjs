@@ -1,4 +1,5 @@
-// PWA smoke: первый визит → SW взял управление → офлайн → перезагрузка → меню → бой (ленивый чанк Phaser из кэша).
+// PWA smoke: первый визит → SW взял управление → офлайн → перезагрузка → новая игра → деревня → вылазка → бой
+// (ленивые чанки Phaser деревни и боя из кэша). Свой Chromium: CHROMIUM_PATH=…
 // Запуск: VITE_BASE_PATH=/my-fe/ pnpm build && pnpm smoke:pwa
 import { preview } from 'vite';
 import { chromium } from 'playwright-core';
@@ -7,7 +8,7 @@ const base = process.env.VITE_BASE_PATH ?? '/my-fe/';
 const server = await preview({ base, preview: { port: 4174, strictPort: true }, logLevel: 'error' });
 const url = `http://localhost:4174${base}`;
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
 const errors = [];
@@ -59,26 +60,18 @@ try {
     const splash = page.getByText('Нажмите, чтобы начать');
     await splash.first().waitFor({ timeout: 8000 });
     await splash.first().click();
-    await page.getByRole('button', { name: /В бой/ }).first().waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: /Новая игра/ }).first().waitFor({ timeout: 5000 });
   });
-  await step('офлайн: создание армии', async () => {
-    await page.getByRole('button', { name: /В бой/ }).first().click();
-    await page.waitForURL(/army\/create/, { timeout: 5000 });
-    await page.waitForTimeout(300);
-    const cards = page.locator('[data-roster-card], .roster-card, .card');
-    for (let i = 0; i < 4; i++) {
-      await cards.nth(i).click();
-      await page.waitForTimeout(150);
-      const take = page.getByRole('button', { name: /^Взять$/ });
-      if (await take.count()) await take.first().click();
-      await page.waitForTimeout(150);
-      const close = page.getByRole('button', { name: /Закрыть|✕|Назад/ });
-      if ((await close.count()) && !(await page.getByRole('button', { name: /Подтвердить/ }).first().isVisible().catch(() => false))) await close.first().click();
-    }
-    await page.getByRole('button', { name: /Подтвердить/ }).first().click();
-    await page.waitForURL(/battle\/setup/, { timeout: 5000 });
+  await step('офлайн: новая игра и деревня (Phaser)', async () => {
+    await page.getByRole('button', { name: /Новая игра/ }).first().click();
+    await page.waitForURL(/#\/village$/, { timeout: 5000 });
+    await page.waitForSelector('.vl-canvas canvas', { timeout: 10000 });
   });
-  await step('офлайн: бой с канвасом Phaser', async () => {
+  await step('офлайн: вылазка у ворот и бой с канвасом Phaser', async () => {
+    await page.evaluate(() => window.__pf.village.talk('sorties'));
+    await page.getByRole('button', { name: /Собрать вылазку/ }).first().click();
+    await page.getByRole('button', { name: /^Далее/ }).first().click();
+    await page.waitForURL(/battle\/squad/, { timeout: 5000 });
     await page.getByRole('button', { name: /Начать бой/ }).first().click();
     await page.waitForURL(/#\/battle$/, { timeout: 5000 });
     await page.waitForSelector('#battle-canvas canvas', { timeout: 10000 });
