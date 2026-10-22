@@ -1,4 +1,5 @@
 import type { Difficulty, ObjectiveKind, Rarity } from "@game/core/types"
+import { tr } from "@game/i18n"
 
 export interface DifficultyDef {
   id: Difficulty
@@ -40,8 +41,8 @@ export interface AiProfile {
 export const DIFFICULTIES: readonly DifficultyDef[] = [
   {
     id: "easy",
-    name: "Легко",
-    desc: "Враги ждут, пока вы подойдёте. Хорошо для новой армии.",
+    get name() { return tr("Easy", "Легко") },
+    get desc() { return tr("Enemies wait for you to come to them. Good for a new army.", "Враги ждут, пока вы подойдёте. Хорошо для новой армии.") },
     enemies: [3, 4],
     levelRange: [-3, 0],
     rarity: [1, 2],
@@ -66,8 +67,8 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
   },
   {
     id: "normal",
-    name: "Нормально",
-    desc: "Половина врагов идёт на вас сразу. Честный бой.",
+    get name() { return tr("Normal", "Нормально") },
+    get desc() { return tr("Half the enemies charge right away. A fair fight.", "Половина врагов идёт на вас сразу. Честный бой.") },
     enemies: [4, 5],
     levelRange: [-1, 2],
     rarity: [2, 3],
@@ -92,8 +93,8 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
   },
   {
     id: "hard",
-    name: "Сложно",
-    desc: "Все враги агрессивны, на 3-м ходу приходит подкрепление.",
+    get name() { return tr("Hard", "Сложно") },
+    get desc() { return tr("Every enemy is aggressive; reinforcements arrive on turn 3.", "Все враги агрессивны, на 3-м ходу приходит подкрепление.") },
     enemies: [5, 7],
     levelRange: [1, 4],
     rarity: [3, 4],
@@ -118,8 +119,8 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
   },
   {
     id: "nightmare",
-    name: "Кошмар",
-    desc: "Вожак, две волны подкреплений без предупреждения и ИИ, который хочет вас убить.",
+    get name() { return tr("Nightmare", "Кошмар") },
+    get desc() { return tr("A Leader, two waves of surprise reinforcements and an AI that wants you dead.", "Вожак, две волны подкреплений без предупреждения и ИИ, который хочет вас убить.") },
     enemies: [6, 8],
     levelRange: [3, 7],
     rarity: [4, 5],
@@ -258,11 +259,11 @@ export interface GloryTier {
 
 export const GLORY_TIERS: readonly GloryTier[] = [
   { glory: 0, rarityWeights: { 1: 40, 2: 40, 3: 20, 4: 0, 5: 0 }, bonus: "" },
-  { glory: 25, rarityWeights: { 1: 20, 2: 40, 3: 35, 4: 5, 5: 0 }, bonus: "Стартовый ростер из 7 персонажей" },
-  { glory: 75, rarityWeights: { 1: 10, 2: 30, 3: 45, 4: 15, 5: 0 }, bonus: "Ростер стартует с 10 уровня" },
-  { glory: 150, rarityWeights: { 1: 0, 2: 25, 3: 50, 4: 22, 5: 3 }, bonus: "Витрина магазина из 5 кандидатов" },
-  { glory: 300, rarityWeights: { 1: 0, 2: 10, 3: 50, 4: 32, 5: 8 }, bonus: "В стартовом ростере гарантированный ★5" },
-  { glory: 600, rarityWeights: { 1: 0, 2: 0, 3: 40, 4: 45, 5: 15 }, bonus: "Стартовые Вкусняшки 500" }
+  { glory: 25, rarityWeights: { 1: 20, 2: 40, 3: 35, 4: 5, 5: 0 }, get bonus() { return tr("Starting Roster of 7 characters", "Стартовый ростер из 7 персонажей") } },
+  { glory: 75, rarityWeights: { 1: 10, 2: 30, 3: 45, 4: 15, 5: 0 }, get bonus() { return tr("Roster starts at level 10", "Ростер стартует с 10 уровня") } },
+  { glory: 150, rarityWeights: { 1: 0, 2: 25, 3: 50, 4: 22, 5: 3 }, get bonus() { return tr("Shop shows 5 candidates", "Витрина магазина из 5 кандидатов") } },
+  { glory: 300, rarityWeights: { 1: 0, 2: 10, 3: 50, 4: 32, 5: 8 }, get bonus() { return tr("Guaranteed ★5 in the starting Roster", "В стартовом ростере гарантированный ★5") } },
+  { glory: 600, rarityWeights: { 1: 0, 2: 0, 3: 40, 4: 45, 5: 15 }, get bonus() { return tr("500 starting Treats", "Стартовые Вкусняшки 500") } }
 ]
 
 export function gloryTier(glory: number): GloryTier {

@@ -100,8 +100,8 @@ let cloudSnapshot = {};
 let localSnapshot = '';
 await step('сейв по id пользователя, отступы Telegram, зеркало в облако', async () => {
   const { ctx, page, errors } = await open({});
-  await page.getByText('Нажмите, чтобы начать').click({ timeout: 30000 });
-  await page.getByRole('button', { name: /Новая игра/ }).click();
+  await page.getByText('Tap to start').click({ timeout: 30000 });
+  await page.getByRole('button', { name: /New game/ }).click();
   await page.locator('.vl-canvas canvas').waitFor({ timeout: 30000 });
   const key = await page.evaluate(() =>
     Object.keys(localStorage).find((k) => k.startsWith('pawfield:save:')),
@@ -119,7 +119,7 @@ await step('сейв по id пользователя, отступы Telegram, 
 });
 await step('кнопка «Назад»: из деревни — в меню, в бою — пауза и подтверждение закрытия', async () => {
   const { ctx, page } = await open(cloudSnapshot, ['pawfield:save:42', localSnapshot]);
-  await page.getByText('Нажмите, чтобы начать').click({ timeout: 30000 });
+  await page.getByText('Tap to start').click({ timeout: 30000 });
   await page.evaluate(() => {
     location.hash = '#/village';
   });
@@ -127,13 +127,13 @@ await step('кнопка «Назад»: из деревни — в меню, в
   await page.evaluate(() => window.__tg.back.handlers.at(-1)());
   await page.waitForFunction(() => location.hash === '#/' || location.hash === '');
   await page
-    .getByRole('button', { name: /Продолжить/ })
+    .getByRole('button', { name: /Continue/ })
     .first()
     .click();
   await page.evaluate(() => window.__pf.village.talk('sorties'));
-  await page.getByRole('button', { name: /Собрать вылазку/ }).click();
-  await page.getByRole('button', { name: /^Далее/ }).click();
-  await page.getByRole('button', { name: /Начать бой/ }).click();
+  await page.getByRole('button', { name: /Plan a sortie/ }).click();
+  await page.getByRole('button', { name: /^Next/ }).click();
+  await page.getByRole('button', { name: /Start battle/ }).click();
   await page.locator('#battle-canvas canvas').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => window.__tg.closing === true);
   await page.evaluate(() => window.__tg.back.handlers.at(-1)());
@@ -149,9 +149,9 @@ await step('облако новее локального — экран выбо
   old.updatedAt -= 3_600_000;
   delete old.army;
   const { ctx, page, errors } = await open(cloudSnapshot, ['pawfield:save:42', JSON.stringify(old)]);
-  await page.getByText('Найден прогресс с другого устройства').waitFor({ timeout: 15000 });
-  await page.getByRole('button', { name: /Загрузить из облака/ }).click();
-  await page.getByText('Нажмите, чтобы начать').click({ timeout: 30000 });
+  await page.getByText('Found progress from another device').waitFor({ timeout: 15000 });
+  await page.getByRole('button', { name: /Load from cloud/ }).click();
+  await page.getByText('Tap to start').click({ timeout: 30000 });
   const units = await page.evaluate(() => window.__pf.save.get().army?.units.length ?? 0);
   if (units === 0) throw new Error('облачный сейв не загружен');
   if (errors.length) throw new Error(errors.join('; '));

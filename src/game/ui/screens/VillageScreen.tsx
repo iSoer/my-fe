@@ -11,7 +11,7 @@ import { haptic } from "@game/platform/haptics"
 import { Button } from "../components/Button"
 import { BottomSheet } from "../components/Sheet"
 import { ResourceBar } from "../components/ResourceBar"
-import { plural } from "../lib/format"
+import { plural, tr } from "@game/i18n"
 import "../village.css"
 
 const npcDef = (id: NpcId): NpcDef => NPCS.find(n => n.id === id) as NpcDef
@@ -51,11 +51,14 @@ function NpcDialog({ id }: { id: NpcId }) {
   let actions = <></>
   if (id === "barracks") {
     lines = units === 0
-      ? ["Казарма пуста: все пали или никого ещё нет. Слава остаётся с вами."]
+      ? [tr("The Barracks are empty: everyone fell, or nobody’s here yet. Your Glory stays with you.", "Казарма пуста: все пали или никого ещё нет. Слава остаётся с вами.")]
       : [
-          `В ростере ${units} ${plural(units, "боец", "бойца", "бойцов")}, в отряде ${squad}/${SQUAD_SIZE}.`,
-          ...(units < SQUAD_SIZE ? ["Не хватает бойцов в отряд — наймите в Наборе."] : []),
-          ...(save.rewardChoice ? ["🎁 Ждёт награда за бой: один боец на выбор бесплатно."] : [])
+          tr(
+            `${units} ${plural(units, ["fighter", "fighters"], ["боец", "бойца", "бойцов"])} on the roster, ${squad}/${SQUAD_SIZE} in the squad.`,
+            `В ростере ${units} ${plural(units, ["fighter", "fighters"], ["боец", "бойца", "бойцов"])}, в отряде ${squad}/${SQUAD_SIZE}.`
+          ),
+          ...(units < SQUAD_SIZE ? [tr("Not enough fighters for a squad — recruit some.", "Не хватает бойцов в отряд — наймите в Наборе.")] : []),
+          ...(save.rewardChoice ? [tr("🎁 A battle reward awaits: one fighter of your choice, free.", "🎁 Ждёт награда за бой: один боец на выбор бесплатно.")] : [])
         ]
     actions = units === 0
       ? (
@@ -69,47 +72,54 @@ function NpcDialog({ id }: { id: NpcId }) {
               go("/army")
             }}
           >
-            Набрать новый ростер
+            {tr("Recruit a new roster", "Набрать новый ростер")}
           </Button>
         )
       : (
           <Button big primary block icon="🛡️" onClick={() => go("/army")}>
-            Казарма: армия и набор
+            {tr("Barracks: army & recruits", "Казарма: армия и набор")}
           </Button>
         )
   }
   else if (id === "store") {
-    lines = [save.store.fresh ? "✨ Свежий завоз после вылазки!" : "Ассортимент обновится после следующего боя."]
+    lines = [save.store.fresh
+      ? tr("✨ Fresh stock after the sortie!", "✨ Свежий завоз после вылазки!")
+      : tr("Stock refreshes after the next battle.", "Ассортимент обновится после следующего боя.")]
     actions = (
       <Button big primary block icon="🛒" onClick={() => go("/store")}>
-        Лавка: оружие, лечение, талисманы
+        {tr("Shop: weapons, healing, talismans", "Лавка: оружие, лечение, талисманы")}
       </Button>
     )
   }
   else if (battleOn) {
-    lines = [`Бой ещё идёт: ход ${save.battle?.turn ?? 1}. Отряд ждёт приказа.`]
+    lines = [tr(
+      `The battle’s still on: turn ${save.battle?.turn ?? 1}. Your squad awaits orders.`,
+      `Бой ещё идёт: ход ${save.battle?.turn ?? 1}. Отряд ждёт приказа.`
+    )]
     actions = (
       <Button big primary block glow icon="⚔️" onClick={() => go("/battle")}>
-        Вернуться в бой
+        {tr("Back to battle", "Вернуться в бой")}
       </Button>
     )
   }
   else if (units === 0 || squad === 0) {
-    lines = [units === 0 ? "Без бойцов не пущу — сперва к Сержанту Барбосу." : "Отряд не собран — отметь бойцов в Казарме."]
+    lines = [units === 0
+      ? tr("No fighters, no passage — see Sergeant Barkley first.", "Без бойцов не пущу — сперва к Сержанту Барбосу.")
+      : tr("No squad assembled — pick your fighters in the Barracks.", "Отряд не собран — отметь бойцов в Казарме.")]
     actions = (
       <Button big primary block icon="🛡️" onClick={toBarracks}>
-        К Казарме
+        {tr("To the Barracks", "К Казарме")}
       </Button>
     )
   }
   else {
     lines = [
-      `Отряд ${squad}/${SQUAD_SIZE}. Добыча — из каждого павшего врага.`,
-      "Проиграешь — унесёшь только половину выбитого, отступишь — три четверти."
+      tr(`Squad ${squad}/${SQUAD_SIZE}. Every fallen enemy drops loot.`, `Отряд ${squad}/${SQUAD_SIZE}. Добыча — из каждого павшего врага.`),
+      tr("Lose and you keep only half the loot; retreat and you keep three quarters.", "Проиграешь — унесёшь только половину выбитого, отступишь — три четверти.")
     ]
     actions = (
       <Button big primary block icon="⚔️" onClick={() => go("/battle/setup")}>
-        Собрать вылазку
+        {tr("Plan a sortie", "Собрать вылазку")}
       </Button>
     )
   }
@@ -129,7 +139,7 @@ function NpcDialog({ id }: { id: NpcId }) {
       ))}
       {actions}
       <Button block ghost onClick={closeNpc}>
-        Уйти
+        {tr("Leave", "Уйти")}
       </Button>
     </div>
   )
@@ -185,7 +195,7 @@ export function VillageScreen() {
       <div className="vl-canvas" ref={canvasRef} />
       <div className="vl-hud">
         <div className="vl-top">
-          <button type="button" className="icon-btn" aria-label="Главное меню" title="Главное меню" onClick={() => navigate("/")}>
+          <button type="button" className="icon-btn" aria-label={tr("Main menu", "Главное меню")} title={tr("Main menu", "Главное меню")} onClick={() => navigate("/")}>
             🏠
           </button>
           <ResourceBar />
@@ -193,8 +203,8 @@ export function VillageScreen() {
           <button
             type="button"
             className="icon-btn"
-            aria-label="Настройки"
-            title="Настройки"
+            aria-label={tr("Settings", "Настройки")}
+            title={tr("Settings", "Настройки")}
             onClick={() => navigate("/settings")}
           >
             ⚙️
@@ -204,10 +214,17 @@ export function VillageScreen() {
           {near && !ui.talking
             ? (
                 <Button big primary block glow icon="💬" onClick={() => openNpc(near.id)}>
-                  {`Поговорить: ${near.name}`}
+                  {`${tr("Talk", "Поговорить")}: ${near.name}`}
                 </Button>
               )
-            : <div className="vl-hint">WASD или стрелки — идти · тап по земле — дойти туда · тап по жителю — поговорить</div>}
+            : (
+                <div className="vl-hint">
+                  {tr(
+                    "WASD or arrows — walk · tap the ground — go there · tap a villager — talk",
+                    "WASD или стрелки — идти · тап по земле — дойти туда · тап по жителю — поговорить"
+                  )}
+                </div>
+              )}
         </div>
       </div>
       <BottomSheet open={!!ui.talking} onClose={closeNpc}>

@@ -35,6 +35,7 @@ import {
   thrustLine
 } from "./motionFx"
 import type { UnitView } from "./UnitView"
+import { tr } from "@game/i18n"
 
 /** Проигрывает события боя на сцене карты (и в кинематике). Логики игры не содержит. */
 export class GamePresenter implements Presenter {
@@ -141,7 +142,7 @@ export class GamePresenter implements Presenter {
         map.setWallHp(ev.pos, ev.hpAfter, sp)
         map.cameras.main.shake(80 / sp, 0.004)
         const c = map.center(ev.pos)
-        floatText(map, c.x, c.y - map.tile * 0.3, ev.hpAfter > 0 ? "Хрясь!" : "Сломано!", "#ffd166", sp, {
+        floatText(map, c.x, c.y - map.tile * 0.3, ev.hpAfter > 0 ? tr("Crack!", "Хрясь!") : tr("Smashed!", "Сломано!"), "#ffd166", sp, {
           size: map.tile * 0.3
         })
         const view = map.units.get(ev.unitId)
@@ -162,7 +163,9 @@ export class GamePresenter implements Presenter {
       case "phaseChanged":
         return banner(
           map,
-          ev.phase === "player" ? `Ход ${ev.turn} · Ваша фаза` : `Ход ${ev.turn} · Фаза врага`,
+          ev.phase === "player"
+            ? tr(`Turn ${ev.turn} · Your phase`, `Ход ${ev.turn} · Ваша фаза`)
+            : tr(`Turn ${ev.turn} · Enemy phase`, `Ход ${ev.turn} · Фаза врага`),
           ev.phase === "player" ? 0xe63946 : 0xffffff,
           sp,
           450,
@@ -172,7 +175,7 @@ export class GamePresenter implements Presenter {
           }
         )
       case "reinforcements": {
-        await banner(map, "Подкрепление!", 0xe63946, sp, 300, { slash: true, blood: true })
+        await banner(map, tr("Reinforcements!", "Подкрепление!"), 0xe63946, sp, 300, { slash: true, blood: true })
         // Каждый боец выходит из портала: вихрь, дым, вспышка, затем «вырастает» с пружиной
         const spawns = ev.unitIds.map(async (id, i) => {
           const bu = after.units[id]
@@ -444,7 +447,7 @@ export class GamePresenter implements Presenter {
       map,
       def.x,
       def.y - tile * 0.55,
-      strike.damage === 0 ? "Хлоп!" : String(strike.damage),
+      strike.damage === 0 ? tr("Bonk!", "Хлоп!") : String(strike.damage),
       numColor,
       tile * (strike.special || lethal ? 0.5 : 0.4),
       sp,
@@ -554,7 +557,9 @@ export class GamePresenter implements Presenter {
       if (!map.sys.isActive()) return
     }
     onPool()
-    const word = side === "player" ? (unit?.gender === "f" ? "ПАЛА" : "ПАЛ") : unit?.gender === "f" ? "ГОТОВА" : "ГОТОВ"
+    const word = side === "player"
+      ? tr("FALLEN", unit?.gender === "f" ? "ПАЛА" : "ПАЛ")
+      : tr("DONE FOR", unit?.gender === "f" ? "ГОТОВА" : "ГОТОВ")
     const ghost = ghostRise(map, c.x, c.y - map.tile * 0.2, map.tile, sp)
     if (view?.scene) this.tweenNoWait(map, { targets: view, alpha: 0, duration: 300 / sp, delay: 150 / sp })
     await stamp(
@@ -626,7 +631,7 @@ export class GamePresenter implements Presenter {
     }
     for (const id of ev.cleansed) {
       const view = map.units.get(id)
-      if (view) floatText(map, view.x, view.y - map.tile * 0.75, "штрафы сняты", "#8fc9ff", sp, { size: map.tile * 0.26 })
+      if (view) floatText(map, view.x, view.y - map.tile * 0.75, tr("debuffs cleared", "штрафы сняты"), "#8fc9ff", sp, { size: map.tile * 0.26 })
     }
     if (ev.heals.length > 0) haptic("light")
     return wait(map, 260 / sp)
@@ -681,7 +686,7 @@ export class GamePresenter implements Presenter {
     if (target && ev.assistId === "as_dance") {
       if (actor) danceFx(map, actor.x, actor.y, map.tile, sp, actor.bodyRig())
       danceFx(map, target.x, target.y, map.tile, sp, target.bodyRig())
-      floatText(map, target.x, target.y - map.tile * 0.7, "↻ ещё раз!", "#ffd166", sp, { size: map.tile * 0.3 })
+      floatText(map, target.x, target.y - map.tile * 0.7, tr("↻ again!", "↻ ещё раз!"), "#ffd166", sp, { size: map.tile * 0.3 })
       target.setActed(false)
       target.hop()
     }

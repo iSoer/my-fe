@@ -6,6 +6,7 @@ import { WeaponBadge, RarityStars } from "./Badges"
 import { MOVE_EMOJI, atkLabel } from "../lib/format"
 import { classRoleText } from "./ClassInfo"
 import { stagger } from "../lib/animate"
+import { tr } from "@game/i18n"
 
 export function UnitRow({
   unit,
@@ -81,7 +82,7 @@ export function UnitRow({
       </div>
       <div className="side">
         <span className="lvl">
-          Ур.
+          {tr("Lv.", "Ур.")}
           {unit.level}
         </span>
         <RarityStars rarity={unit.rarity} />

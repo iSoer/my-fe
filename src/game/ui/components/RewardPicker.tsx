@@ -6,6 +6,7 @@ import { haptic } from "@game/platform/haptics"
 import { Button } from "./Button"
 import { UnitRow } from "./UnitRow"
 import { UnitDetails } from "./UnitDetails"
+import { tr } from "@game/i18n"
 
 /** Бесплатная награда за бой: три кандидата, игрок забирает одного в ростер. */
 export function RewardPicker({
@@ -23,16 +24,16 @@ export function RewardPicker({
 
   const claim = (index: number) => {
     const r = claimRewardAction(index)
-    if (!r.ok || !r.unit) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok || !r.unit) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("success")
-    toast(`${r.unit.name} в ростере!`)
+    toast(tr(`${r.unit.name} joined the Roster!`, `${r.unit.name} в ростере!`))
     onClaimed?.(r.unit)
   }
 
   return (
     <div className="card stack pop-in reward-card">
-      <div className="section-title">🎁 Награда: один персонаж бесплатно</div>
-      {full && <p className="danger-text small">Ростер полон — отпустите кого-нибудь в казарме, чтобы забрать награду.</p>}
+      <div className="section-title">{tr("🎁 Reward: one character for free", "🎁 Награда: один персонаж бесплатно")}</div>
+      {full && <p className="danger-text small">{tr("Roster full — release someone in the Barracks to claim the reward.", "Ростер полон — отпустите кого-нибудь в казарме, чтобы забрать награду.")}</p>}
       {choice.map((unit, i) => {
         const isOpen = expanded === unit.id
         return (
@@ -46,7 +47,7 @@ export function RewardPicker({
                 // Кнопка внутри кликабельной строки: не разворачивать карточку при нажатии
                 <span onClick={e => e.stopPropagation()}>
                   <Button sm primary disabled={full} onClick={() => claim(i)}>
-                    Забрать
+                    {tr("Claim", "Забрать")}
                   </Button>
                 </span>
               )}
@@ -60,7 +61,7 @@ export function RewardPicker({
         )
       })}
       <Button ghost block onClick={() => skipRewardAction()}>
-        Отказаться
+        {tr("Decline", "Отказаться")}
       </Button>
     </div>
   )

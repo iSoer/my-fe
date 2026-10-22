@@ -44,6 +44,7 @@ import {
 } from "./env"
 import { isTallTerrain, waterFillsTile } from "@game/art/tile"
 import { clearGoreStains } from "./gore"
+import { tr } from "@game/i18n"
 
 export const MAP_SCENE_KEY = "Map"
 
@@ -711,7 +712,7 @@ export class MapScene extends Phaser.Scene {
     const veil = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x000000, 0).setDepth(60)
     this.endOverlay.push(veil)
     this.tweens.add({ targets: veil, fillAlpha: 0.55, duration: 200 / speed })
-    const text = result === "victory" ? "ПОБЕДА" : result === "defeat" ? "ПОРАЖЕНИЕ" : "ОТСТУПЛЕНИЕ"
+    const text = result === "victory" ? tr("VICTORY", "ПОБЕДА") : result === "defeat" ? tr("DEFEAT", "ПОРАЖЕНИЕ") : tr("RETREAT", "ОТСТУПЛЕНИЕ")
     const color = result === "victory" ? "#ffffff" : result === "defeat" ? "#ff4d6d" : "#dddddd"
     const edge = result === "victory" ? 0xe63946 : result === "defeat" ? 0xffffff : 0x8e8a94
     const size = Math.min(result === "defeat" ? 46 : 52, w * (result === "defeat" ? 0.115 : 0.13))

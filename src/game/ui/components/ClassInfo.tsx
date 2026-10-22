@@ -1,7 +1,8 @@
 import type { UnitInstance } from "@game/core/types"
 import { classInfo, classRole } from "@game/content/classes"
 import { SKILL_LABELS, rankAtLevel } from "@shared/character/skills"
-import { MOVE_EMOJI, plural } from "../lib/format"
+import { MOVE_EMOJI } from "../lib/format"
+import { plural, tr } from "@game/i18n"
 
 /** Значок и роль класса в бою («⚡ Дуэлянт»); `tier` — ещё и ярус. */
 export function ClassRoleLine({ classId, tier = false }: { classId: string, tier?: boolean }) {
@@ -10,7 +11,7 @@ export function ClassRoleLine({ classId, tier = false }: { classId: string, tier
     <span className="class-role">
       <span className="class-role-ico" aria-hidden="true">{info.icon}</span>
       <span className="class-role-name">{info.role}</span>
-      {tier && <span className="muted small">{`${info.tierLabel} · с ${info.tierLevel} ур.`}</span>}
+      {tier && <span className="muted small">{tr(`${info.tierLabel} · from Lv. ${info.tierLevel}`, `${info.tierLabel} · с ${info.tierLevel} ур.`)}</span>}
     </span>
   )
 }
@@ -24,7 +25,7 @@ export function classRoleText(classId: string): string {
 /** Передвижение одной строкой: «👣 Infantry · ход 2». */
 export function moveText(classId: string): string {
   const info = classInfo(classId)
-  return `${MOVE_EMOJI[info.moveType]} ${info.moveLabel} · ход ${info.moveRange}`
+  return `${MOVE_EMOJI[info.moveType]} ${info.moveLabel} · ${tr("move", "ход")} ${info.moveRange}`
 }
 
 /**
@@ -33,15 +34,15 @@ export function moveText(classId: string): string {
  */
 export function ClassFacts({ classId, unit }: { classId: string, unit?: UnitInstance }) {
   const info = classInfo(classId)
-  const cells = `${info.moveRange} ${plural(info.moveRange, "клетка", "клетки", "клеток")}`
+  const cells = `${info.moveRange} ${plural(info.moveRange, ["tile", "tiles"], ["клетка", "клетки", "клеток"])}`
   return (
     <dl className="class-facts">
-      <dt>Ход</dt>
+      <dt>{tr("Move", "Ход")}</dt>
       <dd>{`${MOVE_EMOJI[info.moveType]} ${info.moveLabel}: ${cells}, ${info.moveNote}`}</dd>
-      <dt>Бонус</dt>
+      <dt>{tr("Bonus", "Бонус")}</dt>
       <dd>
         {info.bonus.length === 0
-          ? <span className="muted">нет</span>
+          ? <span className="muted">{tr("none", "нет")}</span>
           : (
               <span className="bonus-chips">
                 {info.bonus.map(b => (
@@ -52,16 +53,16 @@ export function ClassFacts({ classId, unit }: { classId: string, unit?: UnitInst
               </span>
             )}
       </dd>
-      <dt>Оружие</dt>
+      <dt>{tr("Weapons", "Оружие")}</dt>
       <dd>
         {info.weapons
           .map(w => (unit ? `${SKILL_LABELS[w]} ${rankAtLevel(unit.aptitudes[w], unit.level)}` : SKILL_LABELS[w]))
           .join(", ")}
       </dd>
-      <dt>Нужно</dt>
+      <dt>{tr("Needs", "Нужно")}</dt>
       <dd>
-        {[`${info.tierLevel} ур.`, ...info.requires].join(" · ")}
-        {info.unique ? " · один на армию" : ""}
+        {[tr(`Lv. ${info.tierLevel}`, `${info.tierLevel} ур.`), ...info.requires].join(" · ")}
+        {info.unique ? tr(" · one per Army", " · один на армию") : ""}
       </dd>
     </dl>
   )

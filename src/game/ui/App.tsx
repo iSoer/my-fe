@@ -15,6 +15,7 @@ import { VillageScreen } from "./screens/VillageScreen"
 import { StoreScreen } from "./screens/StoreScreen"
 import { critterSvg, furArt } from "@game/art/index"
 import { gameHost } from "@game/platform/host"
+import { $lang, tr } from "@game/i18n"
 
 const SPLASH_TRIO = [
   critterSvg({
@@ -53,6 +54,8 @@ const SPLASH_TRIO = [
 ]
 
 function Splash({ onStart, ready }: { onStart: () => void, ready: boolean }) {
+  // Язык приходит из сейва во время загрузки — перерисовываемся при смене
+  useStore($lang)
   return (
     <div className="screen splash" onClick={ready ? onStart : undefined}>
       <div className="splash-logo">
@@ -61,10 +64,10 @@ function Splash({ onStart, ready }: { onStart: () => void, ready: boolean }) {
             <div key={i} className="critter-svg critter-svg--lg is-static" dangerouslySetInnerHTML={{ __html: svg }} />
           ))}
         </div>
-        <h1>Пушистая Резня</h1>
-        <p className="muted">Тактика про котиков, собачек и мышек. Милая и кровавая.</p>
+        <h1>{tr("Fluffy Carnage", "Пушистая Резня")}</h1>
+        <p className="muted">{tr("Tactics with kitties, doggos and mice. Cute and bloody.", "Тактика про котиков, собачек и мышек. Милая и кровавая.")}</p>
       </div>
-      <p className="splash-hint">{ready ? "Нажмите, чтобы начать" : "Загрузка…"}</p>
+      <p className="splash-hint">{ready ? tr("Tap to start", "Нажмите, чтобы начать") : tr("Loading…", "Загрузка…")}</p>
     </div>
   )
 }
@@ -107,9 +110,10 @@ function Screen({ route }: { route: Route }) {
 
 function Router() {
   const route = useStore($route)
-  // key пересоздаёт контейнер при смене маршрута — проигрывается CSS-переход route-in
+  const lang = useStore($lang)
+  // key пересоздаёт контейнер при смене маршрута — проигрывается CSS-переход route-in; смена языка перерисовывает экран
   return (
-    <div className="route" key={routeKey(route)}>
+    <div className="route" key={`${lang}:${routeKey(route)}`}>
       <Screen route={route} />
     </div>
   )
@@ -127,9 +131,7 @@ export function App() {
           <div className="toast toast-error">
             <span className="ico">✕</span>
             <span>
-              Сейв повреждён:
-              {err}
-              . Начат новый.
+              {tr(`Save corrupted: ${err}. Started a new one.`, `Сейв повреждён: ${err}. Начат новый.`)}
             </span>
           </div>
         )}

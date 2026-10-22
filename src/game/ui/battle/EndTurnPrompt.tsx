@@ -5,6 +5,7 @@ import { allPlayerUnitsActed } from "@game/core/battle/reducer"
 import { endTurn, type BattleUiState } from "@game/state/battleUi"
 import { $settings } from "@game/state/save"
 import { haptic } from "@game/platform/haptics"
+import { tr } from "@game/i18n"
 import { $endPromptDismissed, endPromptKey } from "./endPrompt"
 
 /** Нужно ли предлагать завершить ход: все походили, фаза игрока, ничего не выбрано, автозавершение выключено. */
@@ -52,22 +53,22 @@ export function EndTurnPrompt({ battle, ui }: { battle: BattleState, ui: BattleU
     $endPromptDismissed.set(endPromptKey(battle.id, battle.turn))
   }
   return (
-    <div className="bf-endprompt bf-card" role="dialog" aria-label="Все бойцы походили">
+    <div className="bf-endprompt bf-card" role="dialog" aria-label={tr("All fighters have moved", "Все бойцы походили")}>
       <div className="bf-endprompt-head">
         <span className="bf-endprompt-ico" aria-hidden="true">
           ✅
         </span>
         <div>
-          <div className="bf-endprompt-title">Все бойцы походили</div>
-          <div className="bf-endprompt-sub">Передать ход противнику?</div>
+          <div className="bf-endprompt-title">{tr("All fighters have moved", "Все бойцы походили")}</div>
+          <div className="bf-endprompt-sub">{tr("Hand the turn to the enemy?", "Передать ход противнику?")}</div>
         </div>
       </div>
       <div className="bf-endprompt-actions">
         <button type="button" className="bf-pill-btn" onClick={later}>
-          Ещё осмотреться
+          {tr("Look around", "Ещё осмотреться")}
         </button>
-        <button type="button" className="bf-pill-btn primary" aria-label="Завершить ход" onClick={go}>
-          ⏭ Завершить ход
+        <button type="button" className="bf-pill-btn primary" aria-label={tr("End turn", "Завершить ход")} onClick={go}>
+          {tr("⏭ End turn", "⏭ Завершить ход")}
         </button>
       </div>
     </div>

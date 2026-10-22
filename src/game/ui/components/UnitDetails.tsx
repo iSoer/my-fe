@@ -9,6 +9,7 @@ import { MoveBadge, RarityStars, WeaponBadge } from "./Badges"
 import { StatsGrid } from "./Stats"
 import { atkLabel, speciesName } from "../lib/format"
 import { aptitudeLine, weaponLine } from "./CharacterPanels"
+import { tr } from "@game/i18n"
 
 /** Полная карточка бойца для шторок (ростер, приют, выбор отряда). */
 export function UnitDetails({ unit, compact = false }: { unit: UnitInstance, compact?: boolean }) {
@@ -33,7 +34,7 @@ export function UnitDetails({ unit, compact = false }: { unit: UnitInstance, com
           <div className="row wrap">
             <RarityStars rarity={unit.rarity} />
             <span className="muted small">
-              Ур.
+              {tr("Lv.", "Ур.")}
               {unit.level}
             </span>
           </div>
@@ -53,14 +54,14 @@ export function UnitDetails({ unit, compact = false }: { unit: UnitInstance, com
       {trait && (
         <div className="card" style={{ padding: 10 }}>
           <b>
-            Особенность:
+            {tr("Trait:", "Особенность:")}
             {trait.name}
           </b>
           <div className="muted small">{trait.desc}</div>
         </div>
       )}
       <div className="stack" style={{ gap: 6 }}>
-        <b className="small muted">Навыки</b>
+        <b className="small muted">{tr("Skills", "Навыки")}</b>
         {skillIds.map((id) => {
           const info = skillInfo(id)
           if (!info) return null

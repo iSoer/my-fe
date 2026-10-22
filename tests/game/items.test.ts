@@ -63,7 +63,7 @@ describe("Лавка", () => {
     $save.set({ ...$save.get(), profile: { ...$save.get().profile, treats: 0 } })
     const r = buyItemAction(store.weapons[0]!)
     expect(r.ok).toBe(false)
-    expect(r.error).toMatch(/Вкусняшек/)
+    expect(r.error).toMatch(/Treats/)
   })
 })
 

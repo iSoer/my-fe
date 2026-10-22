@@ -11,6 +11,7 @@ import { ResourceBar } from "../components/ResourceBar"
 import { useToast } from "../components/Toast"
 import { stagger } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
+import { plural, tr } from "@game/i18n"
 import "../squad.css"
 
 export const DIFF_STYLE: Record<Difficulty, { icon: string, color: string, rgb: string }> = {
@@ -37,27 +38,30 @@ export function BattleSetupScreen() {
 
   const onNext = () => {
     const r = scoutBattle(difficulty, biome)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("medium")
     navigate("/battle/squad")
   }
 
   return (
     <div className="screen">
-      <TopBar title="Вылазка · 1/2" right={<ResourceBar />} onBack={() => navigate("/village", true)} />
+      <TopBar title={tr("Sortie · 1/2", "Вылазка · 1/2")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
       <div className="screen-body">
-        <div className="section-title">Сложность</div>
+        <div className="section-title">{tr("Difficulty", "Сложность")}</div>
         <div className="stack">
           {DIFFICULTIES.map((d, i) => {
             const unlocked = difficultyUnlocked(save, d.id)
             const st = DIFF_STYLE[d.id]
             const rules: string[] = []
             if (d.reinforcements.length)
-              rules.push(`подкрепления (ход ${d.reinforcements.map(r => r.turn).join(", ")})`)
-            if (d.boss) rules.push("вожак")
-            if (d.objective === "killBoss") rules.push("цель: убить вожака")
+              rules.push(`${tr("reinforcements (turn", "подкрепления (ход")} ${d.reinforcements.map(r => r.turn).join(", ")})`)
+            if (d.boss) rules.push(tr("leader", "вожак"))
+            if (d.objective === "killBoss") rules.push(tr("goal: kill the leader", "цель: убить вожака"))
+            const unlockName = DIFFICULTIES.find(x => x.id === d.unlock?.difficulty)?.name
+            const unlockWins = d.unlock?.wins ?? 0
+            const winsWord = plural(unlockWins, ["win", "wins"], ["победы", "побед", "побед"])
             const unlockText = d.unlock
-              ? `после ${d.unlock.wins} побед на «${DIFFICULTIES.find(x => x.id === d.unlock?.difficulty)?.name}»`
+              ? tr(`after ${unlockWins} ${winsWord} on “${unlockName}”`, `после ${unlockWins} ${winsWord} на «${unlockName}»`)
               : ""
             return (
               <div
@@ -65,7 +69,7 @@ export function BattleSetupScreen() {
                 className={`card clickable diff-card pop-in ${difficulty === d.id ? "selected" : ""} ${unlocked ? "" : "locked"}`}
                 style={{ ...stagger(i, 60), "--diff-color": st.color, "--diff-rgb": st.rgb } as Record<string, string>}
                 onClick={() => {
-                  if (!unlocked) return toast(`Откроется ${unlockText}`)
+                  if (!unlocked) return toast(`${tr("Unlocks", "Откроется")} ${unlockText}`)
                   haptic("select")
                   setDifficulty(d.id)
                 }}
@@ -75,7 +79,7 @@ export function BattleSetupScreen() {
                 </span>
                 <div className="diff-body">
                   <b>{d.name}</b>
-                  <div className="muted small">{unlocked ? d.desc : `Закрыто: ${unlockText}`}</div>
+                  <div className="muted small">{unlocked ? d.desc : `${tr("Locked", "Закрыто")}: ${unlockText}`}</div>
                   <div className="diff-meta">
                     <span className="chip">{`🦴 ×${d.treatsMult}`}</span>
                     <span className="chip gold">{`✦ ${d.glory}`}</span>
@@ -91,10 +95,10 @@ export function BattleSetupScreen() {
           })}
         </div>
 
-        <div className="section-title">Биом</div>
+        <div className="section-title">{tr("Biome", "Биом")}</div>
         <div className="biome-chips">
           <Button sm primary={biome === "random"} icon="🎲" onClick={() => setBiome("random")}>
-            Случайно
+            {tr("Random", "Случайно")}
           </Button>
           {biomes.map(id => (
             <Button key={id} sm primary={biome === id} icon={BIOME_ICON[id] ?? "🗺️"} onClick={() => setBiome(id)}>
@@ -103,10 +107,10 @@ export function BattleSetupScreen() {
           ))}
         </div>
 
-        <p className="muted small">Враги и подкрепления будут видны на следующем шаге — до выбора отряда.</p>
+        <p className="muted small">{tr("Enemies and reinforcements are revealed on the next step — before you pick your squad.", "Враги и подкрепления будут видны на следующем шаге — до выбора отряда.")}</p>
         <div className="sticky-cta">
           <Button big primary block icon="🔎" onClick={onNext}>
-            Далее
+            {tr("Next", "Далее")}
           </Button>
         </div>
       </div>

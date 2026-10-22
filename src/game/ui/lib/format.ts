@@ -3,6 +3,7 @@ import { STATS } from "@game/core/types"
 import { difficultyDef } from "@game/content/balance"
 import { isMagicWeapon } from "@game/content/weapons"
 import { CHARACTER_STAT_LABELS as L } from "@shared/character/leveling"
+import { lang, tr } from "@game/i18n"
 
 /** Подписи боевых статов — подписи модели; атака — Str или Mag модели, без бойца — «Str/Mag». */
 export const STAT_LABELS: Record<Stat, string> = {
@@ -18,18 +19,18 @@ export function atkLabel(unit: { weaponSkill: Parameters<typeof isMagicWeapon>[0
   return isMagicWeapon(unit.weaponSkill) ? L.specialAttack : L.attack
 }
 export const STAT_FULL: Record<Stat, string> = {
-  hp: "Здоровье",
-  atk: "Атака",
-  spd: "Скорость",
-  def: "Защита",
-  res: "Сопротивление"
+  get hp() { return tr("HP", "Здоровье") },
+  get atk() { return tr("Attack", "Атака") },
+  get spd() { return tr("Speed", "Скорость") },
+  get def() { return tr("Defense", "Защита") },
+  get res() { return tr("Resistance", "Сопротивление") }
 }
 
 export const COLOR_NAMES: Record<Color, string> = {
-  red: "Красный",
-  blue: "Синий",
-  green: "Зелёный",
-  colorless: "Бесцветный"
+  get red() { return tr("Red", "Красный") },
+  get blue() { return tr("Blue", "Синий") },
+  get green() { return tr("Green", "Зелёный") },
+  get colorless() { return tr("Colorless", "Бесцветный") }
 }
 export const COLOR_CSS: Record<Color, string> = {
   red: "var(--c-red)",
@@ -45,15 +46,19 @@ export const MOVE_EMOJI: Record<MoveType, string> = { infantry: "👣", armored:
 export function speciesName(unit: { species: Species, gender: Gender }): string {
   switch (unit.species) {
     case "cat":
-      return unit.gender === "m" ? "Кот" : "Кошка"
+      return unit.gender === "m" ? tr("Cat", "Кот") : tr("Cat", "Кошка")
     case "dog":
-      return unit.gender === "m" ? "Пёс" : "Собака"
+      return unit.gender === "m" ? tr("Dog", "Пёс") : tr("Dog", "Собака")
     default:
-      return "Мышь"
+      return tr("Mouse", "Мышь")
   }
 }
 
-export const SPECIES_LABEL: Record<Species, string> = { cat: "Коты", dog: "Псы", mouse: "Мыши" }
+export const SPECIES_LABEL: Record<Species, string> = {
+  get cat() { return tr("Cats", "Коты") },
+  get dog() { return tr("Dogs", "Псы") },
+  get mouse() { return tr("Mice", "Мыши") }
+}
 export const SPECIES_ORDER: Record<Species, number> = { cat: 0, dog: 1, mouse: 2 }
 
 export function hex(n: number): string {
@@ -70,15 +75,7 @@ export function fmtGains(gains: Partial<Stats>): string {
     const v = gains[s]
     if (v) parts.push(`${STAT_LABELS[s]} ${v > 0 ? "+" : ""}${v}`)
   }
-  return parts.length ? parts.join(", ") : "без изменений"
-}
-
-export function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10
-  const m100 = n % 100
-  if (m10 === 1 && m100 !== 11) return one
-  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few
-  return many
+  return parts.length ? parts.join(", ") : tr("no change", "без изменений")
 }
 
 export function g(gender: Gender, m: string, f: string): string {
@@ -87,7 +84,7 @@ export function g(gender: Gender, m: string, f: string): string {
 
 export function fmtDate(ts: number): string {
   try {
-    return new Date(ts).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" })
+    return new Date(ts).toLocaleDateString(lang() === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })
   }
   catch {
     return ""

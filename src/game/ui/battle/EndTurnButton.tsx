@@ -3,8 +3,8 @@ import type { BattleState } from "@game/core/types"
 import { livingUnits } from "@game/core/battle/query"
 import { endTurn, type BattleUiState } from "@game/state/battleUi"
 import { haptic } from "@game/platform/haptics"
+import { plural, tr } from "@game/i18n"
 import { ConfirmModal } from "../components/Sheet"
-import { plural } from "../lib/format"
 import { useStore } from "@nanostores/react"
 import { $settings } from "@game/state/save"
 import { $endPromptDismissed } from "./endPrompt"
@@ -18,6 +18,7 @@ export function EndTurnButton({ battle, ui }: { battle: BattleState, ui: BattleU
   const isPlayer = battle.phase === "player"
   const players = livingUnits(battle, "player")
   const left = players.filter(u => !u.acted).length
+  const notMoved = plural(left, ["fighter hasn’t", "fighters haven’t"], ["боец не ходил", "бойца не ходили", "бойцов не ходили"])
   const show = isPlayer && !ui.busy && ui.mode === "idle"
   // Пока всплыло предложение завершить ход — плавающую кнопку не дублируем.
   if (!show || shouldOfferEndTurn(battle, ui, settings.autoEndTurn, dismissed)) return null
@@ -30,7 +31,7 @@ export function EndTurnButton({ battle, ui }: { battle: BattleState, ui: BattleU
     <>
       <button
         type="button"
-        aria-label="Завершить ход"
+        aria-label={tr("End turn", "Завершить ход")}
         className={`bf-endturn ${allActed ? "pulse" : ""}`}
         onClick={() => {
           haptic("light")
@@ -41,16 +42,13 @@ export function EndTurnButton({ battle, ui }: { battle: BattleState, ui: BattleU
         <span className="bf-endturn-ico" aria-hidden="true">
           ⏭
         </span>
-        Завершить ход
+        {tr("End turn", "Завершить ход")}
       </button>
       <ConfirmModal
         open={ask}
-        title="Завершить ход?"
-        text={
-          `Ещё ${left} ${plural(left, "боец", "бойца", "бойцов")} не ${plural(left, "ходил", "ходили", "ходили")}.`
-          + " Враг получит ход."
-        }
-        confirmLabel="Завершить"
+        title={tr("End turn?", "Завершить ход?")}
+        text={tr(`${left} ${notMoved} moved yet. The enemy gets the turn.`, `Ещё ${left} ${notMoved}. Враг получит ход.`)}
+        confirmLabel={tr("End", "Завершить")}
         onConfirm={() => {
           setAsk(false)
           go()

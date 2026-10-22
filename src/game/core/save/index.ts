@@ -7,6 +7,7 @@ import { WEAPON_SKILLS } from "@shared/character/skills"
 import { isWeaponId } from "@game/content/weapons"
 import { EMPTY_STORE } from "../items"
 import { defaultVillage } from "../village"
+import { DEFAULT_LANG, tr } from "@game/i18n"
 
 /**
  * v6: деревня-хаб (позиция героя), признак начатой игры, инвентарь армии, Лавка, талисман бойца, рюкзак вылазки;
@@ -168,7 +169,9 @@ const settingsSchema = z.object({
   autoEndTurn: z.boolean(),
   dangerZoneDefault: z.boolean(),
   blood: z.enum(["sea", "pools"]),
-  confirmAttack: z.boolean()
+  confirmAttack: z.boolean(),
+  // Сейвы до выбора языка — английский по умолчанию
+  lang: z.enum(["en", "ru"]).default(DEFAULT_LANG)
 })
 
 const levelUpSchema = z.object({ unitId: z.string(), from: z.number(), to: z.number(), gains: partialStats })
@@ -345,10 +348,16 @@ export function parseSave(json: string): ParseResult {
   catch (e) {
     return { ok: false, error: `JSON: ${(e as Error).message}` }
   }
-  if (!raw || typeof raw !== "object") return { ok: false, error: "не объект" }
+  if (!raw || typeof raw !== "object") return { ok: false, error: tr("not an object", "не объект") }
   const version = (raw as Record<string, unknown>)["version"]
   if (typeof version === "number" && version < MIN_SAVE_VERSION)
-    return { ok: false, error: `сейв версии ${version} устарел: бойцы и оружие теперь из модели персонажа` }
+    return {
+      ok: false,
+      error: tr(
+        `Save version ${version} is outdated: fighters and weapons now come from the character model`,
+        `сейв версии ${version} устарел: бойцы и оружие теперь из модели персонажа`
+      )
+    }
   const migrated = migrate(raw as Record<string, unknown>)
   const res = saveSchema.safeParse(migrated)
   if (!res.success)

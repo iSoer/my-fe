@@ -9,6 +9,7 @@ import { BottomSheet } from "./Sheet"
 import { Button } from "./Button"
 import { UnitRow } from "./UnitRow"
 import { UnitDetails } from "./UnitDetails"
+import { tr } from "@game/i18n"
 
 /** Набор в Казарме: витрина персонажей за Вкусняшки. Цена зависит от уровня и редкости, витрина обновляется после боя. */
 export function ShopSheet({
@@ -29,24 +30,24 @@ export function ShopSheet({
 
   const buy = (index: number) => {
     const r = buyAction(index)
-    if (!r.ok || !r.unit) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok || !r.unit) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("success")
     setExpanded(null)
     onBought(r.unit)
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="🐾 Набор">
+    <BottomSheet open={open} onClose={onClose} title={tr("🐾 Recruit", "🐾 Набор")}>
       <p className="muted small hire-sub">
-        У вас 🦴
+        {tr("You have 🦴", "У вас 🦴")}
         {" "}
         <b>{treats}</b>
         {" "}
-        · в ростере свободно
+        {tr("· free Roster slots", "· в ростере свободно")}
         {" "}
         <b>{slots}</b>
         {" "}
-        из
+        {tr("of", "из")}
         {" "}
         {BARRACKS_CAP}
       </p>
@@ -61,7 +62,7 @@ export function ShopSheet({
                 index={i}
                 friendly
                 onClick={() => setExpanded(isOpen ? null : unit.id)}
-                right={<span className="muted small">{isOpen ? "Свернуть" : "Подробнее"}</span>}
+                right={<span className="muted small">{isOpen ? tr("Collapse", "Свернуть") : tr("Details", "Подробнее")}</span>}
               />
               {isOpen && (
                 <div className="card hire-details pop-in">
@@ -69,15 +70,18 @@ export function ShopSheet({
                 </div>
               )}
               <Button block primary icon="🦴" disabled={slots === 0 || treats < price} onClick={() => buy(i)}>
-                {slots === 0 ? "Ростер полон" : `Купить за 🦴 ${price}`}
+                {slots === 0 ? tr("Roster full", "Ростер полон") : tr(`Buy for 🦴 ${price}`, `Купить за 🦴 ${price}`)}
               </Button>
             </div>
           )
         })}
-        {save.shelter.candidates.length === 0 && <p className="muted">Витрина пуста — новые персонажи появятся после боя.</p>}
+        {save.shelter.candidates.length === 0 && <p className="muted">{tr("Nothing on display — new characters arrive after a battle.", "Витрина пуста — новые персонажи появятся после боя.")}</p>}
       </div>
       <div className="muted small" style={{ marginTop: 8 }}>
-        Вкусняшки выпадают из врагов в бою и даются за победу. Витрина обновляется после каждого боя.
+        {tr(
+          "Treats drop from enemies in battle and are awarded for victory. The display refreshes after every battle.",
+          "Вкусняшки выпадают из врагов в бою и даются за победу. Витрина обновляется после каждого боя."
+        )}
       </div>
     </BottomSheet>
   )

@@ -57,22 +57,22 @@ try {
   await step('офлайн: холодная перезагрузка', async () => {
     await ctx.setOffline(true);
     await page.reload({ waitUntil: 'load' });
-    const splash = page.getByText('Нажмите, чтобы начать');
+    const splash = page.getByText('Tap to start');
     await splash.first().waitFor({ timeout: 8000 });
     await splash.first().click();
-    await page.getByRole('button', { name: /Новая игра/ }).first().waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: /New game/ }).first().waitFor({ timeout: 5000 });
   });
   await step('офлайн: новая игра и деревня (Phaser)', async () => {
-    await page.getByRole('button', { name: /Новая игра/ }).first().click();
+    await page.getByRole('button', { name: /New game/ }).first().click();
     await page.waitForURL(/#\/village$/, { timeout: 5000 });
     await page.waitForSelector('.vl-canvas canvas', { timeout: 10000 });
   });
   await step('офлайн: вылазка у ворот и бой с канвасом Phaser', async () => {
     await page.evaluate(() => window.__pf.village.talk('sorties'));
-    await page.getByRole('button', { name: /Собрать вылазку/ }).first().click();
-    await page.getByRole('button', { name: /^Далее/ }).first().click();
+    await page.getByRole('button', { name: /Plan a sortie/ }).first().click();
+    await page.getByRole('button', { name: /^Next/ }).first().click();
     await page.waitForURL(/battle\/squad/, { timeout: 5000 });
-    await page.getByRole('button', { name: /Начать бой/ }).first().click();
+    await page.getByRole('button', { name: /Start battle/ }).first().click();
     await page.waitForURL(/#\/battle$/, { timeout: 5000 });
     await page.waitForSelector('#battle-canvas canvas', { timeout: 10000 });
   });

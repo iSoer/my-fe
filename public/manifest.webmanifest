@@ -1,9 +1,9 @@
 {
   "id": "./",
-  "name": "Пушистая Резня",
-  "short_name": "Резня",
-  "description": "Тактическая игра про котиков и собачек. Милая и кровавая.",
-  "lang": "ru",
+  "name": "Fluffy Carnage",
+  "short_name": "Carnage",
+  "description": "A tactics game about kitties and doggos. Cute and bloody.",
+  "lang": "en",
   "dir": "ltr",
   "start_url": "./",
   "scope": "./",

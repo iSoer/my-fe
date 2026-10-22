@@ -7,6 +7,7 @@ import { WEAPON_COLOR } from "@game/content/weapons"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { classRoleText, moveText } from "../components/ClassInfo"
 import { COLOR_CSS, atkLabel } from "../lib/format"
+import { tr } from "@game/i18n"
 
 /** Компактная карточка бойца в нижней полосе: аватар, имя, HP, статы, спецприём. */
 export function UnitCard({
@@ -65,7 +66,7 @@ export function UnitCard({
           <span className="bf-muted">
             {unitClassName(unit)}
             {" "}
-            · Ур.
+            {tr("· Lv.", "· Ур.")}
             {unit.level}
           </span>
           {special && (

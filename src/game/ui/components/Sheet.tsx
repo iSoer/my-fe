@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { Button } from "./Button"
+import { tr } from "@game/i18n"
 
 export function BottomSheet({
   open,
@@ -50,7 +51,7 @@ export function ConfirmModal({
   open,
   title,
   text,
-  confirmLabel = "Да",
+  confirmLabel,
   danger = false,
   onConfirm,
   onClose
@@ -68,10 +69,10 @@ export function ConfirmModal({
       {text && <div className="muted">{text}</div>}
       <div className="row">
         <Button block onClick={onClose}>
-          Отмена
+          {tr("Cancel", "Отмена")}
         </Button>
         <Button block primary={!danger} danger={danger} onClick={onConfirm}>
-          {confirmLabel}
+          {confirmLabel ?? tr("Yes", "Да")}
         </Button>
       </div>
     </Modal>

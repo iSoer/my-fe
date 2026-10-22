@@ -61,12 +61,16 @@ import { invalidateKit } from "@game/core/skills/engine"
 import { BIOMES } from "@game/content/biomes"
 import { clearLocal, loadLocal, saveLocal } from "@game/platform/storage"
 import { setHapticsEnabled } from "@game/platform/haptics"
+import { setLang, tr } from "@game/i18n"
 
 /* ---------- Сторы ---------- */
 
 export const $save = atom<SaveGame>(createEmptySave(Date.now()))
 export const $saveStatus = atom<"loading" | "ready" | "error">("loading")
 export const $saveError = atom<string | null>(null)
+
+// Язык интерфейса следует за сейвом: загрузка, импорт, сброс, облако и настройки меняют его одинаково
+$save.subscribe(s => setLang(s.settings.lang))
 
 export const $profile = computed($save, s => s.profile)
 export const $army = computed($save, s => s.army)
@@ -220,12 +224,12 @@ function joinRoster(st: SaveGame, cand: UnitInstance): Army {
 /** Купить персонажа с витрины магазина за Вкусняшки. */
 export function buyAction(index: number): { ok: boolean, error?: string, unit?: UnitInstance } {
   const s = $save.get()
-  if (!s.army) return { ok: false, error: "нет армии" }
-  if (freeSlots(s) === 0) return { ok: false, error: `Ростер полон (${BARRACKS_CAP})` }
+  if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
+  if (freeSlots(s) === 0) return { ok: false, error: tr(`Roster full (${BARRACKS_CAP})`, `Ростер полон (${BARRACKS_CAP})`) }
   const cand = s.shelter.candidates[index]
-  if (!cand) return { ok: false, error: "нет кандидата" }
+  if (!cand) return { ok: false, error: tr("No recruit", "нет кандидата") }
   const cost = unitPrice(cand)
-  if (s.profile.treats < cost) return { ok: false, error: "Недостаточно Вкусняшек" }
+  if (s.profile.treats < cost) return { ok: false, error: tr("Not enough Treats", "Недостаточно Вкусняшек") }
   updateSave(st => ({
     ...st,
     army: joinRoster(st, cand),
@@ -239,8 +243,8 @@ export function buyAction(index: number): { ok: boolean, error?: string, unit?: 
 export function claimRewardAction(index: number): { ok: boolean, error?: string, unit?: UnitInstance } {
   const s = $save.get()
   const cand = s.rewardChoice?.[index]
-  if (!s.army || !cand) return { ok: false, error: "нет награды" }
-  if (freeSlots(s) === 0) return { ok: false, error: `Ростер полон (${BARRACKS_CAP}) — отпустите кого-нибудь` }
+  if (!s.army || !cand) return { ok: false, error: tr("No reward", "нет награды") }
+  if (freeSlots(s) === 0) return { ok: false, error: tr(`Roster full (${BARRACKS_CAP}) — release someone`, `Ростер полон (${BARRACKS_CAP}) — отпустите кого-нибудь`) }
   updateSave((st) => {
     const next: SaveGame = { ...st, army: joinRoster(st, cand) }
     delete next.rewardChoice
@@ -272,15 +276,15 @@ export function setSquad(ids: string[]): void {
  */
 export function assignSquadSlot(slot: number, unitId: string | null): { ok: boolean, error?: string } {
   const s = $save.get()
-  if (!s.army) return { ok: false, error: "нет армии" }
-  if (slot < 0 || slot >= SQUAD_SIZE) return { ok: false, error: "нет такого слота" }
+  if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
+  if (slot < 0 || slot >= SQUAD_SIZE) return { ok: false, error: tr("No such slot", "нет такого слота") }
   const ids = s.army.squadIds.filter(id => s.army?.units.some(u => u.id === id))
   if (unitId === null) {
     if (slot < ids.length) ids.splice(slot, 1)
     setSquad(ids)
     return { ok: true }
   }
-  if (!s.army.units.some(u => u.id === unitId)) return { ok: false, error: "нет бойца" }
+  if (!s.army.units.some(u => u.id === unitId)) return { ok: false, error: tr("No such fighter", "нет бойца") }
   const cur = ids.indexOf(unitId)
   if (slot >= ids.length) {
     if (cur >= 0) return { ok: true }
@@ -294,9 +298,9 @@ export function assignSquadSlot(slot: number, unitId: string | null): { ok: bool
 
 export function toggleSquad(unitId: string): { ok: boolean, error?: string } {
   const s = $save.get()
-  if (!s.army) return { ok: false, error: "нет армии" }
+  if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
   const inSquad = s.army.squadIds.includes(unitId)
-  if (!inSquad && s.army.squadIds.length >= SQUAD_SIZE) return { ok: false, error: "Отряд полон" }
+  if (!inSquad && s.army.squadIds.length >= SQUAD_SIZE) return { ok: false, error: tr("Squad is full", "Отряд полон") }
   setSquad(inSquad ? s.army.squadIds.filter(id => id !== unitId) : [...s.army.squadIds, unitId])
   return { ok: true }
 }
@@ -304,10 +308,10 @@ export function toggleSquad(unitId: string): { ok: boolean, error?: string } {
 export function trainUnitAction(unitId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
-  if (!s.army || !unit) return { ok: false, error: "нет бойца" }
-  if (unit.level >= MAX_LEVEL) return { ok: false, error: "Максимальный уровень" }
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (unit.level >= MAX_LEVEL) return { ok: false, error: tr("Max level", "Максимальный уровень") }
   const cost = trainCost(unit.level)
-  if (s.profile.treats < cost) return { ok: false, error: "Недостаточно Вкусняшек" }
+  if (s.profile.treats < cost) return { ok: false, error: tr("Not enough Treats", "Недостаточно Вкусняшек") }
   const { unit: next } = trainUnit(unit)
   updateSave(st => ({
     ...st,
@@ -320,8 +324,8 @@ export function trainUnitAction(unitId: string): { ok: boolean, error?: string }
 export function learnSkillAction(unitId: string, skillId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
-  if (!s.army || !unit) return { ok: false, error: "нет бойца" }
-  if (unit.sp < skillCost(skillId)) return { ok: false, error: "Недостаточно SP" }
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (unit.sp < skillCost(skillId)) return { ok: false, error: tr("Not enough SP", "Недостаточно SP") }
   try {
     const next = learnSkill(unit, skillId)
     updateSave(st => ({ ...st, army: replaceUnit(st.army as Army, next) }))
@@ -339,7 +343,7 @@ export function equipAction(
 ): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
-  if (!s.army || !unit) return { ok: false, error: "нет бойца" }
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
   try {
     const next = equipSkill(unit, skillId, slot)
     updateSave(st => ({ ...st, army: replaceUnit(st.army as Army, next) }))
@@ -354,10 +358,10 @@ export function equipAction(
 export function reclassAction(unitId: string, classId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
-  if (!s.army || !unit) return { ok: false, error: "нет бойца" }
-  if (!canTakeClassNow(unit, classId)) return { ok: false, error: "Класс ещё не открыт" }
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (!canTakeClassNow(unit, classId)) return { ok: false, error: tr("Class not unlocked yet", "Класс ещё не открыт") }
   if (isUniqueClassId(classId) && s.army.units.some(u => u.id !== unitId && u.classId === classId)) {
-    return { ok: false, error: "Божественный класс уже у другого бойца" }
+    return { ok: false, error: tr("Another fighter already has this divine class", "Божественный класс уже у другого бойца") }
   }
   const next = reclassUnit(unit, classId)
   updateSave(st => ({ ...st, army: replaceUnit(st.army as Army, next) }))
@@ -369,10 +373,10 @@ export function reclassAction(unitId: string, classId: string): { ok: boolean, e
 /** Купить предмет из ассортимента Лавки в инвентарь армии. */
 export function buyItemAction(itemId: string): { ok: boolean, error?: string } {
   const s = $save.get()
-  if (!inStore(s.store, itemId)) return { ok: false, error: "Такого товара нет" }
+  if (!inStore(s.store, itemId)) return { ok: false, error: tr("No such item in stock", "Такого товара нет") }
   const price = itemPrice(itemId)
-  if (s.profile.treats < price) return { ok: false, error: "Недостаточно Вкусняшек" }
-  if (itemCount(s.inventory, itemId) >= ITEMS.stackCap) return { ok: false, error: "Больше не унести" }
+  if (s.profile.treats < price) return { ok: false, error: tr("Not enough Treats", "Недостаточно Вкусняшек") }
+  if (itemCount(s.inventory, itemId) >= ITEMS.stackCap) return { ok: false, error: tr("Can’t carry any more", "Больше не унести") }
   updateSave(st => ({
     ...st,
     inventory: addItem(st.inventory, itemId),
@@ -393,10 +397,10 @@ export function markStoreSeen(): void {
 export function equipWeaponAction(unitId: string, weaponId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
-  if (!s.army || !unit) return { ok: false, error: "нет бойца" }
-  if (itemCategory(weaponId) !== "weapon") return { ok: false, error: "Это не оружие" }
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (itemCategory(weaponId) !== "weapon") return { ok: false, error: tr("Not a weapon", "Это не оружие") }
   if (unit.skills.weapon === weaponId) return { ok: true }
-  if (!isWoodWeapon(weaponId) && itemCount(s.inventory, weaponId) < 1) return { ok: false, error: "Нет в инвентаре" }
+  if (!isWoodWeapon(weaponId) && itemCount(s.inventory, weaponId) < 1) return { ok: false, error: tr("Not in inventory", "Нет в инвентаре") }
   const next = equipWeapon(unit, weaponId)
   updateSave((st) => {
     let inventory = isWoodWeapon(weaponId) ? st.inventory : removeItem(st.inventory, weaponId)
@@ -410,10 +414,10 @@ export function equipWeaponAction(unitId: string, weaponId: string): { ok: boole
 export function equipTalismanAction(unitId: string, talismanId: string | undefined): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
-  if (!s.army || !unit) return { ok: false, error: "нет бойца" }
-  if (talismanId && !isTalismanId(talismanId)) return { ok: false, error: "Это не талисман" }
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (talismanId && !isTalismanId(talismanId)) return { ok: false, error: tr("Not a talisman", "Это не талисман") }
   if (talismanId === unit.accessory) return { ok: true }
-  if (talismanId && itemCount(s.inventory, talismanId) < 1) return { ok: false, error: "Нет в инвентаре" }
+  if (talismanId && itemCount(s.inventory, talismanId) < 1) return { ok: false, error: tr("Not in inventory", "Нет в инвентаре") }
   const next: UnitInstance = { ...unit }
   if (talismanId) next.accessory = talismanId
   else delete next.accessory
@@ -429,15 +433,15 @@ export function equipTalismanAction(unitId: string, talismanId: string | undefin
 /** Рюкзак вылазки: расходники из инвентаря, всего не больше `ITEMS.packSize`. Списываются при старте боя. */
 export function setPackAction(pack: Inventory): { ok: boolean, error?: string } {
   const s = $save.get()
-  if (!s.pendingBattle) return { ok: false, error: "Сначала разведайте бой" }
+  if (!s.pendingBattle) return { ok: false, error: tr("Scout a battle first", "Сначала разведайте бой") }
   const clean: Inventory = {}
   for (const [id, n] of Object.entries(pack)) {
     if (n <= 0) continue
-    if (!isConsumableId(id)) return { ok: false, error: "В рюкзак — только расходники" }
-    if (itemCount(s.inventory, id) < n) return { ok: false, error: "Столько нет в инвентаре" }
+    if (!isConsumableId(id)) return { ok: false, error: tr("Only consumables go in the pack", "В рюкзак — только расходники") }
+    if (itemCount(s.inventory, id) < n) return { ok: false, error: tr("Not that many in inventory", "Столько нет в инвентаре") }
     clean[id] = n
   }
-  if (totalCount(clean) > ITEMS.packSize) return { ok: false, error: `В рюкзак влезает ${ITEMS.packSize}` }
+  if (totalCount(clean) > ITEMS.packSize) return { ok: false, error: tr(`The pack holds ${ITEMS.packSize}`, `В рюкзак влезает ${ITEMS.packSize}`) }
   updateSave(st => (st.pendingBattle ? { ...st, pendingBattle: { ...st.pendingBattle, pack: clean } } : st))
   return { ok: true }
 }
@@ -454,10 +458,10 @@ export function setHeroPosition(pos: Pos, facing: Facing): void {
 export function sharpenAction(unitId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
-  if (!s.army || !unit) return { ok: false, error: "нет бойца" }
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
   const cost = sharpenCost(unit.weaponTier)
-  if (cost === null) return { ok: false, error: "Оружие заточено до предела" }
-  if (s.profile.treats < cost) return { ok: false, error: "Недостаточно Вкусняшек" }
+  if (cost === null) return { ok: false, error: tr("Weapon is fully sharpened", "Оружие заточено до предела") }
+  if (s.profile.treats < cost) return { ok: false, error: tr("Not enough Treats", "Недостаточно Вкусняшек") }
   updateSave(st => ({
     ...st,
     army: replaceUnit(st.army as Army, sharpenWeapon(unit)),
@@ -498,8 +502,8 @@ export function releaseUnit(unitId: string): { ok: boolean, armyFell?: boolean }
  */
 export function scoutBattle(difficulty: Difficulty, biomeId: string | "random"): { ok: boolean, error?: string } {
   const s = $save.get()
-  if (!s.army) return { ok: false, error: "нет армии" }
-  if (!difficultyUnlocked(s, difficulty)) return { ok: false, error: "Сложность закрыта" }
+  if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
+  if (!difficultyUnlocked(s, difficulty)) return { ok: false, error: tr("Difficulty locked", "Сложность закрыта") }
   const pb = s.pendingBattle
   if (pb && pb.difficulty === difficulty && pb.biomeId === biomeId) return { ok: true }
   const pack = pb?.pack
@@ -520,13 +524,13 @@ export function scoutBattle(difficulty: Difficulty, biomeId: string | "random"):
 /** Начать разведанный бой выбранным отрядом (1–4 бойца ростера). */
 export function startBattle(squadIds: string[]): { ok: boolean, error?: string, events?: BattleEvent[] } {
   const s = $save.get()
-  if (!s.army) return { ok: false, error: "нет армии" }
-  if (s.battle && !s.battle.result) return { ok: false, error: "бой уже идёт" }
+  if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
+  if (s.battle && !s.battle.result) return { ok: false, error: tr("Battle already in progress", "бой уже идёт") }
   const pb = s.pendingBattle
-  if (!pb) return { ok: false, error: "Сначала разведайте бой" }
+  if (!pb) return { ok: false, error: tr("Scout a battle first", "Сначала разведайте бой") }
   const squad = squadIds.map(id => s.army?.units.find(u => u.id === id)).filter((u): u is UnitInstance => !!u)
-  if (squad.length === 0) return { ok: false, error: "Пустой отряд" }
-  if (squad.length > SQUAD_SIZE) return { ok: false, error: `В отряде не больше ${SQUAD_SIZE}` }
+  if (squad.length === 0) return { ok: false, error: tr("Squad is empty", "Пустой отряд") }
+  if (squad.length > SQUAD_SIZE) return { ok: false, error: tr(`Squad holds at most ${SQUAD_SIZE}`, `В отряде не больше ${SQUAD_SIZE}`) }
   // Рюкзак списывается из инвентаря (то, чего уже нет, не берётся); остаток вернётся после боя
   const pack: Inventory = {}
   for (const [id, n] of Object.entries(pb.pack ?? {})) {

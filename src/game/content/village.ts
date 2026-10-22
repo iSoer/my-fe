@@ -1,4 +1,5 @@
 import type { Facing, Pos, Species } from "@game/core/types"
+import { tr } from "@game/i18n"
 
 // Деревня-хаб между боями: карта клетками, домики и NPC. Логика движения — `core/village`, отрисовка — `scene/village`.
 
@@ -77,46 +78,46 @@ export interface NpcDef {
 }
 
 export const HOUSES: readonly HouseDef[] = [
-  { npc: "barracks", x: 2, y: 2, w: 5, h: 3, sign: "Казарма", roof: "#8c3b2e", wall: "#d9b48a" },
-  { npc: "store", x: 9, y: 2, w: 5, h: 3, sign: "Лавка", roof: "#2f6b4f", wall: "#e3c89b" }
+  { npc: "barracks", x: 2, y: 2, w: 5, h: 3, get sign() { return tr("Barracks", "Казарма") }, roof: "#8c3b2e", wall: "#d9b48a" },
+  { npc: "store", x: 9, y: 2, w: 5, h: 3, get sign() { return tr("Shop", "Лавка") }, roof: "#2f6b4f", wall: "#e3c89b" }
 ]
 
 /** Ворота на выход из поселения: клетки `G` в нижнем ряду, тропинка уходит в середину; у ворот — Разведчик Шрам. */
-export const GATE = { x: 10, y: 15, w: 3, sign: "За околицу" } as const
+export const GATE = { x: 10, y: 15, w: 3, get sign() { return tr("Beyond the Fence", "За околицу") } } as const
 
 export const NPCS: readonly NpcDef[] = [
   {
     id: "barracks",
-    name: "Сержант Барбос",
-    title: "Армия и набор",
+    get name() { return tr("Sergeant Barkley", "Сержант Барбос") },
+    get title() { return tr("Army & Recruits", "Армия и набор") },
     species: "dog",
     pos: { x: 5.7, y: 5.6 },
     facing: "down",
-    greeting: "Смирно! Кого берём в отряд, кого нанимаем?",
+    get greeting() { return tr("Ten-hut! Who's joining the squad, who are we hiring?", "Смирно! Кого берём в отряд, кого нанимаем?") },
     fur: 4,
     eyes: 4,
     accessory: 3
   },
   {
     id: "store",
-    name: "Тётушка Сырница",
-    title: "Снаряжение",
+    get name() { return tr("Auntie Brie", "Тётушка Сырница") },
+    get title() { return tr("Gear", "Снаряжение") },
     species: "mouse",
     pos: { x: 12.7, y: 5.6 },
     facing: "down",
-    greeting: "Заходи, милок! Оружие, пластыри, талисманы — всё по честной цене.",
+    get greeting() { return tr("Come on in, dearie! Weapons, band-aids, talismans — all at honest prices.", "Заходи, милок! Оружие, пластыри, талисманы — всё по честной цене.") },
     fur: 1,
     eyes: 0,
     accessory: 6
   },
   {
     id: "sorties",
-    name: "Разведчик Шрам",
-    title: "Вылазки",
+    get name() { return tr("Scout Scar", "Разведчик Шрам") },
+    get title() { return tr("Sorties", "Вылазки") },
     species: "cat",
     pos: { x: 13.7, y: 14.25 },
     facing: "down",
-    greeting: "За воротами опять неспокойно. Соберёшь отряд — выведу за околицу, покажу, где поживиться.",
+    get greeting() { return tr("Trouble beyond the gate again. Gather a squad and I'll take you past the fence, show you where the pickings are.", "За воротами опять неспокойно. Соберёшь отряд — выведу за околицу, покажу, где поживиться.") },
     fur: 0,
     eyes: 0,
     accessory: 1

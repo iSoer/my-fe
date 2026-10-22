@@ -3,6 +3,7 @@ import { displayName } from "@game/core/units"
 import { cancel, confirm, type BattleUiState } from "@game/state/battleUi"
 import { haptic } from "@game/platform/haptics"
 import { UnitCard } from "./UnitCard"
+import { tr } from "@game/i18n"
 
 function Pill({
   label,
@@ -37,8 +38,8 @@ function AssistSummary({ state, ui }: { state: BattleState, ui: BattleUiState })
   const target = ui.targetId ? state.roster[ui.targetId] : undefined
   if (!plan || !plan.assist || !target) return null
   const parts: string[] = []
-  if (plan.heal > 0) parts.push(`лечение +${plan.heal}`)
-  if (plan.allHeal > 0) parts.push(`все союзники +${plan.allHeal}`)
+  if (plan.heal > 0) parts.push(tr(`heal +${plan.heal}`, `лечение +${plan.heal}`))
+  if (plan.allHeal > 0) parts.push(tr(`all allies +${plan.allHeal}`, `все союзники +${plan.allHeal}`))
   if (plan.buffs.length)
     parts.push(
       plan.buffs
@@ -49,10 +50,10 @@ function AssistSummary({ state, ui }: { state: BattleState, ui: BattleUiState })
         )
         .join("; ")
     )
-  if (plan.moves.length) parts.push("перемещение")
-  if (plan.refresh) parts.push("союзник действует ещё раз")
-  if (plan.selfHpDelta) parts.push(`себе ${plan.selfHpDelta}`)
-  if (plan.specialTriggered) parts.push("сработает спецприём")
+  if (plan.moves.length) parts.push(tr("reposition", "перемещение"))
+  if (plan.refresh) parts.push(tr("ally acts again", "союзник действует ещё раз"))
+  if (plan.selfHpDelta) parts.push(tr(`self ${plan.selfHpDelta}`, `себе ${plan.selfHpDelta}`))
+  if (plan.specialTriggered) parts.push(tr("special triggers", "сработает спецприём"))
   return (
     <div className="bf-card bf-assist">
       <b>
@@ -79,7 +80,7 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
   const hint = (text: string, cls = "") => <div className={`bf-hint ${cls}`}>{text}</div>
   const cancelRow = (
     <div className="bf-actions">
-      <Pill label="Отмена" onClick={cancel} />
+      <Pill label={tr("Cancel", "Отмена")} onClick={cancel} />
     </div>
   )
 
@@ -88,15 +89,15 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
     return (
       <>
         {card}
-        {hint(bad ? "Сюда нельзя" : "Отпустите бойца на клетке", bad ? "danger" : "accent")}
+        {hint(bad ? tr("Can’t go here", "Сюда нельзя") : tr("Drop the fighter on a tile", "Отпустите бойца на клетке"), bad ? "danger" : "accent")}
       </>
     )
   }
   switch (ui.mode) {
     case "busy":
-      return hint(isPlayer ? "Анимация…" : "Ход противника…", "thin")
+      return hint(isPlayer ? tr("Animating…", "Анимация…") : tr("Enemy turn…", "Ход противника…"), "thin")
     case "ended":
-      return hint("Бой окончен", "thin")
+      return hint(tr("Battle over", "Бой окончен"), "thin")
     case "enemyInfo": {
       const bu = ui.infoId ? battle.units[ui.infoId] : undefined
       const unit = ui.infoId ? battle.roster[ui.infoId] : undefined
@@ -111,13 +112,13 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
             extra={
               bu.side === "enemy"
                 ? (
-                    <div className="bf-muted bf-caption">Зона угрозы показана фиолетовым</div>
+                    <div className="bf-muted bf-caption">{tr("Threat zone shown in purple", "Зона угрозы показана фиолетовым")}</div>
                   )
                 : undefined
             }
           />
           <div className="bf-actions">
-            <Pill label="Закрыть" onClick={cancel} />
+            <Pill label={tr("Close", "Закрыть")} onClick={cancel} />
           </div>
         </>
       )
@@ -129,7 +130,7 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
       return (
         <>
           {card}
-          {hint("Выберите клетку или перетащите бойца")}
+          {hint(tr("Pick a tile or drag the fighter", "Выберите клетку или перетащите бойца"))}
           {cancelRow}
         </>
       )
@@ -137,7 +138,7 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
       return (
         <>
           {card}
-          {hint("Выберите цель", "accent")}
+          {hint(tr("Pick a target", "Выберите цель"), "accent")}
           {cancelRow}
         </>
       )
@@ -145,15 +146,15 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
       return (
         <>
           {card}
-          {hint("Выберите союзника", "accent")}
+          {hint(tr("Pick an ally", "Выберите союзника"), "accent")}
           {cancelRow}
         </>
       )
     case "forecast":
       return (
         <div className="bf-actions">
-          <Pill label="Отмена" onClick={cancel} />
-          <Pill label="Атаковать" primary big onClick={() => void confirm()} />
+          <Pill label={tr("Cancel", "Отмена")} onClick={cancel} />
+          <Pill label={tr("Attack", "Атаковать")} primary big onClick={() => void confirm()} />
         </div>
       )
     case "assistPreview":
@@ -161,8 +162,8 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
         <>
           <AssistSummary state={battle} ui={ui} />
           <div className="bf-actions">
-            <Pill label="Отмена" onClick={cancel} />
-            <Pill label="Применить" primary big onClick={() => void confirm()} />
+            <Pill label={tr("Cancel", "Отмена")} onClick={cancel} />
+            <Pill label={tr("Apply", "Применить")} primary big onClick={() => void confirm()} />
           </div>
         </>
       )
@@ -171,18 +172,18 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
         <>
           {card}
           <div className="bf-card bf-assist">
-            <b>🧱 Сломать хлипкую стену</b>
-            <div className="bf-muted">Стена потеряет 1 HP. При 0 HP клетка станет проходимой.</div>
+            <b>{tr("🧱 Break the flimsy wall", "🧱 Сломать хлипкую стену")}</b>
+            <div className="bf-muted">{tr("The wall loses 1 HP. At 0 HP the tile opens up.", "Стена потеряет 1 HP. При 0 HP клетка станет проходимой.")}</div>
           </div>
           <div className="bf-actions">
-            <Pill label="Отмена" onClick={cancel} />
-            <Pill label="Сломать" primary big onClick={() => void confirm()} />
+            <Pill label={tr("Cancel", "Отмена")} onClick={cancel} />
+            <Pill label={tr("Break", "Сломать")} primary big onClick={() => void confirm()} />
           </div>
         </>
       )
     default:
       return isPlayer
-        ? hint("Тап по бойцу — меню действий, перетащите его — ход", "thin")
-        : hint("Ход противника…", "thin")
+        ? hint(tr("Tap a fighter for actions, drag to move", "Тап по бойцу — меню действий, перетащите его — ход"), "thin")
+        : hint(tr("Enemy turn…", "Ход противника…"), "thin")
   }
 }

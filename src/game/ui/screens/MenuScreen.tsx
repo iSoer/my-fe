@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useStore } from "@nanostores/react"
 import { $save, gameStarted, newGame, surrenderFromMenu } from "@game/state/save"
 import { navigate } from "@game/state/router"
@@ -10,15 +10,15 @@ import { ResourceBar } from "../components/ResourceBar"
 import { ConfirmModal } from "../components/Sheet"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { haptic } from "@game/platform/haptics"
-import { plural } from "../lib/format"
+import { plural, tr } from "@game/i18n"
 
 // Для широкой диорамы показываем середину сцены (забор и небо), а не только газон.
 const YARD_BG = backdropSvg("yard", "plain", "left").replace(
   "preserveAspectRatio=\"xMidYMax slice\"",
   "preserveAspectRatio=\"xMidYMid slice\""
 )
-/** Демо-тройка для меню без армии: кот, пёс и мышь. */
-const DEMO_CREW: UnitInstance[] = [
+/** Демо-тройка для меню без армии: кот, пёс и мышь. Генерируется при показе — имена на текущем языке. */
+const demoCrew = (): UnitInstance[] => [
   generateUnit({ seed: 1, level: 1, species: "cat", classId: "infantry_claw" }),
   generateUnit({ seed: 2, level: 1, species: "dog", classId: "infantry_stick" }),
   generateUnit({ seed: 3, level: 1, species: "mouse", classId: "infantry_slingshot" })
@@ -70,9 +70,10 @@ export function MenuScreen() {
   const hasBattle = started && !!battle && !battle.result
   const [surrender, setSurrender] = useState(false)
   const [confirmNew, setConfirmNew] = useState(false)
+  const demo = useMemo(demoCrew, [])
 
   // В диораме — бойцы ростера; без них — демо-тройка.
-  const crew: UnitInstance[] = army && army.units.length > 0 ? army.units.slice(0, 3) : DEMO_CREW
+  const crew: UnitInstance[] = army && army.units.length > 0 ? army.units.slice(0, 3) : demo
 
   const onContinue = () => {
     haptic("select")
@@ -94,68 +95,75 @@ export function MenuScreen() {
 
   const units = army?.units.length ?? 0
   const continueSub = hasBattle
-    ? `Ход ${battle?.turn ?? 1} · бой ждёт`
-    : `🦴 ${save.profile.treats} · ${units} ${plural(units, "боец", "бойца", "бойцов")} · в деревню`
+    ? tr(`Turn ${battle?.turn ?? 1} · battle awaits`, `Ход ${battle?.turn ?? 1} · бой ждёт`)
+    : `🦴 ${save.profile.treats} · ${units} ${plural(units, ["fighter", "fighters"], ["боец", "бойца", "бойцов"])} · ${tr("to the village", "в деревню")}`
 
   return (
     <div className="screen menu">
       <div className="row between">
         <ResourceBar />
-        {started && <span className="muted small">{`Ростер: ${units}`}</span>}
+        {started && <span className="muted small">{`${tr("Roster", "Ростер")}: ${units}`}</span>}
       </div>
       <div className="menu-hero">
         <div className="paper-frame">
           <Diorama crew={crew} />
         </div>
-        <h1>Пушистая Резня</h1>
+        <h1>{tr("Fluffy Carnage", "Пушистая Резня")}</h1>
         <span className="title-drip" dangerouslySetInnerHTML={{ __html: DRIP_SVG }} />
-        <p className="muted">Тактика про котиков, собачек и мышек</p>
+        <p className="muted">{tr("Tactics with kitties, doggos and mice", "Тактика про котиков, собачек и мышек")}</p>
       </div>
       <div className="menu-actions">
         {started && (
           <Button big primary block glow={hasBattle} icon={hasBattle ? "⚔️" : "🏡"} onClick={onContinue}>
             <span className="lbl">
-              {hasBattle ? "Продолжить бой" : "Продолжить"}
+              {hasBattle ? tr("Resume battle", "Продолжить бой") : tr("Continue", "Продолжить")}
               <div className="sub">{continueSub}</div>
             </span>
           </Button>
         )}
         {hasBattle && (
           <Button ghost sm block onClick={() => setSurrender(true)}>
-            🏳️ Сдаться
+            {tr("🏳️ Surrender", "🏳️ Сдаться")}
           </Button>
         )}
         <Button big block primary={!started} icon="✨" onClick={onNew}>
           <span className="lbl">
-            Новая игра
-            <div className="sub">{started ? "Прогресс будет стёрт" : "Стартовый ростер и деревня"}</div>
+            {tr("New game", "Новая игра")}
+            <div className="sub">{started ? tr("Progress will be wiped", "Прогресс будет стёрт") : tr("Starter roster and village", "Стартовый ростер и деревня")}</div>
           </span>
         </Button>
         <div className="menu-secondary">
           <Button ghost icon="🪦" onClick={() => navigate("/memorial")}>
-            Кладбище
+            {tr("Graveyard", "Кладбище")}
             {save.memorial.length ? ` (${save.memorial.length})` : ""}
           </Button>
           <Button ghost icon="⚙️" onClick={() => navigate("/settings")}>
-            Настройки
+            {tr("Settings", "Настройки")}
           </Button>
         </div>
       </div>
       <ConfirmModal
         open={surrender}
-        title="Сдаться?"
-        text={"Бой засчитается как отступление: из выбитого достанется только часть, "
-          + "погибшие останутся мёртвыми, выжившие вернутся в деревню."}
-        confirmLabel="Сдаться"
+        title={tr("Surrender?", "Сдаться?")}
+        text={tr(
+          "The battle counts as a retreat: you keep only part of the loot, "
+          + "the dead stay dead, the survivors return to the village.",
+          "Бой засчитается как отступление: из выбитого достанется только часть, "
+          + "погибшие останутся мёртвыми, выжившие вернутся в деревню."
+        )}
+        confirmLabel={tr("Surrender", "Сдаться")}
         danger
         onConfirm={doSurrender}
         onClose={() => setSurrender(false)}
       />
       <ConfirmModal
         open={confirmNew}
-        title="Начать новую игру?"
-        text="Ростер, инвентарь, Вкусняшки, Слава и Кладбище будут стёрты. Настройки сохранятся."
-        confirmLabel="Начать заново"
+        title={tr("Start a new game?", "Начать новую игру?")}
+        text={tr(
+          "Roster, inventory, Treats, Glory and the Graveyard will be wiped. Settings are kept.",
+          "Ростер, инвентарь, Вкусняшки, Слава и Кладбище будут стёрты. Настройки сохранятся."
+        )}
+        confirmLabel={tr("Start over", "Начать заново")}
         danger
         onConfirm={startNew}
         onClose={() => setConfirmNew(false)}

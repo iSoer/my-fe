@@ -40,6 +40,7 @@ import { ensureTextures } from "../textures"
 import { textStyle } from "../style"
 import { stepFx, reducedMotion } from "../motionFx"
 import { sceneAlive } from "../fx"
+import { tr } from "@game/i18n"
 
 export const VILLAGE_SCENE_KEY = "village"
 
@@ -262,7 +263,7 @@ export class VillageScene extends Phaser.Scene {
     const alert = this.add.text(x, y - h * 0.78 - 30, "!", textStyle(22, "#ffd166", true, 4)).setOrigin(0.5, 1).setDepth(10001)
     alert.setVisible(false)
     const prompt = this.add
-      .text(x, y + 10, "E / Пробел — поговорить", {
+      .text(x, y + 10, tr("E / Space — talk", "E / Пробел — поговорить"), {
         ...textStyle(11, "#15121a", true, 0),
         backgroundColor: "#ffffffdd",
         padding: { x: 6, y: 3 }

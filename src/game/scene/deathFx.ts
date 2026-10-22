@@ -20,6 +20,7 @@ import {
 import { reducedMotion } from "@game/ui/lib/animate"
 import { UnitView } from "./UnitView"
 import { ensureUnitPartTextures, hasTexture, withTimeout, type UnitTexSize } from "./svgTextures"
+import { tr } from "@game/i18n"
 
 /**
  * Варианты гибели: милые и кровавые. Выбираются детерминированно по seed (юнит + ход),
@@ -754,7 +755,7 @@ const flatten: VariantFn = async (ctx, b) => {
   await scaleFromFeet(b, 1.7, 0.08, 120 / sp, "Quad.easeIn")
   if (!alive(b)) return
   b.scene.cameras.main.shake(180 / sp, b.mode === "cine" ? 0.028 : 0.015)
-  punchText(b.scene, ctx.x, ctx.y - s * 0.5, "ШМЯК!", "#ffd166", b.mode === "cine" ? 40 : ctx.size * 0.42, sp)
+  punchText(b.scene, ctx.x, ctx.y - s * 0.5, tr("SPLAT!", "ШМЯК!"), "#ffd166", b.mode === "cine" ? 40 : ctx.size * 0.42, sp)
   bloodBurst(
     b.scene,
     ctx.x,

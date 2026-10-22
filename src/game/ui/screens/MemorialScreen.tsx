@@ -7,24 +7,25 @@ import { TopBar } from "../components/TopBar"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { fmtDate, g } from "../lib/format"
 import { stagger } from "../lib/animate"
+import { tr } from "@game/i18n"
 
 export function MemorialScreen() {
   const memorial = useStore($memorial)
   const list = [...memorial].reverse()
   return (
     <div className="screen">
-      <TopBar title="Кладбище" onBack={() => navigate("/", true)} />
+      <TopBar title={tr("Graveyard", "Кладбище")} onBack={() => navigate("/", true)} />
       <div className="screen-body">
         <p className="muted small">
-          Всего павших:
+          {tr("Total fallen:", "Всего павших:")}
           {" "}
           <b>{memorial.length}</b>
-          . Они были хорошими мальчиками и девочками.
+          {tr(". They were good boys and girls.", ". Они были хорошими мальчиками и девочками.")}
         </p>
         {list.length === 0 && (
           <div className="empty">
             <div className="big">🪦</div>
-            <p>Пока пусто. Это ненадолго.</p>
+            <p>{tr("Empty for now. Not for long.", "Пока пусто. Это ненадолго.")}</p>
           </div>
         )}
         {list.map((m, i) => (
@@ -34,7 +35,7 @@ export function MemorialScreen() {
               <b>{displayName(m.unit)}</b>
               <div className="muted small">
                 {unitClassName(m.unit)}
-                , ур.
+                {tr(", lv.", ", ур.")}
                 {m.unit.level}
                 {" "}
                 ·
@@ -45,17 +46,17 @@ export function MemorialScreen() {
               </div>
               <div className="muted small">
                 {m.reason === "released"
-                  ? g(m.unit.gender, "Ушёл сам", "Ушла сама")
+                  ? tr("Left on their own", g(m.unit.gender, "Ушёл сам", "Ушла сама"))
                   : [
-                      g(m.unit.gender, "Пал", "Пала"),
+                      tr("Fell", g(m.unit.gender, "Пал", "Пала")),
                       m.biomeId ? ` (${biomeDef(m.biomeId).name})` : "",
-                      m.killerName ? ` от лап ${m.killerName}` : "",
-                      m.battleTurn ? `, ход ${m.battleTurn}` : ""
+                      m.killerName ? tr(` at the paws of ${m.killerName}`, ` от лап ${m.killerName}`) : "",
+                      m.battleTurn ? `, ${tr("turn", "ход")} ${m.battleTurn}` : ""
                     ].join("")}
                 {" · "}
-                боёв:
+                {tr("battles:", "боёв:")}
                 {m.unit.history.battles}
-                , убийств:
+                {tr(", kills:", ", убийств:")}
                 {m.unit.history.kills}
               </div>
               <div className="epitaph">

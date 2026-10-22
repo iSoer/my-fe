@@ -10,6 +10,7 @@ import {
   type WeaponSkill
 } from "@shared/character/skills"
 import { WEAPON_PRICES } from "./balance"
+import { tr } from "@game/i18n"
 
 // Оружие игры — предметы под оружейные навыки модели (`WEAPON_SKILLS`), названия — `SKILL_LABELS` и
 // `WEAPON_GRADE_LABELS`. Цвет треугольника, дальность, Mt, грейды и разновидности — боевые правила игры поверх модели.
@@ -42,16 +43,16 @@ interface WeaponSpec {
 const MELEE_VARIANTS: readonly WeaponVariant[] = ["basic", "brave", "killer", "armorslayer", "cavslayer"]
 
 const SPECS: Record<WeaponSkill, WeaponSpec> = {
-  sword: { range: 1, mt: 6, magical: false, isStaff: false, variants: MELEE_VARIANTS, desc: "Ближний бой, красный." },
-  spear: { range: 1, mt: 6, magical: false, isStaff: false, variants: MELEE_VARIANTS, desc: "Ближний бой, синий." },
-  axe: { range: 1, mt: 6, magical: false, isStaff: false, variants: MELEE_VARIANTS, desc: "Ближний бой, зелёный." },
+  sword: { range: 1, mt: 6, magical: false, isStaff: false, variants: MELEE_VARIANTS, get desc() { return tr("Melee, red.", "Ближний бой, красный.") } },
+  spear: { range: 1, mt: 6, magical: false, isStaff: false, variants: MELEE_VARIANTS, get desc() { return tr("Melee, blue.", "Ближний бой, синий.") } },
+  axe: { range: 1, mt: 6, magical: false, isStaff: false, variants: MELEE_VARIANTS, get desc() { return tr("Melee, green.", "Ближний бой, зелёный.") } },
   gauntlet: {
     range: 1,
     mt: 5,
     magical: false,
     isStaff: false,
     variants: ["basic", "brave", "killer"],
-    desc: "Ближний бой, бесцветный."
+    get desc() { return tr("Melee, colorless.", "Ближний бой, бесцветный.") }
   },
   bow: {
     range: 2,
@@ -60,7 +61,7 @@ const SPECS: Record<WeaponSkill, WeaponSpec> = {
     isStaff: false,
     variants: ["basic", "brave", "killer"],
     effectiveAgainst: ["flier"],
-    desc: "Дальний бой, бесцветный. Эффективен против flier."
+    get desc() { return tr("Ranged, colorless. Effective against flier.", "Дальний бой, бесцветный. Эффективен против flier.") }
   },
   blackMagic: {
     range: 2,
@@ -68,7 +69,11 @@ const SPECS: Record<WeaponSkill, WeaponSpec> = {
     magical: true,
     isStaff: false,
     variants: ["basic", "killer"],
-    desc: `Магия с 2 клеток: атака от ${CHARACTER_STAT_LABELS.specialAttack}, бьёт по ${CHARACTER_STAT_LABELS.specialDefense}.`
+    get desc() {
+      const mag = CHARACTER_STAT_LABELS.specialAttack
+      const res = CHARACTER_STAT_LABELS.specialDefense
+      return tr(`Magic from 2 tiles: attacks with ${mag}, hits ${res}.`, `Магия с 2 клеток: атака от ${mag}, бьёт по ${res}.`)
+    }
   },
   whiteMagic: {
     range: 2,
@@ -76,7 +81,7 @@ const SPECS: Record<WeaponSkill, WeaponSpec> = {
     magical: true,
     isStaff: true,
     variants: ["basic", "killer"],
-    desc: "Лечит через Поддержку. Урон ×0.5."
+    get desc() { return tr("Heals via Assist. Damage ×0.5.", "Лечит через Поддержку. Урон ×0.5.") }
   }
 }
 
@@ -107,6 +112,23 @@ const VARIANT_RANK: Record<Exclude<WeaponVariant, "basic">, Rank> = {
 
 const SPD = CHARACTER_STAT_LABELS.speed
 
+/** Приписка к описанию оружия (дерево и разновидности); вычисляется при показе — на текущем языке. */
+function weaponNote(variant: WeaponVariant, grade: WeaponGrade): string {
+  if (grade === "wood") return tr("A simple beginner's weapon.", "Простое оружие новичка.")
+  switch (variant) {
+    case "brave":
+      return tr(`Attacks twice in a row when initiating, −5 ${SPD}.`, `Две атаки подряд при инициативе, −5 ${SPD}.`)
+    case "killer":
+      return tr("Special cooldown −1.", "Кулдаун спецприёма −1.")
+    case "armorslayer":
+      return tr("Effective against armored.", "Эффективно против armored.")
+    case "cavslayer":
+      return tr("Effective against cavalry.", "Эффективно против cavalry.")
+    default:
+      return ""
+  }
+}
+
 function build(): WeaponDef[] {
   const out: WeaponDef[] = []
   for (const skill of WEAPON_SKILLS) {
@@ -125,7 +147,10 @@ function build(): WeaponDef[] {
         price: variant === "basic" ? WEAPON_PRICES.grade[grade] : WEAPON_PRICES.variant[variant],
         magical: spec.magical,
         isStaff: spec.isStaff,
-        desc: spec.desc
+        get desc() {
+          const note = weaponNote(variant, grade)
+          return note ? `${spec.desc} ${note}` : spec.desc
+        }
       }
       if (spec.effectiveAgainst) w.effectiveAgainst = spec.effectiveAgainst
       return w
@@ -134,7 +159,6 @@ function build(): WeaponDef[] {
       const g = GRADES[grade]
       const w = base("basic", grade, `${skill}_${g.id}`, `${WEAPON_GRADE_LABELS[grade]} ${SKILL_LABELS[skill]}`, g.rank)
       w.mt += g.mt
-      if (grade === "wood") w.desc += " Простое оружие новичка."
       out.push(w)
     }
     for (const variant of spec.variants) {
@@ -145,20 +169,16 @@ function build(): WeaponDef[] {
         case "brave":
           w.mt -= 2
           w.spdMod = -5
-          w.desc += ` Две атаки подряд при инициативе, −5 ${SPD}.`
           break
         case "killer":
           w.mt -= 1
           w.cdMod = -1
-          w.desc += " Кулдаун спецприёма −1."
           break
         case "armorslayer":
           w.effectiveAgainst = ["armored"]
-          w.desc += " Эффективно против armored."
           break
         case "cavslayer":
           w.effectiveAgainst = ["cavalry"]
-          w.desc += " Эффективно против cavalry."
           break
       }
       out.push(w)

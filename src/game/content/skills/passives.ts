@@ -3,6 +3,7 @@ import { alliesWithin, foesWithin, hpPct, unitsWithinOf } from "@game/core/battl
 import type { Effect, WeaponSkill } from "@game/core/types"
 import { SKILL_LABELS, WEAPON_SKILLS } from "@shared/character/skills"
 import { weaponRange } from "../weapons"
+import { tr } from "@game/i18n"
 
 // Оружейные навыки модели по дальности: ближний бой и дальний
 const MELEE: WeaponSkill[] = WEAPON_SKILLS.filter(w => weaponRange(w) === 1)
@@ -14,7 +15,12 @@ function breaker(skill: WeaponSkill): PassiveDef {
   return {
     id: `b_breaker_${skill}`,
     name: `${label}breaker`,
-    desc: `Против ${label} при HP ≥ 50 %: гарантированная двойная, враг без двойной.`,
+    get desc() {
+      return tr(
+        `Vs ${label} at HP ≥ 50%: guaranteed follow-up, foe can't follow up.`,
+        `Против ${label} при HP ≥ 50 %: гарантированная двойная, враг без двойной.`
+      )
+    },
     slot: "b",
     tier: 2,
     spCost: 200,
@@ -30,7 +36,7 @@ export const PASSIVES: readonly PassiveDef[] = [
   /* ---------- A ---------- */
   {
     id: "a_atk3",
-    name: "Острый коготь",
+    get name() { return tr("Sharp Claw", "Острый коготь") },
     desc: "+3 Str/Mag.",
     slot: "a",
     tier: 1,
@@ -40,7 +46,7 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_spd3",
-    name: "Быстрые лапы",
+    get name() { return tr("Quick Paws", "Быстрые лапы") },
     desc: "+3 Spd.",
     slot: "a",
     tier: 1,
@@ -50,7 +56,7 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_def3",
-    name: "Крепкая шкура",
+    get name() { return tr("Tough Hide", "Крепкая шкура") },
     desc: "+3 Def.",
     slot: "a",
     tier: 1,
@@ -60,7 +66,7 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_res3",
-    name: "Толстый мех",
+    get name() { return tr("Thick Fur", "Толстый мех") },
     desc: "+3 Res.",
     slot: "a",
     tier: 1,
@@ -70,7 +76,7 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_hp5",
-    name: "Жирок",
+    get name() { return tr("Chonk", "Жирок") },
     desc: "+5 HP.",
     slot: "a",
     tier: 1,
@@ -80,8 +86,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_fury",
-    name: "Ярость",
-    desc: "+3 ко всем статам. После боя −6 HP.",
+    get name() { return tr("Fury", "Ярость") },
+    get desc() { return tr("+3 to all stats. −6 HP after combat.", "+3 ко всем статам. После боя −6 HP.") },
     slot: "a",
     tier: 2,
     spCost: 200,
@@ -93,8 +99,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_death_blow",
-    name: "Злобный бросок",
-    desc: "+6 Str/Mag при инициативе.",
+    get name() { return tr("Vicious Pounce", "Злобный бросок") },
+    get desc() { return tr("+6 Str/Mag when initiating.", "+6 Str/Mag при инициативе.") },
     slot: "a",
     tier: 2,
     spCost: 200,
@@ -103,7 +109,7 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_life_death",
-    name: "Жизнь и смерть",
+    get name() { return tr("Life and Death", "Жизнь и смерть") },
     desc: "+5 Str/Mag/Spd, −5 Def/Res.",
     slot: "a",
     tier: 2,
@@ -113,8 +119,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_close_counter",
-    name: "Ближний контрудар",
-    desc: "Контратакует врагов на любой дистанции.",
+    get name() { return tr("Close Counter", "Ближний контрудар") },
+    get desc() { return tr("Counterattacks foes at any range.", "Контратакует врагов на любой дистанции.") },
     slot: "a",
     tier: 3,
     spCost: 300,
@@ -124,8 +130,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "a_distant_counter",
-    name: "Дальний контрудар",
-    desc: "Контратакует врагов на любой дистанции.",
+    get name() { return tr("Distant Counter", "Дальний контрудар") },
+    get desc() { return tr("Counterattacks foes at any range.", "Контратакует врагов на любой дистанции.") },
     slot: "a",
     tier: 3,
     spCost: 300,
@@ -137,8 +143,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   /* ---------- B ---------- */
   {
     id: "b_desperation",
-    name: "Отчаяние",
-    desc: "При HP ≤ 75 % и инициативе двойная атака идёт сразу за первой.",
+    get name() { return tr("Desperation", "Отчаяние") },
+    get desc() { return tr("When initiating at HP ≤ 75%, the follow-up attack lands right after the first.", "При HP ≤ 75 % и инициативе двойная атака идёт сразу за первой.") },
     slot: "b",
     tier: 2,
     spCost: 200,
@@ -147,8 +153,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "b_vantage",
-    name: "Первым бью",
-    desc: "При HP ≤ 75 % контратакует до удара врага.",
+    get name() { return tr("Strike First", "Первым бью") },
+    get desc() { return tr("At HP ≤ 75%, counterattacks before the foe strikes.", "При HP ≤ 75 % контратакует до удара врага.") },
     slot: "b",
     tier: 2,
     spCost: 200,
@@ -157,8 +163,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "b_quick_riposte",
-    name: "Ответка",
-    desc: "При HP ≥ 70 % и обороне — гарантированная двойная атака.",
+    get name() { return tr("Payback", "Ответка") },
+    get desc() { return tr("When defending at HP ≥ 70%: guaranteed follow-up attack.", "При HP ≥ 70 % и обороне — гарантированная двойная атака.") },
     slot: "b",
     tier: 2,
     spCost: 200,
@@ -169,8 +175,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "b_pass",
-    name: "Проскользнуть",
-    desc: "Проходит сквозь врагов.",
+    get name() { return tr("Slip Through", "Проскользнуть") },
+    get desc() { return tr("Moves through foes.", "Проходит сквозь врагов.") },
     slot: "b",
     tier: 2,
     spCost: 200,
@@ -182,8 +188,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   breaker("axe"),
   {
     id: "b_seal_atk",
-    name: "Метка когтя",
-    desc: "После боя −7 Str/Mag врагу до его следующего действия.",
+    get name() { return tr("Claw Mark", "Метка когтя") },
+    get desc() { return tr("After combat, the foe gets −7 Str/Mag until its next action.", "После боя −7 Str/Mag врагу до его следующего действия.") },
     slot: "b",
     tier: 1,
     spCost: 120,
@@ -195,8 +201,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "b_renewal",
-    name: "Передышка",
-    desc: "В начале каждого нечётного хода +10 HP.",
+    get name() { return tr("Breather", "Передышка") },
+    get desc() { return tr("+10 HP at the start of every odd turn.", "В начале каждого нечётного хода +10 HP.") },
     slot: "b",
     tier: 2,
     spCost: 200,
@@ -209,8 +215,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   /* ---------- C ---------- */
   {
     id: "c_hone_atk",
-    name: "Вой атаки",
-    desc: "В начале хода +4 Str/Mag соседним союзникам.",
+    get name() { return tr("Attack Howl", "Вой атаки") },
+    get desc() { return tr("At turn start, adjacent allies get +4 Str/Mag.", "В начале хода +4 Str/Mag соседним союзникам.") },
     slot: "c",
     tier: 1,
     spCost: 120,
@@ -222,8 +228,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_hone_spd",
-    name: "Вой скорости",
-    desc: "В начале хода +4 Spd соседним союзникам.",
+    get name() { return tr("Speed Howl", "Вой скорости") },
+    get desc() { return tr("At turn start, adjacent allies get +4 Spd.", "В начале хода +4 Spd соседним союзникам.") },
     slot: "c",
     tier: 1,
     spCost: 120,
@@ -235,8 +241,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_hone_def",
-    name: "Вой защиты",
-    desc: "В начале хода +4 Def соседним союзникам.",
+    get name() { return tr("Defense Howl", "Вой защиты") },
+    get desc() { return tr("At turn start, adjacent allies get +4 Def.", "В начале хода +4 Def соседним союзникам.") },
     slot: "c",
     tier: 1,
     spCost: 120,
@@ -248,8 +254,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_threaten_def",
-    name: "Угроза защите",
-    desc: "В начале хода −5 Def врагам в 2 клетках.",
+    get name() { return tr("Threaten Defense", "Угроза защите") },
+    get desc() { return tr("At turn start, foes within 2 tiles get −5 Def.", "В начале хода −5 Def врагам в 2 клетках.") },
     slot: "c",
     tier: 2,
     spCost: 200,
@@ -261,8 +267,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_threaten_atk",
-    name: "Угроза атаке",
-    desc: "В начале хода −5 Str/Mag врагам в 2 клетках.",
+    get name() { return tr("Threaten Attack", "Угроза атаке") },
+    get desc() { return tr("At turn start, foes within 2 tiles get −5 Str/Mag.", "В начале хода −5 Str/Mag врагам в 2 клетках.") },
     slot: "c",
     tier: 2,
     spCost: 200,
@@ -274,8 +280,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_spur_atk",
-    name: "Шерсть к шерсти",
-    desc: "Соседние союзники получают +3 Str/Mag в бою.",
+    get name() { return tr("Fur to Fur", "Шерсть к шерсти") },
+    get desc() { return tr("Adjacent allies get +3 Str/Mag in combat.", "Соседние союзники получают +3 Str/Mag в бою.") },
     slot: "c",
     tier: 1,
     spCost: 120,
@@ -284,8 +290,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_drive_spd",
-    name: "Стая",
-    desc: "Союзники в 2 клетках получают +3 Spd в бою.",
+    get name() { return tr("Pack", "Стая") },
+    get desc() { return tr("Allies within 2 tiles get +3 Spd in combat.", "Союзники в 2 клетках получают +3 Spd в бою.") },
     slot: "c",
     tier: 2,
     spCost: 200,
@@ -294,8 +300,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_savage_blow",
-    name: "Запах крови",
-    desc: "При инициативе после боя 7 урона врагам в 2 клетках от цели.",
+    get name() { return tr("Scent of Blood", "Запах крови") },
+    get desc() { return tr("When initiating, after combat deals 7 damage to foes within 2 tiles of the target.", "При инициативе после боя 7 урона врагам в 2 клетках от цели.") },
     slot: "c",
     tier: 2,
     spCost: 200,
@@ -311,8 +317,8 @@ export const PASSIVES: readonly PassiveDef[] = [
   },
   {
     id: "c_breath_of_life",
-    name: "Дыхание стаи",
-    desc: "При инициативе после боя +7 HP соседним союзникам.",
+    get name() { return tr("Breath of the Pack", "Дыхание стаи") },
+    get desc() { return tr("When initiating, after combat adjacent allies recover 7 HP.", "При инициативе после боя +7 HP соседним союзникам.") },
     slot: "c",
     tier: 2,
     spCost: 200,

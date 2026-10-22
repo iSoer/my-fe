@@ -74,10 +74,10 @@ describe("пояснения классов", () => {
     }
   })
   it("роли совпадают с механикой: Dancer танцует, Priest лечит, латы — танк, базовые — универсалы", () => {
-    expect(classInfo("dancer").role).toBe("Танцор")
-    expect(classInfo("priest").role).toBe("Лекарь")
-    expect(classInfo("armored-knight").role).toBe("Танк")
-    expect(classInfo("commoner").role).toBe("Универсал")
+    expect(classInfo("dancer").role).toBe("Dancer")
+    expect(classInfo("priest").role).toBe("Healer")
+    expect(classInfo("armored-knight").role).toBe("Tank")
+    expect(classInfo("commoner").role).toBe("All-rounder")
     expect(classInfo("commoner").bonus).toEqual([])
     expect(classInfo("light-cavalry").moveRange).toBe(3)
     expect(classInfo("wing-soldier").moveLabel).toBe("Pegasus")

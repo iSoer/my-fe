@@ -1,6 +1,7 @@
 import { useStore } from "@nanostores/react"
 import { $profile } from "@game/state/save"
 import { useCountUp } from "../lib/animate"
+import { tr } from "@game/i18n"
 
 function Res({ icon, value, title }: { icon: string, value: number, title: string }) {
   const shown = useCountUp(value, 600)
@@ -20,8 +21,8 @@ export function ResourceBar() {
   const p = useStore($profile)
   return (
     <div className="resources">
-      <Res icon="✦" value={p.glory} title="Слава" />
-      <Res icon="🦴" value={p.treats} title="Вкусняшки" />
+      <Res icon="✦" value={p.glory} title={tr("Glory", "Слава")} />
+      <Res icon="🦴" value={p.treats} title={tr("Treats", "Вкусняшки")} />
     </div>
   )
 }

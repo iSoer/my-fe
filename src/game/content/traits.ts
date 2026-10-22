@@ -1,38 +1,39 @@
 import type { TraitDef } from "@game/core/skills/types"
 import { alliesWithin, foesWithin, hpPct, neighbors, terrainAt } from "@game/core/battle/query"
 import type { Effect } from "@game/core/types"
+import { tr } from "@game/i18n"
 
 export const TRAITS: readonly TraitDef[] = [
   {
     id: "t_box_lover",
-    name: "Коробкофил",
-    desc: "+3 Def/Res, стоя на Укрытии.",
+    get name() { return tr("Box Lover", "Коробкофил") },
+    get desc() { return tr("+3 Def/Res while standing on Cover.", "+3 Def/Res, стоя на Укрытии.") },
     hooks: {
       combatStatMod: ctx => (terrainAt(ctx.state, ctx.self.bu.pos) === "cover" ? { def: 3, res: 3 } : undefined)
     }
   },
   {
     id: "t_pigeon_hunter",
-    name: "Охотник на голубей",
-    desc: "×1.3 урона по flier.",
+    get name() { return tr("Pigeon Hunter", "Охотник на голубей") },
+    get desc() { return tr("×1.3 damage vs flier.", "×1.3 урона по flier.") },
     hooks: { damageMultiplier: ctx => (ctx.foe.cls.moveType === "flier" ? 1.3 : 1) }
   },
   {
     id: "t_berserk",
-    name: "Берсерк",
-    desc: "+4 Str/Mag при HP < 50 %.",
+    get name() { return tr("Berserker", "Берсерк") },
+    get desc() { return tr("+4 Str/Mag when HP < 50%.", "+4 Str/Mag при HP < 50 %.") },
     hooks: { combatStatMod: ctx => (hpPct(ctx.self.bu) < 0.5 ? { atk: 4 } : undefined) }
   },
   {
     id: "t_coward",
-    name: "Трус",
-    desc: "−2 Str/Mag всегда, +4 Spd при HP < 50 %.",
+    get name() { return tr("Coward", "Трус") },
+    get desc() { return tr("−2 Str/Mag always, +4 Spd when HP < 50%.", "−2 Str/Mag всегда, +4 Spd при HP < 50 %.") },
     hooks: { statBonus: { atk: -2 }, combatStatMod: ctx => (hpPct(ctx.self.bu) < 0.5 ? { spd: 4 } : undefined) }
   },
   {
     id: "t_hydrophobe",
-    name: "Боязнь воды",
-    desc: "−2 ко всем статам рядом с водой.",
+    get name() { return tr("Hydrophobe", "Боязнь воды") },
+    get desc() { return tr("−2 to all stats next to water.", "−2 ко всем статам рядом с водой.") },
     hooks: {
       combatStatMod: ctx =>
         neighbors(ctx.self.bu.pos).some(p => terrainAt(ctx.state, p) === "water")
@@ -42,8 +43,8 @@ export const TRAITS: readonly TraitDef[] = [
   },
   {
     id: "t_spare_life",
-    name: "Запасная жизнь",
-    desc: "Раз за бой переживает смертельный удар с 1 HP. Только коты.",
+    get name() { return tr("Spare Life", "Запасная жизнь") },
+    get desc() { return tr("Once per battle, survives a lethal hit with 1 HP. Cats only.", "Раз за бой переживает смертельный удар с 1 HP. Только коты.") },
     onlySpecies: "cat",
     rare: true,
     hooks: {
@@ -56,8 +57,8 @@ export const TRAITS: readonly TraitDef[] = [
   },
   {
     id: "t_loyal",
-    name: "Верный пёс",
-    desc: "+3 ко всем статам, если соседний союзник ранен. Только псы.",
+    get name() { return tr("Loyal Hound", "Верный пёс") },
+    get desc() { return tr("+3 to all stats if an adjacent ally is wounded. Dogs only.", "+3 ко всем статам, если соседний союзник ранен. Только псы.") },
     onlySpecies: "dog",
     hooks: {
       combatStatMod: ctx =>
@@ -68,32 +69,32 @@ export const TRAITS: readonly TraitDef[] = [
   },
   {
     id: "t_nocturnal",
-    name: "Ночной",
-    desc: "+2 Spd в Подвале.",
+    get name() { return tr("Night Owl", "Ночной") },
+    get desc() { return tr("+2 Spd in the Basement.", "+2 Spd в Подвале.") },
     hooks: { combatStatMod: ctx => (ctx.state.map.biomeId === "basement" ? { spd: 2 } : undefined) }
   },
-  { id: "t_glutton", name: "Прожорливый", desc: "+10 % Вкусняшек с боя.", hooks: { treatsMultiplier: 1.1 } },
-  { id: "t_lazy", name: "Ленивый", desc: "−1 движение, +4 Def.", hooks: { moveBonus: -1, statBonus: { def: 4 } } },
+  { id: "t_glutton", get name() { return tr("Glutton", "Прожорливый") }, get desc() { return tr("+10% Treats from battles.", "+10 % Вкусняшек с боя.") }, hooks: { treatsMultiplier: 1.1 } },
+  { id: "t_lazy", get name() { return tr("Lazy", "Ленивый") }, get desc() { return tr("−1 move, +4 Def.", "−1 движение, +4 Def.") }, hooks: { moveBonus: -1, statBonus: { def: 4 } } },
   {
     id: "t_loud",
-    name: "Громкий",
-    desc: "В начале хода −3 Str/Mag соседним врагам.",
+    get name() { return tr("Loud", "Громкий") },
+    get desc() { return tr("At turn start, −3 Str/Mag to adjacent foes.", "В начале хода −3 Str/Mag соседним врагам.") },
     hooks: {
       onTurnStart: (state, self) =>
         foesWithin(state, self, 1).map((f): Effect => ({ type: "debuff", unitId: f.unitId, stats: { atk: -3 } }))
     }
   },
-  { id: "t_mumbler", name: "Мямля", desc: "+2 Res.", hooks: { statBonus: { res: 2 } } },
+  { id: "t_mumbler", get name() { return tr("Mumbler", "Мямля") }, desc: "+2 Res.", hooks: { statBonus: { res: 2 } } },
   {
     id: "t_biter",
-    name: "Кусачий",
-    desc: "Первый удар в бою +3 урона.",
+    get name() { return tr("Bitey", "Кусачий") },
+    get desc() { return tr("+3 damage on the first strike in combat.", "Первый удар в бою +3 урона.") },
     hooks: { flatDamage: (_ctx, s) => (s.isFirstStrike ? 3 : 0) }
   },
   {
     id: "t_vengeful",
-    name: "Злопамятный",
-    desc: "+5 Str/Mag против убийцы союзника до конца боя.",
+    get name() { return tr("Vengeful", "Злопамятный") },
+    get desc() { return tr("+5 Str/Mag vs an ally's killer for the rest of the battle.", "+5 Str/Mag против убийцы союзника до конца боя.") },
     hooks: {
       onAllyDeath: (_state, self, _dead, killer) =>
         killer ? [{ type: "flag", unitId: self.unitId, key: `vengeance:${killer.unitId}`, value: 1 }] : [],
@@ -102,22 +103,22 @@ export const TRAITS: readonly TraitDef[] = [
   },
   {
     id: "t_homebody",
-    name: "Домашний",
-    desc: "−2 Str/Mag, +3 HP, +20 % XP.",
+    get name() { return tr("Homebody", "Домашний") },
+    get desc() { return tr("−2 Str/Mag, +3 HP, +20% XP.", "−2 Str/Mag, +3 HP, +20 % XP.") },
     hooks: { statBonus: { atk: -2, hp: 3 }, xpMultiplier: 1.2 }
   },
-  { id: "t_stray", name: "Бродяга", desc: "Заросли не замедляют.", hooks: { ignoreForestSlow: true } },
+  { id: "t_stray", get name() { return tr("Stray", "Бродяга") }, get desc() { return tr("Not slowed by Thicket.", "Заросли не замедляют.") }, hooks: { ignoreForestSlow: true } },
   {
     id: "t_tiny",
-    name: "Мелкий",
-    desc: "+2 Spd, −1 Def. Только мыши.",
+    get name() { return tr("Tiny", "Мелкий") },
+    get desc() { return tr("+2 Spd, −1 Def. Mice only.", "+2 Spd, −1 Def. Только мыши.") },
     onlySpecies: "mouse",
     hooks: { statBonus: { spd: 2, def: -1 } }
   },
   {
     id: "t_cheese",
-    name: "Сырный нюх",
-    desc: "+15 % Вкусняшек с боя. Только мыши.",
+    get name() { return tr("Cheese Nose", "Сырный нюх") },
+    get desc() { return tr("+15% Treats from battles. Mice only.", "+15 % Вкусняшек с боя. Только мыши.") },
     onlySpecies: "mouse",
     hooks: { treatsMultiplier: 1.15 }
   }

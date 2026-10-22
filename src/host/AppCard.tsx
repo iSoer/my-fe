@@ -12,15 +12,18 @@ import {
   storageEstimate,
 } from './pwa';
 import { cloudAvailable, isTelegram } from './telegram';
+import { $lang, tr } from '@game/i18n';
 
 function fmtMb(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} ${tr('MB', 'МБ')}`;
 }
 
 /** Секция «Приложение» в Настройках игры: офлайн, облако Telegram, установка и обновление PWA. */
 export function AppCard() {
   // installMode() читает атомы — подписываемся, чтобы перерисоваться при их смене.
   useStore($installPrompt);
+  // Секция хоста может не перемонтироваться при смене языка — подписываемся сами.
+  useStore($lang);
   const standalone = useStore($isStandalone);
   const online = useStore($online);
   const updateReady = useStore($updateReady);
@@ -34,54 +37,54 @@ export function AppCard() {
 
   return (
     <div className="card stack pop-in">
-      <div className="section-title">📲 Приложение</div>
+      <div className="section-title">📲 {tr('App', 'Приложение')}</div>
       <div className="stats-table">
-        <span className="k">Офлайн-режим</span>
-        <span className="v">{offline ? 'готов' : 'нет'}</span>
-        <span className="k">Сеть</span>
-        <span className="v">{online ? 'есть' : 'нет'}</span>
+        <span className="k">{tr('Offline mode', 'Офлайн-режим')}</span>
+        <span className="v">{offline ? tr('ready', 'готов') : tr('no', 'нет')}</span>
+        <span className="k">{tr('Network', 'Сеть')}</span>
+        <span className="v">{online ? tr('online', 'есть') : tr('offline', 'нет')}</span>
         {isTelegram && (
           <>
-            <span className="k">Облако Telegram</span>
-            <span className="v">{cloudAvailable() ? 'сейв синхронизируется' : 'недоступно'}</span>
+            <span className="k">{tr('Telegram cloud', 'Облако Telegram')}</span>
+            <span className="v">{cloudAvailable() ? tr('save is syncing', 'сейв синхронизируется') : tr('unavailable', 'недоступно')}</span>
           </>
         )}
         {storage && (
           <>
-            <span className="k">Занято</span>
+            <span className="k">{tr('Storage used', 'Занято')}</span>
             <span className="v">
               {fmtMb(storage.usage)}
-              {storage.persisted ? ' · защищено' : ''}
+              {storage.persisted ? tr(' · protected', ' · защищено') : ''}
             </span>
           </>
         )}
         {!isTelegram && (
           <>
-            <span className="k">Установлено</span>
-            <span className="v">{standalone ? 'да' : 'нет'}</span>
+            <span className="k">{tr('Installed', 'Установлено')}</span>
+            <span className="v">{standalone ? tr('yes', 'да') : tr('no', 'нет')}</span>
           </>
         )}
       </div>
       {updateReady && (
         <Button block primary icon="⬆️" onClick={applyUpdate}>
-          Обновить до новой версии
+          {tr('Update to the new version', 'Обновить до новой версии')}
         </Button>
       )}
       {mode === 'prompt' && (
         <Button block icon="📲" onClick={() => void promptInstall()}>
-          Установить на телефон
+          {tr('Install on your phone', 'Установить на телефон')}
         </Button>
       )}
       {mode === 'ios' && (
         <>
           <Button block icon="📲" onClick={() => setIosHelp(!iosHelp)}>
-            Как установить на iPhone
+            {tr('How to install on iPhone', 'Как установить на iPhone')}
           </Button>
           {iosHelp && (
             <ol className="pwa-steps muted small">
-              <li>Откройте игру в Safari.</li>
-              <li>Нажмите «Поделиться» (квадрат со стрелкой).</li>
-              <li>Выберите «На экран „Домой“».</li>
+              <li>{tr('Open the game in Safari.', 'Откройте игру в Safari.')}</li>
+              <li>{tr('Tap “Share” (the square with an arrow).', 'Нажмите «Поделиться» (квадрат со стрелкой).')}</li>
+              <li>{tr('Choose “Add to Home Screen”.', 'Выберите «На экран „Домой“».')}</li>
             </ol>
           )}
         </>

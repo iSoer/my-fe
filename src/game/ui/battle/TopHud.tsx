@@ -5,6 +5,7 @@ import { biomeDef } from "@game/content/biomes"
 import { $pauseOpen } from "../lib/pause"
 import { haptic } from "@game/platform/haptics"
 import { setFastForward, toggleDanger, type BattleUiState } from "@game/state/battleUi"
+import { tr } from "@game/i18n"
 
 /** Верхняя полоса HUD поверх поля: фаза, счётчик походивших, биом и кнопки. */
 export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState }) {
@@ -17,34 +18,38 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
     <div className="bf-hud-row">
       <div key={`${battle.turn}-${battle.phase}`} className={`bf-phase ${isPlayer ? "player" : "enemy"}`}>
         <span className="bf-phase-turn">
-          Ход
+          {tr("Turn", "Ход")}
           {battle.turn}
         </span>
-        <span className="bf-phase-name">{isPlayer ? "ВАША ФАЗА" : "ФАЗА ВРАГА"}</span>
+        <span className="bf-phase-name">{isPlayer ? tr("YOUR PHASE", "ВАША ФАЗА") : tr("ENEMY PHASE", "ФАЗА ВРАГА")}</span>
       </div>
       {isPlayer && players.length > 0 && (
         <span
           className={`bf-chip bf-acted ${acted === players.length ? "done" : ""}`}
-          title="Сколько бойцов уже действовали"
+          title={tr("Fighters who have already acted", "Сколько бойцов уже действовали")}
         >
           {acted}
           /
           {players.length}
           {" "}
-          ходили
+          {tr("moved", "ходили")}
         </span>
       )}
       <span className="bf-grow" />
       {battle.stats.loot > 0 && (
         <span
           className="bf-chip bf-loot"
-          title={`Добыча под угрозой: целиком — только при победе, при поражении — ${Math.round(lootShare("defeat") * 100)}%, `
-            + `при отступлении — ${Math.round(lootShare("retreat") * 100)}%`}
+          title={tr(
+            `Loot at risk: all of it only on victory, ${Math.round(lootShare("defeat") * 100)}% on defeat, `
+            + `${Math.round(lootShare("retreat") * 100)}% on retreat`,
+            `Добыча под угрозой: целиком — только при победе, при поражении — ${Math.round(lootShare("defeat") * 100)}%, `
+            + `при отступлении — ${Math.round(lootShare("retreat") * 100)}%`
+          )}
         >
           🦴
           {" "}
           {battle.stats.loot}
-          <small className="bf-loot-risk">под угрозой</small>
+          <small className="bf-loot-risk">{tr("at risk", "под угрозой")}</small>
         </span>
       )}
       <span className="bf-chip bf-biome">{biome.name}</span>
@@ -52,8 +57,8 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
         <button
           type="button"
           className={`bf-icon ${ui.fastForward ? "active" : ""}`}
-          aria-label="Ускорить"
-          title="Ускорить ход противника"
+          aria-label={tr("Fast forward", "Ускорить")}
+          title={tr("Speed up the enemy turn", "Ускорить ход противника")}
           onClick={() => {
             haptic("select")
             setFastForward(!ui.fastForward)
@@ -65,8 +70,8 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
       <button
         type="button"
         className={`bf-icon ${ui.dangerOn ? "active warn" : ""}`}
-        aria-label="Зона опасности"
-        title="Показать зону опасности"
+        aria-label={tr("Danger zone", "Зона опасности")}
+        title={tr("Show danger zone", "Показать зону опасности")}
         onClick={() => {
           haptic("select")
           toggleDanger()
@@ -77,7 +82,7 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
       <button
         type="button"
         className="bf-icon"
-        aria-label="Пауза"
+        aria-label={tr("Pause", "Пауза")}
         onClick={() => {
           haptic("select")
           $pauseOpen.set(true)

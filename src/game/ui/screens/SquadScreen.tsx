@@ -22,9 +22,16 @@ import { classRoleText } from "../components/ClassInfo"
 import { atkLabel, statTotal } from "../lib/format"
 import { stagger } from "../lib/animate"
 import { DIFF_STYLE } from "./BattleSetupScreen"
+import { tr } from "@game/i18n"
 import "../squad.css"
 
-const STANCE_LABEL: Record<Stance, string> = { hold: "ждёт", advance: "наступает", guard: "охраняет" }
+function stanceLabel(s: Stance): string {
+  switch (s) {
+    case "hold": return tr("waiting", "ждёт")
+    case "advance": return tr("advancing", "наступает")
+    case "guard": return tr("guarding", "охраняет")
+  }
+}
 
 const power = (units: UnitInstance[]): number => units.reduce((a, u) => a + statTotal(visibleStats(u)), 0)
 
@@ -44,8 +51,8 @@ function FoeCard({ unit, note, index, dim, onOpen }: {
       style={stagger(index, 40)}
       onClick={() => onOpen(unit)}
     >
-      <span className="foe-lvl">{`Ур.${unit.level}`}</span>
-      {unit.isBoss && <span className="foe-boss" aria-label="Вожак">👑</span>}
+      <span className="foe-lvl">{`${tr("Lv.", "Ур.")}${unit.level}`}</span>
+      {unit.isBoss && <span className="foe-boss" aria-label={tr("Leader", "Вожак")}>👑</span>}
       <UnitAvatar unit={unit} size="md" animated={false} />
       <b className="foe-name">{displayName(unit)}</b>
       <span className="foe-role">{classRoleText(unit.classId)}</span>
@@ -61,7 +68,7 @@ function SquadSlot({ unit, slot, onOpen }: { unit?: UnitInstance, slot: number, 
     return (
       <button type="button" className="squad-slot empty" onClick={() => onOpen(slot)}>
         <span className="squad-plus">+</span>
-        <span className="small">Добавить бойца</span>
+        <span className="small">{tr("Add fighter", "Добавить бойца")}</span>
       </button>
     )
   const st = visibleStats(unit)
@@ -70,10 +77,10 @@ function SquadSlot({ unit, slot, onOpen }: { unit?: UnitInstance, slot: number, 
       <span className="squad-num">{slot + 1}</span>
       <UnitAvatar unit={unit} size="md" friendly />
       <b className="squad-name">{displayName(unit)}</b>
-      <span className="small muted">{`${unitClassName(unit)} · Ур.${unit.level}`}</span>
+      <span className="small muted">{`${unitClassName(unit)} · ${tr("Lv.", "Ур.")}${unit.level}`}</span>
       <span className="small">{classRoleText(unit.classId)}</span>
       <span className="squad-stats">{`HP ${st.hp} · ${atkLabel(unit)} ${st.atk} · Spd ${st.spd}`}</span>
-      <span className="squad-swap">Заменить ›</span>
+      <span className="squad-swap">{tr("Swap ›", "Заменить ›")}</span>
     </button>
   )
 }
@@ -103,7 +110,11 @@ export function SquadScreen() {
   const squadPower = power(squad)
   const ratio = enemyPower > 0 ? squadPower / enemyPower : 1
   const ratioLabel
-    = ratio >= 1.1 ? "Преимущество у вас" : ratio >= 0.85 ? "Силы равны" : ratio >= 0.6 ? "Будет тяжело" : "Самоубийство"
+    = ratio >= 1.1
+      ? tr("You have the edge", "Преимущество у вас")
+      : ratio >= 0.85
+        ? tr("Evenly matched", "Силы равны")
+        : ratio >= 0.6 ? tr("This will hurt", "Будет тяжело") : tr("Suicide", "Самоубийство")
   const ratioClass = ratio >= 1.0 ? "ok" : ratio >= 0.75 ? "warn" : "danger"
   const barClass = ratio >= 1.0 ? "good" : ratio >= 0.75 ? "mid" : "bad"
   const diff = difficultyDef(pending.difficulty)
@@ -116,44 +127,44 @@ export function SquadScreen() {
   const pick = (unitId: string | null) => {
     if (slot === null) return
     const r = assignSquadSlot(slot, unitId)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
     setSlot(null)
   }
   const onPack = (id: string, delta: number) => {
     const r = setPackAction({ ...pack, [id]: Math.max(0, (pack[id] ?? 0) + delta) })
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
   }
   const onStart = () => {
-    if (squad.length === 0) return toast("Выберите бойцов в отряд", true)
+    if (squad.length === 0) return toast(tr("Pick fighters for the squad", "Выберите бойцов в отряд"), true)
     const r = startBattle(squad.map(u => u.id))
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("heavy")
     navigate("/battle", true)
   }
 
   return (
     <div className="screen">
-      <TopBar title="Вылазка · 2/2" right={<ResourceBar />} onBack={() => navigate("/battle/setup", true)} />
+      <TopBar title={tr("Sortie · 2/2", "Вылазка · 2/2")} right={<ResourceBar />} onBack={() => navigate("/battle/setup", true)} />
       <div className="screen-body">
         <div className="row wrap" style={{ gap: 6 }}>
           <span className="chip">{`${DIFF_STYLE[pending.difficulty].icon} ${diff.name}`}</span>
           <span className="chip">{biomeDef(map.biomeId).name}</span>
-          {map.objective === "killBoss" && <span className="chip red">цель: убить вожака</span>}
+          {map.objective === "killBoss" && <span className="chip red">{tr("goal: kill the leader", "цель: убить вожака")}</span>}
         </div>
 
-        <div className="section-title">{`Враги ждут: ${enemies.length}`}</div>
+        <div className="section-title">{tr(`Enemies waiting: ${enemies.length}`, `Враги ждут: ${enemies.length}`)}</div>
         <div className="foe-grid">
           {enemies.map((e, i) => (
-            <FoeCard key={e.unit.id} unit={e.unit} index={i} note={STANCE_LABEL[e.stance]} onOpen={setFoe} />
+            <FoeCard key={e.unit.id} unit={e.unit} index={i} note={stanceLabel(e.stance)} onOpen={setFoe} />
           ))}
         </div>
         {waves.map(w => (
           <div key={w.turn} className="stack" style={{ gap: 8 }}>
             <div className="muted small">
-              {`Подкрепление на ходу ${w.turn}`}
-              {pending.difficulty === "nightmare" ? " (в бою без предупреждения)" : ""}
+              {tr(`Reinforcements on turn ${w.turn}`, `Подкрепление на ходу ${w.turn}`)}
+              {pending.difficulty === "nightmare" ? tr(" (no warning in battle)", " (в бою без предупреждения)") : ""}
             </div>
             <div className="foe-grid">
               {w.units.map((x, i) => <FoeCard key={x.unit.id} unit={x.unit} index={i} dim onOpen={setFoe} />)}
@@ -161,8 +172,8 @@ export function SquadScreen() {
           </div>
         ))}
 
-        <div className="section-title">{`Ваш отряд ${squad.length}/${SQUAD_SIZE}`}</div>
-        <p className="muted small">Нажмите на бойца, чтобы заменить его кем-то из ростера.</p>
+        <div className="section-title">{tr(`Your squad ${squad.length}/${SQUAD_SIZE}`, `Ваш отряд ${squad.length}/${SQUAD_SIZE}`)}</div>
+        <p className="muted small">{tr("Tap a fighter to swap them with someone from the roster.", "Нажмите на бойца, чтобы заменить его кем-то из ростера.")}</p>
         <div className="squad-grid">
           {Array.from({ length: SQUAD_SIZE }, (_, i) => (
             <SquadSlot key={squad[i]?.id ?? `empty-${i}`} unit={squad[i]} slot={i} onOpen={setSlot} />
@@ -171,18 +182,18 @@ export function SquadScreen() {
 
         <div className="card power-card">
           <div className="row between">
-            <span>Сила отряда</span>
+            <span>{tr("Squad power", "Сила отряда")}</span>
             <b className={ratioClass}>{ratioLabel}</b>
           </div>
-          <div className="muted small">{`Ваши ${squadPower} против ${enemyPower} у врагов (с подкреплениями)`}</div>
+          <div className="muted small">{tr(`Yours ${squadPower} vs ${enemyPower} for the enemy (with reinforcements)`, `Ваши ${squadPower} против ${enemyPower} у врагов (с подкреплениями)`)}</div>
           <div className="bar" style={{ marginTop: 8 }}>
             <div className={barClass} style={{ width: `${Math.min(100, ratio * 50)}%` }} />
           </div>
         </div>
 
-        <div className="section-title">{`Рюкзак ${packed}/${ITEMS.packSize}`}</div>
+        <div className="section-title">{tr(`Pack ${packed}/${ITEMS.packSize}`, `Рюкзак ${packed}/${ITEMS.packSize}`)}</div>
         {owned.length === 0
-          ? <p className="muted small">Расходников нет — пластыри и аптечки продаёт Тётушка Сырница в Лавке.</p>
+          ? <p className="muted small">{tr("No consumables — Auntie Brie sells bandages and medkits at the Shop.", "Расходников нет — пластыри и аптечки продаёт Тётушка Сырница в Лавке.")}</p>
           : (
               <div className="stack">
                 {owned.map(c => (
@@ -190,7 +201,7 @@ export function SquadScreen() {
                     <span className="store-ico" aria-hidden="true">{c.icon}</span>
                     <div className="grow" style={{ minWidth: 0 }}>
                       <b>{c.name}</b>
-                      <div className="muted small">{`${c.desc} В инвентаре: ${itemCount(save.inventory, c.id)}`}</div>
+                      <div className="muted small">{`${c.desc} ${tr("In inventory:", "В инвентаре:")} ${itemCount(save.inventory, c.id)}`}</div>
                     </div>
                     <Button sm ghost disabled={!pack[c.id]} onClick={() => onPack(c.id, -1)}>−</Button>
                     <b className="pack-count">{pack[c.id] ?? 0}</b>
@@ -206,10 +217,10 @@ export function SquadScreen() {
               </div>
             )}
 
-        <div className="warning-box">☠️ Павшие не возвращаются вместе со снаряжением. Поражение — половина добычи.</div>
+        <div className="warning-box">{tr("☠️ The fallen don’t come back — and neither does their gear. Defeat — half the loot.", "☠️ Павшие не возвращаются вместе со снаряжением. Поражение — половина добычи.")}</div>
         <div className="sticky-cta">
           <Button big primary block pulse={squad.length > 0} icon="⚔️" onClick={onStart} disabled={squad.length === 0}>
-            {`Начать бой · ${squad.length}/${SQUAD_SIZE}`}
+            {`${tr("Start battle", "Начать бой")} · ${squad.length}/${SQUAD_SIZE}`}
           </Button>
         </div>
       </div>
@@ -217,10 +228,12 @@ export function SquadScreen() {
       <BottomSheet
         open={slot !== null}
         onClose={() => setSlot(null)}
-        title={slotUnit ? `Слот ${(slot ?? 0) + 1}: заменить ${displayName(slotUnit)}` : `Слот ${(slot ?? 0) + 1}: кого взять?`}
+        title={slotUnit
+          ? tr(`Slot ${(slot ?? 0) + 1}: replace ${displayName(slotUnit)}`, `Слот ${(slot ?? 0) + 1}: заменить ${displayName(slotUnit)}`)
+          : tr(`Slot ${(slot ?? 0) + 1}: who’s going?`, `Слот ${(slot ?? 0) + 1}: кого взять?`)}
       >
         <div className="stack">
-          <p className="muted small">Боец из отряда поменяется местами с этим слотом.</p>
+          <p className="muted small">{tr("A fighter already in the squad will swap places with this slot.", "Боец из отряда поменяется местами с этим слотом.")}</p>
           {roster.map((u, i) => {
             const at = squad.findIndex(x => x.id === u.id)
             const here = slotUnit?.id === u.id
@@ -234,21 +247,21 @@ export function SquadScreen() {
                 onClick={() => pick(u.id)}
                 right={
                   here
-                    ? <span className="chip squad">Здесь</span>
-                    : at >= 0 ? <span className="chip">{`Слот ${at + 1}`}</span> : undefined
+                    ? <span className="chip squad">{tr("Here", "Здесь")}</span>
+                    : at >= 0 ? <span className="chip">{tr(`Slot ${at + 1}`, `Слот ${at + 1}`)}</span> : undefined
                 }
               />
             )
           })}
           {slotUnit && (
             <Button block ghost onClick={() => pick(null)}>
-              Убрать из отряда
+              {tr("Remove from squad", "Убрать из отряда")}
             </Button>
           )}
         </div>
       </BottomSheet>
 
-      <BottomSheet open={!!foe} onClose={() => setFoe(null)} title={foe?.isBoss ? "👑 Вожак" : "Враг"}>
+      <BottomSheet open={!!foe} onClose={() => setFoe(null)} title={foe?.isBoss ? tr("👑 Leader", "👑 Вожак") : tr("Enemy", "Враг")}>
         {foe && <UnitDetails unit={foe} compact />}
       </BottomSheet>
       {toastEl}

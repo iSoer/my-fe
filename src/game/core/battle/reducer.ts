@@ -23,6 +23,7 @@ import { levelGains, visibleStats } from "../units"
 import { lootFor } from "../progression"
 import { difficultyDef, SP, XP } from "@game/content/balance"
 import { MAX_LEVEL } from "../types"
+import { tr } from "@game/i18n"
 
 export interface CreateBattleOptions {
   map: MapDef
@@ -296,7 +297,7 @@ function moveUnit(state: BattleState, bu: BattleUnit, to: Pos, events: BattleEve
   if (manhattan(bu.pos, to) === 0) return
   const reach = reachableTiles(state, bu)
   const node = reach.get(posKey(to))
-  if (!node || !node.canStop) throw new Error("клетка недостижима")
+  if (!node || !node.canStop) throw new Error(tr("tile unreachable", "клетка недостижима"))
   const path = pathTo(reach, to)
   bu.pos = { ...to }
   events.push({ type: "moved", unitId: bu.unitId, path })
@@ -304,9 +305,9 @@ function moveUnit(state: BattleState, bu: BattleUnit, to: Pos, events: BattleEve
 
 function validateActor(state: BattleState, unitId: string): BattleUnit {
   const bu = state.units[unitId]
-  if (!bu || !bu.alive) throw new Error("юнит недоступен")
-  if (bu.side !== state.phase) throw new Error("не ваша фаза")
-  if (bu.acted) throw new Error("юнит уже действовал")
+  if (!bu || !bu.alive) throw new Error(tr("unit unavailable", "юнит недоступен"))
+  if (bu.side !== state.phase) throw new Error(tr("not your phase", "не ваша фаза"))
+  if (bu.acted) throw new Error(tr("unit has already acted", "юнит уже действовал"))
   return bu
 }
 
@@ -334,11 +335,11 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
     }
     case "item": {
       const bu = validateActor(state, action.unitId)
-      if (bu.side !== "player") throw new Error("предметы только у отряда")
-      if ((state.pack[action.itemId] ?? 0) <= 0) throw new Error("предмета нет в рюкзаке")
+      if (bu.side !== "player") throw new Error(tr("only the squad can use items", "предметы только у отряда"))
+      if ((state.pack[action.itemId] ?? 0) <= 0) throw new Error(tr("item not in the pack", "предмета нет в рюкзаке"))
       moveUnit(state, bu, action.to, events)
       if (!itemTargetsFrom(state, bu, bu.pos, action.itemId).some(u => u.unitId === action.targetId))
-        throw new Error("цель вне досягаемости")
+        throw new Error(tr("target out of reach", "цель вне досягаемости"))
       const plan = planItem(state, bu, bu.pos, action.targetId, action.itemId)
       for (const h of plan.heals) {
         const u = state.units[h.unitId]
@@ -366,7 +367,7 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       const bu = validateActor(state, action.unitId)
       moveUnit(state, bu, action.to, events)
       const key = posKey(action.wall)
-      if (!wallsFrom(state, bu, bu.pos).some(p => posKey(p) === key)) throw new Error("стена недоступна")
+      if (!wallsFrom(state, bu, bu.pos).some(p => posKey(p) === key)) throw new Error(tr("wall out of reach", "стена недоступна"))
       state.walls[key] = Math.max(0, (state.walls[key] ?? 0) - 1)
       events.push({ type: "wallHit", unitId: bu.unitId, pos: action.wall, hpAfter: state.walls[key] ?? 0 })
       finishAction(state, bu, action.newStance)
@@ -376,7 +377,7 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       const bu = validateActor(state, action.unitId)
       moveUnit(state, bu, action.to, events)
       const plan = planAssist(state, bu.unitId, bu.pos, action.targetId)
-      if (!plan.valid || !plan.assist) throw new Error(plan.reason ?? "Поддержка невозможна")
+      if (!plan.valid || !plan.assist) throw new Error(plan.reason ?? tr("Assist not possible", "Поддержка невозможна"))
       const target = state.units[action.targetId] as BattleUnit
       for (const m of plan.moves) {
         const mu = state.units[m.unitId]
@@ -416,8 +417,8 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       const bu = validateActor(state, action.unitId)
       moveUnit(state, bu, action.to, events)
       const target = state.units[action.targetId]
-      if (!target || !target.alive || target.side === bu.side) throw new Error("цель недоступна")
-      if (!targetsFrom(state, bu, bu.pos).some(t => t.unitId === target.unitId)) throw new Error("цель вне дальности")
+      if (!target || !target.alive || target.side === bu.side) throw new Error(tr("target unavailable", "цель недоступна"))
+      if (!targetsFrom(state, bu, bu.pos).some(t => t.unitId === target.unitId)) throw new Error(tr("target out of range", "цель вне дальности"))
       resolveCombat(state, bu, target, events)
       finishAction(state, bu, action.newStance ?? (bu.side === "enemy" ? "advance" : undefined))
       break

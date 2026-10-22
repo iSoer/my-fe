@@ -23,6 +23,7 @@ import { GLORY_TIERS, LOOT, PRICES, REWARDS, SHOP, XP, gloryTier } from "@game/c
 import { EPITAPHS } from "@game/content/epitaphs"
 import { personalityText } from "@game/content/personalities"
 import { biomeDef } from "@game/content/biomes"
+import { tr } from "@game/i18n"
 
 /* ---------- Цены ---------- */
 
@@ -100,7 +101,10 @@ export function memorialEntry(
     diedAt: now,
     epitaph:
       reason === "released"
-        ? `${unit.name} ушёл${unit.gender === "f" ? "а" : ""} сам${unit.gender === "f" ? "а" : ""}. Никто не остановил.`
+        ? tr(
+            `${unit.name} walked away. Nobody stopped ${unit.gender === "f" ? "her" : "him"}.`,
+            `${unit.name} ушёл${unit.gender === "f" ? "а" : ""} сам${unit.gender === "f" ? "а" : ""}. Никто не остановил.`
+          )
         : epitaphFor(unit, extra.killerName, extra.turn, unit.seed ^ now),
     reason
   }

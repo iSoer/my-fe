@@ -35,11 +35,11 @@ await step('splash → главный экран', async () => {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await pf(() => localStorage.clear());
   await page.reload();
-  await page.getByText('Нажмите, чтобы начать').click({ timeout: 30000 });
-  await page.getByRole('button', { name: /Новая игра/ }).waitFor();
+  await page.getByText('Tap to start').click({ timeout: 30000 });
+  await page.getByRole('button', { name: /New game/ }).waitFor();
 });
 await step('новая игра → деревня', async () => {
-  await page.getByRole('button', { name: /Новая игра/ }).click();
+  await page.getByRole('button', { name: /New game/ }).click();
   await page.locator('.vl-canvas canvas').waitFor({ timeout: 30000 });
   await page.waitForTimeout(1500);
 });
@@ -49,22 +49,22 @@ await step('Лавка: покупка пластырей', async () => {
     window.__pf.save.set({ ...s, profile: { ...s.profile, treats: 500 } });
   });
   await pf(() => window.__pf.village.walkTo('store'));
-  await page.getByRole('button', { name: /Лавка: оружие/ }).click({ timeout: 15000 });
-  await page.getByRole('tab', { name: 'Лечение' }).click();
+  await page.getByRole('button', { name: /Shop: weapons/ }).click({ timeout: 15000 });
+  await page.getByRole('tab', { name: 'Healing' }).click();
   await page.locator('.store-item button').first().click();
   await page.locator('.store-item button').first().click();
   const inv = await pf(() => window.__pf.save.get().inventory);
   if (!inv.itm_bandage) throw new Error(`инвентарь: ${JSON.stringify(inv)}`);
-  await page.getByRole('button', { name: 'Назад' }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
   await page.locator('.vl-canvas canvas').waitFor();
 });
 await step('ворота → вылазка 1/2 и 2/2', async () => {
   await pf(() => window.__pf.village.talk('sorties'));
-  await page.getByRole('button', { name: /Собрать вылазку/ }).click();
-  await page.getByRole('button', { name: /^Далее/ }).click();
+  await page.getByRole('button', { name: /Plan a sortie/ }).click();
+  await page.getByRole('button', { name: /^Next/ }).click();
   await page.locator('.foe-card').first().waitFor();
   await page.locator('.pack-row button', { hasText: '+' }).first().click();
-  await page.getByRole('button', { name: /Начать бой/ }).click();
+  await page.getByRole('button', { name: /Start battle/ }).click();
   await page.locator('#battle-canvas canvas').waitFor({ timeout: 30000 });
   await page.waitForTimeout(2500);
 });
@@ -73,7 +73,7 @@ await step('бой: предмет из рюкзака', async () => {
     () => Object.values(window.__pf.save.get().battle.units).find((u) => u.side === 'player').pos,
   );
   await pf((p) => window.__pf.battle.tapTile(p), pos);
-  await page.getByRole('button', { name: 'Предметы' }).click();
+  await page.getByRole('button', { name: 'Items' }).click();
   await page.locator('.bf-item-target').first().click();
   await page.waitForTimeout(1200);
   const pack = await pf(() => window.__pf.save.get().battle.pack);
@@ -83,19 +83,19 @@ await step('сдача → итоги → деревня', async () => {
   await pf(() => {
     location.hash = '#/';
   });
-  await page.getByRole('button', { name: /Сдаться/ }).click();
-  await page.getByRole('button', { name: 'Сдаться' }).last().click();
-  await page.getByRole('button', { name: /В деревню/ }).click({ timeout: 15000 });
+  await page.getByRole('button', { name: /Surrender/ }).click();
+  await page.getByRole('button', { name: 'Surrender' }).last().click();
+  await page.getByRole('button', { name: /To the village/ }).click({ timeout: 15000 });
   await page.locator('.vl-canvas canvas').waitFor();
 });
 await step('перезагрузка → «Продолжить»', async () => {
   await page.reload();
-  await page.getByText('Нажмите, чтобы начать').click({ timeout: 30000 });
+  await page.getByText('Tap to start').click({ timeout: 30000 });
   await pf(() => {
     location.hash = '#/';
   });
   await page
-    .getByRole('button', { name: /^🏡 Продолжить|Продолжить/ })
+    .getByRole('button', { name: /^🏡 Continue|Continue/ })
     .first()
     .waitFor();
 });

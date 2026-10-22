@@ -6,6 +6,7 @@ import { assistDef } from "@game/content/skills/assists"
 import { specialDef } from "@game/content/skills/specials"
 import { DANCER_CLASS, unitClass } from "@game/content/classes"
 import type { AssistDef } from "../skills/types"
+import { tr } from "@game/i18n"
 
 export interface AssistPlan {
   valid: boolean
@@ -47,14 +48,14 @@ function canStand(state: BattleState, bu: BattleUnit, pos: Pos, ignoreIds: strin
 export function planAssist(state: BattleState, unitId: string, from: Pos, targetId: string): AssistPlan {
   const bu = state.units[unitId]
   const target = state.units[targetId]
-  if (!bu || !target || !bu.alive || !target.alive) return invalid("нет юнита")
-  if (bu.side !== target.side || bu.unitId === target.unitId) return invalid("не союзник")
+  if (!bu || !target || !bu.alive || !target.alive) return invalid(tr("no unit", "нет юнита"))
+  if (bu.side !== target.side || bu.unitId === target.unitId) return invalid(tr("not an ally", "не союзник"))
   const unit = state.roster[unitId]
   const tUnit = state.roster[targetId]
-  if (!unit || !tUnit) return invalid("нет данных")
-  if (!unit.skills.assist) return invalid("нет Поддержки")
+  if (!unit || !tUnit) return invalid(tr("no data", "нет данных"))
+  if (!unit.skills.assist) return invalid(tr("no Assist", "нет Поддержки"))
   const assist = assistDef(unit.skills.assist)
-  if (manhattan(from, target.pos) !== 1) return invalid("цель не рядом")
+  if (manhattan(from, target.pos) !== 1) return invalid(tr("target not adjacent", "цель не рядом"))
 
   const base: AssistPlan = { ...invalid(""), valid: true, assist }
   delete base.reason
@@ -68,26 +69,26 @@ export function planAssist(state: BattleState, unitId: string, from: Pos, target
       return base
     case "swap": {
       if (!canStand(state, self, target.pos, [unitId, targetId]) || !canStand(state, target, from, [unitId, targetId]))
-        return invalid("нельзя поменяться")
+        return invalid(tr("can't swap", "нельзя поменяться"))
       base.moves.push({ unitId, to: target.pos }, { unitId: targetId, to: from })
       return base
     }
     case "reposition": {
       const dest = { x: from.x - dx, y: from.y - dy }
-      if (!canStand(state, target, dest, [unitId, targetId])) return invalid("нет места позади")
+      if (!canStand(state, target, dest, [unitId, targetId])) return invalid(tr("no room behind", "нет места позади"))
       base.moves.push({ unitId: targetId, to: dest })
       return base
     }
     case "drawBack": {
       const dest = { x: from.x - dx, y: from.y - dy }
-      if (!canStand(state, self, dest, [unitId, targetId])) return invalid("некуда отступать")
-      if (!canStand(state, target, from, [unitId, targetId])) return invalid("цель не пройдёт")
+      if (!canStand(state, self, dest, [unitId, targetId])) return invalid(tr("nowhere to retreat", "некуда отступать"))
+      if (!canStand(state, target, from, [unitId, targetId])) return invalid(tr("target can't pass", "цель не пройдёт"))
       base.moves.push({ unitId, to: dest }, { unitId: targetId, to: from })
       return base
     }
     case "pivot": {
       const dest = { x: target.pos.x + dx, y: target.pos.y + dy }
-      if (!canStand(state, self, dest, [unitId, targetId])) return invalid("нет места за союзником")
+      if (!canStand(state, self, dest, [unitId, targetId])) return invalid(tr("no room beyond the ally", "нет места за союзником"))
       base.moves.push({ unitId, to: dest })
       return base
     }
@@ -97,13 +98,13 @@ export function planAssist(state: BattleState, unitId: string, from: Pos, target
       let dest = target.pos
       for (let i = 0; i < steps; i++) {
         dest = { x: dest.x + dx, y: dest.y + dy }
-        if (!canStand(state, target, dest, [unitId, targetId])) return invalid("путь перекрыт")
+        if (!canStand(state, target, dest, [unitId, targetId])) return invalid(tr("path blocked", "путь перекрыт"))
       }
       base.moves.push({ unitId: targetId, to: dest })
       return base
     }
     case "heal": {
-      if (target.hp >= target.maxHp) return invalid("союзник здоров")
+      if (target.hp >= target.maxHp) return invalid(tr("ally is at full HP", "союзник здоров"))
       let amount = assist.heal ?? 5
       const spId = unit.skills.special
       if (spId) {
@@ -119,14 +120,14 @@ export function planAssist(state: BattleState, unitId: string, from: Pos, target
       return base
     }
     case "refresh": {
-      if (!target.acted) return invalid("союзник ещё не действовал")
-      if (tUnit.classId === DANCER_CLASS) return invalid("нельзя освежить танцора")
+      if (!target.acted) return invalid(tr("ally hasn't acted yet", "союзник ещё не действовал"))
+      if (tUnit.classId === DANCER_CLASS) return invalid(tr("can't refresh a dancer", "нельзя освежить танцора"))
       base.refresh = true
       return base
     }
     case "sacrifice": {
-      if (target.hp >= target.maxHp) return invalid("союзник здоров")
-      if (bu.hp <= 10) return invalid("слишком мало HP")
+      if (target.hp >= target.maxHp) return invalid(tr("ally is at full HP", "союзник здоров"))
+      if (bu.hp <= 10) return invalid(tr("too little HP", "слишком мало HP"))
       const give = Math.min(10, target.maxHp - target.hp)
       base.selfHpDelta = -10
       base.targetHpDelta = give
@@ -136,7 +137,7 @@ export function planAssist(state: BattleState, unitId: string, from: Pos, target
     case "reciprocal": {
       const newSelf = Math.min(bu.maxHp, target.hp)
       const newTarget = Math.min(target.maxHp, bu.hp)
-      if (newSelf === bu.hp && newTarget === target.hp) return invalid("бессмысленно")
+      if (newSelf === bu.hp && newTarget === target.hp) return invalid(tr("pointless", "бессмысленно"))
       base.selfHpDelta = newSelf - bu.hp
       base.targetHpDelta = newTarget - target.hp
       return base

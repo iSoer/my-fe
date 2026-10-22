@@ -25,6 +25,7 @@ import {
   withTimeout
 } from "./svgTextures"
 import { FUR_PALETTES } from "@game/content/appearance"
+import { tr } from "@game/i18n"
 
 export const CINEMATIC_SCENE_KEY = "Cinematic"
 
@@ -231,7 +232,7 @@ export class CinematicScene extends Phaser.Scene {
         .text(
           barX + (onLeft ? 0 : barW),
           topY + 26,
-          `${unitClassName(unit)} · ур. ${unit.level}`,
+          `${unitClassName(unit)} · ${tr("Lv.", "ур.")} ${unit.level}`,
           textStyle(Math.min(12, w * 0.03), "#d0d0d0", false, 2)
         )
         .setOrigin(onLeft ? 0 : 1, 0)
@@ -487,14 +488,14 @@ export class CinematicScene extends Phaser.Scene {
     haptic(strike.special ? "heavy" : "medium")
     const dmgColor
       = strike.damage === 0 ? "#bbbbbb" : strike.special ? "#ffd166" : strike.effective ? "#ff6b6b" : "#ffffff"
-    const dmgText = strike.damage === 0 ? "Хлоп!" : String(strike.damage)
+    const dmgText = strike.damage === 0 ? tr("Bonk!", "Хлоп!") : String(strike.damage)
     const big = strike.damage >= def.maxHp * 0.5
     bigNumber(this, def.sprite.x, defBodyY - 30, dmgText, dmgColor, big || lethal ? 58 : strike.special ? 50 : 42, sp, {
       crit: big || !!strike.special,
       depth: 46
     })
     if (strike.effective)
-      floatText(this, def.sprite.x + 40, defBodyY - 90, "×1.5 ЭФФЕКТИВНО", "#ff6b6b", sp, { size: 14, rise: 22 })
+      floatText(this, def.sprite.x + 40, defBodyY - 90, tr("×1.5 EFFECTIVE", "×1.5 ЭФФЕКТИВНО"), "#ff6b6b", sp, { size: 14, rise: 22 })
     if (strike.damage > 0) {
       hitGore(this, {
         x: def.sprite.x,
@@ -703,7 +704,9 @@ export class CinematicScene extends Phaser.Scene {
     await playDeathCine(ctx)
     if (!this.sys || !this.sys.isActive()) return
     ctx.onPool?.()
-    const word = isPlayer ? (unit?.gender === "f" ? "ПАЛА" : "ПАЛ") : unit?.gender === "f" ? "ГОТОВА" : "ГОТОВ"
+    const word = isPlayer
+      ? tr("FALLEN", unit?.gender === "f" ? "ПАЛА" : "ПАЛ")
+      : tr("DONE FOR", unit?.gender === "f" ? "ГОТОВА" : "ГОТОВ")
     const w = this.scale.width
     const stampText = this.add
       .text(

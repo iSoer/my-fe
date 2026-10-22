@@ -19,6 +19,7 @@ import { SKILL_LABELS, type Rank, type Skill } from "@shared/character/skills"
 import type { Stat as ModelStat } from "@shared/api/schema/pokemon/generated"
 import { isMagicWeapon, weaponRange } from "./weapons"
 import { MODEL_SCALE } from "./balance"
+import { tr } from "@game/i18n"
 
 // Классы, их тип движения и оружие — модель персонажа (`src/shared/character/classes.ts`); здесь только поиск
 // и боевой класс для ядра. Названия — `CharacterClass.name`, ярусы — `TIER_LABELS`, навыки — `SKILL_LABELS`.
@@ -89,15 +90,23 @@ export { isMagicWeapon }
 
 /** Правила передвижения (как в `moveCost` и `content/weapons.ts`): дальность, местность, чем уязвим. */
 const MOVE_NOTES: Record<MoveType, string> = {
-  infantry: "лес отнимает 2 очка хода, вода и горы непроходимы",
-  armored: "медленный, зато лес не замедляет; Armorslayer бьёт ×1.5",
-  cavalry: "быстрый, но в лес не заходит; Horseslayer бьёт ×1.5",
-  flier: "перелетает воду, горы и лес; Bow бьёт ×1.5"
+  get infantry() {
+    return tr("forest costs 2 move points; water and mountains are impassable", "лес отнимает 2 очка хода, вода и горы непроходимы")
+  },
+  get armored() {
+    return tr("slow, but forest doesn't slow it down; Armorslayer hits ×1.5", "медленный, зато лес не замедляет; Armorslayer бьёт ×1.5")
+  },
+  get cavalry() {
+    return tr("fast, but can't enter forest; Horseslayer hits ×1.5", "быстрый, но в лес не заходит; Horseslayer бьёт ×1.5")
+  },
+  get flier() {
+    return tr("flies over water, mountains and forest; Bow hits ×1.5", "перелетает воду, горы и лес; Bow бьёт ×1.5")
+  }
 }
 
 export interface ClassRole {
   icon: string
-  /** Роль в бою по-русски — пояснение, не название класса. */
+  /** Роль в бою на текущем языке — пояснение, не название класса. */
   role: string
   /** Чем класс полезен в бою, 1–2 фразы. */
   summary: string
@@ -137,28 +146,28 @@ export function classRole(classId: string): ClassRole {
   const has = (w: WeaponSkill) => weapons.includes(w)
   const top = [...classCombatBonus(classId)].filter(b => b.stat !== "hp").sort((a, b) => b.value - a.value)[0]?.stat
   if (classId === DANCER_CLASS)
-    return { icon: "💃", role: "Танцор", summary: "Танцем даёт союзнику, который уже ходил, ещё один ход." }
+    return { icon: "💃", role: tr("Dancer", "Танцор"), summary: tr("Dances to give an ally who has already acted one more turn.", "Танцем даёт союзнику, который уже ходил, ещё один ход.") }
   if (fw.tier === "base")
-    return { icon: "🎒", role: "Универсал", summary: "Стартовый класс без бонусов: можно взять любое оружие." }
+    return { icon: "🎒", role: tr("All-rounder", "Универсал"), summary: tr("Starter class with no bonuses: can use any weapon.", "Стартовый класс без бонусов: можно взять любое оружие.") }
   if (weapons.every(w => w === "whiteMagic"))
-    return { icon: "🩹", role: "Лекарь", summary: "Лечит союзников Поддержкой с 2 клеток, сам бьёт слабо (урон ×0.5)." }
+    return { icon: "🩹", role: tr("Healer", "Лекарь"), summary: tr("Heals allies with Assist from 2 tiles; hits weakly itself (damage ×0.5).", "Лечит союзников Поддержкой с 2 клеток, сам бьёт слабо (урон ×0.5).") }
   if (weapons.every(w => isMagicWeapon(w)))
     return has("whiteMagic")
-      ? { icon: "🔮", role: "Маг-целитель", summary: "Магия с 2 клеток по Res; с White Magic ещё и лечит." }
-      : { icon: "✨", role: "Маг", summary: "Бьёт магией с 2 клеток по Res — хорош против латников." }
+      ? { icon: "🔮", role: tr("Mage-Healer", "Маг-целитель"), summary: tr("Magic from 2 tiles against Res; with White Magic it heals too.", "Магия с 2 клеток по Res; с White Magic ещё и лечит.") }
+      : { icon: "✨", role: tr("Mage", "Маг"), summary: tr("Hits with magic from 2 tiles against Res — great vs armored foes.", "Бьёт магией с 2 клеток по Res — хорош против латников.") }
   if (move === "armored")
-    return { icon: "🛡️", role: "Танк", summary: "Держит удар и закрывает проходы, но ходит всего на 1 клетку." }
+    return { icon: "🛡️", role: tr("Tank", "Танк"), summary: tr("Soaks hits and blocks passages, but moves only 1 tile.", "Держит удар и закрывает проходы, но ходит всего на 1 клетку.") }
   if (move === "flier")
-    return { icon: "🪽", role: "Летун", summary: "Перелетает препятствия и заходит с фланга; берегите от стрелков." }
+    return { icon: "🪽", role: tr("Flier", "Летун"), summary: tr("Flies over obstacles and hits the flanks; keep away from archers.", "Перелетает препятствия и заходит с фланга; берегите от стрелков.") }
   if (move === "cavalry")
-    return { icon: "🐎", role: "Всадник", summary: "Ходит дальше всех — быстро добивает и уводит раненых." }
+    return { icon: "🐎", role: tr("Rider", "Всадник"), summary: tr("Moves farthest of all — finishes foes fast and pulls the wounded out.", "Ходит дальше всех — быстро добивает и уводит раненых.") }
   if (weapons.every(w => weaponRange(w) === 2))
-    return { icon: "🏹", role: "Стрелок", summary: "Бьёт с 2 клеток, ближние не могут ответить; Bow сбивает летунов." }
+    return { icon: "🏹", role: tr("Archer", "Стрелок"), summary: tr("Hits from 2 tiles, melee foes can't strike back; Bow downs fliers.", "Бьёт с 2 клеток, ближние не могут ответить; Bow сбивает летунов.") }
   if (top === "speed")
-    return { icon: "⚡", role: "Дуэлянт", summary: "Быстрый боец ближнего боя: чаще бьёт дважды и реже получает второй удар." }
+    return { icon: "⚡", role: tr("Duelist", "Дуэлянт"), summary: tr("Fast melee fighter: strikes twice more often and gets hit twice less.", "Быстрый боец ближнего боя: чаще бьёт дважды и реже получает второй удар.") }
   if (top === "defense" || top === "specialDefense")
-    return { icon: "🧱", role: "Страж", summary: "Крепкий боец ближнего боя, стоит на передовой." }
-  return { icon: "⚔️", role: "Боец", summary: "Сильный удар в ближнем бою — основа отряда." }
+    return { icon: "🧱", role: tr("Guardian", "Страж"), summary: tr("Sturdy melee fighter who holds the front line.", "Крепкий боец ближнего боя, стоит на передовой.") }
+  return { icon: "⚔️", role: tr("Fighter", "Боец"), summary: tr("Hard-hitting melee fighter — the backbone of the squad.", "Сильный удар в ближнем бою — основа отряда.") }
 }
 
 function requirementText(req: Partial<Record<Skill, Rank>>, joiner: string): string {
@@ -170,8 +179,8 @@ export function classInfo(classId: string): ClassInfo {
   const fw = fwClass(classId)
   const moveType = movementOf(fw)
   const requires: string[] = []
-  if (Object.keys(fw.all).length > 0) requires.push(requirementText(fw.all, " и "))
-  if (Object.keys(fw.any).length > 0) requires.push(requirementText(fw.any, " или "))
+  if (Object.keys(fw.all).length > 0) requires.push(requirementText(fw.all, tr(" and ", " и ")))
+  if (Object.keys(fw.any).length > 0) requires.push(requirementText(fw.any, tr(" or ", " или ")))
   return {
     ...classRole(classId),
     tierLabel: TIER_LABELS[fw.tier],

@@ -3,6 +3,7 @@ import type { Archetype } from "@shared/api/schema/pokemon/generated"
 import { MAX_LEVEL as CHARACTER_MAX_LEVEL, type StatValues } from "@shared/character/leveling"
 import type { Movement } from "@shared/character/classes"
 import type { Aptitudes, WeaponSkill } from "@shared/character/skills"
+import { DEFAULT_LANG, type Lang } from "@game/i18n"
 
 export type { WeaponSkill }
 
@@ -223,6 +224,8 @@ export interface Settings {
   dangerZoneDefault: boolean
   blood: "sea" | "pools"
   confirmAttack: boolean
+  /** Язык интерфейса. */
+  lang: Lang
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -234,7 +237,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoEndTurn: false,
   dangerZoneDefault: false,
   blood: "sea",
-  confirmAttack: true
+  confirmAttack: true,
+  lang: DEFAULT_LANG
 }
 
 /* ---------- Бой: состояние, действия, события ---------- */

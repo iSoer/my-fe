@@ -1,54 +1,62 @@
 import type { Species } from "@game/core/types"
+import { tr } from "@game/i18n"
 
 export interface BreedDef {
   id: string
   species: Species
-  name: string
+  readonly name: string
   /** Подсказка комплекции для внешности: 0 худой, 1 обычный, 2 крупный. */
   build: 0 | 1 | 2
 }
 
+const breed = (id: string, species: Species, en: string, ru: string, build: 0 | 1 | 2): BreedDef => ({
+  id,
+  species,
+  get name() { return tr(en, ru) },
+  build
+})
+
 export const BREEDS: readonly BreedDef[] = [
-  { id: "cat_yard", species: "cat", name: "Дворовый", build: 1 },
-  { id: "cat_siamese", species: "cat", name: "Сиамский", build: 0 },
-  { id: "cat_mainecoon", species: "cat", name: "Мейн-кун", build: 2 },
-  { id: "cat_sphynx", species: "cat", name: "Сфинкс", build: 0 },
-  { id: "cat_british", species: "cat", name: "Британец", build: 2 },
-  { id: "cat_persian", species: "cat", name: "Персидский", build: 2 },
-  { id: "cat_bengal", species: "cat", name: "Бенгальский", build: 1 },
-  { id: "cat_ginger", species: "cat", name: "Рыжий полосатый", build: 1 },
-  { id: "cat_calico", species: "cat", name: "Трёхцветный", build: 1 },
-  { id: "cat_black", species: "cat", name: "Чёрный", build: 1 },
-  { id: "cat_ragdoll", species: "cat", name: "Рэгдолл", build: 2 },
-  { id: "cat_scottish", species: "cat", name: "Шотландский вислоухий", build: 1 },
-  { id: "cat_abyssinian", species: "cat", name: "Абиссинский", build: 0 },
-  { id: "cat_norwegian", species: "cat", name: "Норвежский лесной", build: 2 },
-  { id: "cat_munchkin", species: "cat", name: "Манчкин", build: 0 },
-  { id: "dog_mutt", species: "dog", name: "Дворняга", build: 1 },
-  { id: "dog_dachshund", species: "dog", name: "Такса", build: 0 },
-  { id: "dog_corgi", species: "dog", name: "Корги", build: 1 },
-  { id: "dog_shepherd", species: "dog", name: "Овчарка", build: 2 },
-  { id: "dog_husky", species: "dog", name: "Хаски", build: 2 },
-  { id: "dog_chihuahua", species: "dog", name: "Чихуахуа", build: 0 },
-  { id: "dog_pug", species: "dog", name: "Мопс", build: 1 },
-  { id: "dog_bulldog", species: "dog", name: "Бульдог", build: 2 },
-  { id: "dog_labrador", species: "dog", name: "Лабрадор", build: 2 },
-  { id: "dog_poodle", species: "dog", name: "Пудель", build: 1 },
-  { id: "dog_spitz", species: "dog", name: "Шпиц", build: 0 },
-  { id: "dog_rottweiler", species: "dog", name: "Ротвейлер", build: 2 },
-  { id: "dog_jackrussell", species: "dog", name: "Джек-рассел", build: 0 },
-  { id: "dog_beagle", species: "dog", name: "Бигль", build: 1 },
-  { id: "dog_doberman", species: "dog", name: "Доберман", build: 2 },
-  { id: "mouse_house", species: "mouse", name: "Домовая мышь", build: 0 },
-  { id: "mouse_field", species: "mouse", name: "Полёвка", build: 1 },
-  { id: "mouse_wood", species: "mouse", name: "Лесная мышь", build: 0 },
-  { id: "mouse_lab", species: "mouse", name: "Белая лабораторная", build: 0 },
-  { id: "mouse_rat", species: "mouse", name: "Крыса", build: 2 },
-  { id: "mouse_hamster", species: "mouse", name: "Хомяк", build: 2 },
-  { id: "mouse_gerbil", species: "mouse", name: "Песчанка", build: 1 },
-  { id: "mouse_dormouse", species: "mouse", name: "Соня", build: 1 },
-  { id: "mouse_jerboa", species: "mouse", name: "Тушканчик", build: 0 },
-  { id: "mouse_harvest", species: "mouse", name: "Мышь-малютка", build: 0 }
+  breed("cat_yard", "cat", "Alley cat", "Дворовый", 1),
+  breed("cat_siamese", "cat", "Siamese", "Сиамский", 0),
+  breed("cat_mainecoon", "cat", "Maine Coon", "Мейн-кун", 2),
+  breed("cat_sphynx", "cat", "Sphynx", "Сфинкс", 0),
+  breed("cat_british", "cat", "British", "Британец", 2),
+  breed("cat_persian", "cat", "Persian", "Персидский", 2),
+  breed("cat_bengal", "cat", "Bengal", "Бенгальский", 1),
+  breed("cat_ginger", "cat", "Ginger tabby", "Рыжий полосатый", 1),
+  breed("cat_calico", "cat", "Calico", "Трёхцветный", 1),
+  breed("cat_black", "cat", "Black cat", "Чёрный", 1),
+  breed("cat_ragdoll", "cat", "Ragdoll", "Рэгдолл", 2),
+  breed("cat_scottish", "cat", "Scottish Fold", "Шотландский вислоухий", 1),
+  breed("cat_abyssinian", "cat", "Abyssinian", "Абиссинский", 0),
+  breed("cat_norwegian", "cat", "Norwegian Forest", "Норвежский лесной", 2),
+  breed("cat_munchkin", "cat", "Munchkin", "Манчкин", 0),
+  breed("dog_mutt", "dog", "Mutt", "Дворняга", 1),
+  breed("dog_dachshund", "dog", "Dachshund", "Такса", 0),
+  breed("dog_corgi", "dog", "Corgi", "Корги", 1),
+  breed("dog_shepherd", "dog", "Shepherd", "Овчарка", 2),
+  breed("dog_husky", "dog", "Husky", "Хаски", 2),
+  breed("dog_chihuahua", "dog", "Chihuahua", "Чихуахуа", 0),
+  breed("dog_pug", "dog", "Pug", "Мопс", 1),
+  breed("dog_bulldog", "dog", "Bulldog", "Бульдог", 2),
+  breed("dog_labrador", "dog", "Labrador", "Лабрадор", 2),
+  breed("dog_poodle", "dog", "Poodle", "Пудель", 1),
+  breed("dog_spitz", "dog", "Spitz", "Шпиц", 0),
+  breed("dog_rottweiler", "dog", "Rottweiler", "Ротвейлер", 2),
+  breed("dog_jackrussell", "dog", "Jack Russell", "Джек-рассел", 0),
+  breed("dog_beagle", "dog", "Beagle", "Бигль", 1),
+  breed("dog_doberman", "dog", "Doberman", "Доберман", 2),
+  breed("mouse_house", "mouse", "House mouse", "Домовая мышь", 0),
+  breed("mouse_field", "mouse", "Field vole", "Полёвка", 1),
+  breed("mouse_wood", "mouse", "Wood mouse", "Лесная мышь", 0),
+  breed("mouse_lab", "mouse", "White lab mouse", "Белая лабораторная", 0),
+  breed("mouse_rat", "mouse", "Rat", "Крыса", 2),
+  breed("mouse_hamster", "mouse", "Hamster", "Хомяк", 2),
+  breed("mouse_gerbil", "mouse", "Gerbil", "Песчанка", 1),
+  breed("mouse_dormouse", "mouse", "Dormouse", "Соня", 1),
+  breed("mouse_jerboa", "mouse", "Jerboa", "Тушканчик", 0),
+  breed("mouse_harvest", "mouse", "Harvest mouse", "Мышь-малютка", 0)
 ]
 
 const MAP = new Map(BREEDS.map(b => [b.id, b]))

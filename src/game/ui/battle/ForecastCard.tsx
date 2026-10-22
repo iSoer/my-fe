@@ -5,6 +5,7 @@ import { specialDef } from "@game/content/skills/specials"
 import { WEAPON_COLOR } from "@game/content/weapons"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { COLOR_CSS } from "../lib/format"
+import { tr } from "@game/i18n"
 
 /** Полоска HP, которая за кадр проезжает от «до» к «после»; новый прогноз монтирует её заново (key). */
 function HpBar(props: { before: number, after: number, max: number }) {
@@ -78,7 +79,7 @@ function Side({
               </>
             )
           : (
-              <small className="bf-muted">{canCounter ? "—" : "не контратакует"}</small>
+              <small className="bf-muted">{canCounter ? "—" : tr("no counter", "не контратакует")}</small>
             )}
       </div>
       <div className="bf-fc-tags">
@@ -89,8 +90,8 @@ function Side({
           </span>
         )}
         {effective && hits > 0 && <span className="bf-tag red">×1.5</span>}
-        {dies && !enemy && <span className="bf-tag death">☠ ПОГИБНЕТ</span>}
-        {dies && enemy && <span className="bf-tag kill">☠ погибнет</span>}
+        {dies && !enemy && <span className="bf-tag death">{tr("☠ WILL DIE", "☠ ПОГИБНЕТ")}</span>}
+        {dies && enemy && <span className="bf-tag kill">{tr("☠ kill", "☠ погибнет")}</span>}
       </div>
     </div>
   )
@@ -114,7 +115,7 @@ export function ForecastCard({ state, forecast }: { state: BattleState, forecast
   const tri = f.triangle
   const triLeft = playerIsAttacker ? tri : tri === "adv" ? "dis" : tri === "dis" ? "adv" : "neutral"
   return (
-    <div className="bf-card bf-forecast" role="status" aria-label="Прогноз боя">
+    <div className="bf-card bf-forecast" role="status" aria-label={tr("Combat forecast", "Прогноз боя")}>
       <Side
         unit={left.unit}
         res={left.res}

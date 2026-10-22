@@ -47,14 +47,17 @@ import { ClassInfoBlock } from "../components/ClassInfo"
 import { STAT_LABELS, atkLabel, fmtGains, speciesName } from "../lib/format"
 import { useReplay } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
+import { tr } from "@game/i18n"
 
-const SLOT_NAMES: Record<keyof UnitSkills, string> = {
-  weapon: "Оружие",
-  assist: "Поддержка",
-  special: "Спецприём",
-  a: "Навык A",
-  b: "Навык B",
-  c: "Навык C"
+function slotName(s: keyof UnitSkills): string {
+  switch (s) {
+    case "weapon": return tr("Weapon", "Оружие")
+    case "assist": return tr("Assist", "Поддержка")
+    case "special": return tr("Special", "Спецприём")
+    case "a": return tr("Skill A", "Навык A")
+    case "b": return tr("Skill B", "Навык B")
+    case "c": return tr("Skill C", "Навык C")
+  }
 }
 const SLOT_ICONS: Record<keyof UnitSkills, string> = {
   weapon: "⚔️",
@@ -106,25 +109,25 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   const onTrain = () => {
     const gains = levelGains(unit, unit.level, unit.level + 1)
     const r = trainUnitAction(unit.id)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("success")
     celebrate()
-    toast(`Уровень ${unit.level + 1}! ${fmtGains(gains)}`)
+    toast(tr(`Level ${unit.level + 1}! ${fmtGains(gains)}`, `Уровень ${unit.level + 1}! ${fmtGains(gains)}`))
   }
   const onReclass = (classId: string) => {
     const r = reclassAction(unit.id, classId)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("success")
     celebrate()
     setClassOpen(false)
-    toast(`Новый класс: ${unitClassName({ ...unit, classId })}`)
+    toast(tr(`New class: ${unitClassName({ ...unit, classId })}`, `Новый класс: ${unitClassName({ ...unit, classId })}`))
   }
   const onSharpen = () => {
     const r = sharpenAction(unit.id)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("medium")
     celebrate()
-    toast("Оружие заточено")
+    toast(tr("Weapon sharpened", "Оружие заточено"))
   }
   const onRelease = () => {
     const r = releaseUnit(unit.id)
@@ -145,14 +148,14 @@ export function UnitScreen({ unitId }: { unitId: string }) {
 
   const onLearn = (id: string) => {
     const r = learnSkillAction(unit.id, id)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("success")
     celebrate()
-    toast(`Изучено: ${skillInfo(id)?.name ?? id}`)
+    toast(tr(`Learned: ${skillInfo(id)?.name ?? id}`, `Изучено: ${skillInfo(id)?.name ?? id}`))
   }
   const onEquip = (s: keyof UnitSkills, id: string | undefined) => {
     const r = equipAction(unit.id, s, id)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
     setSlot(null)
   }
@@ -178,7 +181,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
             <div className="row wrap">
               <RarityStars rarity={unit.rarity} />
               <b>
-                Ур.
+                {tr("Lv.", "Ур.")}
                 {unit.level}
               </b>
             </div>
@@ -205,12 +208,12 @@ export function UnitScreen({ unitId }: { unitId: string }) {
 
         <div className="card stack pop-in" style={{ animationDelay: "60ms" }}>
           <div className="row between">
-            <b>Характеристики</b>
+            <b>{tr("Stats", "Характеристики")}</b>
             <span className="muted small">
-              Mt оружия
+              {tr("Weapon Mt", "Mt оружия")}
               {" "}
               {weaponMt(unit)}
-              {unit.weaponTier ? ` · заточка ${"I".repeat(unit.weaponTier)}` : ""}
+              {unit.weaponTier ? ` · ${tr("sharpened", "заточка")} ${"I".repeat(unit.weaponTier)}` : ""}
             </span>
           </div>
           <StatsGrid stats={stats} animate atkLabel={atkLabel(unit)} />
@@ -231,17 +234,10 @@ export function UnitScreen({ unitId }: { unitId: string }) {
               </div>
             ))}
             <div className="muted small">
-              Статы растут линейно до
-              {" "}
-              {MAX_LEVEL}
-              {" "}
-              уровня (модель персонажа, редкость
-              {" "}
-              {unit.rarity}
-              ★); справа — сколько будет на
-              {" "}
-              {MAX_LEVEL}
-              -м в этом классе.
+              {tr(
+                `Stats grow linearly up to level ${MAX_LEVEL} (character model, rarity ${unit.rarity}★); on the right — the value at level ${MAX_LEVEL} in this class.`,
+                `Статы растут линейно до ${MAX_LEVEL} уровня (модель персонажа, редкость ${unit.rarity}★); справа — сколько будет на ${MAX_LEVEL}-м в этом классе.`
+              )}
             </div>
           </div>
         </div>
@@ -249,7 +245,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         <div className="card stack pop-in" style={{ animationDelay: "80ms" }}>
           <div className="row between">
             <b>
-              Класс:
+              {tr("Class:", "Класс:")}
               {" "}
               {unitClassName(unit)}
               {" "}
@@ -258,20 +254,20 @@ export function UnitScreen({ unitId }: { unitId: string }) {
                 {TIER_LABELS[cls.tier]}
               </span>
             </b>
-            {hasClassUpgrade(unit) && <span className="chip red pop">Повышение</span>}
+            {hasClassUpgrade(unit) && <span className="chip red pop">{tr("Promotion", "Повышение")}</span>}
           </div>
           <ClassInfoBlock classId={unit.classId} unit={unit} tier={false} />
           <div className="muted small">{`${weaponLine(unit)} · ${aptitudeLine(unit)}`}</div>
           <SkillRanks unit={unit} />
           <Button block icon="🎓" onClick={() => setClassOpen(true)}>
-            Сменить класс
+            {tr("Change class", "Сменить класс")}
           </Button>
         </div>
 
         {trait && (
           <div className="card pop-in" style={{ animationDelay: "100ms" }}>
             <b>
-              ★ Особенность:
+              {tr("★ Trait:", "★ Особенность:")}
               {trait.name}
             </b>
             <div className="muted small">{trait.desc}</div>
@@ -279,11 +275,11 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         )}
 
         <div className="card stack pop-in" style={{ animationDelay: "120ms" }}>
-          <b>Снаряжение</b>
+          <b>{tr("Gear", "Снаряжение")}</b>
           <div className="slot" onClick={() => setGear("weapon")}>
             <span className="slot-ico">⚔️</span>
             <span className="slot-text">
-              <div className="slot-name">Оружие</div>
+              <div className="slot-name">{tr("Weapon", "Оружие")}</div>
               <div className="slot-value">{weaponLine(unit)}</div>
             </span>
             <span className="muted">›</span>
@@ -291,9 +287,9 @@ export function UnitScreen({ unitId }: { unitId: string }) {
           <div className="slot" onClick={() => setGear("talisman")}>
             <span className="slot-ico">🔮</span>
             <span className="slot-text">
-              <div className="slot-name">Талисман</div>
+              <div className="slot-name">{tr("Talisman", "Талисман")}</div>
               <div className={`slot-value ${unit.accessory ? "" : "empty"}`}>
-                {unit.accessory ? `${talismanDef(unit.accessory).icon} ${talismanDef(unit.accessory).name}` : "— пусто —"}
+                {unit.accessory ? `${talismanDef(unit.accessory).icon} ${talismanDef(unit.accessory).name}` : tr("— empty —", "— пусто —")}
               </div>
             </span>
             <span className="muted">›</span>
@@ -301,7 +297,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "140ms" }}>
-          <b>Навыки</b>
+          <b>{tr("Skills", "Навыки")}</b>
           {SLOTS.map((s) => {
             const id = unit.skills[s]
             const info = id ? skillInfo(id) : undefined
@@ -311,10 +307,10 @@ export function UnitScreen({ unitId }: { unitId: string }) {
               <div key={s} className="slot" onClick={() => setSlot(s)}>
                 <span className={`slot-ico ${letter ? "letter" : ""}`}>{SLOT_ICONS[s]}</span>
                 <span className="slot-text">
-                  <div className="slot-name">{SLOT_NAMES[s]}</div>
-                  <div className={`slot-value ${info ? "" : "empty"}`}>{info?.name ?? "— пусто —"}</div>
+                  <div className="slot-name">{slotName(s)}</div>
+                  <div className={`slot-value ${info ? "" : "empty"}`}>{info?.name ?? tr("— empty —", "— пусто —")}</div>
                 </span>
-                {hasLearnable && <span className="chip red pop">Новое</span>}
+                {hasLearnable && <span className="chip red pop">{tr("New", "Новое")}</span>}
                 <span className="muted">›</span>
               </div>
             )
@@ -322,36 +318,36 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "180ms" }}>
-          <b>Прокачка</b>
+          <b>{tr("Upgrades", "Прокачка")}</b>
           <Button block icon="🏋️" onClick={onTrain} disabled={unit.level >= MAX_LEVEL || save.profile.treats < tCost}>
-            Тренировка: +1 уровень
+            {tr("Train: +1 level", "Тренировка: +1 уровень")}
             {" "}
-            {unit.level >= MAX_LEVEL ? "(максимум)" : `(🦴 ${tCost})`}
+            {unit.level >= MAX_LEVEL ? tr("(max)", "(максимум)") : `(🦴 ${tCost})`}
           </Button>
           <Button block icon="🔪" onClick={onSharpen} disabled={sCost === null || save.profile.treats < sCost}>
-            Заточить оружие
+            {tr("Sharpen weapon", "Заточить оружие")}
             {" "}
-            {sCost === null ? "(предел)" : `(🦴 ${sCost}, Mt +2)`}
+            {sCost === null ? tr("(maxed)", "(предел)") : `(🦴 ${sCost}, Mt +2)`}
           </Button>
           <Button block danger onClick={() => setRelease(1)}>
-            Отпустить
+            {tr("Release", "Отпустить")}
           </Button>
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "220ms" }}>
-          <b>История</b>
+          <b>{tr("History", "История")}</b>
           <div className="stats-table">
-            <span className="k">Боёв</span>
+            <span className="k">{tr("Battles", "Боёв")}</span>
             <span className="v">{unit.history.battles}</span>
-            <span className="k">Убийств</span>
+            <span className="k">{tr("Kills", "Убийств")}</span>
             <span className="v">{unit.history.kills}</span>
-            <span className="k">Урона нанесено</span>
+            <span className="k">{tr("Damage dealt", "Урона нанесено")}</span>
             <span className="v">{unit.history.damageDealt}</span>
-            <span className="k">Урона получено</span>
+            <span className="k">{tr("Damage taken", "Урона получено")}</span>
             <span className="v">{unit.history.damageTaken}</span>
             {unit.history.closestCall < 999 && (
               <>
-                <span className="k">Ближе всего к смерти</span>
+                <span className="k">{tr("Closest call", "Ближе всего к смерти")}</span>
                 <span className="v danger">
                   {unit.history.closestCall}
                   {" "}
@@ -371,7 +367,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
       <BottomSheet
         open={!!slot}
         onClose={() => setSlot(null)}
-        title={slot ? `${SLOT_ICONS[slot]} ${SLOT_NAMES[slot]}` : ""}
+        title={slot ? `${SLOT_ICONS[slot]} ${slotName(slot)}` : ""}
       >
         {slot && (
           <div className="stack">
@@ -385,18 +381,18 @@ export function UnitScreen({ unitId }: { unitId: string }) {
                     <div>
                       <b>{info.name}</b>
                       {" "}
-                      {state === "equipped" && <span className="chip squad">Экипирован</span>}
+                      {state === "equipped" && <span className="chip squad">{tr("Equipped", "Экипирован")}</span>}
                     </div>
                     <div className="desc">{info.desc}</div>
                   </div>
                   {state === "learned" && (
                     <Button sm primary onClick={() => onEquip(slot, id)}>
-                      Надеть
+                      {tr("Equip", "Надеть")}
                     </Button>
                   )}
                   {state === "learnable" && (
                     <Button sm onClick={() => onLearn(id)} disabled={unit.sp < cost}>
-                      Изучить ·
+                      {tr("Learn ·", "Изучить ·")}
                       {" "}
                       {cost}
                       {" "}
@@ -406,17 +402,17 @@ export function UnitScreen({ unitId }: { unitId: string }) {
                 </div>
               )
             })}
-            {slotOptions(slot).length === 0 && <p className="muted">Нет доступных навыков для этого слота.</p>}
+            {slotOptions(slot).length === 0 && <p className="muted">{tr("No skills available for this slot.", "Нет доступных навыков для этого слота.")}</p>}
             {unit.skills[slot] && (
               <Button block ghost onClick={() => onEquip(slot, undefined)}>
-                Снять
+                {tr("Unequip", "Снять")}
               </Button>
             )}
             <p className="muted small">
               SP:
               {" "}
               <b className="gold">{unit.sp}</b>
-              . Очки навыков копятся в боях.
+              {tr(". Skill points are earned in battle.", ". Очки навыков копятся в боях.")}
             </p>
           </div>
         )}
@@ -435,19 +431,23 @@ export function UnitScreen({ unitId }: { unitId: string }) {
 
       <ConfirmModal
         open={release === 1}
-        title="Отпустить бойца?"
-        text={`${displayName(unit)} уйдёт навсегда и попадёт на Кладбище с пометкой «ушёл сам». `
-          + "Купленное оружие и талисман вернутся в инвентарь."}
-        confirmLabel="Отпустить"
+        title={tr("Release this fighter?", "Отпустить бойца?")}
+        text={tr(
+          `${displayName(unit)} will leave forever and go to the Graveyard marked “left on their own”. `
+          + "Bought weapons and talismans return to your inventory.",
+          `${displayName(unit)} уйдёт навсегда и попадёт на Кладбище с пометкой «ушёл сам». `
+          + "Купленное оружие и талисман вернутся в инвентарь."
+        )}
+        confirmLabel={tr("Release", "Отпустить")}
         danger
         onConfirm={() => setRelease(2)}
         onClose={() => setRelease(0)}
       />
       <ConfirmModal
         open={release === 2}
-        title="Точно?"
-        text="Вернуть нельзя. Совсем."
-        confirmLabel="Да, отпустить"
+        title={tr("Sure?", "Точно?")}
+        text={tr("There’s no undo. None at all.", "Вернуть нельзя. Совсем.")}
+        confirmLabel={tr("Yes, release", "Да, отпустить")}
         danger
         onConfirm={onRelease}
         onClose={() => setRelease(0)}

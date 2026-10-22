@@ -5,6 +5,7 @@ import { weaponDef } from "@game/content/weapons"
 import { TEX } from "./textures"
 import { floatText, sceneAlive, wait } from "./fx"
 import { arrowShot, magicBolt, slashTrail, shockRing, thrustLine } from "./motionFx"
+import { tr } from "@game/i18n"
 
 /** Цвет тёмной (Black Magic) и светлой (White Magic) магии. */
 const DARK_MAGIC = 0xb15cff
@@ -744,7 +745,7 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
           slashTrail(scene, defPos.x - dir * size * 0.05, defPos.y, size * 0.8, dir, 0x2ec4b6, speed, true)
           swingArc(scene, attacker.x + dir * size * 0.1, atkPos.y, size * 0.55, dir, speed)
           impactStar(scene, defPos.x - dir * size * 0.1, defPos.y - size * 0.05, size, 0xffd166, speed)
-          floatText(scene, defPos.x, defPos.y - size * 0.55, "ХРЯСЬ", "#ffd166", speed, {
+          floatText(scene, defPos.x, defPos.y - size * 0.55, tr("CRACK", "ХРЯСЬ"), "#ffd166", speed, {
             size: size * 0.16,
             rise: size * 0.3,
             stroke: 5,
@@ -822,7 +823,7 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
           // Bow: стрела по дуге с хвостом
           await arrowShot(scene, hand, defPos, size * 0.8, speed)
           impactStar(scene, defPos.x, defPos.y, size, 0xffd166, speed)
-          floatText(scene, defPos.x + dir * size * 0.15, defPos.y - size * 0.5, "БАМ", "#ffe08a", speed, {
+          floatText(scene, defPos.x + dir * size * 0.15, defPos.y - size * 0.5, tr("BAM", "БАМ"), "#ffe08a", speed, {
             size: size * 0.13,
             rise: size * 0.25,
             stroke: 4
@@ -851,7 +852,7 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
           if (!deco) return wait(scene, 140 / speed)
           // White Magic: светлый сгусток с рунами
           await magicBolt(scene, hand, defPos, size * 0.7, speed, LIGHT_MAGIC)
-          floatText(scene, defPos.x, defPos.y - size * 0.45, "шлёп", "#e9ecef", speed, {
+          floatText(scene, defPos.x, defPos.y - size * 0.45, tr("splat", "шлёп"), "#e9ecef", speed, {
             size: size * 0.1,
             rise: size * 0.2,
             stroke: 3

@@ -35,7 +35,7 @@ export function UnitAvatar({
   const svg = unitSvg(unit, { pose: effPose, animated: anim, blinkDelay, friendly })
   const a = unit.appearance
   const acc = ACCESSORIES[a.accessory] ?? ""
-  const accText = acc && acc !== "Без аксессуара" ? `, ${acc.toLowerCase()}` : ""
+  const accText = acc && a.accessory !== 0 ? `, ${acc.toLowerCase()}` : ""
   const title = `${FUR_PALETTES[a.furPalette]?.name ?? ""}, ${(PATTERNS[a.pattern] ?? "").toLowerCase()}${accText}`
   const cls = [
     "critter-svg",

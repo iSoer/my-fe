@@ -9,6 +9,7 @@ import { TopBar } from "../components/TopBar"
 import { Modal } from "../components/Sheet"
 import { useToast } from "../components/Toast"
 import { haptic } from "@game/platform/haptics"
+import { LANG_NAMES, LANGS, tr } from "@game/i18n"
 
 function Switch({ on, onChange }: { on: boolean, onChange: (v: boolean) => void }) {
   return <span role="switch" aria-checked={on} className={`switch ${on ? "on" : ""}`} onClick={() => onChange(!on)} />
@@ -52,18 +53,18 @@ export function SettingsScreen() {
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      toast("Скопировано")
+      toast(tr("Copied", "Скопировано"))
     }
     catch {
-      toast("Не удалось скопировать — выделите текст вручную", true)
+      toast(tr("Couldn’t copy — select the text manually", "Не удалось скопировать — выделите текст вручную"), true)
     }
   }
 
   const doImport = () => {
     const r = importSaveCode(importCode)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("success")
-    toast("Сейв импортирован")
+    toast(tr("Save imported", "Сейв импортирован"))
     setImportCode("")
   }
 
@@ -76,17 +77,24 @@ export function SettingsScreen() {
   }
 
   const wins = save.profile.wins
+  const resetConfirm = tr("DELETE", "УДАЛИТЬ")
 
   return (
     <div className="screen">
-      <TopBar title="Настройки" />
+      <TopBar title={tr("Settings", "Настройки")} />
       <div className="screen-body">
         {SettingsSection && <SettingsSection />}
         <div className="card pop-in">
-          <div className="section-title">🔊 Звук и отклик</div>
+          <div className="section-title">🌐 Language · Язык</div>
+          <div className="setting">
+            <Seg value={s.lang} options={LANGS.map(v => ({ v, label: LANG_NAMES[v] }))} onChange={v => set({ lang: v })} />
+          </div>
+        </div>
+        <div className="card pop-in">
+          <div className="section-title">🔊 {tr("Sound & feedback", "Звук и отклик")}</div>
           <div className="setting">
             <div className="row">
-              <span>Музыка</span>
+              <span>{tr("Music", "Музыка")}</span>
               <span className="muted small">{s.music}</span>
             </div>
             <input
@@ -99,7 +107,7 @@ export function SettingsScreen() {
           </div>
           <div className="setting">
             <div className="row">
-              <span>Звуки</span>
+              <span>{tr("Sound effects", "Звуки")}</span>
               <span className="muted small">{s.sfx}</span>
             </div>
             <input
@@ -112,16 +120,16 @@ export function SettingsScreen() {
           </div>
           <div className="setting">
             <div className="row">
-              <span>Вибрация</span>
+              <span>{tr("Vibration", "Вибрация")}</span>
               <Switch on={s.haptics} onChange={v => set({ haptics: v })} />
             </div>
           </div>
         </div>
 
         <div className="card pop-in" style={{ animationDelay: "60ms" }}>
-          <div className="section-title">⚔️ Бой</div>
+          <div className="section-title">⚔️ {tr("Battle", "Бой")}</div>
           <div className="setting">
-            <span>Скорость анимаций</span>
+            <span>{tr("Animation speed", "Скорость анимаций")}</span>
             <Seg
               value={s.animSpeed}
               options={[
@@ -132,42 +140,42 @@ export function SettingsScreen() {
             />
           </div>
           <div className="setting">
-            <span>Кинематик атак</span>
+            <span>{tr("Attack cinematics", "Кинематик атак")}</span>
             <Seg
               value={s.cinematic}
               options={[
-                { v: "always" as const, label: "Всегда" },
-                { v: "mine" as const, label: "Только мои" },
-                { v: "never" as const, label: "Никогда" }
+                { v: "always" as const, label: tr("Always", "Всегда") },
+                { v: "mine" as const, label: tr("Mine only", "Только мои") },
+                { v: "never" as const, label: tr("Never", "Никогда") }
               ]}
               onChange={v => set({ cinematic: v })}
             />
           </div>
           <div className="setting">
             <div className="row">
-              <span>Авто-завершение хода</span>
+              <span>{tr("Auto end turn", "Авто-завершение хода")}</span>
               <Switch on={s.autoEndTurn} onChange={v => set({ autoEndTurn: v })} />
             </div>
           </div>
           <div className="setting">
             <div className="row">
-              <span>Зона опасности по умолчанию</span>
+              <span>{tr("Danger zone by default", "Зона опасности по умолчанию")}</span>
               <Switch on={s.dangerZoneDefault} onChange={v => set({ dangerZoneDefault: v })} />
             </div>
           </div>
           <div className="setting">
             <div className="row">
-              <span>Подтверждение атаки</span>
+              <span>{tr("Confirm attacks", "Подтверждение атаки")}</span>
               <Switch on={s.confirmAttack} onChange={v => set({ confirmAttack: v })} />
             </div>
           </div>
           <div className="setting">
-            <span>Кровь</span>
+            <span>{tr("Blood", "Кровь")}</span>
             <Seg
               value={s.blood}
               options={[
-                { v: "sea" as const, label: "🩸 Море" },
-                { v: "pools" as const, label: "💧 Лужи" }
+                { v: "sea" as const, label: `🩸 ${tr("Sea", "Море")}` },
+                { v: "pools" as const, label: `💧 ${tr("Puddles", "Лужи")}` }
               ]}
               onChange={v => set({ blood: v })}
             />
@@ -175,54 +183,54 @@ export function SettingsScreen() {
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "120ms" }}>
-          <div className="section-title">💾 Сейв</div>
+          <div className="section-title">💾 {tr("Save", "Сейв")}</div>
           <Button block icon="📤" onClick={() => setExportCode(exportSaveCode())}>
-            Экспортировать код сейва
+            {tr("Export save code", "Экспортировать код сейва")}
           </Button>
           {exportCode && (
             <>
               <textarea readOnly value={exportCode} onClick={e => (e.target as HTMLTextAreaElement).select()} />
               <Button block sm icon="📋" onClick={() => void copy(exportCode)}>
-                Скопировать
+                {tr("Copy", "Скопировать")}
               </Button>
             </>
           )}
           <textarea
-            placeholder="Вставьте код сейва для импорта"
+            placeholder={tr("Paste a save code to import", "Вставьте код сейва для импорта")}
             value={importCode}
             onChange={e => setImportCode((e.target as HTMLTextAreaElement).value)}
           />
           <Button block icon="📥" onClick={doImport} disabled={!importCode.trim()}>
-            Импортировать
+            {tr("Import", "Импортировать")}
           </Button>
           <Button block danger onClick={() => setResetOpen(true)}>
-            Сбросить прогресс
+            {tr("Reset progress", "Сбросить прогресс")}
           </Button>
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "180ms" }}>
-          <div className="section-title">📊 Статистика</div>
+          <div className="section-title">📊 {tr("Statistics", "Статистика")}</div>
           <div className="stats-table">
-            <span className="k">Боёв</span>
+            <span className="k">{tr("Battles", "Боёв")}</span>
             <span className="v">{save.stats.battles}</span>
-            <span className="k">Побед</span>
+            <span className="k">{tr("Wins", "Побед")}</span>
             <span className="v">{save.stats.wins}</span>
-            <span className="k">Убийств</span>
+            <span className="k">{tr("Kills", "Убийств")}</span>
             <span className="v">{save.stats.kills}</span>
-            <span className="k">Потерь</span>
+            <span className="k">{tr("Losses", "Потерь")}</span>
             <span className="v">{save.stats.deaths}</span>
-            <span className="k">Армий создано</span>
+            <span className="k">{tr("Armies created", "Армий создано")}</span>
             <span className="v">{save.profile.armiesCreated}</span>
-            <span className="k">Армий потеряно</span>
+            <span className="k">{tr("Armies lost", "Армий потеряно")}</span>
             <span className="v">{save.stats.armiesLost}</span>
-            <span className="k">Побед: Легко / Нормально</span>
+            <span className="k">{tr("Wins: Easy / Normal", "Побед: Легко / Нормально")}</span>
             <span className="v">
               {wins.easy}
               {" "}
               /
               {wins.normal}
             </span>
-            <span className="k">Побед: Сложно / Кошмар</span>
+            <span className="k">{tr("Wins: Hard / Nightmare", "Побед: Сложно / Кошмар")}</span>
             <span className="v">
               {wins.hard}
               {" "}
@@ -233,32 +241,40 @@ export function SettingsScreen() {
         </div>
 
         <p className="muted small center-text">
-          Сборка:
+          {tr("Build", "Сборка")}
+          :
           {" "}
           {process.env.NODE_ENV}
-          {save.battle ? ` · seed боя: ${save.battle.map.seed}` : ""}
+          {save.battle ? ` · ${tr("battle seed", "seed боя")}: ${save.battle.map.seed}` : ""}
           {" "}
-          · сейв v
+          ·
+          {" "}
+          {tr("save", "сейв")}
+          {" "}
+          v
           {save.version}
         </p>
       </div>
 
-      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title="Сбросить весь прогресс?">
+      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title={tr("Reset all progress?", "Сбросить весь прогресс?")}>
         <p className="muted small">
-          Будут удалены армия, Кладбище, Слава и Вкусняшки из этого браузера. Введите слово УДАЛИТЬ.
+          {tr(
+            `Your army, Graveyard, Glory and Treats will be deleted from this browser. Type ${resetConfirm}.`,
+            `Будут удалены армия, Кладбище, Слава и Вкусняшки из этого браузера. Введите слово ${resetConfirm}.`
+          )}
         </p>
         <input
           type="text"
           value={resetWord}
           onChange={e => setResetWord((e.target as HTMLInputElement).value)}
-          placeholder="УДАЛИТЬ"
+          placeholder={resetConfirm}
         />
         <div className="row">
           <Button block onClick={() => setResetOpen(false)}>
-            Отмена
+            {tr("Cancel", "Отмена")}
           </Button>
-          <Button block danger disabled={resetWord.trim().toUpperCase() !== "УДАЛИТЬ"} onClick={() => void doReset()}>
-            Удалить всё
+          <Button block danger disabled={resetWord.trim().toUpperCase() !== resetConfirm} onClick={() => void doReset()}>
+            {tr("Delete everything", "Удалить всё")}
           </Button>
         </div>
       </Modal>

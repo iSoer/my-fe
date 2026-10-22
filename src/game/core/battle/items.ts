@@ -2,6 +2,7 @@ import type { BattleState, BattleUnit, Pos } from "../types"
 import { manhattan } from "../types"
 import { livingUnits } from "./query"
 import { consumableDef, isConsumableId } from "@game/content/items"
+import { tr } from "@game/i18n"
 
 /** Расходники в рюкзаке вылазки (id → количество > 0). */
 export function packItems(state: BattleState): [string, number][] {
@@ -26,7 +27,7 @@ export interface ItemPlan {
 export function planItem(state: BattleState, bu: BattleUnit, from: Pos, targetId: string, itemId: string): ItemPlan {
   const def = consumableDef(itemId)
   const target = state.units[targetId]
-  if (!target || !target.alive || target.side !== bu.side) throw new Error("цель недоступна")
+  if (!target || !target.alive || target.side !== bu.side) throw new Error(tr("target unavailable", "цель недоступна"))
   const affected = def.area
     ? livingUnits(state, bu.side).filter(u => u.unitId === bu.unitId || manhattan(u.pos, from) <= (def.area ?? 0))
     : [target]

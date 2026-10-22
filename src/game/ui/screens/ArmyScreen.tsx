@@ -26,6 +26,7 @@ import { MOVE_EMOJI, atkLabel } from "../lib/format"
 import { MOVE_RANGE } from "@game/content/classes"
 import { classRoleText } from "../components/ClassInfo"
 import { stagger } from "../lib/animate"
+import { tr } from "@game/i18n"
 
 /** Заполненный слот: краткая карточка бойца, тап — на экран бойца. */
 function FilledSlot({
@@ -54,7 +55,7 @@ function FilledSlot({
       }}
     >
       <span className="slot-tab">
-        Ур.
+        {tr("Lv.", "Ур.")}
         {unit.level}
       </span>
       <div className="slot-head">
@@ -63,13 +64,13 @@ function FilledSlot({
           <div className="slot-name">{displayName(unit)}</div>
           <RarityStars rarity={unit.rarity} />
           <div className="muted small slot-class">{`${unitClassName(unit)} · ${classRoleText(unit.classId)}`}</div>
-          <div className="muted small slot-class">{`${MOVE_EMOJI[cls.moveType]} ход ${MOVE_RANGE[cls.moveType]}`}</div>
+          <div className="muted small slot-class">{`${MOVE_EMOJI[cls.moveType]} ${tr("move", "ход")} ${MOVE_RANGE[cls.moveType]}`}</div>
         </div>
       </div>
       <div className="slot-foot">
         <WeaponBadge skill={cls.weaponSkill} />
-        {canLearn && <span className="chip red pop">Есть навык</span>}
-        {hasClassUpgrade(unit) && <span className="chip gold pop">Новый класс</span>}
+        {canLearn && <span className="chip red pop">{tr("New skill", "Есть навык")}</span>}
+        {hasClassUpgrade(unit) && <span className="chip gold pop">{tr("New class", "Новый класс")}</span>}
         <button
           type="button"
           className={`chip squad-toggle ${inSquad ? "squad" : ""}`}
@@ -78,7 +79,7 @@ function FilledSlot({
             onToggleSquad(unit.id)
           }}
         >
-          {inSquad ? "✓ В отряде" : "+ В отряд"}
+          {inSquad ? tr("✓ In squad", "✓ В отряде") : tr("+ To squad", "+ В отряд")}
         </button>
       </div>
       <div className="mini-stats">
@@ -121,21 +122,21 @@ export function ArmyScreen() {
 
   const welcome = (unit: UnitInstance) => {
     setJustHired(unit.id)
-    toast(`${displayName(unit)} в ростере!`)
+    toast(tr(`${displayName(unit)} joined the roster!`, `${displayName(unit)} в ростере!`))
     window.setTimeout(() => setJustHired(cur => (cur === unit.id ? null : cur)), 900)
   }
 
   if (!army || army.units.length === 0) {
     return (
       <div className="screen">
-        <TopBar title="Казарма" right={<ResourceBar />} onBack={() => navigate("/village", true)} />
+        <TopBar title={tr("Barracks", "Казарма")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
         <div className="screen-body">
           <div className="empty">
             <div className="big">🪦</div>
-            <h3>Казарма пуста</h3>
-            <p>Все пали или никого ещё нет. Новый ростер выдаётся сразу; Слава остаётся с вами.</p>
+            <h3>{tr("The Barracks are empty", "Казарма пуста")}</h3>
+            <p>{tr("Everyone fell, or nobody’s here yet. A new roster is issued right away; your Glory stays with you.", "Все пали или никого ещё нет. Новый ростер выдаётся сразу; Слава остаётся с вами.")}</p>
             <Button primary big icon="🐾" onClick={() => ensureRoster()}>
-              Набрать новый ростер
+              {tr("Recruit a new roster", "Набрать новый ростер")}
             </Button>
           </div>
         </div>
@@ -145,7 +146,7 @@ export function ArmyScreen() {
 
   const onToggleSquad = (id: string) => {
     const r = toggleSquad(id)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
   }
 
@@ -155,18 +156,18 @@ export function ArmyScreen() {
 
   return (
     <div className="screen">
-      <TopBar title="Казарма" right={<ResourceBar />} onBack={() => navigate("/village", true)} />
+      <TopBar title={tr("Barracks", "Казарма")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
       <div className="screen-body">
         <RewardPicker toast={toast} onClaimed={welcome} />
         <div className="row between">
           <span className="muted small">
-            Персонажей:
+            {tr("Fighters:", "Персонажей:")}
             {" "}
             <b>{army.units.length}</b>
             /
             {BARRACKS_CAP}
           </span>
-          <span className="muted small">{`Отряд: ${army.squadIds.length}/${SQUAD_SIZE}`}</span>
+          <span className="muted small">{`${tr("Squad", "Отряд")}: ${army.squadIds.length}/${SQUAD_SIZE}`}</span>
         </div>
         <div className="slot-grid">
           {units.map((u, i) => (
@@ -181,7 +182,7 @@ export function ArmyScreen() {
           ))}
         </div>
         {army.units.length < SQUAD_SIZE && (
-          <div className="warning-box">{`Не хватает бойцов в отряд (${army.units.length}/${SQUAD_SIZE}) — наймите.`}</div>
+          <div className="warning-box">{tr(`Not enough fighters for a squad (${army.units.length}/${SQUAD_SIZE}) — recruit some.`, `Не хватает бойцов в отряд (${army.units.length}/${SQUAD_SIZE}) — наймите.`)}</div>
         )}
         <Button
           block
@@ -192,11 +193,11 @@ export function ArmyScreen() {
             setShopOpen(true)
           }}
         >
-          {`Набор (${save.shelter.candidates.length})`}
+          {`${tr("Recruit", "Набор")} (${save.shelter.candidates.length})`}
         </Button>
-        <p className="muted small hint-line">В бой отряд выводит Разведчик Шрам — он ждёт у ворот поселения.</p>
+        <p className="muted small hint-line">{tr("The Scout leads your squad into battle — he waits at the village gate.", "В бой отряд выводит Разведчик Шрам — он ждёт у ворот поселения.")}</p>
         {freeSlots(save) === 0 && (
-          <p className="muted small hint-line">Ростер полон: чтобы взять новых, кого-то придётся отпустить.</p>
+          <p className="muted small hint-line">{tr("Roster full: to take on new fighters, you’ll have to release someone.", "Ростер полон: чтобы взять новых, кого-то придётся отпустить.")}</p>
         )}
       </div>
       <ShopSheet open={shopOpen} onClose={() => setShopOpen(false)} toast={toast} onBought={welcome} />

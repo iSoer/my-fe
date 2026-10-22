@@ -1,10 +1,11 @@
 import type { SpecialDef } from "@game/core/skills/types"
+import { tr } from "@game/i18n"
 
 export const SPECIALS: readonly SpecialDef[] = [
   {
     id: "sp_glimmer",
-    name: "Кровавый блеск",
-    desc: "Урон +50 %.",
+    get name() { return tr("Bloody Glimmer", "Кровавый блеск") },
+    get desc() { return tr("Damage +50%.", "Урон +50 %.") },
     cd: 2,
     kind: "offense",
     spCost: 200,
@@ -13,8 +14,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_moonbow",
-    name: "Лунный серп",
-    desc: "Игнорирует 30 % Def/Res цели.",
+    get name() { return tr("Moon Sickle", "Лунный серп") },
+    get desc() { return tr("Ignores 30% of the target's Def/Res.", "Игнорирует 30 % Def/Res цели.") },
     cd: 2,
     kind: "offense",
     spCost: 200,
@@ -23,8 +24,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_luna",
-    name: "Клыкастая луна",
-    desc: "Игнорирует 50 % Def/Res цели.",
+    get name() { return tr("Fanged Moon", "Клыкастая луна") },
+    get desc() { return tr("Ignores 50% of the target's Def/Res.", "Игнорирует 50 % Def/Res цели.") },
     cd: 3,
     kind: "offense",
     spCost: 200,
@@ -33,8 +34,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_bonfire",
-    name: "Пламя шерсти",
-    desc: "Урон +50 % своего Def.",
+    get name() { return tr("Fur Blaze", "Пламя шерсти") },
+    get desc() { return tr("Damage +50% of own Def.", "Урон +50 % своего Def.") },
     cd: 3,
     kind: "offense",
     spCost: 200,
@@ -43,8 +44,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_iceberg",
-    name: "Ледяная шерсть",
-    desc: "Урон +50 % своего Res.",
+    get name() { return tr("Frost Fur", "Ледяная шерсть") },
+    get desc() { return tr("Damage +50% of own Res.", "Урон +50 % своего Res.") },
     cd: 3,
     kind: "offense",
     spCost: 200,
@@ -53,8 +54,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_draconic",
-    name: "Шквал когтей",
-    desc: "Урон +30 % своего Str/Mag.",
+    get name() { return tr("Claw Flurry", "Шквал когтей") },
+    get desc() { return tr("Damage +30% of own Str/Mag.", "Урон +30 % своего Str/Mag.") },
     cd: 3,
     kind: "offense",
     spCost: 200,
@@ -63,8 +64,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_sol",
-    name: "Чистая рана",
-    desc: "Лечит 50 % нанесённого урона.",
+    get name() { return tr("Clean Wound", "Чистая рана") },
+    get desc() { return tr("Heals 50% of damage dealt.", "Лечит 50 % нанесённого урона.") },
     cd: 3,
     kind: "offense",
     spCost: 200,
@@ -73,8 +74,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_escutcheon",
-    name: "Пушистая стена",
-    desc: "−30 % урона от ближней атаки.",
+    get name() { return tr("Fluffy Wall", "Пушистая стена") },
+    get desc() { return tr("−30% damage from melee attacks.", "−30 % урона от ближней атаки.") },
     cd: 3,
     kind: "defense",
     spCost: 200,
@@ -83,8 +84,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_cowl",
-    name: "Хвост-щит",
-    desc: "−30 % урона от дальней атаки.",
+    get name() { return tr("Tail Shield", "Хвост-щит") },
+    get desc() { return tr("−30% damage from ranged attacks.", "−30 % урона от дальней атаки.") },
     cd: 3,
     kind: "defense",
     spCost: 200,
@@ -93,8 +94,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_miracle",
-    name: "Девять жизней",
-    desc: "Пережить смертельный удар с 1 HP (если HP > 1). Только коты.",
+    get name() { return tr("Nine Lives", "Девять жизней") },
+    get desc() { return tr("Survive a lethal blow with 1 HP (if HP > 1). Cats only.", "Пережить смертельный удар с 1 HP (если HP > 1). Только коты.") },
     cd: 5,
     kind: "defense",
     spCost: 200,
@@ -104,8 +105,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_loyalty",
-    name: "Верность",
-    desc: "−30 % урона от любой атаки и лечение на 30 % этого урона. Только псы.",
+    get name() { return tr("Loyalty", "Верность") },
+    get desc() { return tr("−30% damage from any attack and heals 30% of that damage. Dogs only.", "−30 % урона от любой атаки и лечение на 30 % этого урона. Только псы.") },
     cd: 4,
     kind: "defense",
     spCost: 200,
@@ -115,8 +116,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_squeak",
-    name: "Шмыг",
-    desc: "−40 % урона от любой атаки. Только мыши.",
+    get name() { return tr("Scurry", "Шмыг") },
+    get desc() { return tr("−40% damage from any attack. Mice only.", "−40 % урона от любой атаки. Только мыши.") },
     cd: 3,
     kind: "defense",
     spCost: 200,
@@ -126,8 +127,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_imbue",
-    name: "Мурчание исцеления",
-    desc: "+10 к лечению.",
+    get name() { return tr("Healing Purr", "Мурчание исцеления") },
+    get desc() { return tr("+10 to healing.", "+10 к лечению.") },
     cd: 1,
     kind: "heal",
     spCost: 200,
@@ -137,8 +138,8 @@ export const SPECIALS: readonly SpecialDef[] = [
   },
   {
     id: "sp_heavenly",
-    name: "Общий лай",
-    desc: "При лечении +10 HP всем союзникам.",
+    get name() { return tr("Chorus Bark", "Общий лай") },
+    get desc() { return tr("When healing, +10 HP to all allies.", "При лечении +10 HP всем союзникам.") },
     cd: 2,
     kind: "heal",
     spCost: 200,

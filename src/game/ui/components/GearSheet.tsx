@@ -9,6 +9,7 @@ import { $inventory, equipTalismanAction, equipWeaponAction } from "@game/state/
 import { haptic } from "@game/platform/haptics"
 import { BottomSheet } from "./Sheet"
 import { Button } from "./Button"
+import { tr } from "@game/i18n"
 
 type Toast = (msg: string, error?: boolean) => void
 
@@ -24,7 +25,7 @@ function rankNote(unit: UnitInstance, weaponId: string): { text: string, short: 
   const w = weaponDef(weaponId)
   const rank = rankAtLevel(unit.aptitudes[w.kind], unit.level)
   const short = rankIndex(rank) < rankIndex(w.requiredRank)
-  return { text: `${SKILL_LABELS[w.kind]} ${rank}${short ? ` · нужен ${w.requiredRank}` : ""}`, short }
+  return { text: `${SKILL_LABELS[w.kind]} ${rank}${short ? tr(` · needs ${w.requiredRank}`, ` · нужен ${w.requiredRank}`) : ""}`, short }
 }
 
 /** Шторка оружия: в лапах, купленное в инвентаре и бесплатное деревянное любого навыка. */
@@ -34,7 +35,7 @@ export function WeaponSheet({ unit, open, onClose, toast }: GearSheetProps) {
   const owned = WEAPONS.filter(w => w.grade !== "wood" && itemCount(inventory, w.id) > 0)
   const equip = (id: string) => {
     const r = equipWeaponAction(unit.id, id)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
     onClose()
   }
@@ -57,20 +58,24 @@ export function WeaponSheet({ unit, open, onClose, toast }: GearSheetProps) {
     )
   }
   return (
-    <BottomSheet open={open} onClose={onClose} title="⚔️ Оружие">
+    <BottomSheet open={open} onClose={onClose} title={tr("⚔️ Weapon", "⚔️ Оружие")}>
       <div className="stack">
-        {row(unit.skills.weapon, <span className="chip squad">{`В лапах · Mt ${weaponMt(unit)}`}</span>)}
-        {owned.length > 0 && <b className="small muted">Инвентарь</b>}
+        {row(unit.skills.weapon, <span className="chip squad">{tr(`In paws · Mt ${weaponMt(unit)}`, `В лапах · Mt ${weaponMt(unit)}`)}</span>)}
+        {owned.length > 0 && <b className="small muted">{tr("Inventory", "Инвентарь")}</b>}
         {owned
           .filter(w => w.id !== unit.skills.weapon)
-          .map(w => row(w.id, <Button sm primary onClick={() => equip(w.id)}>Взять</Button>, itemCount(inventory, w.id)))}
-        <b className="small muted">Деревянное (бесплатно)</b>
+          .map(w => row(w.id, <Button sm primary onClick={() => equip(w.id)}>{tr("Take", "Взять")}</Button>, itemCount(inventory, w.id)))}
+        <b className="small muted">{tr("Wooden (free)", "Деревянное (бесплатно)")}</b>
         {WEAPON_SKILLS.map(woodWeaponId)
           .filter(id => id !== unit.skills.weapon)
-          .map(id => row(id, <Button sm onClick={() => equip(id)}>Взять</Button>))}
+          .map(id => row(id, <Button sm onClick={() => equip(id)}>{tr("Take", "Взять")}</Button>))}
         <p className="muted small">
-          {"Сражаться можно любым оружием. Ранг навыка добавляет Mt, а ниже требуемого ранга оружие теряет Mt. "
-            + `Сейчас: ${SKILL_LABELS[unit.weaponSkill]} ${weaponRank(unit)}. Новое оружие — в Лавке.`}
+          {tr(
+            "Any weapon can be used. Skill rank adds Mt; below the required rank the weapon loses Mt. "
+            + `Now: ${SKILL_LABELS[unit.weaponSkill]} ${weaponRank(unit)}. New weapons are in the Shop.`,
+            "Сражаться можно любым оружием. Ранг навыка добавляет Mt, а ниже требуемого ранга оружие теряет Mt. "
+            + `Сейчас: ${SKILL_LABELS[unit.weaponSkill]} ${weaponRank(unit)}. Новое оружие — в Лавке.`
+          )}
         </p>
       </div>
     </BottomSheet>
@@ -84,13 +89,13 @@ export function TalismanSheet({ unit, open, onClose, toast }: GearSheetProps) {
   const owned = TALISMANS.filter(t => itemCount(inventory, t.id) > 0 && t.id !== unit.accessory)
   const put = (id: string | undefined) => {
     const r = equipTalismanAction(unit.id, id)
-    if (!r.ok) return toast(r.error ?? "Ошибка", true)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
     onClose()
   }
   const worn = unit.accessory ? talismanDef(unit.accessory) : undefined
   return (
-    <BottomSheet open={open} onClose={onClose} title="🔮 Талисман">
+    <BottomSheet open={open} onClose={onClose} title={tr("🔮 Talisman", "🔮 Талисман")}>
       <div className="stack">
         {worn && (
           <div className="skill-item equipped">
@@ -98,12 +103,12 @@ export function TalismanSheet({ unit, open, onClose, toast }: GearSheetProps) {
               <div>
                 <b>{`${worn.icon} ${worn.name}`}</b>
                 {" "}
-                <span className="chip squad">Надет</span>
+                <span className="chip squad">{tr("Worn", "Надет")}</span>
               </div>
               <div className="desc">{worn.desc}</div>
             </div>
             <Button sm ghost onClick={() => put(undefined)}>
-              Снять
+              {tr("Remove", "Снять")}
             </Button>
           </div>
         )}
@@ -117,12 +122,17 @@ export function TalismanSheet({ unit, open, onClose, toast }: GearSheetProps) {
               <div className="desc">{t.desc}</div>
             </div>
             <Button sm primary onClick={() => put(t.id)}>
-              Надеть
+              {tr("Equip", "Надеть")}
             </Button>
           </div>
         ))}
-        {!worn && owned.length === 0 && <p className="muted">Талисманов нет — загляните в Лавку.</p>}
-        <p className="muted small">Один талисман на бойца. Павший теряет его вместе с оружием, отпущенный — оставляет.</p>
+        {!worn && owned.length === 0 && <p className="muted">{tr("No Talismans — check the Shop.", "Талисманов нет — загляните в Лавку.")}</p>}
+        <p className="muted small">
+          {tr(
+            "One Talisman per fighter. The fallen lose it along with their weapon; the released leave it behind.",
+            "Один талисман на бойца. Павший теряет его вместе с оружием, отпущенный — оставляет."
+          )}
+        </p>
       </div>
     </BottomSheet>
   )

@@ -3,6 +3,7 @@ import { itemTargetsFrom, packItems } from "@game/core/battle/items"
 import { consumableDef } from "@game/content/items"
 import { applyItem, cancel, type BattleUiState } from "@game/state/battleUi"
 import { haptic } from "@game/platform/haptics"
+import { tr } from "@game/i18n"
 
 /** Рюкзак вылазки в бою: предмет и кому его дать (себе или соседу); массовый — только себе, лечит всех вокруг. */
 export function ItemMenu({ battle, ui }: { battle: BattleState, ui: BattleUiState }) {
@@ -12,10 +13,10 @@ export function ItemMenu({ battle, ui }: { battle: BattleState, ui: BattleUiStat
   const from = ui.movedTo ?? bu.pos
   const items = packItems(battle)
   return (
-    <div className="bf-items" role="dialog" aria-label="Предметы">
+    <div className="bf-items" role="dialog" aria-label={tr("Items", "Предметы")}>
       <div className="bf-items-head">
-        <b>🎒 Рюкзак</b>
-        <button type="button" className="bf-items-close" aria-label="Назад" onClick={cancel}>
+        <b>{tr("🎒 Backpack", "🎒 Рюкзак")}</b>
+        <button type="button" className="bf-items-close" aria-label={tr("Back", "Назад")} onClick={cancel}>
           ✕
         </button>
       </div>
@@ -30,7 +31,7 @@ export function ItemMenu({ battle, ui }: { battle: BattleState, ui: BattleUiStat
             </div>
             <div className="bf-item-targets">
               {targets.map((t) => {
-                const name = t.unitId === bu.unitId ? "Себе" : (battle.roster[t.unitId]?.name ?? "?")
+                const name = t.unitId === bu.unitId ? tr("Self", "Себе") : (battle.roster[t.unitId]?.name ?? "?")
                 return (
                   <button
                     key={t.unitId}

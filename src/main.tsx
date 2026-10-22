@@ -14,6 +14,7 @@ import { PwaBanners } from '@host/PwaBanners';
 import { AppCard } from '@host/AppCard';
 import { ConflictScreen } from '@host/ConflictScreen';
 import '@host/host.css';
+import { setLang, tr } from '@game/i18n';
 
 // my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Сама игра (src/game) синхронизируется из next-instapok
 // (tools/sync-game.mjs) и одинакова в обоих проектах; платформа подключается здесь через setGameHost и сторы игры.
@@ -25,7 +26,7 @@ function showFatal(message: string, stack: string): void {
   const box = document.createElement('div');
   box.className = 'fatal';
   const h = document.createElement('h2');
-  h.textContent = 'Что-то пошло не так';
+  h.textContent = tr('Something went wrong', 'Что-то пошло не так');
   const p = document.createElement('p');
   p.textContent = message;
   const pre = document.createElement('pre');
@@ -34,11 +35,11 @@ function showFatal(message: string, stack: string): void {
   row.className = 'row';
   const reload = document.createElement('button');
   reload.className = 'btn btn-primary';
-  reload.textContent = 'Перезапустить';
+  reload.textContent = tr('Restart', 'Перезапустить');
   reload.onclick = () => location.reload();
   const copy = document.createElement('button');
   copy.className = 'btn';
-  copy.textContent = 'Скопировать ошибку';
+  copy.textContent = tr('Copy error', 'Скопировать ошибку');
   copy.onclick = () => void navigator.clipboard?.writeText(`${message}\n${stack}`).catch(() => undefined);
   row.append(reload, copy);
   box.append(h, p, pre, row);
@@ -82,6 +83,8 @@ async function boot(): Promise<void> {
 
   const conflict = await reconcileCloudSave();
   if (!conflict) return start();
+  // Сейв ещё не загружен в игру — экран выбора показываем на языке локального сейва
+  setLang(conflict.local.settings.lang);
   root.render(
     <ConflictScreen
       conflict={conflict}

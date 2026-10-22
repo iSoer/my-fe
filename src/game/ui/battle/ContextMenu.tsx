@@ -11,6 +11,7 @@ import {
   type BattleUiState
 } from "@game/state/battleUi"
 import { haptic } from "@game/platform/haptics"
+import { tr } from "@game/i18n"
 
 interface MenuItem {
   key: string
@@ -41,19 +42,19 @@ export function ContextMenu({ ui, topBand }: { ui: BattleUiState, topBand: numbe
   const a = ui.actions
 
   const items: MenuItem[] = []
-  if (a.attack) items.push({ key: "attack", icon: "⚔️", label: "Атаковать", primary: true, onClick: chooseAttack })
-  if (a.assist) items.push({ key: "assist", icon: "🩹", label: "Поддержать", onClick: chooseAssist })
+  if (a.attack) items.push({ key: "attack", icon: "⚔️", label: tr("Attack", "Атаковать"), primary: true, onClick: chooseAttack })
+  if (a.assist) items.push({ key: "assist", icon: "🩹", label: tr("Assist", "Поддержать"), onClick: chooseAssist })
   if (a.move)
-    items.push({ key: "move", icon: "🐾", label: "Идти", primary: !a.attack && atOrigin, onClick: chooseMove })
+    items.push({ key: "move", icon: "🐾", label: tr("Move", "Идти"), primary: !a.attack && atOrigin, onClick: chooseMove })
   items.push({
     key: "wait",
     icon: "💤",
-    label: "Ждать",
+    label: tr("Wait", "Ждать"),
     primary: !a.attack && !atOrigin,
     onClick: () => void waitHere()
   })
-  if (a.items) items.push({ key: "items", icon: "🎒", label: "Предметы", onClick: chooseItems })
-  items.push({ key: "cancel", icon: "✕", label: "Отмена", onClick: cancel })
+  if (a.items) items.push({ key: "items", icon: "🎒", label: tr("Items", "Предметы"), onClick: chooseItems })
+  items.push({ key: "cancel", icon: "✕", label: tr("Cancel", "Отмена"), onClick: cancel })
 
   const n = items.length
   const w = n * BTN + (n - 1) * GAP + PAD * 2
@@ -69,7 +70,7 @@ export function ContextMenu({ ui, topBand }: { ui: BattleUiState, topBand: numbe
     : { left: `${cx}px`, top: `${tileBottom + 12}px`, transform: "translate(-50%, 0)" }
 
   return (
-    <div className={`bf-menu ${above ? "above" : "below"}`} style={style} role="group" aria-label="Действия бойца">
+    <div className={`bf-menu ${above ? "above" : "below"}`} style={style} role="group" aria-label={tr("Fighter actions", "Действия бойца")}>
       <span className="bf-menu-notch" style={{ left: `${notchLeft}px` }} />
       {items.map((it, i) => (
         <button

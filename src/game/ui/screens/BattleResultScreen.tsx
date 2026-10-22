@@ -12,7 +12,8 @@ import { UnitAvatar } from "../components/UnitAvatar"
 import { StatBar } from "../components/Stats"
 import { useToast } from "../components/Toast"
 import { RewardPicker } from "../components/RewardPicker"
-import { STAT_LABELS, difficultyName, g, plural } from "../lib/format"
+import { STAT_LABELS, difficultyName, g } from "../lib/format"
+import { plural, tr } from "@game/i18n"
 import { stagger, useCountUp } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
 
@@ -103,7 +104,9 @@ export function BattleResultScreen() {
   }, [result])
   if (!lb) return <div className="screen" />
 
-  const title = lb.result === "victory" ? "ПОБЕДА" : lb.result === "defeat" ? "ПОРАЖЕНИЕ" : "ОТСТУПЛЕНИЕ"
+  const title = lb.result === "victory"
+    ? tr("VICTORY", "ПОБЕДА")
+    : lb.result === "defeat" ? tr("DEFEAT", "ПОРАЖЕНИЕ") : tr("RETREAT", "ОТСТУПЛЕНИЕ")
   const mvp = lb.mvpId ? lb.survivors.find(u => u.id === lb.mvpId) : undefined
   const next = delaySequence(300)
   // Карточки появляются сверху вниз: первые задержки берутся в том же порядке, что и в разметке
@@ -129,13 +132,13 @@ export function BattleResultScreen() {
             ·
             {lb.turns}
             {" "}
-            {plural(lb.turns, "ход", "хода", "ходов")}
+            {plural(lb.turns, ["turn", "turns"], ["ход", "хода", "ходов"])}
           </div>
         </div>
 
         {lb.fallen.length > 0 && (
           <div className="stack">
-            <div className="section-title danger">☠ Павшие</div>
+            <div className="section-title danger">{tr("☠ The Fallen", "☠ Павшие")}</div>
             {lb.fallen.map((f, i) => (
               <div key={f.id} className="card fallen-card grave" style={stagger(i, 160)}>
                 <UnitAvatar unit={f.unit} size="md" dead />
@@ -143,10 +146,10 @@ export function BattleResultScreen() {
                   <b>{displayName(f.unit)}</b>
                   <div className="muted small">
                     {unitClassName(f.unit)}
-                    , ур.
+                    {tr(", lv.", ", ур.")}
                     {f.unit.level}
-                    {f.killerName ? ` · ${g(f.unit.gender, "убит", "убита")}: ${f.killerName}` : ""}
-                    {f.battleTurn ? ` · ход ${f.battleTurn}` : ""}
+                    {f.killerName ? ` · ${tr("killed by", g(f.unit.gender, "убит", "убита"))}: ${f.killerName}` : ""}
+                    {f.battleTurn ? ` · ${tr("turn", "ход")} ${f.battleTurn}` : ""}
                   </div>
                   <div className="epitaph">
                     «
@@ -161,15 +164,18 @@ export function BattleResultScreen() {
 
         {lb.armyFell && (
           <div className="card warning-box stack pop-in" style={{ animationDelay: `${fellDelay}ms` }}>
-            <div>РОСТЕР ПАЛ</div>
+            <div>{tr("ROSTER WIPED OUT", "РОСТЕР ПАЛ")}</div>
             <div className="small" style={{ fontWeight: 400 }}>
-              Никого не осталось. Слава начислена; Сержант Барбос в Казарме выдаст новый стартовый ростер.
+              {tr(
+                "Nobody’s left. Glory has been awarded; Sergeant Barkley in the Barracks will issue a new starter roster.",
+                "Никого не осталось. Слава начислена; Сержант Барбос в Казарме выдаст новый стартовый ростер."
+              )}
             </div>
           </div>
         )}
 
         <div className="card stack pop-in" style={{ animationDelay: `${rewardsDelay}ms` }}>
-          <div className="section-title">Награды</div>
+          <div className="section-title">{tr("Rewards", "Награды")}</div>
           <div className="reward-chips">
             <span className="reward-chip">
               <span className="ico">🦴</span>
@@ -179,28 +185,35 @@ export function BattleResultScreen() {
               <span className="ico">✦</span>
               <Counter value={lb.rewards.glory} />
             </span>
-            {lb.rewards.flawless && <span className="chip squad pop">Без потерь +50%</span>}
+            {lb.rewards.flawless && <span className="chip squad pop">{tr("Flawless +50%", "Без потерь +50%")}</span>}
           </div>
           <div className="muted small">
-            {`Выбито из врагов: 🦴 ${lb.rewards.loot}`}
+            {`${tr("Looted from enemies", "Выбито из врагов")}: 🦴 ${lb.rewards.loot}`}
             {lb.result === "victory" && lb.rewards.treats > lb.rewards.loot
-              ? ` · за победу: 🦴 ${lb.rewards.treats - lb.rewards.loot}`
+              ? ` · ${tr("victory bonus", "за победу")}: 🦴 ${lb.rewards.treats - lb.rewards.loot}`
               : ""}
           </div>
           {lb.rewards.lost > 0 && (
             <div className="small danger">
-              {`${lb.result === "defeat" ? "Поражение" : "Отступление"}: потеряно 🦴 ${lb.rewards.lost} — `
-                + "целиком добыча достаётся только победителям."}
+              {lb.result === "defeat"
+                ? tr(
+                    `Defeat: lost 🦴 ${lb.rewards.lost} — only winners keep all the loot.`,
+                    `Поражение: потеряно 🦴 ${lb.rewards.lost} — целиком добыча достаётся только победителям.`
+                  )
+                : tr(
+                    `Retreat: lost 🦴 ${lb.rewards.lost} — only winners keep all the loot.`,
+                    `Отступление: потеряно 🦴 ${lb.rewards.lost} — целиком добыча достаётся только победителям.`
+                  )}
             </div>
           )}
           <div className="row wrap small muted">
             <span>
-              Убийств:
+              {tr("Kills:", "Убийств:")}
               {" "}
               <b>{lb.kills}</b>
             </span>
             <span>
-              Урона:
+              {tr("Damage:", "Урона:")}
               {" "}
               <b>{lb.damage}</b>
             </span>
@@ -215,7 +228,7 @@ export function BattleResultScreen() {
 
         {lb.survivors.length > 0 && (
           <div className="card ink stack pop-in" style={{ animationDelay: `${xpDelay}ms` }}>
-            <div className="section-title">Опыт</div>
+            <div className="section-title">{tr("Experience", "Опыт")}</div>
             {lb.survivors.map((u, i) => {
               const lvl = lb.levelUps.find(l => l.unitId === u.id)
               const xp = lb.xp[u.id] ?? 0
@@ -229,7 +242,7 @@ export function BattleResultScreen() {
                       {mvp?.id === u.id && <span className="chip gold">🏆</span>}
                       {lvl && (
                         <span className="lvl-arrow" style={{ animationDelay: `${rowDelay + 300}ms` }}>
-                          Ур.
+                          {tr("Lv.", "Ур.")}
                           {" "}
                           {lvl.from}
                           {" "}
@@ -273,7 +286,7 @@ export function BattleResultScreen() {
             style={{ animationDelay: `${next(120)}ms` }}
             onClick={() => navigate("/village", true)}
           >
-            В деревню
+            {tr("To the village", "В деревню")}
           </Button>
         </div>
       </div>
