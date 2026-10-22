@@ -196,6 +196,8 @@ export interface OutfitArt {
   pose?: string
   /** Окрас зверька: лапы, держащие предмет, и пучок волос. */
   fur?: { fur: string, dark: string, line: string }
+  /** Оружие в правой лапе (art/held.ts): правый кулак рисует оружие, одинаковый предмет в левой лапе не дублируется. */
+  weapon?: string
 }
 
 /** Высота глаз (как в critter.ts). */
@@ -470,9 +472,28 @@ function shieldFace(outfit: Outfit, rich: boolean): { face: string, rim: string,
   return { face: outfit.color, rim: rich ? GOLD : "#d4dae2", mark: outfit.accent }
 }
 
+/** Посох в левой лапе при посохе-оружии в правой (и книга при гримуаре) — лишний: остаётся оружие. */
+function duplicatesWeapon(hand: HandKind, weapon: string | undefined): boolean {
+  return ((hand === "staff" || hand === "crozier") && weapon === "whiteMagic") || (hand === "book" && weapon === "blackMagic")
+}
+
+/** Левая лапа свободна (нет щита, посоха, книги…): в ней можно показать второй кастет. */
+export function leftPawFree(a: OutfitArt): boolean {
+  if (!a.classId) return true
+  const hand = outfitOf(a.classId).hand
+  return !hand || duplicatesWeapon(hand, a.weapon)
+}
+
+/** Лапа, держащая оружие: в перчатке/бинтах/рукавице наряда или просто лапа окраса. */
+export function heldPawSvg(a: OutfitArt, x: number, y: number): string {
+  const outfit = a.classId ? outfitOf(a.classId) : undefined
+  if (outfit?.paws) return fist(a, outfit, x, y)
+  return paw(a, x, y, 6.4)
+}
+
 /** Предмет в левой лапе: щит, посох, книга, шар, веер. Рисуется до головы. */
 function handItem(a: OutfitArt, outfit: Outfit): string {
-  if (!outfit.hand) return ""
+  if (!outfit.hand || duplicatesWeapon(outfit.hand, a.weapon)) return ""
   const { cy, rx } = bodyGeom(a.species)
   const rich = a.tier === "master" || a.tier === "divine"
   const hx = 60 - rx - 1
@@ -596,28 +617,30 @@ function handItem(a: OutfitArt, outfit: Outfit): string {
   }
 }
 
-/** Кулаки по бокам тела: боксёрские перчатки, бинты, золотые латные рукавицы. */
+/** Кулак в перчатке наряда: боксёрская перчатка, бинты или золотая латная рукавица. */
+function fist(a: OutfitArt, outfit: Outfit, x: number, y: number): string {
+  switch (outfit.paws) {
+    case "gloves":
+      return `<rect x="${f1(x - 7)}" y="${f1(y + 6)}" width="14" height="6" rx="2" fill="#ffffff" stroke="#adb5bd" stroke-width="1" />
+          <circle cx="${f1(x)}" cy="${f1(y)}" r="10" fill="#d62828" stroke="#7a1010" stroke-width="1.5" />
+          <path d="M${f1(x - 5)} ${f1(y - 1)} q2 6 9 4" fill="none" stroke="#7a1010" stroke-width="1.2" />
+          <ellipse cx="${f1(x - 3)}" cy="${f1(y - 5)}" rx="3.4" ry="2.2" fill="#ffffff" opacity=".55" />`
+    case "wraps":
+      return `${paw(a, x, y, 7.5)}<path d="M${f1(x - 7)} ${f1(y - 3)} l14 2 M${f1(x - 7.5)} ${f1(y + 1)} l15 2 M${f1(x - 6)} ${f1(y + 5)} l12 1.5" stroke="#f8f1dc" stroke-width="2.6" stroke-linecap="round" />`
+    default:
+      return `<path d="M${f1(x - 6)} ${f1(y + 6)} l-2 6 h16 l-2 -6 z" fill="${GOLD}" stroke="#b8860b" stroke-width="1" />
+          <rect x="${f1(x - 9)}" y="${f1(y - 8)}" width="18" height="16" rx="6" fill="${GOLD}" stroke="#b8860b" stroke-width="1.5" />
+          <path d="M${f1(x - 6)} ${f1(y - 8)} v6 M${f1(x - 2)} ${f1(y - 8)} v6 M${f1(x + 2)} ${f1(y - 8)} v6 M${f1(x + 6)} ${f1(y - 8)} v6" stroke="#b8860b" stroke-width="1.1" />
+          <circle cx="${f1(x)}" cy="${f1(y + 3)}" r="2.2" fill="#ff6f9c" />`
+  }
+}
+
+/** Кулаки по бокам тела: боксёрские перчатки, бинты, золотые латные рукавицы. Правый — с оружием (art/held.ts). */
 function pawGear(a: OutfitArt, outfit: Outfit): string {
   if (!outfit.paws) return ""
   const { cy, rx } = bodyGeom(a.species)
   const y = cy + 3
-  const fist = (x: number): string => {
-    switch (outfit.paws) {
-      case "gloves":
-        return `<rect x="${f1(x - 7)}" y="${y + 6}" width="14" height="6" rx="2" fill="#ffffff" stroke="#adb5bd" stroke-width="1" />
-          <circle cx="${f1(x)}" cy="${y}" r="10" fill="#d62828" stroke="#7a1010" stroke-width="1.5" />
-          <path d="M${f1(x - 5)} ${y - 1} q2 6 9 4" fill="none" stroke="#7a1010" stroke-width="1.2" />
-          <ellipse cx="${f1(x - 3)}" cy="${y - 5}" rx="3.4" ry="2.2" fill="#ffffff" opacity=".55" />`
-      case "wraps":
-        return `${paw(a, x, y, 7.5)}<path d="M${f1(x - 7)} ${y - 3} l14 2 M${f1(x - 7.5)} ${y + 1} l15 2 M${f1(x - 6)} ${y + 5} l12 1.5" stroke="#f8f1dc" stroke-width="2.6" stroke-linecap="round" />`
-      default:
-        return `<path d="M${f1(x - 6)} ${y + 6} l-2 6 h16 l-2 -6 z" fill="${GOLD}" stroke="#b8860b" stroke-width="1" />
-          <rect x="${f1(x - 9)}" y="${y - 8}" width="18" height="16" rx="6" fill="${GOLD}" stroke="#b8860b" stroke-width="1.5" />
-          <path d="M${f1(x - 6)} ${y - 8} v6 M${f1(x - 2)} ${y - 8} v6 M${f1(x + 2)} ${y - 8} v6 M${f1(x + 6)} ${y - 8} v6" stroke="#b8860b" stroke-width="1.1" />
-          <circle cx="${f1(x)}" cy="${y + 3}" r="2.2" fill="#ff6f9c" />`
-    }
-  }
-  return `<g class="paws">${fist(60 - rx - 1)}${fist(60 + rx + 1)}</g>`
+  return `<g class="paws">${fist(a, outfit, 60 - rx - 1, y)}${a.weapon ? "" : fist(a, outfit, 60 + rx + 1, y)}</g>`
 }
 
 /** Шипастые наплечники или один большой наплечник гладиатора. */

@@ -1,19 +1,35 @@
-import type Phaser from "phaser"
+import Phaser from "phaser"
 import type { BattleState, UnitInstance } from "@game/core/types"
+import type { WeaponVariant } from "@game/core/skills/types"
+import type { WeaponGrade } from "@shared/character/skills"
 import { artWeapon, type ArtWeapon } from "@game/art/index"
 import { weaponDef } from "@game/content/weapons"
 import { TEX } from "./textures"
-import { floatText, sceneAlive, wait } from "./fx"
-import { arrowShot, magicBolt, slashTrail, shockRing, thrustLine } from "./motionFx"
+import { debrisBurst, dustPuff, floatText, ichorSplash, sceneAlive, wait } from "./fx"
+import {
+  MTEX,
+  afterImages,
+  arrowShot,
+  ensureMotionTextures,
+  magicBolt,
+  reducedMotion,
+  shakeCam,
+  shakeMul,
+  shockRing,
+  slashTrail,
+  thrustLine
+} from "./motionFx"
 import { tr } from "@game/i18n"
 
 /** Цвет тёмной (Black Magic) и светлой (White Magic) магии. */
 const DARK_MAGIC = 0xb15cff
+const DARK_CORE = 0x2a0a3d
 const LIGHT_MAGIC = 0xffe8a3
 
 /**
- * Персональные анимации атак по типу оружия: замах/бросок атакующего, фирменный эффект на защищающемся,
- * «ощутимость» удара (хит-стоп, зум-удар, тряска). Только презентация, без игровой логики.
+ * Персональные анимации атак по виду оружия: замах/бросок атакующего, фирменный эффект на защищающемся,
+ * «ощутимость» удара (хит-стоп, зум-удар, тряска). Материал оружия красит след и искры, разновидность даёт акцент
+ * (Killer — красная вспышка, slayer — зелёная «эффективно»). Только презентация, без игровой логики.
  */
 
 export type FxTarget = Phaser.GameObjects.Image | Phaser.GameObjects.Container
@@ -38,6 +54,14 @@ export interface AttackFxCtx {
   size: number
   /** Цвет оружия (hex number). */
   color: number
+  /** Материал оружия (след, искры, блик). По умолчанию — железо. */
+  grade?: WeaponGrade
+  /** Разновидность оружия (акцент удара). */
+  variant?: WeaponVariant
+  /** Цель — зомби (враг): к обычной крови добавляются зеленоватые брызги. */
+  zombie?: boolean
+  /** Y земли под целью (трещина от топора). */
+  groundY?: number
   /** Сцена в режиме пропуска — декорации можно сократить. */
   skipped?: boolean
 }
@@ -58,7 +82,86 @@ export function weaponKindOfUnit(unit: UnitInstance): ArtWeapon {
 
 export function weaponKindOf(state: BattleState, unitId: string): ArtWeapon {
   const unit = state.roster[unitId]
-  return unit ? weaponKindOfUnit(unit) : "claw"
+  return unit ? weaponKindOfUnit(unit) : "sword"
+}
+
+export interface WeaponLook {
+  kind: ArtWeapon
+  grade: WeaponGrade
+  variant: WeaponVariant
+}
+
+/** Вид, материал и разновидность оружия бойца — всё, что влияет на рисунок удара. */
+export function weaponLookOfUnit(unit: UnitInstance | undefined): WeaponLook {
+  if (!unit) return { kind: "sword", grade: "iron", variant: "basic" }
+  const w = weaponDef(unit.skills.weapon)
+  return { kind: artWeapon(w.kind), grade: w.grade, variant: w.variant }
+}
+
+/** Разновидность «против кого-то»: эффективность подсвечивается зелёным. */
+export function isSlayer(variant: WeaponVariant | undefined): boolean {
+  return variant === "armorslayer" || variant === "cavslayer"
+}
+
+/* ---------- Материал ---------- */
+
+interface Material {
+  /** Цвет следа взмаха/укола. */
+  trail: number
+  /** Цвет наконечника/кромки. */
+  edge: number
+  /** Искры при попадании. */
+  sparks: number[]
+  /** Блик металла на замахе (дерево не блестит). */
+  glint: number | null
+  /** Дерево: вместо искр — щепки. */
+  splinters: boolean
+  /** Масштаб магии и бликов. */
+  power: number
+}
+
+const MATERIAL: Record<WeaponGrade, Material> = {
+  wood: {
+    trail: 0xe9c08a,
+    edge: 0x8d5a2b,
+    sparks: [0xd9a066, 0x8d5a2b, 0xf1d3a1],
+    glint: null,
+    splinters: true,
+    power: 0.85
+  },
+  iron: {
+    trail: 0xf1f3f5,
+    edge: 0xadb5bd,
+    sparks: [0xffd166, 0xff9f1c, 0xfff3b0],
+    glint: 0xffffff,
+    splinters: false,
+    power: 1
+  },
+  steel: {
+    trail: 0xcfe8ff,
+    edge: 0x8ecae6,
+    sparks: [0xbfe3ff, 0xffffff, 0x8ecae6],
+    glint: 0xcfe8ff,
+    splinters: false,
+    power: 1.12
+  },
+  silver: {
+    trail: 0xf4fbff,
+    edge: 0xe0f4ff,
+    sparks: [0xffffff, 0xe0f4ff, 0xb8e0ff],
+    glint: 0xffffff,
+    splinters: false,
+    power: 1.25
+  }
+}
+
+function materialOf(ctx: AttackFxCtx): Material {
+  return MATERIAL[ctx.grade ?? "iron"]
+}
+
+/** Цвета брызг на цели: зомби — зеленоватые поверх красных, остальные — красные. */
+function bloodTints(ctx: AttackFxCtx): number[] {
+  return ctx.zombie ? [0x9acd32, 0x6b8e23, 0xd9122b] : [0xd9122b, 0xff2e4a]
 }
 
 /* ---------- Ощутимость удара ---------- */
@@ -85,9 +188,10 @@ export function zoomPunch(scene: Phaser.Scene, amount: number, ms: number): void
   if (!sceneAlive(scene)) return
   const cam = scene.cameras.main
   const base = cam.zoom
+  const amt = 1 + (amount - 1) * shakeMul()
   scene.tweens.add({
     targets: cam,
-    zoom: base * amount,
+    zoom: base * amt,
     duration: ms / 2,
     yoyo: true,
     ease: "Quad.easeOut",
@@ -115,7 +219,7 @@ function freezeTweens(scene: Phaser.Scene, factor: number, realMs: number): void
 export function impactFeel(scene: Phaser.Scene, f: ImpactFeel): void {
   if (!sceneAlive(scene)) return
   const px = shakePx(f.special, f.effective) + Math.min(4, f.damage / 12)
-  scene.cameras.main.shake(140 / f.speed, px / Math.max(1, scene.scale.width))
+  shakeCam(scene, 140 / f.speed, px)
   zoomPunch(scene, f.special ? 1.07 : 1.05, 160 / f.speed)
   if (f.heavy && !f.skipped && f.damage > 0) {
     if (f.special) {
@@ -224,11 +328,27 @@ function burst(
   ttl: number,
   texture: string = TEX.dot
 ): void {
-  if (!sceneAlive(scene)) return
+  if (!sceneAlive(scene) || count <= 0) return
   const e = scene.add.particles(x, y, texture, { ...cfg, emitting: false, quantity: count })
   e.setDepth(24)
   e.explode(count)
   later(scene, ttl, () => safeDestroy(e))
+}
+
+/** Мягкая вспышка (ADD) у точки: растёт и тает. */
+function glow(scene: Phaser.Scene, x: number, y: number, from: number, to: number, color: number, ms: number, alpha = 1): void {
+  if (!sceneAlive(scene)) return
+  const g = scene.add.image(x, y, MTEX.glow).setDepth(28).setTint(color).setBlendMode(Phaser.BlendModes.ADD)
+  g.setAlpha(alpha).setDisplaySize(from, from)
+  scene.tweens.add({
+    targets: g,
+    displayWidth: to,
+    displayHeight: to,
+    alpha: 0,
+    duration: ms,
+    ease: "Cubic.easeOut",
+    onComplete: () => safeDestroy(g)
+  })
 }
 
 function impactStar(scene: Phaser.Scene, x: number, y: number, size: number, color: number, speed: number): void {
@@ -248,9 +368,95 @@ function impactStar(scene: Phaser.Scene, x: number, y: number, size: number, col
   })
 }
 
+/** Блик металла: четырёхлучевая звёздочка на клинке/наконечнике. */
+function glint(scene: Phaser.Scene, x: number, y: number, size: number, color: number, speed: number, power = 1): void {
+  if (!sceneAlive(scene)) return
+  const star = scene.add.image(x, y, TEX.star).setTint(color).setDepth(29).setBlendMode(Phaser.BlendModes.ADD)
+  star.setDisplaySize(size * 0.05, size * 0.05).setAngle(0)
+  scene.tweens.add({
+    targets: star,
+    displayWidth: size * 0.3 * power,
+    displayHeight: size * 0.3 * power,
+    angle: 90,
+    duration: 120 / speed,
+    yoyo: true,
+    ease: "Sine.easeOut",
+    onComplete: () => safeDestroy(star)
+  })
+  glow(scene, x, y, size * 0.05, size * 0.32 * power, color, 220 / speed, 0.8)
+}
+
+/** Осколки-треугольники разлетаются от точки (щепки дерева, камни, лёд). */
+function shards(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  size: number,
+  speed: number,
+  count: number,
+  fill: number,
+  stroke: number,
+  dir = 0
+): void {
+  if (!sceneAlive(scene)) return
+  for (let i = 0; i < count; i++) {
+    const g = scene.add.graphics().setDepth(26).setPosition(x, y)
+    const t = size * 0.05
+    g.fillStyle(fill, 0.95)
+    g.lineStyle(1, stroke, 1)
+    g.fillTriangle(-t * 0.4, t, t * 0.4, t, 0, -t * 1.8)
+    g.strokeTriangle(-t * 0.4, t, t * 0.4, t, 0, -t * 1.8)
+    // dir ≠ 0 — конус по направлению удара, иначе по кругу
+    const a = dir !== 0
+      ? (dir > 0 ? 0 : Math.PI) + (i / Math.max(1, count - 1) - 0.5) * 1.6 - 0.4
+      : (i / count) * Math.PI * 2 + 0.3
+    const r = size * (0.4 + (i % 3) * 0.1)
+    scene.tweens.add({
+      targets: g,
+      x: x + Math.cos(a) * r,
+      y: y + Math.sin(a) * r + size * 0.3,
+      angle: 180 + i * 75,
+      alpha: 0,
+      duration: 420 / speed,
+      ease: "Quad.easeOut",
+      onComplete: () => safeDestroy(g)
+    })
+  }
+}
+
+/** Попадание оружием: искры цвета материала (конус по удару) или щепки у дерева. */
+function weaponHit(ctx: AttackFxCtx, x: number, y: number, count: number): void {
+  const { scene, size, speed, dir } = ctx
+  const m = materialOf(ctx)
+  if (m.splinters) {
+    shards(scene, x, y, size, speed, Math.max(3, Math.round(count * 0.6)), 0xd9a066, 0x6d4c41, dir)
+    return
+  }
+  const base = dir > 0 ? 0 : 180
+  burst(
+    scene,
+    x,
+    y,
+    {
+      speed: { min: size * 1.4, max: size * 3.2 },
+      angle: { min: base - 70, max: base + 40 },
+      scale: { start: 0.32, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: { min: 140, max: 300 },
+      gravityY: size * 3,
+      tint: m.sparks,
+      blendMode: Phaser.BlendModes.ADD
+    },
+    count,
+    360 / speed,
+    MTEX.streak
+  )
+  glow(scene, x, y, size * 0.1, size * 0.55, m.sparks[0] ?? 0xffffff, 160 / speed, 0.9)
+}
+
 /* ---------- Фирменные эффекты на цели ---------- */
 
-/** Три диагональных пореза: белая сердцевина с красной кромкой, появляются по очереди. */
+/** Три диагональных пореза: белая сердцевина с кромкой цвета крови, появляются по очереди. */
 function slashMarks(
   scene: Phaser.Scene,
   x: number,
@@ -258,7 +464,8 @@ function slashMarks(
   size: number,
   dir: number,
   speed: number,
-  scale = 1
+  scale = 1,
+  tints: number[] = [0xd9122b, 0xff2e4a]
 ): void {
   if (!sceneAlive(scene)) return
   const len = size * 0.62 * scale
@@ -266,15 +473,16 @@ function slashMarks(
   const ang = (-38 * dir * Math.PI) / 180
   for (let i = 0; i < 3; i++) {
     later(scene, (i * 40) / speed, () => {
-      const g = scene.add.graphics().setDepth(26)
       const cx = x + (i - 1) * gap * 0.9
       const cy = y + (i - 1) * gap * 0.35
+      // Рисуем относительно центра пореза: масштаб «прорезания» — от центра, а не от начала координат
+      const g = scene.add.graphics().setDepth(26).setPosition(cx, cy).setRotation(ang)
+      g.lineStyle(size * 0.05 * scale, tints[0] ?? 0xd9122b, 0.75)
+      g.lineBetween(-len / 2, 0, len / 2, 0)
+      g.lineStyle(size * 0.022 * scale, 0xffffff, 1)
+      g.lineBetween(-len / 2, 0, len / 2, 0)
       const dx = Math.cos(ang) * len * 0.5
       const dy = Math.sin(ang) * len * 0.5
-      g.lineStyle(size * 0.05 * scale, 0xd9122b, 0.75)
-      g.lineBetween(cx - dx, cy - dy, cx + dx, cy + dy)
-      g.lineStyle(size * 0.022 * scale, 0xffffff, 1)
-      g.lineBetween(cx - dx, cy - dy, cx + dx, cy + dy)
       g.setScale(0.2, 1)
       scene.tweens.add({ targets: g, scaleX: 1, duration: 70 / speed, ease: "Cubic.easeOut" })
       scene.tweens.add({
@@ -284,6 +492,7 @@ function slashMarks(
         delay: 180 / speed,
         onComplete: () => safeDestroy(g)
       })
+      if (i !== 1) return
       burst(
         scene,
         cx + dx * 0.3,
@@ -294,73 +503,17 @@ function slashMarks(
           scale: { start: 0.6 * scale, end: 0.1 },
           lifespan: { min: 250, max: 500 },
           gravityY: size * 2,
-          tint: [0xd9122b, 0xff2e4a]
+          tint: tints
         },
-        6,
+        7,
         700
       )
     })
   }
 }
 
-/** Челюсти смыкаются сверху и снизу, остаётся кольцо следов зубов. */
-function jawClamp(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, scale = 1): void {
-  if (!sceneAlive(scene)) return
-  const h = size * 0.28 * scale
-  const w = size * 0.42 * scale
-  const top = scene.add.graphics().setDepth(26)
-  const bot = scene.add.graphics().setDepth(26)
-  const teeth = (g: Phaser.GameObjects.Graphics, up: boolean): void => {
-    g.fillStyle(0xffffff, 1)
-    g.lineStyle(1.5, 0x2e1f33, 1)
-    const n = 4
-    for (let i = 0; i < n; i++) {
-      const tx = -w / 2 + (i + 0.5) * (w / n)
-      const ty = up ? -h : h
-      g.fillTriangle(tx - w / (n * 2), ty, tx + w / (n * 2), ty, tx, 0)
-      g.strokeTriangle(tx - w / (n * 2), ty, tx + w / (n * 2), ty, tx, 0)
-    }
-  }
-  teeth(top, true)
-  teeth(bot, false)
-  top.setPosition(x, y - h * 1.6)
-  bot.setPosition(x, y + h * 1.6)
-  scene.tweens.add({ targets: top, y: y - h * 0.25, duration: 90 / speed, ease: "Back.easeIn" })
-  scene.tweens.add({ targets: bot, y: y + h * 0.25, duration: 90 / speed, ease: "Back.easeIn" })
-  later(scene, 90 / speed, () => {
-    // След от укуса: кольцо маленьких треугольников
-    const ring = scene.add.graphics().setDepth(25).setPosition(x, y)
-    ring.fillStyle(0x9b0f20, 0.85)
-    const r = size * 0.2 * scale
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2
-      const px = Math.cos(a) * r
-      const py = Math.sin(a) * r * 0.75
-      const t = size * 0.035 * scale
-      ring.fillTriangle(px - t, py - t, px + t, py - t, px, py + t * 1.4)
-    }
-    scene.tweens.add({
-      targets: ring,
-      alpha: 0,
-      duration: 450 / speed,
-      delay: 150 / speed,
-      onComplete: () => safeDestroy(ring)
-    })
-    scene.tweens.add({
-      targets: [top, bot],
-      alpha: 0,
-      duration: 140 / speed,
-      delay: 60 / speed,
-      onComplete: () => {
-        safeDestroy(top)
-        safeDestroy(bot)
-      }
-    })
-  })
-}
-
-/** Дуга замаха палкой. */
-function swingArc(scene: Phaser.Scene, x: number, y: number, radius: number, dir: number, speed: number): void {
+/** Дуга замаха над атакующим (топор). */
+function swingArc(scene: Phaser.Scene, x: number, y: number, radius: number, dir: number, speed: number, color = 0xfff3b0): void {
   if (!sceneAlive(scene)) return
   const g = scene.add.graphics().setDepth(26).setPosition(x, y)
   const start = dir > 0 ? -2.1 : Math.PI + 2.1
@@ -369,7 +522,7 @@ function swingArc(scene: Phaser.Scene, x: number, y: number, radius: number, dir
   g.beginPath()
   g.arc(0, 0, radius, start, end, dir < 0)
   g.strokePath()
-  g.lineStyle(radius * 0.06, 0xfff3b0, 0.9)
+  g.lineStyle(radius * 0.06, color, 0.9)
   g.beginPath()
   g.arc(0, 0, radius * 1.05, start, end, dir < 0)
   g.strokePath()
@@ -384,8 +537,175 @@ function swingArc(scene: Phaser.Scene, x: number, y: number, radius: number, dir
   })
 }
 
-/** Угли поднимаются с цели после шипения. */
-function embers(scene: Phaser.Scene, x: number, y: number, size: number): void {
+/** Пробой копьём: «выходные» брызги и штрихи за спиной цели. */
+function pierceExit(ctx: AttackFxCtx, x: number, y: number, scale = 1): void {
+  const { scene, size, speed, dir } = ctx
+  const base = dir > 0 ? 0 : 180
+  burst(
+    scene,
+    x,
+    y,
+    {
+      speed: { min: size * 1.2, max: size * 2.8 },
+      angle: { min: base - 18, max: base + 18 },
+      scale: { start: 0.5 * scale, end: 0.05 },
+      alpha: { start: 1, end: 0.2 },
+      lifespan: { min: 200, max: 420 },
+      gravityY: size * 3,
+      tint: bloodTints(ctx)
+    },
+    Math.round(8 * scale),
+    500 / speed
+  )
+  burst(
+    scene,
+    x,
+    y,
+    {
+      speed: { min: size * 2.2, max: size * 3.6 },
+      angle: { min: base - 6, max: base + 6 },
+      scale: { start: 0.4 * scale, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 160,
+      tint: [0xffffff, materialOf(ctx).trail],
+      blendMode: Phaser.BlendModes.ADD
+    },
+    4,
+    260 / speed,
+    MTEX.streak
+  )
+}
+
+/** Трещина в земле и обломки после удара топором. */
+function groundCrack(ctx: AttackFxCtx, x: number, y: number, scale = 1): void {
+  const { scene, size, speed } = ctx
+  if (!sceneAlive(scene)) return
+  const g = scene.add.graphics().setDepth(9).setPosition(x, y)
+  const len = size * 0.5 * scale
+  const draw = (w: number, color: number, alpha: number): void => {
+    g.lineStyle(w, color, alpha)
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + 0.4
+      let px = 0
+      let py = 0
+      g.beginPath()
+      g.moveTo(px, py)
+      for (let k = 1; k <= 3; k++) {
+        const r = (len * k) / 3 * (0.7 + ((i * 7 + k * 3) % 5) * 0.08)
+        const jit = (((i * 13 + k * 5) % 7) - 3) * 0.08
+        px = Math.cos(a + jit) * r
+        py = Math.sin(a + jit) * r * 0.32
+        g.lineTo(px, py)
+      }
+      g.strokePath()
+    }
+  }
+  draw(Math.max(2, size * 0.03 * scale), 0x1b1209, 0.85)
+  draw(Math.max(1, size * 0.01 * scale), 0x8a7a63, 0.7)
+  g.setScale(0.2)
+  scene.tweens.add({ targets: g, scale: 1, duration: 90 / speed, ease: "Cubic.easeOut" })
+  scene.tweens.add({ targets: g, alpha: 0, duration: 500 / speed, delay: 520 / speed, onComplete: () => safeDestroy(g) })
+  if (materialOf(ctx).splinters) shards(scene, x, y - size * 0.05, size * scale, speed, 5, 0xd9a066, 0x6d4c41)
+  debrisBurst(scene, x, y - size * 0.03, size * scale, Math.round(8 * scale), speed)
+  dustPuff(scene, x, y, size * 0.7 * scale, Math.round(8 * scale))
+}
+
+/** Стрела торчит из цели, подрагивает и тает. */
+function stuckArrow(ctx: AttackFxCtx, x: number, y: number, scale = 1): void {
+  const { scene, size, speed, dir } = ctx
+  if (!sceneAlive(scene)) return
+  const L = size * 0.3 * scale
+  const g = scene.add.graphics().setDepth(27).setPosition(x, y)
+  g.lineStyle(Math.max(2, size * 0.03 * scale), 0x6d4c41, 1)
+  g.lineBetween(-L, 0, 0, 0)
+  g.fillStyle(0xe63946, 1)
+  g.fillTriangle(-L, 0, -L - size * 0.07 * scale, -size * 0.05 * scale, -L + size * 0.05 * scale, 0)
+  g.fillTriangle(-L, 0, -L - size * 0.07 * scale, size * 0.05 * scale, -L + size * 0.05 * scale, 0)
+  const ang = dir > 0 ? 12 : 168
+  g.setAngle(ang)
+  scene.tweens.add({ targets: g, angle: ang - 7 * dir, duration: 50 / speed, yoyo: true, repeat: 2 })
+  scene.tweens.add({ targets: g, alpha: 0, duration: 220 / speed, delay: 520 / speed, onComplete: () => safeDestroy(g) })
+}
+
+/** Натяжение тетивы: штрихи сходятся к руке, свечение растёт. */
+function drawCharge(scene: Phaser.Scene, x: number, y: number, size: number, ms: number, color: number): void {
+  if (!sceneAlive(scene)) return
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4
+    const r = size * 0.32
+    const s = scene.add
+      .image(x + Math.cos(a) * r, y + Math.sin(a) * r, MTEX.streak)
+      .setRotation(a)
+      .setTint(color)
+      .setAlpha(0)
+      .setDepth(27)
+      .setBlendMode(Phaser.BlendModes.ADD)
+    s.setDisplaySize(size * 0.18, Math.max(2, size * 0.02))
+    scene.tweens.add({
+      targets: s,
+      x,
+      y,
+      alpha: { from: 0.9, to: 0 },
+      displayWidth: size * 0.04,
+      duration: ms,
+      ease: "Quad.easeIn",
+      onComplete: () => safeDestroy(s)
+    })
+  }
+  const g = scene.add.image(x, y, MTEX.glow).setDepth(27).setTint(color).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.2)
+  g.setDisplaySize(size * 0.06, size * 0.06)
+  scene.tweens.add({
+    targets: g,
+    displayWidth: size * 0.26,
+    displayHeight: size * 0.26,
+    alpha: 0.85,
+    duration: ms,
+    ease: "Quad.easeIn",
+    onComplete: () => safeDestroy(g)
+  })
+}
+
+/** Круг рун на земле под кастером: сплющенное кольцо, вращается и гаснет. */
+function runeCircle(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, color: number, ms: number): void {
+  if (!sceneAlive(scene)) return
+  const c = scene.add.container(x, y).setDepth(9)
+  c.setScale(0.2, 0.07)
+  const g = scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD)
+  const r = size * 0.42
+  g.lineStyle(Math.max(2, size * 0.02), color, 0.95)
+  g.strokeCircle(0, 0, r)
+  g.lineStyle(Math.max(1, size * 0.01), 0xffffff, 0.6)
+  g.strokeCircle(0, 0, r * 0.78)
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    const t = size * 0.035
+    g.fillStyle(i % 2 ? 0xffffff : color, 0.9)
+    g.fillTriangle(
+      Math.cos(a) * r * 0.9 - t * 0.5,
+      Math.sin(a) * r * 0.9,
+      Math.cos(a) * r * 0.9 + t * 0.5,
+      Math.sin(a) * r * 0.9,
+      Math.cos(a) * r * 0.9,
+      Math.sin(a) * r * 0.9 - t
+    )
+  }
+  // Пентаграмма внутри
+  g.lineStyle(Math.max(1, size * 0.008), color, 0.8)
+  g.beginPath()
+  for (let i = 0; i <= 5; i++) {
+    const a = ((i * 2) % 5) / 5 * Math.PI * 2 - Math.PI / 2
+    if (i === 0) g.moveTo(Math.cos(a) * r * 0.75, Math.sin(a) * r * 0.75)
+    else g.lineTo(Math.cos(a) * r * 0.75, Math.sin(a) * r * 0.75)
+  }
+  g.strokePath()
+  c.add(g)
+  scene.tweens.add({ targets: c, scaleX: 1, scaleY: 0.34, duration: 160 / speed, ease: "Back.easeOut" })
+  scene.tweens.add({ targets: g, angle: 160, duration: ms, ease: "Sine.easeInOut" })
+  scene.tweens.add({ targets: c, alpha: 0, duration: 220 / speed, delay: ms - 200 / speed, onComplete: () => safeDestroy(c) })
+}
+
+/** Тёмные клочья поднимаются вверх (от кастера или от цели). */
+function darkWisps(scene: Phaser.Scene, x: number, y: number, size: number, count = 8): void {
   burst(
     scene,
     x,
@@ -393,219 +713,226 @@ function embers(scene: Phaser.Scene, x: number, y: number, size: number): void {
     {
       speed: { min: size * 0.3, max: size * 0.9 },
       angle: { min: 240, max: 300 },
-      scale: { start: 0.6, end: 0 },
-      alpha: { start: 1, end: 0 },
+      scale: { start: 0.7, end: 0 },
+      alpha: { start: 0.9, end: 0 },
       lifespan: { min: 400, max: 800 },
       gravityY: -size * 0.8,
-      tint: [0xff6b35, 0xff9f1c, 0xffd166]
+      tint: [DARK_MAGIC, 0x7b2cbf, 0x3c096c, 0xe0aaff]
     },
-    10,
+    count,
     1000
   )
 }
 
-/** Три синих кольца летят от головы атакующего к цели. */
-function howlRings(
+/** Столб тьмы из земли под целью. */
+function darkPillar(scene: Phaser.Scene, x: number, groundY: number, size: number, height: number, speed: number): void {
+  if (!sceneAlive(scene)) return
+  const ray = scene.add.image(x, groundY, MTEX.ray).setOrigin(0.5, 1).setDepth(27).setTint(DARK_MAGIC)
+  ray.setBlendMode(Phaser.BlendModes.ADD).setDisplaySize(size * 0.42, 1)
+  const core = scene.add.image(x, groundY, MTEX.ray).setOrigin(0.5, 1).setDepth(26).setTint(DARK_CORE).setAlpha(0.75)
+  core.setDisplaySize(size * 0.22, 1)
+  scene.tweens.add({ targets: [ray, core], displayHeight: height, duration: 110 / speed, ease: "Cubic.easeOut" })
+  scene.tweens.add({
+    targets: [ray, core],
+    alpha: 0,
+    displayWidth: size * 0.05,
+    duration: 260 / speed,
+    delay: 160 / speed,
+    onComplete: () => {
+      safeDestroy(ray)
+      safeDestroy(core)
+    }
+  })
+}
+
+/** Взрыв тьмы: тёмная сфера, фиолетовое кольцо, осколки и клочья. */
+function darkBlast(scene: Phaser.Scene, x: number, y: number, size: number, speed: number): void {
+  if (!sceneAlive(scene)) return
+  const ball = scene.add.circle(x, y, size * 0.1, DARK_CORE, 0.8).setDepth(26)
+  scene.tweens.add({
+    targets: ball,
+    radius: size * 0.42,
+    alpha: 0,
+    duration: 320 / speed,
+    ease: "Cubic.easeOut",
+    onComplete: () => safeDestroy(ball)
+  })
+  const ring = scene.add.image(x, y, TEX.ring).setTint(DARK_MAGIC).setDepth(27).setBlendMode(Phaser.BlendModes.ADD)
+  ring.setDisplaySize(size * 0.2, size * 0.2)
+  scene.tweens.add({
+    targets: ring,
+    displayWidth: size * 1.4,
+    displayHeight: size * 1.4,
+    alpha: 0,
+    duration: 340 / speed,
+    ease: "Cubic.easeOut",
+    onComplete: () => safeDestroy(ring)
+  })
+  darkWisps(scene, x, y, size, 9)
+}
+
+/** Тычок светом: луч из навершия посоха к цели. Промис — касание. */
+function lightBeam(
   scene: Phaser.Scene,
   from: { x: number, y: number },
   to: { x: number, y: number },
   size: number,
-  speed: number,
-  scale = 1
+  speed: number
 ): Promise<void> {
   if (!sceneAlive(scene)) return Promise.resolve()
-  const travel = 240 / speed
-  for (let i = 0; i < 3; i++) {
-    later(scene, (i * 70) / speed, () => {
-      const ring = scene.add
-        .image(from.x, from.y - size * 0.1, TEX.ring)
-        .setTint(0x3a86ff)
-        .setDepth(24)
-        .setAlpha(0.9)
-      ring.setDisplaySize(size * 0.25 * scale, size * 0.25 * scale)
-      const s = ring.scaleX
-      scene.tweens.add({
-        targets: ring,
-        x: to.x,
-        y: to.y,
-        scaleX: s * 5,
-        scaleY: s * 5,
-        alpha: 0.1,
-        duration: travel,
-        ease: "Sine.easeIn",
-        onComplete: () => safeDestroy(ring)
-      })
-    })
+  const ang = Math.atan2(to.y - from.y, to.x - from.x)
+  const len = Math.hypot(to.x - from.x, to.y - from.y)
+  const mk = (h: number, color: number, alpha: number): Phaser.GameObjects.Image => {
+    const img = scene.add
+      .image(from.x, from.y, MTEX.streak)
+      .setOrigin(0, 0.5)
+      .setRotation(ang)
+      .setDepth(27)
+      .setTint(color)
+      .setAlpha(alpha)
+      .setBlendMode(Phaser.BlendModes.ADD)
+    img.setDisplaySize(1, h)
+    return img
   }
-  return wait(scene, travel + 60 / speed)
-}
-
-/** Осколки льда разлетаются от цели. */
-function iceShards(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, count = 6): void {
-  if (!sceneAlive(scene)) return
-  for (let i = 0; i < count; i++) {
-    const g = scene.add.graphics().setDepth(26).setPosition(x, y)
-    const t = size * 0.07
-    g.fillStyle(0xbfe9ff, 0.95)
-    g.lineStyle(1, 0x5fa8ff, 1)
-    g.fillTriangle(-t * 0.5, t, t * 0.5, t, 0, -t * 1.6)
-    g.strokeTriangle(-t * 0.5, t, t * 0.5, t, 0, -t * 1.6)
-    const a = (i / count) * Math.PI * 2 + 0.3
-    const r = size * 0.55
+  const outer = mk(size * 0.14, LIGHT_MAGIC, 0.7)
+  const inner = mk(size * 0.04, 0xffffff, 1)
+  const ms = Math.max(70, len * 0.25) / speed
+  return new Promise((resolve) => {
     scene.tweens.add({
-      targets: g,
-      x: x + Math.cos(a) * r,
-      y: y + Math.sin(a) * r + size * 0.25,
-      angle: 180 + i * 60,
-      alpha: 0,
-      duration: 420 / speed,
-      ease: "Quad.easeOut",
-      onComplete: () => safeDestroy(g)
+      targets: [outer, inner],
+      displayWidth: len,
+      duration: ms,
+      ease: "Cubic.easeOut",
+      onComplete: () => {
+        scene.tweens.add({
+          targets: [outer, inner],
+          alpha: 0,
+          displayHeight: 1,
+          duration: 200 / speed,
+          onComplete: () => {
+            safeDestroy(outer)
+            safeDestroy(inner)
+          }
+        })
+        resolve()
+      }
     })
-  }
+  })
 }
 
-/** Зелёный вихрь вокруг цели + листья. */
-function windSwirl(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, ms: number): void {
-  if (!sceneAlive(scene)) return
-  const c = scene.add.container(x, y).setDepth(26)
-  for (let i = 0; i < 3; i++) {
-    const g = scene.add.graphics()
-    const r = size * (0.28 + i * 0.1)
-    g.lineStyle(size * 0.035, i === 1 ? 0x80ed99 : 0x2ec4b6, 0.85 - i * 0.2)
-    g.beginPath()
-    g.arc(0, 0, r, (i * Math.PI * 2) / 3, (i * Math.PI * 2) / 3 + Math.PI * 0.9, false)
-    g.strokePath()
-    g.setScale(1, 0.55)
-    c.add(g)
-  }
-  scene.tweens.add({ targets: c, angle: 540, duration: ms, ease: "Cubic.easeOut" })
-  scene.tweens.add({ targets: c, alpha: 0, duration: ms * 0.4, delay: ms * 0.6, onComplete: () => safeDestroy(c) })
+/** Звёздочки света разлетаются от точки. */
+function lightStars(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, count = 6): void {
   burst(
     scene,
     x,
     y,
     {
-      speed: { min: size * 0.5, max: size * 1.3 },
+      speed: { min: size * 0.6, max: size * 1.6 },
       angle: { min: 0, max: 360 },
-      scale: { start: 0.5, end: 0.1 },
+      scale: { start: 0.9, end: 0 },
       alpha: { start: 1, end: 0 },
-      lifespan: { min: 350, max: 600 },
       rotate: { min: 0, max: 360 },
-      gravityY: size * 0.5,
-      tint: [0x57cc99, 0x2ec4b6, 0x80ed99, 0x1b998b]
+      lifespan: { min: 300, max: 520 },
+      tint: [LIGHT_MAGIC, 0xffffff, 0xfff3b0]
     },
-    12,
-    800,
-    TEX.square
+    count,
+    620 / speed,
+    TEX.star
+  )
+  glow(scene, x, y, size * 0.1, size * 0.8, LIGHT_MAGIC, 260 / speed, 0.9)
+}
+
+/** Короткое ударное кольцо (один толчок кастета). */
+function popRing(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, color: number): void {
+  if (!sceneAlive(scene)) return
+  const ring = scene.add.image(x, y, TEX.ring).setDepth(27).setTint(color).setAlpha(0.95)
+  ring.setDisplaySize(size * 0.1, size * 0.1)
+  scene.tweens.add({
+    targets: ring,
+    displayWidth: size * 0.6,
+    displayHeight: size * 0.6,
+    alpha: 0,
+    duration: 180 / speed,
+    ease: "Cubic.easeOut",
+    onComplete: () => safeDestroy(ring)
+  })
+  impactStar(scene, x, y, size * 0.6, 0xfff3b0, speed)
+}
+
+/** Красная крит-вспышка (Killer). */
+function critFlash(scene: Phaser.Scene, x: number, y: number, size: number, speed: number): void {
+  if (!sceneAlive(scene)) return
+  const k = shakeMul()
+  glow(scene, x, y, size * 0.2, size * 1.6, 0xff2e4a, 280 / speed, 0.9 * k)
+  const star = scene.add.image(x, y, TEX.star).setTint(0xff2e4a).setDepth(29).setBlendMode(Phaser.BlendModes.ADD)
+  star.setDisplaySize(size * 0.15, size * 0.15)
+  scene.tweens.add({
+    targets: star,
+    displayWidth: size * 1.1,
+    displayHeight: size * 1.1,
+    angle: 30,
+    alpha: 0,
+    duration: 260 / speed,
+    ease: "Quad.easeOut",
+    onComplete: () => safeDestroy(star)
+  })
+  burst(
+    scene,
+    x,
+    y,
+    {
+      speed: { min: size * 2, max: size * 3.2 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.4, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 220,
+      rotate: 0,
+      tint: [0xff2e4a, 0xffffff],
+      blendMode: Phaser.BlendModes.ADD
+    },
+    8,
+    300 / speed,
+    MTEX.streak
   )
 }
 
-/** Веер репейников летит в цель и прилипает. Возвращает промис попадания первого. */
-function burrFan(
-  scene: Phaser.Scene,
-  from: { x: number, y: number },
-  to: { x: number, y: number },
-  size: number,
-  speed: number,
-  count: number,
-  stick: number,
-  scale = 1
-): Promise<void> {
-  if (!sceneAlive(scene)) return Promise.resolve()
-  const travel = 240 / speed
-  const r = size * 0.05 * scale
-  for (let i = 0; i < count; i++) {
-    later(scene, (i * 40) / speed, () => {
-      const g = scene.add.graphics().setDepth(25).setPosition(from.x, from.y)
-      g.fillStyle(0x7a8a3a, 1)
-      g.lineStyle(1.2, 0x4f5c22, 1)
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2
-        g.lineBetween(0, 0, Math.cos(a) * r * 1.9, Math.sin(a) * r * 1.9)
-      }
-      g.fillCircle(0, 0, r)
-      g.strokeCircle(0, 0, r)
-      const ox = (i - (count - 1) / 2) * size * 0.14 * scale
-      const oy = ((i % 2) - 0.5) * size * 0.16 * scale
-      scene.tweens.add({
-        targets: g,
-        x: to.x + ox,
-        y: to.y + oy,
-        angle: 540,
-        duration: travel,
-        ease: "Quad.easeIn",
-        onComplete: () => {
-          scene.tweens.add({
-            targets: g,
-            alpha: 0,
-            duration: 150 / speed,
-            delay: stick / speed,
-            onComplete: () => safeDestroy(g)
-          })
-        }
-      })
+/** «Эффективно»: двойное кольцо (зелёное у slayer-оружия, иначе оранжево-красное). */
+function effectiveFlash(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, green: boolean): void {
+  if (!sceneAlive(scene)) return
+  const color = green ? 0x57e389 : 0xff8c42
+  glow(scene, x, y, size * 0.2, size * 1.1, color, 260 / speed, 0.7 * shakeMul())
+  for (let i = 0; i < 2; i++) {
+    const ring = scene.add.image(x, y, TEX.ring).setDepth(27).setTint(color).setAlpha(0.95)
+    ring.setDisplaySize(size * 0.3, size * 0.3)
+    scene.tweens.add({
+      targets: ring,
+      displayWidth: size * (1.2 + i * 0.4),
+      displayHeight: size * (1.2 + i * 0.4),
+      alpha: 0,
+      delay: (i * 70) / speed,
+      duration: 300 / speed,
+      ease: "Cubic.easeOut",
+      onComplete: () => safeDestroy(ring)
     })
   }
-  return wait(scene, travel + 10)
 }
 
-/** Розовая ударная волна + ноты/сердечки к цели. Возвращает промис попадания. */
-function purrWave(
-  scene: Phaser.Scene,
-  from: { x: number, y: number },
-  to: { x: number, y: number },
-  size: number,
-  speed: number,
-  scale = 1
-): Promise<void> {
-  if (!sceneAlive(scene)) return Promise.resolve()
-  const travel = 240 / speed
-  const ring = scene.add.image(from.x, from.y, TEX.ring).setTint(0xff6f9c).setDepth(24).setAlpha(0.85)
-  ring.setDisplaySize(size * 0.3 * scale, size * 0.3 * scale)
-  const s = ring.scaleX
-  scene.tweens.add({
-    targets: ring,
-    scaleX: s * 4,
-    scaleY: s * 4,
-    alpha: 0,
-    duration: travel,
-    ease: "Quad.easeOut",
-    onComplete: () => safeDestroy(ring)
-  })
-  const glyphs = ["♪", "♥", "♫"]
-  glyphs.forEach((gl, i) => {
-    later(scene, (i * 50) / speed, () => {
-      const t = scene.add
-        .text(from.x, from.y - size * 0.1, gl, {
-          fontFamily: "system-ui, sans-serif",
-          fontSize: `${Math.round(size * 0.16 * scale)}px`,
-          color: i === 1 ? "#ff6f9c" : "#f7a8c4",
-          fontStyle: "bold",
-          stroke: "#000",
-          strokeThickness: 2
-        })
-        .setOrigin(0.5)
-        .setDepth(26)
-      scene.tweens.add({
-        targets: t,
-        x: to.x,
-        y: to.y - size * (0.25 - i * 0.12),
-        duration: travel,
-        ease: "Sine.easeInOut",
-        onComplete: () => {
-          scene.tweens.add({
-            targets: t,
-            alpha: 0,
-            y: t.y - size * 0.2,
-            duration: 200 / speed,
-            onComplete: () => safeDestroy(t)
-          })
-        }
-      })
-    })
-  })
-  return wait(scene, travel)
+/** Общие акценты в момент контакта: разновидность, эффективность, зомби, удар без урона. */
+function impactAccents(ctx: AttackFxCtx, quick: boolean): void {
+  const { scene, size, speed, dir, defPos, kind } = ctx
+  if (!sceneAlive(scene)) return
+  const magic = kind === "blackMagic" || kind === "whiteMagic"
+  if (ctx.damage <= 0) {
+    // Удар не прошёл: лязг металла или магия рассеялась (на карте искры даёт презентер)
+    if (quick) return
+    if (magic) dustPuff(scene, defPos.x, defPos.y, size * 0.6, 8)
+    else weaponHit(ctx, defPos.x - dir * size * 0.12, defPos.y, 12)
+    return
+  }
+  const s = quick ? 0.75 : 1
+  if (ctx.variant === "killer") critFlash(scene, defPos.x, defPos.y, size * s, speed)
+  if (ctx.effective) effectiveFlash(scene, defPos.x, defPos.y, size * s, speed, isSlayer(ctx.variant))
+  if (ctx.zombie) ichorSplash(scene, defPos.x, defPos.y, size, dir, speed, quick ? 0.9 : 1.6)
 }
 
 /* ---------- Движение атакующего (кинематик) ---------- */
@@ -617,134 +944,191 @@ interface Motion {
   settle: Promise<void>
 }
 
-/** Выпад к цели и возврат. frac — доля расстояния до цели. */
-function lungeMotion(
-  ctx: AttackFxCtx,
-  frac: number,
-  inMs: number,
-  outMs: number,
-  hold = 0,
-  extra?: () => void
-): Motion {
-  const { scene, attacker, home, dir, speed, atkPos, defPos } = ctx
-  const reach = Math.max(ctx.size * 0.3, (Math.abs(defPos.x - atkPos.x) - ctx.size * 0.35) * frac)
-  const target = home.x + dir * reach
+/** Дистанция рывка: frac — доля расстояния до цели. */
+function reach(ctx: AttackFxCtx, frac: number): number {
+  return Math.max(ctx.size * 0.3, (Math.abs(ctx.defPos.x - ctx.atkPos.x) - ctx.size * 0.35) * frac)
+}
+
+/**
+ * Обёртка хореографии: body получает hit() — вызвать в момент контакта (если не вызван — контакт в конце).
+ * После body атакующий гарантированно возвращается на место (позиция, поворот, масштаб).
+ */
+function choreo(ctx: AttackFxCtx, body: (hit: () => void) => Promise<void>): Motion {
+  const { attacker, home } = ctx
+  const bx = attacker.scaleX
+  const by = attacker.scaleY
   let resolveImpact: () => void = () => undefined
   const impact = new Promise<void>(r => (resolveImpact = r))
   const settle = (async () => {
-    await tweenP(scene, { targets: attacker, x: target, duration: inMs / speed, ease: "Quad.easeIn" })
-    extra?.()
-    resolveImpact()
-    if (hold > 0) await wait(scene, hold / speed)
-    await tweenP(scene, { targets: attacker, x: home.x, duration: outMs / speed, ease: "Quad.easeOut" })
-    if (attacker.scene) attacker.setX(home.x)
+    try {
+      await body(resolveImpact)
+    }
+    finally {
+      resolveImpact()
+      if (attacker.scene) {
+        attacker.setPosition(home.x, home.y)
+        attacker.setAngle(0)
+        attacker.setScale(bx, by)
+      }
+    }
   })()
   return { impact, settle }
 }
 
-/** Небольшой наклон/замах на месте, затем проекция (projectile) и возврат. */
-function castMotion(ctx: AttackFxCtx, leanMs: number, project: () => Promise<void>, lean = 10): Motion {
-  const { scene, attacker, home, dir, speed } = ctx
-  let resolveImpact: () => void = () => undefined
-  const impact = new Promise<void>(r => (resolveImpact = r))
-  const bx = attacker.scaleX
-  const by = attacker.scaleY
-  const settle = (async () => {
-    await tweenP(scene, {
-      targets: attacker,
-      x: home.x - dir * lean,
-      scaleX: bx * 0.94,
-      scaleY: by * 1.04,
-      duration: leanMs / speed,
-      ease: "Quad.easeOut"
-    })
-    scene.tweens.add({
-      targets: attacker,
-      x: home.x + dir * lean * 1.4,
-      scaleX: bx * 1.06,
-      scaleY: by * 0.97,
-      duration: (leanMs * 0.6) / speed,
-      ease: "Back.easeOut"
-    })
-    await project()
-    resolveImpact()
-    await tweenP(scene, {
-      targets: attacker,
-      x: home.x,
-      scaleX: bx,
-      scaleY: by,
-      duration: 180 / speed,
-      ease: "Quad.easeOut"
-    })
-    if (attacker.scene) {
-      attacker.setX(home.x)
-      attacker.setScale(bx, by)
-    }
-  })()
-  return { impact, settle }
+/** Возврат на место после удара. */
+function recover(ctx: AttackFxCtx, ms: number, bx: number, by: number): Promise<void> {
+  return tweenP(ctx.scene, {
+    targets: ctx.attacker,
+    x: ctx.home.x,
+    y: ctx.home.y,
+    angle: 0,
+    scaleX: bx,
+    scaleY: by,
+    duration: ms / ctx.speed,
+    ease: "Quad.easeOut"
+  })
 }
 
 /* ---------- Кинематик: хореография по оружию ---------- */
 
 export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
-  const { scene, kind, defender, defPos, atkPos, dir, speed, size, color } = ctx
+  const { scene, kind, attacker, defender, defPos, atkPos, home, dir, speed, size } = ctx
   if (!sceneAlive(scene)) return { impactAt: Promise.resolve(), done: Promise.resolve() }
+  ensureMotionTextures(scene)
   const skipped = ctx.skipped || scene.tweens.timeScale >= 10
   const deco = !skipped
+  const m = materialOf(ctx)
+  const brave = ctx.variant === "brave"
+  const calm = reducedMotion()
+  const groundY = ctx.groundY ?? defPos.y + size * 0.45
+  const bx = attacker.scaleX
+  const by = attacker.scaleY
   let motion: Motion
 
   switch (kind) {
-    case "claw": {
-      motion = lungeMotion(ctx, 0.6, 120, 180, 40, () => {
-        if (!deco) return
-        slashTrail(scene, defPos.x, defPos.y, size * 0.9, dir, 0xff9aa2, speed, ctx.special)
-        slashMarks(scene, defPos.x, defPos.y, size, dir, speed)
-        squash(scene, defender, 0.85, 180 / speed)
-      })
-      break
-    }
-    case "fang": {
-      motion = lungeMotion(ctx, 0.7, 130, 200, 90, () => {
-        if (!deco) return
-        thrustLine(
-          scene,
-          { x: defPos.x - dir * size * 0.6, y: defPos.y },
-          { x: defPos.x + dir * size * 0.15, y: defPos.y },
-          size,
-          0x8ecae6,
-          speed
-        )
-        jawClamp(scene, defPos.x, defPos.y, size, speed)
-        later(scene, 90 / speed, () => squash(scene, defender, 0.8, 200 / speed))
-      })
-      break
-    }
-    case "stick": {
-      const { attacker, home } = ctx
-      let resolveImpact: () => void = () => undefined
-      const impact = new Promise<void>(r => (resolveImpact = r))
-      const settle = (async () => {
-        // Замах назад
+    case "sword": {
+      // Замах с бликом клинка → рывок → рубящая дуга, порезы, искры. Brave — второй взмах крест-накрест.
+      motion = choreo(ctx, async (hit) => {
         await tweenP(scene, {
           targets: attacker,
-          angle: -28 * dir,
-          x: home.x - dir * size * 0.06,
-          duration: 160 / speed,
+          x: home.x - dir * size * 0.05,
+          angle: -12 * dir,
+          duration: 130 / speed,
           ease: "Quad.easeOut"
         })
-        // Удар: доворот и выпад
-        const reach = Math.max(size * 0.3, (Math.abs(defPos.x - atkPos.x) - size * 0.35) * 0.4)
+        if (deco && m.glint !== null) glint(scene, attacker.x + dir * size * 0.18, atkPos.y - size * 0.3, size, m.glint, speed, m.power)
+        if (deco) {
+          await wait(scene, 60 / speed)
+          afterImages(scene, attacker, 3, 25, m.trail, speed)
+        }
         await tweenP(scene, {
           targets: attacker,
-          angle: 40 * dir,
-          x: home.x + dir * reach,
+          x: home.x + dir * reach(ctx, 0.6),
+          angle: 14 * dir,
+          duration: 100 / speed,
+          ease: "Cubic.easeIn"
+        })
+        if (deco) {
+          slashTrail(scene, defPos.x, defPos.y, size * 0.95, dir, m.trail, speed, ctx.special)
+          if (ctx.damage > 0) slashMarks(scene, defPos.x, defPos.y, size, dir, speed, 1, bloodTints(ctx))
+          weaponHit(ctx, defPos.x - dir * size * 0.1, defPos.y - size * 0.05, 10)
+          squash(scene, defender, 0.85, 180 / speed)
+        }
+        hit()
+        if (brave && deco) {
+          await wait(scene, 70 / speed)
+          await tweenP(scene, { targets: attacker, angle: -8 * dir, duration: 60 / speed, ease: "Quad.easeOut" })
+          slashTrail(scene, defPos.x, defPos.y, size * 0.9, dir, m.trail, speed, false, true)
+          weaponHit(ctx, defPos.x - dir * size * 0.08, defPos.y + size * 0.05, 6)
+          jitter(scene, defender, 3, 160 / speed)
+        }
+        await wait(scene, 60 / speed)
+        await recover(ctx, 200, bx, by)
+      })
+      break
+    }
+    case "spear": {
+      // Отвод назад → рывок-выпад → прямой след укола насквозь, брызги за спиной цели.
+      motion = choreo(ctx, async (hit) => {
+        await tweenP(scene, {
+          targets: attacker,
+          x: home.x - dir * size * 0.12,
+          scaleX: bx * 0.92,
+          angle: -5 * dir,
+          duration: 150 / speed,
+          ease: "Quad.easeOut"
+        })
+        if (deco && m.glint !== null) glint(scene, attacker.x + dir * size * 0.32, atkPos.y, size, m.glint, speed, m.power * 0.8)
+        if (deco) {
+          await wait(scene, 40 / speed)
+          afterImages(scene, attacker, 3, 22, m.trail, speed)
+        }
+        await tweenP(scene, {
+          targets: attacker,
+          x: home.x + dir * reach(ctx, 0.8),
+          scaleX: bx * 1.08,
+          angle: 4 * dir,
+          duration: 80 / speed,
+          ease: "Expo.easeIn"
+        })
+        const thrust = (dy: number, scale: number): void => {
+          thrustLine(
+            scene,
+            { x: attacker.x + dir * size * 0.1, y: defPos.y + dy },
+            { x: defPos.x + dir * size * 0.5, y: defPos.y + dy },
+            size * scale,
+            m.trail,
+            speed
+          )
+          if (ctx.damage > 0) pierceExit(ctx, defPos.x + dir * size * 0.22, defPos.y + dy, scale)
+          weaponHit(ctx, defPos.x - dir * size * 0.12, defPos.y + dy, 5)
+        }
+        if (deco) {
+          thrust(0, 1)
+          later(scene, 60 / speed, () => squash(scene, defender, 0.8, 200 / speed))
+        }
+        hit()
+        if (brave && deco) {
+          await tweenP(scene, { targets: attacker, x: attacker.x - dir * size * 0.08, duration: 60 / speed, yoyo: true })
+          thrust(-size * 0.1, 0.8)
+        }
+        await wait(scene, 110 / speed)
+        await recover(ctx, 200, bx, by)
+      })
+      break
+    }
+    case "axe": {
+      // Подъём над головой → пауза-«вес» с бликом → рубящий удар вниз, трещина в земле, обломки, тряска.
+      motion = choreo(ctx, async (hit) => {
+        await tweenP(scene, {
+          targets: attacker,
+          angle: -38 * dir,
+          x: home.x - dir * size * 0.06,
+          y: home.y - size * 0.05,
+          scaleY: by * 1.05,
+          duration: 200 / speed,
+          ease: "Quad.easeOut"
+        })
+        if (deco) {
+          if (m.glint !== null) glint(scene, attacker.x - dir * size * 0.02, atkPos.y - size * 0.48, size, m.glint, speed, m.power)
+          if (!calm) jitter(scene, attacker, 1.5, 150 / speed)
+          await wait(scene, 150 / speed)
+        }
+        await tweenP(scene, {
+          targets: attacker,
+          angle: 34 * dir,
+          x: home.x + dir * reach(ctx, 0.45),
+          y: home.y,
+          scaleY: by * 0.94,
           duration: 90 / speed,
           ease: "Cubic.easeIn"
         })
         if (deco) {
-          slashTrail(scene, defPos.x - dir * size * 0.05, defPos.y, size * 0.8, dir, 0x2ec4b6, speed, true)
-          swingArc(scene, attacker.x + dir * size * 0.1, atkPos.y, size * 0.55, dir, speed)
+          slashTrail(scene, defPos.x - dir * size * 0.05, defPos.y, size * 0.85, dir, m.trail, speed, true)
+          swingArc(scene, attacker.x + dir * size * 0.1, atkPos.y, size * 0.55, dir, speed, m.trail)
           impactStar(scene, defPos.x - dir * size * 0.1, defPos.y - size * 0.05, size, 0xffd166, speed)
+          groundCrack(ctx, defPos.x - dir * size * 0.05, groundY)
+          shakeCam(scene, 200 / speed, 9)
           floatText(scene, defPos.x, defPos.y - size * 0.55, tr("CRACK", "ХРЯСЬ"), "#ffd166", speed, {
             size: size * 0.16,
             rise: size * 0.3,
@@ -753,209 +1137,280 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
           })
           knockback(scene, defender, dir * size * 0.25, 260 / speed)
         }
-        resolveImpact()
-        await wait(scene, 70 / speed)
-        await tweenP(scene, { targets: attacker, angle: 0, x: home.x, duration: 220 / speed, ease: "Quad.easeOut" })
-        if (attacker.scene) {
-          attacker.setAngle(0)
-          attacker.setX(home.x)
+        hit()
+        if (brave && deco) {
+          await wait(scene, 90 / speed)
+          swingArc(scene, attacker.x + dir * size * 0.1, atkPos.y + size * 0.1, size * 0.45, dir, speed, m.trail)
+          impactStar(scene, defPos.x, defPos.y + size * 0.1, size * 0.8, 0xffd166, speed)
+          weaponHit(ctx, defPos.x - dir * size * 0.1, defPos.y + size * 0.1, 6)
         }
-      })()
-      motion = { impact, settle }
-      break
-    }
-    case "hiss": {
-      motion = castMotion(ctx, 120, async () => {
-        const mouth = { x: atkPos.x + dir * size * 0.18, y: atkPos.y - size * 0.05 }
-        if (!deco) return wait(scene, 120 / speed)
-        // Black Magic: круг рун, тёмный сгусток с хвостом, вспышка и пламя у цели
-        await magicBolt(scene, mouth, defPos, size * 0.8, speed, DARK_MAGIC)
-        tintFor(scene, defender, 0xc77dff, 40 / speed, 300 / speed)
-        embers(scene, defPos.x, defPos.y, size)
-        jitter(scene, defender, 4, 220 / speed)
+        await wait(scene, 110 / speed)
+        await recover(ctx, 240, bx, by)
       })
       break
     }
-    case "howl": {
-      motion = castMotion(
-        ctx,
-        140,
-        async () => {
-          const head = { x: atkPos.x + dir * size * 0.1, y: atkPos.y - size * 0.15 }
-          if (!deco) return wait(scene, 120 / speed)
-          await howlRings(scene, head, defPos, size, speed)
-          jitter(scene, defender, 4, 240 / speed)
-          tintFor(scene, defender, 0xbfe9ff, 80 / speed, 320 / speed)
-          iceShards(scene, defPos.x, defPos.y, size, speed)
-        },
-        14
-      )
-      break
-    }
-    case "growl": {
-      const { attacker } = ctx
-      motion = castMotion(ctx, 110, async () => {
-        if (!deco) return wait(scene, 120 / speed)
-        // Рык: присесть и выпрямиться
-        const by = attacker.scaleY
+    case "bow": {
+      // Натяжение (штрихи сходятся к руке) → выстрел с отдачей → стрела по дуге → втыкается и дрожит.
+      motion = choreo(ctx, async (hit) => {
+        const hand = { x: atkPos.x + dir * size * 0.22, y: atkPos.y - size * 0.02 }
+        if (deco) drawCharge(scene, hand.x, hand.y, size, 220 / speed, m.trail)
+        await tweenP(scene, {
+          targets: attacker,
+          x: home.x - dir * size * 0.05,
+          scaleX: bx * 0.93,
+          angle: -4 * dir,
+          duration: 220 / speed,
+          ease: "Sine.easeOut"
+        })
+        if (!deco) {
+          await wait(scene, 100 / speed)
+          hit()
+          await recover(ctx, 160, bx, by)
+          return
+        }
+        if (m.glint !== null) glint(scene, hand.x + dir * size * 0.08, hand.y, size, m.glint, speed, m.power * 0.7)
+        // Отдача и щелчок тетивы
         scene.tweens.add({
           targets: attacker,
-          scaleY: by * 1.08,
-          duration: 90 / speed,
-          yoyo: true,
-          onComplete: () => {
-            if (attacker.scene) attacker.setScale(attacker.scaleX, by)
-          }
+          x: home.x - dir * size * 0.1,
+          scaleX: bx * 1.04,
+          angle: 2 * dir,
+          duration: 70 / speed,
+          ease: "Back.easeOut"
         })
-        windSwirl(scene, defPos.x, defPos.y, size, speed, 300 / speed)
-        await wait(scene, 200 / speed)
-        knockback(scene, defender, dir * size * 0.2, 280 / speed)
+        popRing(scene, hand.x, hand.y, size * 0.6, speed, 0xffffff)
+        const look = { tip: m.edge, trail: m.trail }
+        const shot = (dy: number): Promise<void> =>
+          arrowShot(scene, hand, { x: defPos.x - dir * size * 0.05, y: defPos.y + dy }, size * 0.8, speed, look).then(() => {
+            stuckArrow(ctx, defPos.x - dir * size * 0.05, defPos.y + dy)
+            if (ctx.damage > 0) pierceExit(ctx, defPos.x + dir * size * 0.05, defPos.y + dy, 0.6)
+            impactStar(scene, defPos.x - dir * size * 0.08, defPos.y + dy, size * 0.8, 0xffd166, speed)
+            jitter(scene, defender, 3, 160 / speed)
+          })
+        const second = brave ? wait(scene, 100 / speed).then(() => shot(size * 0.1)) : Promise.resolve()
+        await shot(-size * 0.04)
+        hit()
+        await second
+        await wait(scene, 60 / speed)
+        await recover(ctx, 180, bx, by)
       })
       break
     }
-    case "slingshot": {
-      motion = castMotion(
-        ctx,
-        140,
-        async () => {
-          const hand = { x: atkPos.x + dir * size * 0.2, y: atkPos.y + size * 0.05 }
-          if (!deco) return wait(scene, 140 / speed)
-          // Bow: стрела по дуге с хвостом
-          await arrowShot(scene, hand, defPos, size * 0.8, speed)
-          impactStar(scene, defPos.x, defPos.y, size, 0xffd166, speed)
-          floatText(scene, defPos.x + dir * size * 0.15, defPos.y - size * 0.5, tr("BAM", "БАМ"), "#ffe08a", speed, {
-            size: size * 0.13,
-            rise: size * 0.25,
-            stroke: 4
-          })
-        },
-        12
-      )
-      break
-    }
-    case "burr": {
-      motion = castMotion(ctx, 120, async () => {
-        const hand = { x: atkPos.x + dir * size * 0.2, y: atkPos.y }
-        if (!deco) return wait(scene, 140 / speed)
-        await burrFan(scene, hand, defPos, size, speed, 4, 450)
-        jitter(scene, defender, 3, 300 / speed)
-        tintFor(scene, defender, 0xc77dff, 80 / speed, 250 / speed)
+    case "blackMagic": {
+      // Круг рун под кастером, клочья тьмы → тёмный снаряд → столб тьмы из-под цели и взрыв.
+      motion = choreo(ctx, async (hit) => {
+        const hand = { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.06 }
+        if (deco) {
+          runeCircle(scene, home.x, home.y, size * m.power, speed, DARK_MAGIC, 720 / speed)
+          darkWisps(scene, home.x, home.y - size * 0.2, size * 0.7, 6)
+        }
+        await tweenP(scene, {
+          targets: attacker,
+          y: home.y - size * 0.04,
+          scaleX: bx * 1.04,
+          scaleY: by * 1.04,
+          angle: -4 * dir,
+          duration: 200 / speed,
+          ease: "Sine.easeOut"
+        })
+        scene.tweens.add({ targets: attacker, x: home.x + dir * size * 0.05, angle: 5 * dir, duration: 90 / speed, ease: "Back.easeOut" })
+        if (!deco) {
+          await wait(scene, 120 / speed)
+          hit()
+          await recover(ctx, 180, bx, by)
+          return
+        }
+        await magicBolt(scene, hand, defPos, size * 0.8 * m.power, speed, DARK_MAGIC, DARK_CORE)
+        darkPillar(scene, defPos.x, groundY, size * m.power, size * 1.25, speed)
+        darkBlast(scene, defPos.x, defPos.y, size * m.power, speed)
+        tintFor(scene, defender, 0xc77dff, 40 / speed, 300 / speed)
+        jitter(scene, defender, 4, 220 / speed)
+        hit()
+        await wait(scene, 80 / speed)
+        await recover(ctx, 220, bx, by)
       })
       break
     }
-    case "bandage": {
-      motion = castMotion(
-        ctx,
-        120,
-        async () => {
-          const hand = { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.05 }
-          if (!deco) return wait(scene, 140 / speed)
-          // White Magic: светлый сгусток с рунами
-          await magicBolt(scene, hand, defPos, size * 0.7, speed, LIGHT_MAGIC)
-          floatText(scene, defPos.x, defPos.y - size * 0.45, tr("splat", "шлёп"), "#e9ecef", speed, {
-            size: size * 0.1,
-            rise: size * 0.2,
-            stroke: 3
-          })
-          squash(scene, defender, 0.93, 160 / speed)
-        },
-        8
-      )
+    case "whiteMagic": {
+      // Посох вверх, свет собирается в навершии → короткий тычок светом, звёздочки на цели.
+      motion = choreo(ctx, async (hit) => {
+        const tip = { x: atkPos.x + dir * size * 0.24, y: atkPos.y - size * 0.3 }
+        if (deco) {
+          glow(scene, tip.x, tip.y, size * 0.05, size * 0.4 * m.power, LIGHT_MAGIC, 260 / speed, 0.9)
+          later(scene, 80 / speed, () => lightStars(scene, tip.x, tip.y, size * 0.4, speed, 4))
+        }
+        await tweenP(scene, {
+          targets: attacker,
+          y: home.y - size * 0.02,
+          angle: -6 * dir,
+          duration: 160 / speed,
+          ease: "Sine.easeOut"
+        })
+        scene.tweens.add({
+          targets: attacker,
+          x: home.x + dir * size * 0.08,
+          angle: 8 * dir,
+          duration: 80 / speed,
+          ease: "Back.easeOut"
+        })
+        if (!deco) {
+          await wait(scene, 100 / speed)
+          hit()
+          await recover(ctx, 160, bx, by)
+          return
+        }
+        await lightBeam(scene, tip, defPos, size * m.power, speed)
+        lightStars(scene, defPos.x, defPos.y, size * m.power, speed, 6)
+        tintFor(scene, defender, 0xfff3b0, 20 / speed, 160 / speed)
+        squash(scene, defender, 0.93, 160 / speed)
+        hit()
+        await wait(scene, 60 / speed)
+        await recover(ctx, 180, bx, by)
+      })
       break
     }
-    case "purr":
+    case "gauntlet":
     default: {
-      motion = castMotion(
-        ctx,
-        110,
-        async () => {
-          const mouth = { x: atkPos.x + dir * size * 0.15, y: atkPos.y }
-          if (!deco) return wait(scene, 120 / speed)
-          // Gauntlet: волна удара кулаком и ударная волна у цели
-          await purrWave(scene, mouth, defPos, size, speed)
-          shockRing(scene, defPos.x, defPos.y, size * 0.8, speed)
-          tintFor(scene, defender, 0xffb3c6, 80 / speed, 220 / speed)
-          squash(scene, defender, 0.85, 180 / speed)
-          knockback(scene, defender, dir * size * 0.15, 220 / speed)
-        },
-        6
-      )
+      // Рывок вплотную → серия толчков (3, Brave — 4) с ударными кольцами → последний — с ударной волной.
+      motion = choreo(ctx, async (hit) => {
+        if (deco) afterImages(scene, attacker, 2, 25, m.trail, speed)
+        await tweenP(scene, {
+          targets: attacker,
+          x: home.x + dir * reach(ctx, 0.78),
+          angle: 6 * dir,
+          duration: 110 / speed,
+          ease: "Quad.easeIn"
+        })
+        const n = brave ? 4 : 3
+        const base = attacker.x
+        const ringColor = m.sparks[0] ?? 0xffd166
+        for (let i = 0; i < n; i++) {
+          const last = i === n - 1
+          await tweenP(scene, {
+            targets: attacker,
+            x: base + dir * size * (last ? 0.1 : 0.06),
+            angle: (last ? 10 : i % 2 ? 2 : 8) * dir,
+            duration: 45 / speed,
+            ease: "Quad.easeIn"
+          })
+          if (deco) {
+            const py = defPos.y + (i % 2 ? size * 0.08 : -size * 0.06)
+            if (last) {
+              shockRing(scene, defPos.x - dir * size * 0.1, py, size * 0.8, speed, ringColor)
+              knockback(scene, defender, dir * size * 0.15, 220 / speed)
+              squash(scene, defender, 0.85, 180 / speed)
+            }
+            else {
+              popRing(scene, defPos.x - dir * size * 0.12, py, size, speed, ringColor)
+              jitter(scene, defender, 2.5, 90 / speed)
+            }
+            if (m.splinters && last) weaponHit(ctx, defPos.x - dir * size * 0.1, py, 5)
+          }
+          if (last) hit()
+          await tweenP(scene, { targets: attacker, x: base, angle: 4 * dir, duration: 45 / speed, ease: "Quad.easeOut" })
+        }
+        await wait(scene, 50 / speed)
+        await recover(ctx, 200, bx, by)
+      })
       break
     }
   }
-  void color
-  return { impactAt: motion.impact, done: motion.settle }
+  const impactAt = motion.impact.then(() => {
+    if (deco) impactAccents(ctx, false)
+  })
+  return { impactAt, done: motion.settle }
 }
 
 /* ---------- Карта: облегчённые версии у клетки цели ---------- */
 
+/**
+ * Быстрый вариант для карты: замах и рывок делает презентер, здесь — след оружия, снаряд и эффект на цели.
+ * impactAt — момент контакта (у снарядов — после полёта).
+ */
 export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
   const { scene, kind, defPos, atkPos, dir, speed, size, defender } = ctx
   if (!sceneAlive(scene)) return { impactAt: Promise.resolve(), done: Promise.resolve() }
+  ensureMotionTextures(scene)
   const s = 0.9
+  const m = materialOf(ctx)
+  const brave = ctx.variant === "brave"
+  const groundY = ctx.groundY ?? defPos.y + size * 0.4
   let impactAt: Promise<void>
   switch (kind) {
-    case "claw":
-      slashMarks(scene, defPos.x, defPos.y, size, dir, speed, s)
+    case "sword":
+      slashTrail(scene, defPos.x, defPos.y, size, dir, m.trail, speed, ctx.special)
+      if (ctx.damage > 0) slashMarks(scene, defPos.x, defPos.y, size, dir, speed, s * 0.85, bloodTints(ctx))
+      weaponHit(ctx, defPos.x - dir * size * 0.1, defPos.y, 6)
+      if (brave) later(scene, 80 / speed, () => slashTrail(scene, defPos.x, defPos.y, size * 0.9, dir, m.trail, speed, false, true))
       impactAt = Promise.resolve()
       break
-    case "fang":
-      jawClamp(scene, defPos.x, defPos.y, size, speed, s)
+    case "spear": {
+      const thrust = (dy: number): void => {
+        thrustLine(scene, { x: atkPos.x, y: atkPos.y + dy }, { x: defPos.x + dir * size * 0.45, y: defPos.y + dy }, size, m.trail, speed)
+        if (ctx.damage > 0) pierceExit(ctx, defPos.x + dir * size * 0.2, defPos.y + dy, 0.6)
+      }
+      thrust(0)
+      weaponHit(ctx, defPos.x - dir * size * 0.1, defPos.y, 4)
+      if (brave) later(scene, 80 / speed, () => thrust(-size * 0.1))
       impactAt = Promise.resolve()
       break
-    case "stick":
-      swingArc(scene, atkPos.x + dir * size * 0.2, atkPos.y, size * 0.5, dir, speed)
+    }
+    case "axe":
+      slashTrail(scene, defPos.x, defPos.y, size, dir, m.trail, speed, true)
+      swingArc(scene, atkPos.x + dir * size * 0.2, atkPos.y, size * 0.5, dir, speed, m.trail)
       impactStar(scene, defPos.x, defPos.y, size, 0xffd166, speed)
+      groundCrack(ctx, defPos.x, groundY, 0.65)
       knockback(scene, defender, dir * size * 0.14, 200 / speed)
+      if (brave) later(scene, 90 / speed, () => impactStar(scene, defPos.x, defPos.y + size * 0.1, size * 0.8, 0xffd166, speed))
       impactAt = Promise.resolve()
       break
-    case "hiss":
+    case "blackMagic":
+      runeCircle(scene, atkPos.x, atkPos.y + size * 0.38, size * 0.8 * m.power, speed, DARK_MAGIC, 520 / speed)
       impactAt = magicBolt(
         scene,
         { x: atkPos.x + dir * size * 0.25, y: atkPos.y },
         defPos,
-        size * 0.7,
+        size * 0.7 * m.power,
         speed,
-        DARK_MAGIC
-      ).then(() => embers(scene, defPos.x, defPos.y, size * 0.8))
+        DARK_MAGIC,
+        DARK_CORE
+      ).then(() => {
+        darkPillar(scene, defPos.x, groundY, size * 0.8, size * 0.9, speed)
+        darkBlast(scene, defPos.x, defPos.y, size * 0.7, speed)
+      })
       break
-    case "howl":
-      impactAt = howlRings(
-        scene,
-        { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.1 },
-        defPos,
-        size,
-        speed,
-        0.8
-      ).then(() => iceShards(scene, defPos.x, defPos.y, size * 0.8, speed, 4))
+    case "bow": {
+      const look = { tip: m.edge, trail: m.trail }
+      const from = { x: atkPos.x + dir * size * 0.25, y: atkPos.y }
+      const shot = (dy: number): Promise<void> =>
+        arrowShot(scene, from, { x: defPos.x, y: defPos.y + dy }, size, speed, look).then(() => {
+          stuckArrow(ctx, defPos.x - dir * size * 0.05, defPos.y + dy, 0.8)
+          impactStar(scene, defPos.x, defPos.y + dy, size * 0.8, 0xffd166, speed)
+        })
+      impactAt = shot(0)
+      if (brave) later(scene, 90 / speed, () => void shot(size * 0.12))
       break
-    case "growl":
-      windSwirl(scene, defPos.x, defPos.y, size * 0.9, speed, 240 / speed)
-      impactAt = wait(scene, 120 / speed)
-      break
-    case "slingshot":
-      impactAt = arrowShot(scene, { x: atkPos.x + dir * size * 0.25, y: atkPos.y }, defPos, size, speed).then(() =>
-        impactStar(scene, defPos.x, defPos.y, size, 0xffd166, speed)
+    }
+    case "whiteMagic":
+      impactAt = lightBeam(scene, { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.2 }, defPos, size * 0.8, speed).then(() =>
+        lightStars(scene, defPos.x, defPos.y, size * 0.7, speed, 5)
       )
       break
-    case "burr":
-      impactAt = burrFan(scene, { x: atkPos.x + dir * size * 0.25, y: atkPos.y }, defPos, size, speed, 2, 300, 0.8)
+    case "gauntlet":
+    default: {
+      // Серия толчков: кольца у цели одно за другим, контакт — на последнем
+      const n = brave ? 4 : 3
+      for (let i = 0; i < n - 1; i++) {
+        later(scene, (i * 55) / speed, () => {
+          popRing(scene, defPos.x - dir * size * 0.1, defPos.y + (i % 2 ? size * 0.08 : -size * 0.06), size, speed, m.sparks[0] ?? 0xffd166)
+          jitter(scene, defender, 2, 80 / speed)
+        })
+      }
+      impactAt = wait(scene, ((n - 1) * 55) / speed).then(() => shockRing(scene, defPos.x, defPos.y, size, speed, m.sparks[0] ?? 0xffd166))
       break
-    case "bandage":
-      impactAt = magicBolt(
-        scene,
-        { x: atkPos.x + dir * size * 0.25, y: atkPos.y },
-        defPos,
-        size * 0.6,
-        speed,
-        LIGHT_MAGIC
-      )
-      break
-    case "purr":
-    default:
-      impactAt = purrWave(scene, { x: atkPos.x + dir * size * 0.2, y: atkPos.y }, defPos, size, speed, 0.8)
-      break
+    }
   }
+  impactAt = impactAt.then(() => impactAccents(ctx, true))
   const done = impactAt.then(() => {
     zoomPunch(scene, 1.04, 140 / speed)
   })

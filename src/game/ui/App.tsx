@@ -25,7 +25,7 @@ const SPLASH_TRIO = [
     pattern: 1,
     eyes: 0,
     accessory: 1,
-    weapon: "claw",
+    weapon: "sword",
     weaponColor: "#e63946",
     pose: "happy"
   }),
@@ -36,7 +36,7 @@ const SPLASH_TRIO = [
     pattern: 0,
     eyes: 4,
     accessory: 3,
-    weapon: "stick",
+    weapon: "axe",
     weaponColor: "#2ec4b6",
     pose: "happy"
   }),
@@ -47,7 +47,7 @@ const SPLASH_TRIO = [
     pattern: 0,
     eyes: 0,
     accessory: 6,
-    weapon: "slingshot",
+    weapon: "bow",
     weaponColor: "#adb5bd",
     pose: "happy"
   })

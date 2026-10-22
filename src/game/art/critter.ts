@@ -4,24 +4,31 @@
  * С `classId` поверх зверька рисуется наряд класса FW и его верховое животное (art/outfits.ts).
  */
 import type { ClassTier, Mount } from "@shared/character/classes"
+import type { WeaponGrade, WeaponSkill } from "@shared/character/skills"
+import type { WeaponVariant } from "@game/core/skills/types"
 import { BLUSH, INK, NOSE, mixColor, shade, type FurArt } from "./palettes"
-import { RIDER_TRANSFORM, hatLift, mountSvg, outfitAura, outfitBack, outfitBody, outfitCape, outfitHead, outfitHeadBack } from "./outfits"
+import {
+  RIDER_TRANSFORM,
+  hatLift,
+  heldPawSvg,
+  leftPawFree,
+  mountSvg,
+  outfitAura,
+  outfitBack,
+  outfitBody,
+  outfitCape,
+  outfitHead,
+  outfitHeadBack,
+  outfitOf
+} from "./outfits"
+import { heldWeaponSvg } from "./held"
+import { DEFAULT_LOOK, type CritterLook } from "./look"
 
 export type ArtSpecies = "cat" | "dog" | "mouse"
 export type Pose = "idle" | "run" | "hurt" | "dead" | "happy" | "carried" | "blink"
 export type ArtMoveType = "infantry" | "armored" | "cavalry" | "flier"
-/** Рисунок оружия в руках (визуальный слой; какое оружие что рисует — `ART_WEAPON` в art/index.ts). */
-export type ArtWeapon
-  = | "claw"
-    | "fang"
-    | "stick"
-    | "hiss"
-    | "howl"
-    | "growl"
-    | "slingshot"
-    | "burr"
-    | "bandage"
-    | "purr"
+/** Оружие в лапах — вид оружия (навык модели); материал и разновидность — `weaponGrade`, `weaponVariant`. */
+export type ArtWeapon = WeaponSkill
 
 export interface CritterArt {
   species: ArtSpecies
@@ -35,7 +42,13 @@ export interface CritterArt {
   accessory: number
   moveType?: ArtMoveType
   weapon?: ArtWeapon
+  /** Материал оружия: деревянное, железное, стальное, серебряное. */
+  weaponGrade?: WeaponGrade
+  /** Разновидность (Killer, Brave, …) — отметка на оружии. */
+  weaponVariant?: WeaponVariant
   weaponColor?: string
+  /** Детали внешности (уши, хвост, морда, отметины, пух…); без них — прежний облик вида (`DEFAULT_LOOK`). */
+  look?: CritterLook
   boss?: boolean
   /** Хмурые брови (враги). */
   angry?: boolean
@@ -57,6 +70,51 @@ export const VIEW = { x: 0, y: -28, w: 120, h: 140 } as const
 export const VIEW_BOX = `${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`
 
 const sw = "stroke-width=\"1.5\""
+
+const f1 = (n: number): string => (Math.round(n * 10) / 10).toString()
+
+function lookOf(a: CritterArt): CritterLook {
+  return a.look ?? DEFAULT_LOOK[a.species]
+}
+
+/** Светлый ли цвет (для выбора контрастных пятен). */
+function light(c: string): boolean {
+  const n = parseInt(c.replace("#", ""), 16)
+  return ((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11 > 150
+}
+
+/** Отметины и пятна у зомби тоже «гниют». */
+function tint(a: CritterArt, c: string): string {
+  return a.zombie ? mixColor(c, "#7f9f62", 0.5) : c
+}
+
+/** Тёмный «пойнт» сиамских: морда, уши, хвост, лапы. */
+function pointColor(a: CritterArt): string {
+  return tint(a, mixColor(a.fur.fur, "#3d2b22", 0.62))
+}
+
+/** Пятна, контрастные к шерсти: на светлой — тёмные, на тёмной — светлые. */
+function spotColor(a: CritterArt): string {
+  return light(a.fur.fur) ? a.fur.dark : a.fur.belly
+}
+
+const TAN = "#c98a46"
+
+/**
+ * Серп тени внутри круга (свет сверху-слева): часть круга (cx, cy, r), не закрытая тем же кругом,
+ * сдвинутым на (−dx, −dy).
+ */
+function crescent(cx: number, cy: number, r: number, dx: number, dy: number): string {
+  const d = Math.hypot(dx, dy)
+  const mx = cx - dx / 2
+  const my = cy - dy / 2
+  const h = Math.sqrt(r * r - (d / 2) ** 2)
+  const px = dy / d
+  const py = -dx / d
+  const p1 = `${f1(mx + h * px)} ${f1(my + h * py)}`
+  const p2 = `${f1(mx - h * px)} ${f1(my - h * py)}`
+  return `M${p1} A${r} ${r} 0 1 1 ${p2} A${r} ${r} 0 1 0 ${p1} z`
+}
 
 /* ---------- Глаза ---------- */
 
@@ -132,10 +190,19 @@ function eyesGroup(a: CritterArt, pose: Pose): string {
 
 /* ---------- Рот и нос ---------- */
 
+function fangSvg(x: number, y: number): string {
+  return `<path d="M${x} ${y} l1.6 4.2 l1.6 -4.2 z" fill="#fff" stroke="${INK}" stroke-width=".6" stroke-linejoin="round" />`
+}
+
 function mouth(a: CritterArt, pose: Pose): string {
   const s = a.species
+  const look = lookOf(a)
   if (s === "cat") {
-    const nose = `<path d="M56.5 62 h7 l-3.5 4.5 z" fill="${NOSE}" />`
+    // подушечки усов и крошечный подбородок
+    const padsFill = look.marking === "point" ? shade(pointColor(a), 0.15) : a.fur.belly
+    const pads = `<g fill="${padsFill}"><ellipse cx="55" cy="66.5" rx="5.6" ry="4.2" /><ellipse cx="65" cy="66.5" rx="5.6" ry="4.2" /></g>
+      <g fill="${a.fur.line}" opacity=".55"><circle cx="52.5" cy="65.5" r=".8" /><circle cx="54.5" cy="68" r=".8" /><circle cx="67.5" cy="65.5" r=".8" /><circle cx="65.5" cy="68" r=".8" /></g>`
+    const nose = `${pads}<path d="M56.5 62 h7 l-3.5 4.5 z" fill="${NOSE}" stroke="${shade(NOSE, -0.3)}" stroke-width=".6" stroke-linejoin="round" /><circle cx="58.6" cy="62.9" r=".8" fill="#fff" opacity=".8" />`
     if (pose === "dead")
       return `${nose}<path d="M52 68 h16" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><ellipse cx="64" cy="71" rx="3.5" ry="4.5" fill="#ff7f9c" />`
     if (pose === "hurt")
@@ -143,29 +210,32 @@ function mouth(a: CritterArt, pose: Pose): string {
     if (pose === "happy")
       return `${nose}<path d="M50 66 q5 7 10 0 q5 7 10 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" />`
     if (pose === "carried") return `${nose}<ellipse cx="60" cy="69" rx="2.6" ry="3" fill="${INK}" />`
-    const fang
-      = a.weapon === "fang"
-        ? `<path d="M55 67 l2 5 l2 -5 z M61 67 l2 5 l2 -5 z" fill="#fff" stroke="${INK}" stroke-width=".6" />`
-        : ""
-    return `${nose}<path d="M53 66 q3.5 4 7 0 q3.5 4 7 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" />${fang}`
+    return `${nose}<path d="M53 66 q3.5 4 7 0 q3.5 4 7 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" />${look.fang ? fangSvg(61.4, 67.6) : ""}`
   }
   if (s === "dog") {
-    const base = `<ellipse cx="60" cy="67" rx="15" ry="11" fill="${a.fur.belly}" /><ellipse cx="60" cy="62" rx="4.8" ry="3.6" fill="${INK}" /><circle cx="58.5" cy="61" r="1.2" fill="#fff" opacity=".8" />`
+    // длина морды: 0 — короткая приплюснутая (мопс), 2 — длинная (овчарка, такса)
+    const m = look.muzzle
+    const my = m === 0 ? 66 : m === 2 ? 69 : 67
+    const mry = m === 0 ? 8.5 : m === 2 ? 13 : 11
+    const mrx = m === 0 ? 14 : m === 2 ? 13 : 15
+    const ny = m === 0 ? 61 : m === 2 ? 62 : 62
+    const muzzleFill = look.marking === "muzzle" ? tint(a, mixColor(a.fur.line, "#2a2128", 0.55)) : look.marking === "tan" ? tint(a, TAN) : a.fur.belly
+    const bridge = m === 2 ? `<path d="M55 ${my - mry + 2} Q60 ${my - mry - 1} 65 ${my - mry + 2}" fill="none" stroke="${shade(muzzleFill, -0.25)}" stroke-width="1.2" opacity=".7" />` : ""
+    const wrinkles = m === 0 ? `<path d="M50 ${my - 9} q10 -4 20 0 M53 ${my - 12} q7 -3 14 0" fill="none" stroke="${a.fur.line}" stroke-width="1.3" stroke-linecap="round" opacity=".6" />` : ""
+    const dots = `<g fill="${shade(muzzleFill, -0.35)}" opacity=".6"><circle cx="52" cy="${my}" r=".9" /><circle cx="54.5" cy="${my + 2.5}" r=".9" /><circle cx="68" cy="${my}" r=".9" /><circle cx="65.5" cy="${my + 2.5}" r=".9" /></g>`
+    const base = `${wrinkles}<ellipse cx="60" cy="${my}" rx="${mrx}" ry="${mry}" fill="${muzzleFill}" />${bridge}${dots}<ellipse cx="60" cy="${ny}" rx="${m === 0 ? 5.4 : 4.8}" ry="3.6" fill="${INK}" /><circle cx="58.5" cy="${ny - 1}" r="1.2" fill="#fff" opacity=".8" />`
+    const y0 = my - 2
     if (pose === "dead")
-      return `${base}<path d="M52 69 h16" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M64 69 q6 4 3 9 q-4 1 -5 -4 z" fill="#ff7f9c" />`
+      return `${base}<path d="M52 ${y0 + 4} h16" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M64 ${y0 + 4} q6 4 3 9 q-4 1 -5 -4 z" fill="#ff7f9c" />`
     if (pose === "hurt")
-      return `${base}<ellipse cx="60" cy="70" rx="5" ry="4.5" fill="${INK}" /><path d="M57 72 q3 4 6 0 z" fill="#ff7f9c" />`
+      return `${base}<ellipse cx="60" cy="${y0 + 5}" rx="5" ry="4.5" fill="${INK}" /><path d="M57 ${y0 + 7} q3 4 6 0 z" fill="#ff7f9c" />`
     if (pose === "happy")
-      return `${base}<path d="M50 67 q10 10 20 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M56 70 q4 9 8 0 z" fill="#ff8fa8" />`
-    if (pose === "carried") return `${base}<ellipse cx="60" cy="70" rx="3" ry="3.4" fill="${INK}" />`
-    const fang
-      = a.weapon === "fang"
-        ? `<path d="M54 69 l2 5 l2 -5 z M62 69 l2 5 l2 -5 z" fill="#fff" stroke="${INK}" stroke-width=".6" />`
-        : ""
-    return `${base}<path d="M60 65 v3 M54 68 q6 5 12 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M57.5 70 q2.5 8 5 0 z" fill="${NOSE}" />${fang}`
+      return `${base}<path d="M50 ${y0 + 2} q10 10 20 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M56 ${y0 + 5} q4 9 8 0 z" fill="#ff8fa8" />`
+    if (pose === "carried") return `${base}<ellipse cx="60" cy="${y0 + 5}" rx="3" ry="3.4" fill="${INK}" />`
+    return `${base}<path d="M60 ${ny + 3} v${y0 - ny} M54 ${y0 + 3} q6 5 12 0" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round" /><path d="M57.5 ${y0 + 5} q2.5 8 5 0 z" fill="${NOSE}" />${look.fang ? fangSvg(63, y0 + 3.4) + fangSvg(53.8, y0 + 3.4) : ""}`
   }
   // мышь: вытянутая мордочка, розовый нос, два зуба
-  const muzzle = `<ellipse cx="60" cy="63" rx="13" ry="9.5" fill="${a.fur.belly}" /><circle cx="60" cy="67.5" r="3.4" fill="${NOSE}" stroke="${shade(NOSE, -0.25)}" stroke-width=".8" />`
+  const muzzle = `<ellipse cx="60" cy="63" rx="13" ry="9.5" fill="${a.fur.belly}" /><g fill="${a.fur.line}" opacity=".5"><circle cx="52" cy="63" r=".8" /><circle cx="68" cy="63" r=".8" /><circle cx="53.5" cy="66" r=".8" /><circle cx="66.5" cy="66" r=".8" /></g><circle cx="60" cy="67.5" r="3.4" fill="${NOSE}" stroke="${shade(NOSE, -0.25)}" stroke-width=".8" /><circle cx="59" cy="66.4" r="1" fill="#fff" opacity=".8" />`
   if (pose === "dead")
     return `${muzzle}<path d="M54 72 h12" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" /><ellipse cx="63" cy="74" rx="2.5" ry="3.5" fill="#ff7f9c" />`
   if (pose === "hurt" || pose === "carried")
@@ -179,34 +249,140 @@ function mouth(a: CritterArt, pose: Pose): string {
 }
 
 function whiskers(a: CritterArt): string {
-  const long = a.species === "mouse" ? 16 : 12
+  const w = lookOf(a).whiskers
+  const long = (a.species === "mouse" ? 16 : 12) + (w - 1) * 4
   const y = a.species === "mouse" ? 64 : 60
+  const third = w === 2 ? `<path d="M23 ${y - 5} l-${long - 3} -3" /><path d="M97 ${y - 5} l${long - 3} -3" />` : ""
   return `<g stroke="${a.fur.line}" stroke-width="1.4" stroke-linecap="round" opacity=".8">
     <path d="M22 ${y} h-${long}" /><path d="M23 ${y + 6} l-${long - 1} 3" />
-    <path d="M98 ${y} h${long}" /><path d="M97 ${y + 6} l${long - 1} 3" /></g>`
+    <path d="M98 ${y} h${long}" /><path d="M97 ${y + 6} l${long - 1} 3" />${third}</g>`
 }
 
 /* ---------- Уши ---------- */
 
-function ears(a: CritterArt, pose: Pose): string {
+interface EarParts {
+  /** За головой. */
+  back: string
+  /** Поверх головы (вислоухие, загнутые кончики). */
+  front: string
+}
+
+/** Пара ушей из левого: правое — зеркальная копия; поворот при гибели вокруг основания. */
+function earPair(left: string, pivot: [number, number], droop: number, cls = "ear"): string {
+  const rot = (deg: number): string => (deg ? ` transform="rotate(${deg} ${pivot[0]} ${pivot[1]})"` : "")
+  return `<g class="${cls} ear-l"><g${rot(-droop)}>${left}</g></g>`
+    + `<g class="${cls} ear-r"><g transform="translate(120 0) scale(-1 1)"><g${rot(-droop)}>${left}</g></g></g>`
+}
+
+function catEar(a: CritterArt, look: CritterLook): { back: string, front: string } {
   const f = a.fur
-  const droop = pose === "dead"
+  const outer = look.marking === "point" ? pointColor(a) : f.fur
+  const st = `stroke="${f.line}" ${sw} stroke-linejoin="round"`
+  const fluff = `<path d="M33 29 l-3 -6 M36 27 l-2 -7 M39 26 l0 -6" stroke="${f.belly}" stroke-width="1.3" stroke-linecap="round" opacity=".9" />`
+  switch (look.ears) {
+    case "tufted":
+      return {
+        back: `<path d="M29 36 L21 4 Q22 1 25 3 L53 22 Z" fill="${outer}" ${st} /><path d="M32 31 L26 10 L47 23 Z" fill="${f.earInner}" />${fluff}
+          <path d="M22 4 l-3 -10 M23 3 l1 -11 M24 4 l4 -8" stroke="${f.line}" stroke-width="2" stroke-linecap="round" />`,
+        front: ""
+      }
+    case "round":
+      return {
+        back: `<path d="M30 34 Q22 12 33 11 Q43 12 51 23 Z" fill="${outer}" ${st} /><path d="M33 29 Q28 17 34 16 Q41 17 46 24 Z" fill="${f.earInner}" />`,
+        front: ""
+      }
+    case "folded":
+      // вислоухий: маленькое ухо прижато вперёд, кончик лежит на лбу
+      return {
+        back: "",
+        front: `<path d="M27 32 Q26 17 38 16 Q48 17 50 25 Q44 23 40 27 Q36 25 33 31 Z" fill="${outer}" ${st} /><path d="M33 26 Q35 20 41 20 Q46 21 47 24 Q42 23 39 25 Z" fill="${shade(f.earInner, -0.08)}" opacity=".85" />`
+      }
+    case "big":
+      return {
+        back: `<path d="M28 39 L15 -1 Q16 -4 19 -2 L55 22 Z" fill="${outer}" ${st} /><path d="M31 33 L20 6 L48 23 Z" fill="${f.earInner}" />${fluff}`,
+        front: ""
+      }
+    default:
+      return {
+        back: `<path d="M30 34 L24 9 Q25 6 28 8 L52 22 Z" fill="${outer}" ${st} /><path d="M32 30 L28 14 L46 23 Z" fill="${f.earInner}" />${look.cheeks ? fluff : ""}`,
+        front: ""
+      }
+  }
+}
+
+function dogEar(a: CritterArt, look: CritterLook): { back: string, front: string } {
+  const f = a.fur
+  const flap = look.marking === "muzzle" ? tint(a, mixColor(f.line, "#2a2128", 0.4)) : f.dark
+  const st = `stroke="${f.line}" ${sw} stroke-linejoin="round"`
+  switch (look.ears) {
+    case "erect":
+      return {
+        back: `<path d="M32 36 Q25 12 30 3 Q34 -1 39 3 L56 22 Z" fill="${look.marking === "muzzle" ? flap : f.fur}" ${st} /><path d="M35 30 Q30 14 33 8 Q36 6 39 9 L49 22 Z" fill="${f.earInner}" />`,
+        front: ""
+      }
+    case "big":
+      return {
+        back: `<path d="M35 36 L9 6 Q9 2 13 3 L56 22 Z" fill="${f.fur}" ${st} /><path d="M35 30 L15 9 L49 22 Z" fill="${f.earInner}" />`,
+        front: ""
+      }
+    case "semi":
+      // полустоячее: кончик загнут вперёд
+      return {
+        back: `<path d="M33 34 L30 12 L53 22 Z" fill="${f.fur}" ${st} /><path d="M35 30 L33 16 L47 23 Z" fill="${f.earInner}" />`,
+        front: `<path d="M30 13 Q31 6 38 7 Q45 9 47 18 Q40 15 36 22 Z" fill="${flap}" ${st} />`
+      }
+    case "button":
+      // «розочка»: маленькое ухо загнуто назад и в сторону
+      return {
+        back: `<path d="M40 28 Q28 21 19 29 Q15 37 20 45 Q25 37 35 35 Z" fill="${flap}" ${st} /><path d="M21 33 Q25 29 31 30" fill="none" stroke="${shade(flap, -0.25)}" stroke-width="1.2" stroke-linecap="round" />`,
+        front: ""
+      }
+    case "long":
+      if (look.curly) {
+        const c = (x: number, y: number, r: number): string => `<circle cx="${x}" cy="${y}" r="${r}" />`
+        return {
+          back: `<g fill="${flap}" ${st}>${c(30, 40, 10)}${c(25, 54, 10)}${c(24, 68, 10)}${c(28, 81, 9)}</g>
+            <g fill="${flap}">${c(30, 40, 8.6)}${c(25, 54, 8.6)}${c(24, 68, 8.6)}</g>`,
+          front: ""
+        }
+      }
+      return {
+        back: `<path d="M37 28 C 15 30, 8 74, 21 87 C 32 93, 43 70, 42 40 Z" fill="${flap}" ${st} /><path d="M33 40 C 24 50, 21 66, 24 78" fill="none" stroke="${shade(flap, -0.2)}" stroke-width="1.4" stroke-linecap="round" opacity=".6" />`,
+        front: ""
+      }
+    default:
+      return {
+        back: `<path d="M36 30 C 16 32, 10 66, 24 74 C 34 78, 42 62, 42 42 Z" fill="${flap}" ${st} /><path d="M31 42 C 24 52, 22 62, 25 69" fill="none" stroke="${shade(flap, -0.2)}" stroke-width="1.4" stroke-linecap="round" opacity=".6" />`,
+        front: ""
+      }
+  }
+}
+
+function mouseEar(a: CritterArt, look: CritterLook): { back: string, front: string } {
+  const f = a.fur
+  // у мышей внутри уха ярко-розовое, с прожилкой
+  const pink = a.zombie ? f.earInner : mixColor(f.earInner, "#ffa8c0", 0.55)
+  const [cx, cy, r] = look.ears === "big" ? [25, 19, 19] : look.ears === "small" ? [33, 28, 10.5] : [29, 24, 15]
+  return {
+    back: `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${f.fur}" stroke="${f.line}" ${sw} /><circle cx="${cx + 1}" cy="${cy + 1}" r="${f1(r * 0.66)}" fill="${pink}" />
+      <path d="M${f1(cx - r * 0.3)} ${f1(cy - r * 0.25)} q${f1(r * 0.25)} ${f1(r * 0.3)} ${f1(r * 0.5)} ${f1(r * 0.45)}" fill="none" stroke="${shade(pink, -0.18)}" stroke-width="1.2" stroke-linecap="round" />`,
+    front: ""
+  }
+}
+
+function ears(a: CritterArt, pose: Pose): EarParts {
+  const look = lookOf(a)
+  const dead = pose === "dead"
   if (a.species === "cat") {
-    const rot = droop ? "transform=\"rotate(-25 30 34)\"" : ""
-    const rotR = droop ? "transform=\"rotate(25 90 34)\"" : ""
-    return `<g class="ear ear-l" ${rot}><path d="M30 34 L24 8 L52 22 Z" fill="${f.fur}" stroke="${f.line}" ${sw} stroke-linejoin="round" /><path d="M32 30 L28 14 L46 23 Z" fill="${f.earInner}" /></g>
-      <g class="ear ear-r" ${rotR}><path d="M90 34 L96 8 L68 22 Z" fill="${f.fur}" stroke="${f.line}" ${sw} stroke-linejoin="round" /><path d="M88 30 L92 14 L74 23 Z" fill="${f.earInner}" /></g>`
+    const e = catEar(a, look)
+    return { back: e.back ? earPair(e.back, [30, 34], dead ? 25 : 0) : "", front: e.front ? earPair(e.front, [30, 30], dead ? 15 : 0, "ear ear-fold") : "" }
   }
   if (a.species === "dog") {
-    const rot = droop ? "transform=\"rotate(-12 36 30)\"" : ""
-    const rotR = droop ? "transform=\"rotate(12 84 30)\"" : ""
-    return `<g class="ear ear-l" ${rot}><path d="M36 30 C 16 32, 10 66, 24 74 C 34 78, 42 62, 42 42 Z" fill="${f.dark}" stroke="${f.line}" ${sw} stroke-linejoin="round" /></g>
-      <g class="ear ear-r" ${rotR}><path d="M84 30 C 104 32, 110 66, 96 74 C 86 78, 78 62, 78 42 Z" fill="${f.dark}" stroke="${f.line}" ${sw} stroke-linejoin="round" /></g>`
+    const e = dogEar(a, look)
+    return { back: e.back ? earPair(e.back, [36, 30], dead ? 12 : 0) : "", front: e.front ? earPair(e.front, [36, 24], dead ? 12 : 0, "ear ear-fold") : "" }
   }
-  const rot = droop ? "transform=\"rotate(-30 30 26)\"" : ""
-  const rotR = droop ? "transform=\"rotate(30 90 26)\"" : ""
-  return `<g class="ear ear-l" ${rot}><circle cx="29" cy="24" r="15" fill="${f.fur}" stroke="${f.line}" ${sw} /><circle cx="30" cy="25" r="9.5" fill="${f.earInner}" /></g>
-    <g class="ear ear-r" ${rotR}><circle cx="91" cy="24" r="15" fill="${f.fur}" stroke="${f.line}" ${sw} /><circle cx="90" cy="25" r="9.5" fill="${f.earInner}" /></g>`
+  const e = mouseEar(a, look)
+  return { back: earPair(e.back, [30, 26], dead ? 30 : 0), front: "" }
 }
 
 /* ---------- Окрас ---------- */
@@ -229,6 +405,74 @@ function patternBody(a: CritterArt): string {
     return `<g fill="${f.dark}" opacity=".85"><circle cx="46" cy="82" r="4" /><circle cx="70" cy="94" r="3" /></g>`
   if (a.pattern === 3) return `<ellipse cx="60" cy="88" rx="19" ry="13" fill="${f.belly}" />`
   return ""
+}
+
+/** Отметины породы на голове (поверх окраса, до теней и мордочки). */
+function markingHead(a: CritterArt, cy: number, r: number): string {
+  const f = a.fur
+  const look = lookOf(a)
+  switch (look.marking) {
+    case "point":
+      return `<ellipse cx="60" cy="${cy + 12}" rx="${r * 0.62}" ry="${r * 0.5}" fill="${pointColor(a)}" opacity=".9" />`
+    case "mask":
+      // светлая маска хаски с «вдовьим мыском» между глаз, тёмная шапочка сверху
+      return `<path d="M${60 - r + 1} ${cy + 4} Q${60 - r + 5} ${cy - 12} 44 ${cy - 7} Q52 ${cy - 6} 55 ${cy - 17} L60 ${cy - 23} L65 ${cy - 17} Q68 ${cy - 6} 76 ${cy - 7} Q${60 + r - 5} ${cy - 12} ${60 + r - 1} ${cy + 4} Q${60 + r - 6} ${cy + r - 2} 60 ${cy + r} Q${60 - r + 6} ${cy + r - 2} ${60 - r + 1} ${cy + 4} Z" fill="${f.belly}" />`
+    case "blaze":
+      return `<path d="M56 ${cy - r + 1} Q60 ${cy - r - 1} 64 ${cy - r + 1} L63.5 ${cy - 4} Q66 ${cy + 4} 66 ${cy + 10} L54 ${cy + 10} Q54 ${cy + 4} 56.5 ${cy - 4} Z" fill="${f.belly}" />`
+    case "calico":
+      return `<path d="M${60 - r + 3} ${cy - 6} Q${60 - r + 6} ${cy - r + 4} 50 ${cy - r + 2} Q56 ${cy - 22} 50 ${cy - 12} Q42 ${cy - 4} ${60 - r + 3} ${cy - 6} Z" fill="${tint(a, "#f4a259")}" />
+        <path d="M70 ${cy - r + 3} Q84 ${cy - r + 4} ${60 + r - 3} ${cy - 10} Q84 ${cy - 4} 76 ${cy - 12} Q68 ${cy - 18} 70 ${cy - r + 3} Z" fill="${tint(a, "#3d3540")}" />`
+    case "eyepatch":
+      return `<ellipse cx="76" cy="${cy}" rx="12.5" ry="12" fill="${tint(a, light(f.fur) ? mixColor(f.dark, "#7a4a26", 0.5) : f.belly)}" opacity=".95" />`
+    case "tan":
+      return `<g fill="${tint(a, TAN)}"><ellipse cx="42" cy="${cy + 17}" rx="7" ry="5" /><ellipse cx="78" cy="${cy + 17}" rx="7" ry="5" /></g>`
+    default:
+      return ""
+  }
+}
+
+/** Брови-пятна, веснушки — мелочи, отличающие бойцов одного вида. */
+function faceSpots(a: CritterArt, cy: number): string {
+  const look = lookOf(a)
+  let s = ""
+  if (look.brows) {
+    const c = look.marking === "tan" ? tint(a, TAN) : spotColor(a)
+    s += `<g fill="${c}"><ellipse cx="43" cy="${cy - 15}" rx="5" ry="3.2" transform="rotate(-12 43 ${cy - 15})" /><ellipse cx="77" cy="${cy - 15}" rx="5" ry="3.2" transform="rotate(12 77 ${cy - 15})" /></g>`
+  }
+  if (look.freckles) {
+    const c = light(a.fur.fur) ? a.fur.line : a.fur.belly
+    s += `<g fill="${c}" opacity=".7"><circle cx="38" cy="${cy + 12}" r="1.2" /><circle cx="42" cy="${cy + 14}" r="1.2" /><circle cx="37" cy="${cy + 16}" r="1.2" /><circle cx="82" cy="${cy + 12}" r="1.2" /><circle cx="78" cy="${cy + 14}" r="1.2" /><circle cx="83" cy="${cy + 16}" r="1.2" /></g>`
+  }
+  return s
+}
+
+/** Клок шерсти на макушке: завиток или хохолок из трёх прядей. */
+function tuft(a: CritterArt, top: number): string {
+  const t = lookOf(a).tuft
+  const f = a.fur
+  const fill = lookOf(a).marking === "calico" ? tint(a, "#f4a259") : f.fur
+  if (t === 1)
+    return `<path d="M55 ${top + 3} Q53 ${top - 8} 63 ${top - 8} Q69 ${top - 7} 67 ${top - 2} Q65 ${top - 5} 61 ${top - 3} Q59 ${top} 62 ${top + 3} Z" fill="${fill}" stroke="${f.line}" stroke-width="1.3" stroke-linejoin="round" />`
+  if (t === 2)
+    return `<path d="M51 ${top + 4} L52 ${top - 6} L56 ${top + 1} L59 ${top - 9} L62 ${top + 1} L67 ${top - 6} L69 ${top + 4} Z" fill="${fill}" stroke="${f.line}" stroke-width="1.3" stroke-linejoin="round" />`
+  return ""
+}
+
+/** Пух на щеках: пряди торчат по бокам головы (рисуется до головы). */
+function cheekFluff(a: CritterArt, cy: number, r: number): string {
+  if (!lookOf(a).cheeks) return ""
+  const f = a.fur
+  const x = 60 - r + 3
+  const left = `<path d="M${x} ${cy + 2} L${x - 11} ${cy + 6} L${x - 3} ${cy + 9} L${x - 12} ${cy + 15} L${x - 1} ${cy + 15} L${x - 7} ${cy + 22} L${x + 6} ${cy + 18} Z" fill="${f.fur}" stroke="${f.line}" ${sw} stroke-linejoin="round" />`
+  return `<g class="cheeks">${left}<g transform="translate(120 0) scale(-1 1)">${left}</g></g>`
+}
+
+/** Пушистое жабо на грудке под подбородком. */
+function chestFluff(a: CritterArt): string {
+  if (!lookOf(a).chest) return ""
+  const f = a.fur
+  const y = a.species === "mouse" ? 76 : a.species === "dog" ? 78 : 76
+  return `<path class="chest" d="M44 ${y} L46 ${y + 12} L51 ${y + 8} L54 ${y + 16} L60 ${y + 10} L66 ${y + 16} L69 ${y + 8} L74 ${y + 12} L76 ${y} Z" fill="${lookOf(a).marking === "tan" ? tint(a, TAN) : f.belly}" stroke="${f.line}" stroke-width="1.2" stroke-linejoin="round" />`
 }
 
 /* ---------- Аксессуары и снаряжение ---------- */
@@ -308,79 +552,142 @@ function gearHead(a: CritterArt): string {
   return ""
 }
 
-function weaponProp(a: CritterArt): string {
-  const c = a.weaponColor ?? "#adb5bd"
-  switch (a.weapon) {
-    case "stick":
-      return "<g class=\"stick\"><path d=\"M44 72 L92 60\" stroke=\"#6b4a2c\" stroke-width=\"5.5\" stroke-linecap=\"round\" /><path d=\"M44 72 L92 60\" stroke=\"#8d6248\" stroke-width=\"3\" stroke-linecap=\"round\" /><path d=\"M80 63 l4 -6\" stroke=\"#6b4a2c\" stroke-width=\"2.5\" stroke-linecap=\"round\" /></g>"
-    case "slingshot":
-      return "<g class=\"slingshot\" transform=\"translate(96 80)\"><path d=\"M0 22 v-12 M0 10 l-8 -11 M0 10 l8 -11\" fill=\"none\" stroke=\"#8d6248\" stroke-width=\"4.5\" stroke-linecap=\"round\" /><path d=\"M-8 -1 Q 0 6 8 -1\" fill=\"none\" stroke=\"#c0392b\" stroke-width=\"2\" /></g>"
-    case "burr":
-      return `<g class="burrs" fill="#7a8a3a" stroke="#4f5c22" stroke-width="1"><circle cx="100" cy="66" r="3.5" /><circle cx="107" cy="78" r="3" /><circle cx="97" cy="86" r="2.6" /></g>
-        <g stroke="#4f5c22" stroke-width="1" stroke-linecap="round"><path d="M100 61 v-3 M105 66 h3 M100 71 v3 M95 66 h-3" /><path d="M107 74 v-2 M111 78 h2 M107 82 v2" /></g>`
-    case "bandage":
-      return "<g class=\"medkit\"><rect x=\"82\" y=\"84\" width=\"14\" height=\"14\" rx=\"2.5\" fill=\"#fff\" stroke=\"#c0392b\" stroke-width=\"1.4\" /><path d=\"M89 87 v8 M85 91 h8\" stroke=\"#c0392b\" stroke-width=\"2.6\" stroke-linecap=\"round\" /></g>"
-    case "hiss":
-    case "howl":
-    case "growl":
-      return `<g class="aura" fill="none" stroke="${c}" stroke-width="2.6" stroke-linecap="round" opacity=".9"><path d="M100 54 q7 6 0 12" /><path d="M106 48 q12 12 0 24" /></g>
-        <g fill="${c}"><circle cx="18" cy="40" r="2" /><circle cx="12" cy="52" r="1.4" /></g>`
-    case "purr":
-      return `<g class="note" fill="${c}" stroke="${shade(c, -0.3)}" stroke-width="1"><ellipse cx="104" cy="52" rx="4.2" ry="3.2" transform="rotate(-20 104 52)" /><path d="M107.5 51 v-16 q6 1 8 6" fill="none" stroke="${shade(c, -0.3)}" stroke-width="2.2" stroke-linecap="round" /></g>
-        <path d="M14 46 c-5 -6 -13 1 -6 7 l6 5 l6 -5 c7 -6 -1 -13 -6 -7 z" fill="#ff6f9c" />`
-    case "claw":
-      return "<g class=\"claws\" stroke=\"#fff\" stroke-width=\"2\" stroke-linecap=\"round\" opacity=\".9\"><path d=\"M84 96 l6 -6 M88 100 l7 -5 M80 93 l5 -7\" /></g>"
-    default:
-      return ""
-  }
+/** Правая лапа у бока тела: точка хвата оружия. */
+function pawAnchor(a: CritterArt, side: 1 | -1): { x: number, y: number } {
+  const rx = a.species === "mouse" ? 24 : a.species === "dog" ? 28 : 27
+  const cy = a.species === "mouse" ? 88 : 86
+  return { x: 60 + side * (rx + 1), y: cy + 3 }
+}
+
+/** Лапа окраса с пальчиками (без перчаток наряда). */
+function furPaw(a: CritterArt, x: number, y: number, r = 6.4): string {
+  const f = a.fur
+  const look = lookOf(a)
+  const fill = look.marking === "point" ? pointColor(a) : look.socks ? f.belly : f.fur
+  return `<circle cx="${f1(x)}" cy="${f1(y)}" r="${r}" fill="${fill}" stroke="${f.line}" stroke-width="1.4" />
+    <path d="M${f1(x - 2.2)} ${f1(y + r - 4)} v2.6 M${f1(x + 2.2)} ${f1(y + r - 4)} v2.6" stroke="${f.line}" stroke-width="1.1" stroke-linecap="round" />`
+}
+
+/** Оружие в правой лапе: вид — форма, грейд — материал, разновидность — отметка (art/held.ts). */
+function weaponProp(a: CritterArt, pose: Pose): string {
+  if (!a.weapon) return ""
+  const outfitPaws = a.classId ? outfitOf(a.classId).paws : undefined
+  const fistR = a.weapon === "gauntlet" ? 8 : 6.4
+  const pawSvg = (x: number, y: number): string => (outfitPaws ? heldPawSvg(a, x, y) : furPaw(a, x, y, fistR))
+  return heldWeaponSvg({
+    kind: a.weapon,
+    ...(a.weaponGrade ? { grade: a.weaponGrade } : {}),
+    ...(a.weaponVariant ? { variant: a.weaponVariant } : {}),
+    pose,
+    paw: pawAnchor(a, 1),
+    pawSvg,
+    ...(leftPawFree(a) && !outfitPaws ? { leftPaw: pawAnchor(a, -1) } : {})
+  })
 }
 
 /* ---------- Тело ---------- */
 
+interface TailStroke {
+  d: string
+  /** Толщина хвоста. */
+  w: number
+  /** Кончик: для кисточки и помпона. */
+  end: [number, number]
+}
+
+function catTail(shape: string, pose: Pose): TailStroke {
+  if (shape === "stub") return { d: "M38 92 C 31 91, 27 86, 29 80", w: 11, end: [29, 80] }
+  const w = shape === "fluffy" ? 14 : shape === "thin" ? 6.5 : 9
+  if (pose === "dead") return { d: "M38 92 C 20 100, 6 96, 6 90", w, end: [6, 90] }
+  if (pose === "run") return { d: "M38 92 C 12 90, 6 66, 20 56", w, end: [20, 56] }
+  if (pose === "carried") return { d: "M38 92 C 30 100, 30 108, 24 112", w, end: [24, 112] }
+  if (shape === "thin") return { d: "M38 92 C 14 96, 8 74, 18 62 C 22 56, 28 58, 26 62", w, end: [26, 62] }
+  return { d: "M38 92 C 14 94, 8 72, 22 62", w, end: [22, 62] }
+}
+
+function dogTail(shape: string, pose: Pose): TailStroke {
+  if (shape === "stub") return { d: "M34 86 C 29 84, 27 80, 28 76", w: 10, end: [28, 76] }
+  const w = shape === "plume" ? 13 : shape === "thin" || shape === "pom" ? 5.5 : 9
+  if (pose === "dead") return { d: "M34 86 C 20 92, 10 90, 8 86", w, end: [8, 86] }
+  if (pose === "carried") return { d: "M34 86 C 28 94, 28 102, 22 108", w, end: [22, 108] }
+  switch (shape) {
+    case "curl":
+      return { d: "M34 86 C 18 84, 14 64, 28 60 C 38 58, 41 70, 32 72", w, end: [32, 72] }
+    case "long":
+      return { d: "M34 86 C 20 90, 12 84, 10 72", w, end: [10, 72] }
+    case "plume":
+      return { d: "M34 86 C 16 90, 8 80, 9 66", w, end: [9, 66] }
+    case "pom":
+      return { d: "M34 86 C 26 82, 22 72, 25 62", w, end: [25, 62] }
+    default:
+      return { d: "M34 86 C 18 80, 20 58, 38 62", w, end: [38, 62] }
+  }
+}
+
+function mouseTail(shape: string, pose: Pose): TailStroke {
+  if (shape === "stub") return { d: "M40 94 C 35 96, 31 95, 30 91", w: 6, end: [30, 91] }
+  const w = shape === "ringed" ? 6.5 : shape === "fluffy" ? 11 : 4.5
+  if (pose === "dead") return { d: "M40 94 C 24 104, 10 100, 4 92", w, end: [4, 92] }
+  if (pose === "run") return { d: "M40 94 C 20 100, 8 86, 12 70", w, end: [12, 70] }
+  if (pose === "carried") return { d: "M40 94 C 34 104, 34 112, 26 118", w, end: [26, 118] }
+  if (shape === "curl") return { d: "M40 94 C 22 98, 8 86, 14 72 C 18 63, 28 66, 25 73 C 23 77, 18 74, 20 71", w, end: [20, 71] }
+  if (shape === "fluffy") return { d: "M40 94 C 22 98, 12 86, 18 70", w, end: [18, 70] }
+  return { d: "M40 94 C 22 98, 10 86, 18 70 C 22 62, 14 60, 12 64", w, end: [12, 64] }
+}
+
+/** Хвост: форма по облику (пушистый, кольцом, тонкий, обрубок, с кисточкой…), полоски у табби. */
 function tail(a: CritterArt, pose: Pose): string {
   const f = a.fur
-  if (a.species === "cat") {
-    const d
-      = pose === "dead"
-        ? "M38 92 C 20 100, 6 96, 6 90"
-        : pose === "run"
-          ? "M38 92 C 12 90, 6 66, 20 56"
-          : pose === "carried"
-            ? "M38 92 C 30 100, 30 108, 24 112"
-            : "M38 92 C 14 94, 8 72, 22 62"
-    return `<g class="tail"><path d="${d}" fill="none" stroke="${f.line}" stroke-width="12" stroke-linecap="round" opacity=".35" /><path d="${d}" fill="none" stroke="${f.fur}" stroke-width="9" stroke-linecap="round" /></g>`
-  }
-  if (a.species === "dog") {
-    const d
-      = pose === "dead"
-        ? "M34 86 C 20 92, 10 90, 8 86"
-        : pose === "carried"
-          ? "M34 86 C 28 94, 28 102, 22 108"
-          : "M34 86 C 18 80, 20 58, 38 62"
-    return `<g class="tail"><path d="${d}" fill="none" stroke="${f.line}" stroke-width="12" stroke-linecap="round" opacity=".35" /><path d="${d}" fill="none" stroke="${f.fur}" stroke-width="9" stroke-linecap="round" /></g>`
-  }
-  const d
-    = pose === "dead"
-      ? "M40 94 C 24 104, 10 100, 4 92"
-      : pose === "run"
-        ? "M40 94 C 20 100, 8 86, 12 70"
-        : pose === "carried"
-          ? "M40 94 C 34 104, 34 112, 26 118"
-          : "M40 94 C 22 98, 10 86, 18 70 C 22 62, 14 60, 12 64"
-  return `<g class="tail"><path d="${d}" fill="none" stroke="${shade(f.earInner, -0.25)}" stroke-width="5" stroke-linecap="round" /><path d="${d}" fill="none" stroke="${f.earInner}" stroke-width="3" stroke-linecap="round" /></g>`
+  const look = lookOf(a)
+  const shape = look.tail
+  const t = a.species === "cat" ? catTail(shape, pose) : a.species === "dog" ? dogTail(shape, pose) : mouseTail(shape, pose)
+  const bare = a.species === "mouse" && (shape === "bare" || shape === "ringed" || shape === "curl" || shape === "tufted" || shape === "stub")
+  const pink = a.zombie ? f.earInner : mixColor(f.earInner, "#ffa8c0", 0.45)
+  const fill = bare ? pink : look.marking === "point" ? pointColor(a) : f.fur
+  const edge = bare ? shade(pink, -0.25) : f.line
+  const stroke = (d: string, w: number, c: string, extra = "", cap: "round" | "butt" = "round"): string =>
+    `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="${cap}" stroke-linejoin="round"${extra} />`
+  let s = bare
+    ? stroke(t.d, t.w + 2, edge) + stroke(t.d, t.w, fill)
+    : stroke(t.d, t.w + 3, f.line, " opacity=\".35\"") + stroke(t.d, t.w, fill)
+  // кольца: полосы табби, кольчатый хвост крысы
+  if (!bare && (a.pattern === 1 || f.tabby) && shape !== "stub")
+    s += stroke(t.d, t.w, f.line, ` stroke-dasharray="3 7" opacity=".5"`, "butt")
+  if (shape === "ringed") s += stroke(t.d, t.w, edge, ` stroke-dasharray="1 3.5" opacity=".7"`, "butt")
+  // светлая прядь вдоль пушистого хвоста
+  if (shape === "fluffy" || shape === "plume") s += stroke(t.d, t.w * 0.3, shade(fill, 0.3), " opacity=\".6\" stroke-dasharray=\"10 6\"")
+  const [ex, ey] = t.end
+  if (shape === "tufted")
+    s += `<path d="M${ex} ${ey} l-5 -7 l4 2 l1 -7 l3 7 l3 -4 l-1 7 z" fill="${f.dark}" stroke="${f.line}" stroke-width="1" stroke-linejoin="round" />`
+  if (shape === "pom") s += `<g fill="${f.fur}" stroke="${f.line}" stroke-width="1.2"><circle cx="${ex - 3}" cy="${ey - 2}" r="5.5" /><circle cx="${ex + 3}" cy="${ey - 3}" r="5.5" /><circle cx="${ex}" cy="${ey - 7}" r="5.5" /></g><circle cx="${ex}" cy="${ey - 3}" r="5" fill="${f.fur}" />`
+  // белый кончик (бигль, проточина)
+  if (look.marking === "blaze" && !bare && shape !== "stub") s += `<circle cx="${ex}" cy="${ey}" r="${f1(t.w / 2)}" fill="${f.belly}" />`
+  return `<g class="tail">${s}</g>`
+}
+
+/** Ступни: носочки, пальчики; у мышей — розовые, в позе «на руках» видны подушечки. */
+function foot(a: CritterArt, cls: string, cx: number, cy: number, rx: number, ry: number, pads: boolean): string {
+  const f = a.fur
+  const look = lookOf(a)
+  const pinkFeet = a.species === "mouse" && !a.zombie
+  const fill = look.marking === "point" ? pointColor(a) : look.marking === "tan" ? tint(a, TAN) : look.socks || a.pattern === 3 ? f.belly : f.fur
+  const toes = `<path d="M${f1(cx - rx * 0.3)} ${f1(cy - ry + 1.5)} v3.2 M${f1(cx + rx * 0.3)} ${f1(cy - ry + 1.5)} v3.2" stroke="${f.line}" stroke-width="1.2" stroke-linecap="round" />`
+  const pink = mixColor(f.earInner, "#ffa8c0", 0.45)
+  const beans = pads
+    ? `<ellipse cx="${cx}" cy="${f1(cy + 1.2)}" rx="${f1(rx * 0.42)}" ry="${f1(ry * 0.38)}" fill="${pink}" /><g fill="${pink}"><circle cx="${f1(cx - rx * 0.5)}" cy="${f1(cy - ry * 0.35)}" r="1.5" /><circle cx="${cx}" cy="${f1(cy - ry * 0.55)}" r="1.5" /><circle cx="${f1(cx + rx * 0.5)}" cy="${f1(cy - ry * 0.35)}" r="1.5" /></g>`
+    : ""
+  const tips = pinkFeet ? `<ellipse cx="${cx}" cy="${f1(cy + ry * 0.35)}" rx="${f1(rx * 0.7)}" ry="${f1(ry * 0.4)}" fill="${pink}" opacity=".9" />` : ""
+  return `<g class="leg ${cls}"><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${f1(ry)}" fill="${fill}" stroke="${f.line}" ${sw} />${tips}${beans || toes}</g>`
 }
 
 function legs(a: CritterArt, pose: Pose): string {
   if (a.mount || (!a.classId && a.moveType === "cavalry")) return ""
-  const f = a.fur
-  const fill = a.pattern === 3 ? f.belly : f.fur
   const dx = pose === "run" ? 6 : pose === "carried" ? -4 : 0
   const cy = pose === "carried" ? 99 : 102
   const rx = a.species === "mouse" ? 7.5 : 9
   const ry = (a.species === "mouse" ? 5.5 : 6.5) * (pose === "carried" ? 1.15 : 1)
-  return `<g class="legs">
-    <ellipse class="leg leg-back" cx="${44 - dx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} />
-    <ellipse class="leg leg-front" cx="${76 + dx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} /></g>`
+  const pads = pose === "carried" || pose === "dead"
+  return `<g class="legs">${foot(a, "leg-back", 44 - dx, cy, rx, ry, pads)}${foot(a, "leg-front", 76 + dx, cy, rx, ry, pads)}</g>`
 }
 
 function body(a: CritterArt): string {
@@ -388,7 +695,10 @@ function body(a: CritterArt): string {
   const rx = a.species === "mouse" ? 24 : a.species === "dog" ? 28 : 27
   const ry = a.species === "mouse" ? 16 : 18
   const cy = a.species === "mouse" ? 88 : 86
-  return `<ellipse cx="60" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f.fur}" stroke="${f.line}" ${sw} /><ellipse cx="60" cy="${cy + 4}" rx="15" ry="10" fill="${f.belly}" />${patternBody(a)}${a.zombie ? zombiePatch(cy) : ""}`
+  const belly = lookOf(a).marking === "tan" ? tint(a, TAN) : f.belly
+  return `<ellipse cx="60" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f.fur}" stroke="${f.line}" ${sw} />
+    <path d="${crescent(60, cy, ry - 0.8, 3.5, 4)}" transform="translate(60 ${cy}) scale(${f1(rx / ry)} 1) translate(-60 ${-cy})" fill="${f.line}" opacity=".16" />
+    <ellipse cx="60" cy="${cy + 4}" rx="15" ry="10" fill="${belly}" />${patternBody(a)}${a.zombie ? zombiePatch(cy) : ""}`
 }
 
 /** Лицо зомби вместо румянца: трупные пятна на щеках и шрам со швами через лоб. */
@@ -414,13 +724,21 @@ function head(a: CritterArt, pose: Pose): string {
   const cy = a.species === "mouse" ? 52 : 50
   const blushY = a.species === "mouse" ? 62 : 60
   const blush = pose === "happy" ? 0.75 : 0.55
+  const e = ears(a, pose)
   return `<g class="head">
     ${outfitHeadBack(a)}
-    ${ears(a, pose)}
+    ${e.back}
+    ${cheekFluff(a, cy, r)}
     <circle cx="60" cy="${cy}" r="${r}" fill="${f.fur}" stroke="${f.line}" ${sw} />
     ${patternHead(a)}
+    ${markingHead(a, cy, r)}
+    <path d="${crescent(60, cy, r - 0.8, 4, 5)}" fill="${f.line}" opacity=".15" />
+    <ellipse cx="${60 - r * 0.5}" cy="${cy - r * 0.55}" rx="8" ry="4.5" transform="rotate(-35 ${60 - r * 0.5} ${cy - r * 0.55})" fill="#fff" opacity=".22" />
+    ${e.front}
+    ${tuft(a, cy - r)}
     ${a.zombie ? zombieFace(a, cy, r) : `<ellipse cx="34" cy="${blushY}" rx="8" ry="4.5" fill="${BLUSH}" opacity="${blush}" />
     <ellipse cx="86" cy="${blushY}" rx="8" ry="4.5" fill="${BLUSH}" opacity="${blush}" />`}
+    ${faceSpots(a, cy)}
     ${eyesGroup(a, pose)}
     ${mouth(a, pose)}
     ${a.zombie && pose !== "dead" ? "<path d=\"M66 70 q1.5 5 0 8 a2.2 2.2 0 1 0 3 -1 q-1 -4 -1.5 -7 z\" fill=\"#9fd356\" stroke=\"#4f7a1f\" stroke-width=\".8\" />" : ""}
@@ -473,7 +791,10 @@ export function critterSvg(art: CritterArt): string {
         : pose === "carried"
           ? "transform=\"translate(60 40) scale(0.96 1.06) rotate(-6) translate(-60 -40)\""
           : ""
-  const rider = `${gearBehind(a)}${tail(a, pose)}${legs(a, pose)}${body(a)}${gearBody(a)}${head(a, pose)}${weaponProp(a)}`
+  // выпавшее оружие лежит у лап (под телом), в остальных позах — в правой лапе поверх головы
+  const dropped = pose === "dead" ? weaponProp(a, pose) : ""
+  const held = pose === "dead" ? "" : weaponProp(a, pose)
+  const rider = `${gearBehind(a)}${tail(a, pose)}${legs(a, pose)}${dropped}${body(a)}${gearBody(a)}${chestFluff(a)}${head(a, pose)}${held}`
   return `<svg viewBox="${VIEW_BOX}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" overflow="visible">
   <g class="rig" ${rigTransform}>
     ${behindRider(a)}
@@ -497,12 +818,10 @@ export const CRITTER_PART_ANCHORS: Record<CritterPart, { x: number, y: number }>
 }
 
 function singleLeg(a: CritterArt, which: "front" | "back"): string {
-  const f = a.fur
-  const fill = a.pattern === 3 ? f.belly : f.fur
   const rx = a.species === "mouse" ? 7.5 : 9
   const ry = a.species === "mouse" ? 5.5 : 6.5
   const cx = which === "front" ? 76 : 44
-  return `<ellipse cx="${cx}" cy="102" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${f.line}" ${sw} />
+  return `${foot(a, `leg-${which}`, cx, 102, rx, ry, false)}
     <ellipse cx="${cx}" cy="${102 - ry + 1}" rx="${rx * 0.55}" ry="2.2" fill="#d9122b" opacity=".85" />`
 }
 
@@ -519,7 +838,7 @@ export function critterPartSvg(a: CritterArt, part: CritterPart): string {
       break
     case "body":
       inner = behindRider(dead)
-        + onMount(dead, `${gearBehind(dead)}${body(dead)}${gearBody(dead)}${weaponProp(dead)}<ellipse cx="60" cy="70" rx="12" ry="3.5" fill="#d9122b" opacity=".9" />`)
+        + onMount(dead, `${gearBehind(dead)}${weaponProp(dead, "dead")}${body(dead)}${gearBody(dead)}${chestFluff(dead)}<ellipse cx="60" cy="70" rx="12" ry="3.5" fill="#d9122b" opacity=".9" />`)
       break
     case "tail":
       inner = onMount(dead, `${tail(dead, "idle")}<circle cx="38" cy="92" r="4" fill="#d9122b" opacity=".9" />`)

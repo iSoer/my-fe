@@ -196,20 +196,26 @@ function grantXp(state: BattleState, unitId: string, xp: number, sp: number, eve
   state.roster[unitId] = next
 }
 
+/** Чем схватка закончилась для бойца: урона не нанёс, нанёс, добил. */
+export type CombatXpResult = "none" | "hit" | "kill"
+
 /**
- * Опыт за схватку: выше от сильного врага, ниже от слабого. Если боец выше врага по уровню, опыт за схватку и
- * убийство режется на `overlevelPenalty` за каждый уровень разницы — фарм слабых команд почти ничего не даёт,
- * но не меньше `combatMin`.
+ * Опыт за схватку как в Fire Emblem (`XP`): урон — по разнице уровней, добивание — сверху бонус (у вожака больше),
+ * без урона — единица. Если боец выше врага, опыт режется на `overlevelPenalty` за уровень, но не меньше `combatMin`.
  */
-export function xpForCombat(selfLevel: number, foeLevel: number, killed: boolean): number {
-  const base = Math.max(
-    XP.combatMin,
-    Math.min(XP.combatMax, XP.combatBase + XP.combatPerLevelDiff * (foeLevel - selfLevel))
-  )
-  const raw = killed ? base * 2 + XP.killBonus : base
-  const over = selfLevel - foeLevel
-  const mult = over > 0 ? Math.max(0, 1 - over * XP.overlevelPenalty) : 1
+export function xpForCombat(selfLevel: number, foeLevel: number, result: CombatXpResult, foeIsBoss = false): number {
+  if (result === "none") return XP.noDamage
+  const diff = foeLevel - selfLevel
+  const hit = Math.max(XP.combatMin, Math.min(XP.combatMax, XP.combatBase + XP.combatPerLevelDiff * diff))
+  const raw = result === "kill" ? hit + Math.max(0, XP.killBonus + XP.killPerLevelDiff * diff) + (foeIsBoss ? XP.bossBonus : 0) : hit
+  const mult = diff < 0 ? Math.max(0, 1 + diff * XP.overlevelPenalty) : 1
   return Math.max(XP.combatMin, Math.round(raw * mult))
+}
+
+/** Опыт за лечение: больше вылечил — больше опыта; предметом — вдвое меньше. */
+export function xpForHeal(healed: number, byItem = false): number {
+  const staff = Math.min(XP.healMax, XP.heal + Math.round(healed * XP.healPerHp))
+  return byItem ? Math.max(XP.itemMin, Math.round(staff / 2)) : staff
 }
 
 function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"]): void {
@@ -349,9 +355,12 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       if (!itemTargetsFrom(state, bu, bu.pos, action.itemId).some(u => u.unitId === action.targetId))
         throw new Error(tr("target out of reach", "цель вне досягаемости"))
       const plan = planItem(state, bu, bu.pos, action.targetId, action.itemId)
+      let healed = 0
       for (const h of plan.heals) {
         const u = state.units[h.unitId]
-        if (u) u.hp = h.hpAfter
+        if (!u) continue
+        healed += Math.max(0, h.hpAfter - u.hp)
+        u.hp = h.hpAfter
       }
       for (const id of plan.cleansed) {
         const u = state.units[id]
@@ -369,6 +378,8 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
         cleansed: plan.cleansed
       })
       finishAction(state, bu, action.newStance)
+      // Лечение предметом — тоже опыт (вдвое меньше посоха)
+      if (healed > 0) grantXp(state, bu.unitId, xpForHeal(healed, true), 0, events)
       break
     }
     case "attackWall": {
@@ -394,10 +405,13 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       for (const b of plan.buffs) applyEffects(state, [{ type: "buff", unitId: b.unitId, stats: b.stats }], [])
       if (plan.targetHpDelta !== 0) target.hp = Math.max(1, Math.min(target.maxHp, target.hp + plan.targetHpDelta))
       if (plan.selfHpDelta !== 0) bu.hp = Math.max(1, Math.min(bu.maxHp, bu.hp + plan.selfHpDelta))
+      let healedAll = 0
       if (plan.allHeal > 0) {
         for (const ally of livingUnits(state, bu.side)) {
           if (ally.unitId === bu.unitId || ally.unitId === target.unitId) continue
+          const before = ally.hp
           ally.hp = Math.min(ally.maxHp, ally.hp + plan.allHeal)
+          healedAll += ally.hp - before
         }
       }
       if (plan.assist.kind === "heal") {
@@ -418,7 +432,11 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
         unitHpAfter: bu.hp
       })
       finishAction(state, bu, action.newStance)
-      grantXp(state, bu.unitId, plan.assist.kind === "rally" ? XP.rally : XP.assist, SP.assist, events)
+      // Лечение — по вылеченному (с лечением всех союзников спецприёмом), танец и Ободрение — фиксированно
+      const kind = plan.assist.kind
+      const healed = kind === "heal" || kind === "sacrifice" || kind === "reciprocal" ? plan.heal + healedAll : 0
+      const xp = healed > 0 ? xpForHeal(healed) : kind === "refresh" ? XP.dance : kind === "rally" ? XP.rally : XP.assist
+      grantXp(state, bu.unitId, xp, SP.assist, events)
       break
     }
     case "attack": {
@@ -492,12 +510,18 @@ function resolveCombat(state: BattleState, bu: BattleUnit, target: BattleUnit, e
   applyEffects(state, outcome.afterEffects, events)
   // Эффекты «после боя» (Ярость) могут не убивать — applyEffects оставляет минимум 1 HP.
 
+  // Опыт получает каждый выживший участник: добил — больше всего, нанёс урон — по разнице уровней, иначе — единица
   const aStruck = outcome.strikes.some(s => s.attackerId === bu.unitId)
   const dStruck = outcome.strikes.some(s => s.attackerId === target.unitId)
-  if (!aDied && aStruck)
-    grantXp(state, bu.unitId, xpForCombat(aUnit.level, dUnit.level, dDied), dDied ? SP.kill : SP.combat, events)
-  if (!dDied && dStruck)
-    grantXp(state, target.unitId, xpForCombat(dUnit.level, aUnit.level, aDied), aDied ? SP.kill : SP.combat, events)
+  const result = (killed: boolean, dealt: number): CombatXpResult => (killed ? "kill" : dealt > 0 ? "hit" : "none")
+  if (!aDied) {
+    const xp = xpForCombat(aUnit.level, dUnit.level, result(dDied, dealtByA), !!dUnit.isBoss)
+    grantXp(state, bu.unitId, xp, dDied ? SP.kill : aStruck ? SP.combat : 0, events)
+  }
+  if (!dDied) {
+    const xp = xpForCombat(dUnit.level, aUnit.level, result(aDied, dealtByD), !!aUnit.isBoss)
+    grantXp(state, target.unitId, xp, aDied ? SP.kill : dStruck ? SP.combat : 0, events)
+  }
 }
 
 /** Удобный прогноз для UI: статы и исход без мутаций. */

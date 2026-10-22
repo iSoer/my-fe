@@ -5,7 +5,7 @@ import { CRITTER_PART_ANCHORS, type CritterPart } from "@game/art/index"
 import { FUR_PALETTES } from "@game/content/appearance"
 import { TEX } from "./textures"
 import { textStyle } from "./style"
-import { bloodBurst, dustPuff, sceneAlive, tween, wait } from "./fx"
+import { bloodBurst, dustPuff, ichorSplash, sceneAlive, tween, wait } from "./fx"
 import {
   GORE_TEX,
   bloodDrip,
@@ -69,16 +69,16 @@ const BASE_WEIGHTS: Record<DeathVariant, number> = {
 
 /** Уклон по оружию убийцы (добавка к базовому весу). */
 const WEAPON_BIAS: Record<ArtWeapon, Partial<Record<DeathVariant, number>>> = {
-  claw: { gibs: 4, launch: 2, ragdoll: 2 },
-  fang: { gibs: 5, ragdoll: 2, launch: 1 },
-  stick: { launch: 4, flatten: 4, ragdoll: 3 },
-  hiss: { explode: 4, dissolve: 3, electro: 3 },
-  howl: { electro: 4, crumble: 4, dissolve: 2 },
-  growl: { launch: 4, ragdoll: 3, explode: 2 },
-  slingshot: { launch: 4, flatten: 3 },
-  burr: { explode: 4, dissolve: 3 },
-  bandage: { fall: 3, sink: 3, dissolve: 2 },
-  purr: { fall: 3, sink: 3, dissolve: 2 }
+  // Меч рубит (куски, отлёт), копьё пробивает (куски, тряпичная кукла), топор — тяжёлый: вбивает в землю
+  // или подбрасывает, кастеты — серия толчков (отлёт, кукла), стрела сбивает с ног, тьма взрывает и растворяет,
+  // свет — тихо: падение, растворение, «кристалл» (crumble в светлых тонах).
+  sword: { gibs: 4, launch: 2, ragdoll: 2 },
+  spear: { gibs: 5, ragdoll: 2, launch: 1 },
+  axe: { flatten: 5, launch: 3, gibs: 2, ragdoll: 2 },
+  gauntlet: { launch: 4, ragdoll: 4, explode: 1 },
+  bow: { launch: 3, fall: 3, ragdoll: 2 },
+  blackMagic: { explode: 4, dissolve: 4, electro: 2 },
+  whiteMagic: { fall: 3, dissolve: 3, crumble: 3 }
 }
 
 const MOVE_BIAS: Record<MoveType, Partial<Record<DeathVariant, number>>> = {
@@ -571,7 +571,20 @@ async function killMoment(ctx: DeathCtx, b: Body): Promise<void> {
   }
   if (!alive(b)) return
   if (!calm) b.scene.cameras.main.shake(240 / sp, b.mode === "cine" ? 0.018 : 0.01)
-  gush(ctx, b, ctx.x, ctx.y - b.h * 0.5, 1, ctx.killerKind === "hiss" ? "magic" : "slash", -0.3)
+  gush(ctx, b, ctx.x, ctx.y - b.h * 0.5, 1, KILL_GORE[ctx.killerKind ?? "sword"], -0.3)
+  // Враги — зомби: к крови добавляется зеленоватая сукровица
+  if (ctx.unit.isEnemy) ichorSplash(b.scene, ctx.x, ctx.y - b.h * 0.5, fxSize(ctx, b), ctx.dir, sp, 1.4)
+}
+
+/** Вид брызг добивающего удара по оружию убийцы. */
+const KILL_GORE: Record<ArtWeapon, "slash" | "pierce" | "blunt" | "magic" | "arrow"> = {
+  sword: "slash",
+  spear: "pierce",
+  axe: "slash",
+  gauntlet: "blunt",
+  bow: "arrow",
+  blackMagic: "magic",
+  whiteMagic: "magic"
 }
 
 /** Короткие судороги лежащего тела. */
@@ -970,7 +983,8 @@ const drill: VariantFn = async (ctx, b) => {
 const crumble: VariantFn = async (ctx, b, rng) => {
   const sp = ctx.speed
   const s = b.h
-  const frozen = ctx.killerKind === "howl"
+  // Добит светом (посох) — рассыпается светлым кристаллом, иначе камнем
+  const frozen = ctx.killerKind === "whiteMagic"
   const stone = frozen ? 0xa8dcff : 0x9e9e9e
   await tintRamp(b, stone, 220 / sp)
   if (!alive(b)) return

@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import { TEX } from "./textures"
 import { FONT, textStyle } from "./style"
-import { goreBurst, goreDecal } from "./gore"
+import { GORE_TEX, ensureGoreTextures, goreBurst, goreDecal, goreEnabled } from "./gore"
 
 /** Сцена пригодна для твинов/таймеров: создаётся или работает. */
 export function sceneAlive(scene: Phaser.Scene): boolean {
@@ -467,4 +467,56 @@ export function confettiRain(scene: Phaser.Scene, count: number, speed: number):
   emitter.setDepth(61)
   emitter.explode(count)
   scene.time.delayedCall(2500 / speed + 100, () => emitter.destroy())
+}
+
+/** Зеленоватая «зомби»-сукровица: капли конусом по удару и облачко взвеси. Не блокирует. */
+export function ichorSplash(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  size: number,
+  dirX: number,
+  speed: number,
+  power = 1
+): void {
+  if (!sceneAlive(scene)) return
+  ensureGoreTextures(scene)
+  const level = goreEnabled().level === "sea" ? 1 : 0.5
+  const n = Math.max(3, Math.min(12, Math.round(7 * power * level)))
+  const base = dirX >= 0 ? 0 : 180
+  const k = (size * 0.07) / 16
+  const drops = scene.add.particles(x, y, GORE_TEX.drop, {
+    speed: { min: size * 1.1, max: size * 2.6 },
+    angle: { min: base - 55, max: base + 30 },
+    scale: { start: k * 1.4, end: k * 0.5 },
+    alpha: { start: 1, end: 0.5 },
+    lifespan: { min: 320, max: 600 },
+    gravityY: size * 6,
+    rotate: {
+      onEmit: () => 0,
+      onUpdate: (p: Phaser.GameObjects.Particles.Particle) =>
+        Phaser.Math.RadToDeg(Math.atan2(p.velocityY, p.velocityX)) + 90
+    } as unknown as Phaser.Types.GameObjects.Particles.EmitterOpOnUpdateType,
+    tint: [0x9be22d, 0x7cb518, 0xc5f05a, 0x5e8c1f],
+    emitting: false,
+    quantity: n
+  })
+  drops.setDepth(25)
+  drops.explode(n)
+  const mist = scene.add.particles(x, y, GORE_TEX.mist, {
+    speed: { min: size * 0.2, max: size * 0.7 },
+    angle: { min: base - 60, max: base + 60 },
+    scale: { start: (size * 0.12) / 16, end: (size * 0.3) / 16 },
+    alpha: { start: 0.55, end: 0 },
+    lifespan: 380,
+    tint: [0x9acd32, 0x6b8e23],
+    emitting: false,
+    quantity: 3
+  })
+  mist.setDepth(25)
+  mist.explode(3)
+  scene.time.delayedCall(700 / speed + 100, () => {
+    drops.destroy()
+    mist.destroy()
+  })
 }

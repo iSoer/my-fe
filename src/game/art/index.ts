@@ -1,9 +1,11 @@
 import type { UnitInstance, WeaponSkill } from "@game/core/types"
 import { fwClass, unitClass } from "@game/content/classes"
 import { mountOf } from "@shared/character/classes"
-import { WEAPON_COLOR } from "@game/content/weapons"
+import { WEAPON_COLOR, weaponDef } from "@game/content/weapons"
+import { BREEDS } from "@game/content/breeds"
 import { critterSvg, critterPartSvg, type ArtWeapon, type CritterArt, type CritterPart, type Pose } from "./critter"
 import { eyeArt, furArt } from "./palettes"
+import { critterLook } from "./look"
 
 export {
   critterSvg,
@@ -18,6 +20,7 @@ export {
   type CritterPart
 } from "./critter"
 export { CLASS_OUTFITS, outfitOf, type Outfit } from "./outfits"
+export { critterLook, DEFAULT_LOOK, type CritterLook } from "./look"
 export { backdropSvg, backdropLayersSvg, BACKDROP, type BackdropLayers } from "./backdrop"
 export { tileSvg, TILE_SIZE, TILE_FRAME_COUNT } from "./tile"
 export { svgToImage, svgDataUri, clearRasterCache } from "./raster"
@@ -31,19 +34,9 @@ export const WEAPON_HEX: Record<string, string> = {
   colorless: "#adb5bd"
 }
 
-/** Чем рисуется оружейный навык модели в лапах (только визуал: когти, древко, рогатка…). */
-export const ART_WEAPON: Record<WeaponSkill, ArtWeapon> = {
-  sword: "claw",
-  spear: "fang",
-  axe: "stick",
-  gauntlet: "purr",
-  bow: "slingshot",
-  blackMagic: "hiss",
-  whiteMagic: "bandage"
-}
-
+/** Оружие в лапах — вид оружия бойца (навык модели); материал и разновидность берутся из оружия в лапах. */
 export function artWeapon(skill: WeaponSkill): ArtWeapon {
-  return ART_WEAPON[skill]
+  return skill
 }
 
 export interface UnitArtOptions {
@@ -54,7 +47,9 @@ export interface UnitArtOptions {
   friendly?: boolean
 }
 
-/** Параметры миниатюры из данных бойца. */
+const BREED_LOOK = new Map(BREEDS.map(b => [b.id, b.look]))
+
+/** Параметры миниатюры из данных бойца. Детали облика — из породы и seed (сейв не меняется). */
 export function unitArt(unit: UnitInstance, opts: UnitArtOptions = {}): CritterArt {
   const cls = unitClass(unit)
   const art: CritterArt = {
@@ -64,8 +59,11 @@ export function unitArt(unit: UnitInstance, opts: UnitArtOptions = {}): CritterA
     pattern: unit.appearance.pattern,
     eyes: unit.appearance.eyes,
     accessory: unit.appearance.accessory,
+    look: critterLook(unit.species, BREED_LOOK.get(unit.breedId), unit.seed),
     moveType: cls.moveType,
     weapon: artWeapon(cls.weaponSkill),
+    weaponGrade: weaponDef(unit.skills.weapon).grade,
+    weaponVariant: weaponDef(unit.skills.weapon).variant,
     weaponColor: WEAPON_HEX[WEAPON_COLOR[cls.weaponSkill]] ?? "#adb5bd",
     classId: cls.id,
     tier: cls.tier,
@@ -89,7 +87,7 @@ export function unitSvg(unit: UnitInstance, opts: UnitArtOptions = {}): string {
 /** Ключ кэша текстуры: всё, что влияет на картинку (класс — наряд и животное, оружие — предмет в лапах). */
 export function unitArtKey(unit: UnitInstance, pose: Pose): string {
   const a = unit.appearance
-  return `${unit.species}:${unit.classId}:${unit.weaponSkill}:${a.furPalette}:${a.pattern}:${a.eyes}:${a.eyeColor}:${a.accessory}:${unit.isBoss ? "b" : ""}${unit.isEnemy ? "e" : ""}:${pose}`
+  return `${unit.species}:${unit.breedId}:${unit.seed}:${unit.classId}:${unit.weaponSkill}:${unit.skills.weapon}:${a.furPalette}:${a.pattern}:${a.eyes}:${a.eyeColor}:${a.accessory}:${unit.isBoss ? "b" : ""}${unit.isEnemy ? "e" : ""}:${pose}`
 }
 
 export function unitPartSvg(unit: UnitInstance, part: CritterPart): string {

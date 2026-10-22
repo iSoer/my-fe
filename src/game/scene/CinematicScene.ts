@@ -15,7 +15,7 @@ import { floatText, ghostRise, tween, wait } from "./fx"
 import { hitGore, screenBloodSplat } from "./gore"
 import { bigNumber, ensureMotionTextures, goreKindOfUnit, hitStop, shakeCam, shakeMul, speedLines } from "./motionFx"
 import { WeatherLayer } from "./weather"
-import { impactFeel, playAttackFx, weaponKindOfUnit } from "./attackFx"
+import { impactFeel, isSlayer, playAttackFx, weaponKindOfUnit, weaponLookOfUnit } from "./attackFx"
 import {
   backdropTexKey,
   ensureBackdropTexture,
@@ -408,8 +408,19 @@ export class CinematicScene extends Phaser.Scene {
       })
     }
 
+    // Контратака: подпись над отвечающим, чтобы было видно, кто бьёт в ответ
+    if (strike.isCounter && !this.skipped) {
+      // У лап, а не над головой: над головой ещё висит число урона прошлого удара по этому бойцу
+      floatText(this, atk.x, atk.feetY + Math.min(28, atk.height * 0.12), tr("COUNTER", "КОНТРА"), "#8ecae6", sp, {
+        size: Math.min(20, w * 0.05),
+        rise: 18,
+        stroke: 4
+      })
+    }
+
     // Хореография по оружию: замах/бросок атакующего и фирменный эффект на цели.
     this.setPose(atk, "run")
+    const look = weaponLookOfUnit(atk.unit)
     // Камера чуть подаётся к атакующему, фон уезжает против рывка (параллакс), летят скоростные линии
     const cam = this.cameras.main
     const lethal = strike.defenderHpAfter <= 0
@@ -427,7 +438,11 @@ export class CinematicScene extends Phaser.Scene {
     }
     const fx = playAttackFx({
       scene: this,
-      kind: weaponKindOfUnit(atk.unit),
+      kind: look.kind,
+      grade: look.grade,
+      variant: look.variant,
+      zombie: !!def.unit.isEnemy,
+      groundY: def.feetY,
       attacker: atk.sprite,
       defender: def.sprite,
       atkPos: { x: atk.x, y: atkBodyY },
@@ -488,8 +503,10 @@ export class CinematicScene extends Phaser.Scene {
       crit: big || !!strike.special,
       depth: 46
     })
-    if (strike.effective)
-      floatText(this, def.sprite.x + 40, defBodyY - 90, tr("×1.5 EFFECTIVE", "×1.5 ЭФФЕКТИВНО"), "#ff6b6b", sp, { size: 14, rise: 22 })
+    if (strike.effective) {
+      const color = isSlayer(look.variant) ? "#57e389" : "#ff6b6b"
+      floatText(this, def.sprite.x + 40, defBodyY - 90, tr("×1.5 EFFECTIVE", "×1.5 ЭФФЕКТИВНО"), color, sp, { size: 14, rise: 22 })
+    }
     if (strike.damage > 0) {
       hitGore(this, {
         x: def.sprite.x,

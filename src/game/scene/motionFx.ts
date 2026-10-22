@@ -287,13 +287,16 @@ export function slashTrail(
   dir: number,
   color: number,
   speed: number,
-  heavy = false
+  heavy = false,
+  /** Зеркально по вертикали: удар снизу вверх (второй взмах крест-накрест). */
+  flip = false
 ): void {
   if (!sceneAlive(scene)) return
   const r = size * (heavy ? 0.62 : 0.5)
   const g = scene.add.graphics().setDepth(27).setBlendMode(Phaser.BlendModes.ADD)
-  const start = dir > 0 ? -2.2 : Math.PI + 2.2
-  const sweep = (dir > 0 ? 1 : -1) * 2.4
+  const v = flip ? -1 : 1
+  const start = v * (dir > 0 ? -2.2 : Math.PI + 2.2)
+  const sweep = v * (dir > 0 ? 1 : -1) * 2.4
   const state = { t: 0 }
   const draw = (): void => {
     if (!g.scene) return
@@ -461,7 +464,9 @@ export function arrowShot(
   from: { x: number, y: number },
   to: { x: number, y: number },
   size: number,
-  speed: number
+  speed: number,
+  /** Цвет наконечника и хвоста (материал оружия). */
+  look: { tip?: number, trail?: number } = {}
 ): Promise<void> {
   if (!sceneAlive(scene)) return Promise.resolve()
   ensureMotionTextures(scene)
@@ -469,7 +474,7 @@ export function arrowShot(
   const L = size * 0.42
   g.lineStyle(Math.max(2, size * 0.035), 0x6d4c41, 1)
   g.lineBetween(-L / 2, 0, L / 2, 0)
-  g.fillStyle(0xdee2e6, 1)
+  g.fillStyle(look.tip ?? 0xdee2e6, 1)
   g.fillTriangle(L / 2 + size * 0.1, 0, L / 2 - 2, -size * 0.05, L / 2 - 2, size * 0.05)
   g.fillStyle(0xe63946, 1)
   g.fillTriangle(-L / 2, 0, -L / 2 - size * 0.08, -size * 0.06, -L / 2 + size * 0.06, 0)
@@ -494,7 +499,7 @@ export function arrowShot(
         g.setPosition(x, y).setRotation(Math.atan2(dy, dx))
         if (st.t - lastTrail > 0.06) {
           lastTrail = st.t
-          const d = scene.add.image(x, y, MTEX.glow).setDepth(26).setTint(0xfff3b0).setAlpha(0.6)
+          const d = scene.add.image(x, y, MTEX.glow).setDepth(26).setTint(look.trail ?? 0xfff3b0).setAlpha(0.6)
           d.setDisplaySize(size * 0.14, size * 0.14).setBlendMode(Phaser.BlendModes.ADD)
           scene.tweens.add({ targets: d, alpha: 0, scale: d.scale * 0.3, duration: 260, onComplete: () => d.destroy() })
         }
@@ -517,7 +522,9 @@ export function magicBolt(
   to: { x: number, y: number },
   size: number,
   speed: number,
-  color: number
+  color: number,
+  /** Цвет сердцевины сгустка (тёмная магия — чёрно-фиолетовая, обычный блендинг). По умолчанию — белое свечение. */
+  coreColor?: number
 ): Promise<void> {
   if (!sceneAlive(scene)) return Promise.resolve()
   ensureMotionTextures(scene)
@@ -547,9 +554,9 @@ export function magicBolt(
   const core = scene.add
     .image(from.x, from.y, MTEX.glow)
     .setDepth(28)
-    .setTint(0xffffff)
-    .setBlendMode(Phaser.BlendModes.ADD)
-  core.setDisplaySize(size * 0.2, size * 0.2)
+    .setTint(coreColor ?? 0xffffff)
+    .setBlendMode(coreColor === undefined ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL)
+  core.setDisplaySize(size * (coreColor === undefined ? 0.2 : 0.3), size * (coreColor === undefined ? 0.2 : 0.3))
   const trail = scene.add.particles(0, 0, MTEX.glow, {
     follow: orb,
     frequency: 18,

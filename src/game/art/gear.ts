@@ -9,7 +9,9 @@ const svg = (body: string): string =>
 const INK = "#3b2614"
 
 /** Материал грейда: основной цвет «металла», светлый блик и тёмная кромка. Деревянное — коричневое целиком. */
-const MATERIAL: Record<WeaponGrade, { base: string, light: string, dark: string }> = {
+export interface Material { base: string, light: string, dark: string }
+
+export const MATERIAL: Record<WeaponGrade, Material> = {
   wood: { base: "#a0673a", light: "#c98b55", dark: "#6b4226" },
   iron: { base: "#9aa3ad", light: "#c9d0d8", dark: "#5f6873" },
   steel: { base: "#b7cbe0", light: "#e3eef9", dark: "#5a7894" },
@@ -17,10 +19,10 @@ const MATERIAL: Record<WeaponGrade, { base: string, light: string, dark: string 
 }
 
 /** Рукоять, древко, переплёт — дерево у любого грейда (у деревянного — темнее, чтобы отличаться от клинка). */
-const HANDLE = "#7a4e2d"
+export const HANDLE = "#7a4e2d"
 
 /** Отметка разновидности на рукояти: Killer — красный камень, Brave — золотой, «-slayer» — зелёный. */
-const VARIANT_GEM: Partial<Record<WeaponVariant, string>> = {
+export const VARIANT_GEM: Partial<Record<WeaponVariant, string>> = {
   killer: "#e63946",
   brave: "#ffd166",
   armorslayer: "#52b788",

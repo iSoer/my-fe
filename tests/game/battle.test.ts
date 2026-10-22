@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { applyAction, createBattle, xpForCombat } from "@game/core/battle/reducer"
+import { applyAction, createBattle, xpForCombat, xpForHeal } from "@game/core/battle/reducer"
 import { nextEnemyAction } from "@game/core/ai"
 import { attackOptions, reachableTiles } from "@game/core/map/pathing"
 import { generateMap } from "@game/core/map/generate"
@@ -64,7 +64,18 @@ describe("редьюсер боя", () => {
     })
     expect(state.units[ally]!.hp).toBe(10)
     expect(events.some(e => e.type === "assist" && e.heal === 5)).toBe(true)
-    expect(state.roster[healer]!.xp).toBeGreaterThan(0)
+    // опыт за лечение — по вылеченному HP
+    expect(events.find(e => e.type === "xp" && e.unitId === healer)).toMatchObject({ amount: xpForHeal(5) })
+  })
+
+  it("удар без урона даёт 1 опыта, удар с уроном — по разнице уровней", () => {
+    const weak = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, level: 10, baseStats: { ...flat, atk: 0 } }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, level: 10, baseStats: { ...flat, def: 30, atk: 0 } }]
+    )
+    const id = weak.players[0]!.id
+    const r = applyAction(weak.state, { type: "attack", unitId: id, to: { x: 2, y: 4 }, targetId: weak.enemies[0]!.id })
+    expect(r.events.find(e => e.type === "xp" && e.unitId === id)).toMatchObject({ amount: 1 })
   })
 
   it("Поменяться меняет позиции", () => {
@@ -245,15 +256,27 @@ describe("полные бои: ИИ не падает и бой завершае
   }
 })
 
-describe("опыт за схватку", () => {
-  it("против более слабого — меньше и меньше с разницей, но не ниже 1; против сильного — больше", () => {
-    const even = xpForCombat(10, 10, false)
-    expect(xpForCombat(10, 14, false)).toBeGreaterThan(even)
-    expect(xpForCombat(13, 10, false)).toBeLessThan(even)
-    expect(xpForCombat(13, 10, true)).toBeLessThan(xpForCombat(10, 10, true))
-    // убийство намного более слабого врага — тоже почти ничего
-    expect(xpForCombat(40, 5, true)).toBe(1)
-    expect(xpForCombat(40, 5, false)).toBe(1)
-    for (let gap = 0; gap < 40; gap++) expect(xpForCombat(10 + gap, 10, true)).toBeGreaterThanOrEqual(1)
+describe("опыт как в Fire Emblem", () => {
+  it("урон — по разнице уровней, без урона — 1, добивание — больше всего, вожак — ещё больше", () => {
+    const hit = xpForCombat(10, 10, "hit")
+    const kill = xpForCombat(10, 10, "kill")
+    expect(xpForCombat(10, 10, "none")).toBe(1)
+    expect(hit).toBe(20)
+    expect(kill).toBe(50)
+    expect(kill).toBeGreaterThan(hit * 2)
+    expect(xpForCombat(10, 10, "kill", true)).toBe(70)
+    expect(xpForCombat(10, 14, "hit")).toBeGreaterThan(hit)
+    expect(xpForCombat(13, 10, "hit")).toBeLessThan(hit)
+    expect(xpForCombat(13, 10, "kill")).toBeLessThan(kill)
+    // намного сильнее врага — почти ничего, но не меньше 1
+    expect(xpForCombat(40, 5, "kill")).toBe(1)
+    for (let gap = 0; gap < 40; gap++) expect(xpForCombat(10 + gap, 10, "kill")).toBeGreaterThanOrEqual(1)
+  })
+  it("лечение: больше вылечил — больше опыта; предметом — вдвое меньше", () => {
+    expect(xpForHeal(10)).toBe(15)
+    expect(xpForHeal(20)).toBeGreaterThan(xpForHeal(10))
+    expect(xpForHeal(200)).toBe(25)
+    expect(xpForHeal(10, true)).toBe(8)
+    expect(xpForHeal(1, true)).toBeGreaterThanOrEqual(3)
   })
 })

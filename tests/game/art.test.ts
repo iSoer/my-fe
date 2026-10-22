@@ -18,7 +18,10 @@ import { BIOMES } from "@game/content/biomes"
 import { WEAPONS } from "@game/content/weapons"
 import { zombieFur } from "@game/art/critter"
 import { TALISMANS } from "@game/content/items"
-import { ringSvg, weaponIconSvg } from "@game/art/gear"
+import { MATERIAL, ringSvg, weaponIconSvg } from "@game/art/gear"
+import { critterLook, DEFAULT_LOOK } from "@game/art/look"
+import { BREEDS } from "@game/content/breeds"
+import { WEAPON_SKILLS, type WeaponGrade, type WeaponSkill } from "@shared/character/skills"
 import { gearAlerts } from "@game/ui/components/UnitPanels"
 import { CLASS_IDS, classDef, classWeapons, fwClass } from "@game/content/classes"
 import { generateUnit } from "@game/core/units"
@@ -55,6 +58,11 @@ function wellFormed(svg: string): void {
   expect(svg.startsWith("<svg")).toBe(true)
   expect(svg.trimEnd().endsWith("</svg>")).toBe(true)
   expect(svg).not.toMatch(/NaN|undefined|null/)
+  // Повтор атрибута в теге — невалидный XML: браузер не загрузит такую картинку (боец станет «чёрным квадратом»)
+  for (const tag of svg.match(/<[a-zA-Z][^<>]*>/g) ?? []) {
+    const attrs = [...tag.matchAll(/\s([a-zA-Z:-]+)=/g)].map(m => m[1])
+    expect(new Set(attrs).size, tag.slice(0, 120)).toBe(attrs.length)
+  }
   // парные теги g
   const open = (svg.match(/<g\b/g) ?? []).length
   const close = (svg.match(/<\/g>/g) ?? []).length
@@ -163,6 +171,106 @@ describe("арт: миниатюры", () => {
       wellFormed(unitSvg(u, { pose: POSES[i % POSES.length] }))
       expect(unitArtKey(u, "idle")).toBe(unitArtKey({ ...u }, "idle"))
     }
+  })
+})
+
+describe("арт: оружие в лапах", () => {
+  const GRADES: WeaponGrade[] = ["wood", "iron", "steel", "silver"]
+  const armed = (weapon: WeaponSkill, weaponGrade: WeaponGrade, extra: Partial<CritterArt> = {}): CritterArt => ({
+    ...classCat("myrmidon"),
+    weapon,
+    weaponGrade,
+    ...extra
+  })
+  it("все виды × позы × оружие × грейды — корректный SVG, в лапах — надетое оружие", () => {
+    for (const species of ["cat", "dog", "mouse"] as const) {
+      for (const pose of POSES) {
+        for (const kind of WEAPON_SKILLS) {
+          for (const grade of GRADES) {
+            const svg = critterSvg(armed(kind, grade, { species, pose }))
+            wellFormed(svg)
+            expect(svg).toContain(`held-${kind}`)
+          }
+        }
+      }
+    }
+  })
+  it("рисунок меняется от вида оружия, грейда и разновидности; деревянное — коричневое", () => {
+    const kinds = WEAPON_SKILLS.map(k => critterSvg(armed(k, "iron")))
+    expect(new Set(kinds).size).toBe(WEAPON_SKILLS.length)
+    for (const kind of WEAPON_SKILLS) {
+      const grades = GRADES.map(g => critterSvg(armed(kind, g)))
+      expect(new Set(grades).size).toBe(GRADES.length)
+    }
+    expect(critterSvg(armed("sword", "wood"))).toContain(MATERIAL.wood.base)
+    expect(critterSvg(armed("sword", "silver"))).toContain(MATERIAL.silver.base)
+    expect(critterSvg(armed("sword", "iron", { weaponVariant: "killer" }))).not.toBe(critterSvg(armed("sword", "iron")))
+    expect(critterSvg(armed("sword", "iron", { weaponVariant: "brave" }))).not.toBe(critterSvg(armed("sword", "iron", { weaponVariant: "killer" })))
+    // выпавшее при гибели оружие
+    expect(critterSvg(armed("axe", "steel", { pose: "dead" }))).toContain("dropped")
+  })
+  it("ключ кэша различает оружие и грейд, unitArt берёт грейд и разновидность из оружия в лапах", () => {
+    const u = generateUnit({ seed: 91, level: 10 })
+    const wood = { ...u, weaponSkill: "sword" as const, skills: { ...u.skills, weapon: "sword_wood" } }
+    const steel = { ...wood, skills: { ...u.skills, weapon: "sword_steel" } }
+    const killer = { ...wood, skills: { ...u.skills, weapon: "sword_killer" } }
+    const axe = { ...wood, weaponSkill: "axe" as const, skills: { ...u.skills, weapon: "axe_wood" } }
+    const keys = [wood, steel, killer, axe].map(x => unitArtKey(x, "idle"))
+    expect(new Set(keys).size).toBe(4)
+    expect(unitArt(steel).weaponGrade).toBe("steel")
+    expect(unitArt(killer).weaponVariant).toBe("killer")
+    expect(new Set([wood, steel, killer, axe].map(x => unitSvg(x))).size).toBe(4)
+  })
+  it("предмет класса в левой лапе не дублирует оружие; щит остаётся рядом с оружием", () => {
+    expect(critterSvg(armed("whiteMagic", "iron", { classId: "ovate", tier: fwClass("ovate").tier }))).not.toContain("hand staff")
+    expect(critterSvg(armed("sword", "iron", { classId: "ovate", tier: fwClass("ovate").tier }))).toContain("hand staff")
+    const priest = critterSvg(armed("whiteMagic", "iron", { classId: "priest", tier: fwClass("priest").tier }))
+    expect(priest).toContain("hand book")
+    expect(priest).toContain("held-whiteMagic")
+    expect(critterSvg(armed("sword", "iron", { classId: "guardian", tier: fwClass("guardian").tier }))).toContain("hand shield")
+  })
+})
+
+describe("арт: облик бойца", () => {
+  it("у каждой породы есть формы ушей и хвоста; облик детерминирован по seed", () => {
+    for (const b of BREEDS) {
+      expect(b.look.ears.length).toBeGreaterThan(0)
+      expect(b.look.tails.length).toBeGreaterThan(0)
+      const look = critterLook(b.species, b.look, 12345)
+      expect(b.look.ears).toContain(look.ears)
+      expect(b.look.tails).toContain(look.tail)
+      expect(critterLook(b.species, b.look, 12345)).toEqual(look)
+    }
+    // без данных бойца — прежний облик вида
+    expect(critterSvg({ ...classCat("myrmidon"), classId: undefined } as CritterArt)).toBe(critterSvg({ ...classCat("myrmidon"), classId: undefined, look: DEFAULT_LOOK.cat } as CritterArt))
+  })
+  it("бойцы одного вида, породы и класса заметно различаются; все детали — корректный SVG", () => {
+    for (const species of ["cat", "dog", "mouse"] as const) {
+      const base = generateUnit({ seed: 4242, level: 10, species })
+      const svgs = new Set<string>()
+      const looks = new Set<string>()
+      for (let seed = 0; seed < 30; seed++) {
+        const u = { ...base, seed }
+        looks.add(JSON.stringify(unitArt(u).look))
+        const svg = unitSvg(u)
+        wellFormed(svg)
+        svgs.add(svg)
+      }
+      expect(looks.size).toBeGreaterThan(10)
+      expect(svgs.size).toBeGreaterThan(10)
+    }
+    for (const b of BREEDS) {
+      const u = { ...generateUnit({ seed: 7, level: 5, species: b.species }), breedId: b.id }
+      for (const pose of POSES) {
+        wellFormed(unitSvg(u, { pose }))
+        wellFormed(unitSvg({ ...u, isEnemy: true }, { pose }))
+      }
+      for (const part of CRITTER_PARTS) wellFormed(unitPartSvg(u, part))
+    }
+  })
+  it("неизвестная порода не ломает миниатюру", () => {
+    const u = { ...generateUnit({ seed: 8, level: 5 }), breedId: "nope" }
+    wellFormed(unitSvg(u))
   })
 })
 

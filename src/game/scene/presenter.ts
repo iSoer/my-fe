@@ -10,7 +10,7 @@ import { specialDef } from "@game/content/skills/specials"
 import { unitClass } from "@game/content/classes"
 import type { CritterPart } from "@game/art/index"
 import { deathSeed, pickDeathVariant, playDeathMap, preloadDeathParts, type DeathCtx } from "./deathFx"
-import { playQuickAttackFx, shakePx, weaponKindOf, weaponKindOfUnit } from "./attackFx"
+import { isSlayer, playQuickAttackFx, shakePx, weaponKindOfUnit, weaponLookOfUnit } from "./attackFx"
 import { WEAPON_COLOR_HEX } from "./style"
 import { weaponDef } from "@game/content/weapons"
 import { hitGore, bloodTrail, screenBloodSplat } from "./gore"
@@ -27,12 +27,9 @@ import {
   levelUpFx,
   portalSpawn,
   shakeCam,
-  shockRing,
-  slashTrail,
   sparks,
   specialCutIn,
-  stepFx,
-  thrustLine
+  stepFx
 } from "./motionFx"
 import type { UnitView } from "./UnitView"
 import { tr } from "@game/i18n"
@@ -360,6 +357,8 @@ export class GamePresenter implements Presenter {
     const color = atkUnit ? WEAPON_COLOR_HEX[weaponDef(atkUnit.skills.weapon).color] : 0xffffff
     const trailColor = color === WEAPON_COLOR_HEX.colorless ? 0xfff3b0 : color
     if (second) doubleStrikeMark(map, atk.x, atk.y - tile * 0.75, tile, sp)
+    if (strike.isCounter)
+      floatText(map, atk.x, atk.y - tile * 0.85, tr("COUNTER", "КОНТРА"), "#8ecae6", sp, { size: tile * 0.2, rise: tile * 0.25 })
     if (strike.special) {
       haptic("heavy")
       const portrait = atkUnit ? unitTexKey(atkUnit, "happy", "map") : undefined
@@ -381,9 +380,10 @@ export class GamePresenter implements Presenter {
       tween(map, { targets: rig, scaleX: 1.12, scaleY: 0.88, duration: 110 / sp, ease: "Quad.easeOut" })
     ])
     if (!atk.scene) return
-    // Рывок с остаточными образами
-    const reach = def.side === atk.side ? 0.2 : 0.38
-    afterImages(map, atk, 3, 28, trailColor, sp)
+    // Рывок с остаточными образами (стрелок и маг лишь подаются вперёд — удар летит снарядом)
+    const ranged = skill === "bow" || skill === "blackMagic" || skill === "whiteMagic"
+    const reach = ranged ? 0.1 : def.side === atk.side ? 0.2 : 0.38
+    afterImages(map, atk, ranged ? 1 : 3, 28, trailColor, sp)
     map.tweens.add({ targets: rig, scaleX: 0.92, scaleY: 1.1, duration: 90 / sp, ease: "Quad.easeIn" })
     await tween(map, {
       targets: atk,
@@ -394,13 +394,16 @@ export class GamePresenter implements Presenter {
     })
     if (!atk.scene || !def.scene) return
     const hitPos = { x: def.x, y: def.y - tile * 0.1 }
-    // След оружия поверх фирменного эффекта
-    if (skill === "sword" || skill === "axe")
-      slashTrail(map, hitPos.x, hitPos.y, tile, ux >= 0 ? 1 : -1, trailColor, sp, !!strike.special)
-    else if (skill === "spear") thrustLine(map, { x: atk.x, y: atk.y - tile * 0.1 }, hitPos, tile, trailColor, sp)
+    // След оружия, снаряд и эффект на цели — по виду, материалу и разновидности оружия
+    const look = weaponLookOfUnit(atkUnit)
+    const defUnit = before.roster[strike.defenderId]
     const quickFx = playQuickAttackFx({
       scene: map,
-      kind: weaponKindOf(before, strike.attackerId),
+      kind: look.kind,
+      grade: look.grade,
+      variant: look.variant,
+      zombie: !!defUnit?.isEnemy,
+      groundY: def.y + tile * 0.3,
       attacker: atk,
       defender: def,
       atkPos: { x: atk.x, y: atk.y - tile * 0.1 },
@@ -416,7 +419,6 @@ export class GamePresenter implements Presenter {
     })
     await quickFx.impactAt
     if (!def.scene || !atk.scene) return
-    if (skill === "gauntlet") shockRing(map, hitPos.x, hitPos.y, tile, sp)
     // Контакт: хит-стоп, отдача, тряска
     const frac = strike.damage / Math.max(1, defMax)
     const lethal = strike.defenderHpAfter <= 0
@@ -453,8 +455,10 @@ export class GamePresenter implements Presenter {
       sp,
       { crit: !!strike.special || frac >= 0.5 }
     )
-    if (strike.effective)
-      floatText(map, def.x + tile * 0.3, def.y - tile * 0.85, "×1.5", "#ff6b6b", sp, { size: tile * 0.22 })
+    if (strike.effective) {
+      const slayer = isSlayer(atkUnit ? weaponDef(atkUnit.skills.weapon).variant : undefined)
+      floatText(map, def.x + tile * 0.3, def.y - tile * 0.85, "×1.5", slayer ? "#57e389" : "#ff6b6b", sp, { size: tile * 0.22 })
+    }
     if (strike.healed > 0) {
       floatText(map, atk.x, atk.y - tile * 0.5, `+${strike.healed}`, "#80ed99", sp, { size: tile * 0.3 })
       healPillar(map, ox, oy, tile, sp)
