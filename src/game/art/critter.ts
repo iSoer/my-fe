@@ -5,7 +5,7 @@
  */
 import type { ClassTier, Mount } from "@shared/character/classes"
 import { BLUSH, INK, NOSE, shade, type FurArt } from "./palettes"
-import { RIDER_TRANSFORM, hatLift, mountSvg, outfitAura, outfitBody, outfitCape, outfitHead, outfitHeadBack } from "./outfits"
+import { RIDER_TRANSFORM, hatLift, mountSvg, outfitAura, outfitBack, outfitBody, outfitCape, outfitHead, outfitHeadBack } from "./outfits"
 
 export type ArtSpecies = "cat" | "dog" | "mouse"
 export type Pose = "idle" | "run" | "hurt" | "dead" | "happy" | "carried" | "blink"
@@ -249,7 +249,7 @@ function crown(lift = 0): string {
 
 /** Снаряжение: до тела (сзади) и после головы (спереди/сверху). С классом — наряд и животное класса. */
 function gearBehind(a: CritterArt): string {
-  if (a.classId) return outfitCape(a)
+  if (a.classId) return outfitCape(a) + outfitBack(a)
   if (a.moveType === "cavalry") {
     return `<g class="vacuum"><ellipse cx="60" cy="104" rx="36" ry="10" fill="#2f3440" stroke="#1c2029" stroke-width="1.5" />
       <ellipse cx="60" cy="101" rx="36" ry="10" fill="#4a5262" stroke="#1c2029" stroke-width="1.5" />

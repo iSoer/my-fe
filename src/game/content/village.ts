@@ -4,7 +4,7 @@ import { tr } from "@game/i18n"
 // Деревня-хаб между боями: карта клетками, домики и NPC. Логика движения — `core/village`, отрисовка — `scene/village`.
 
 /**
- * Легенда: `T` дерево, `#` стена домика, `D` дверь, `G` ворота на выход из поселения, `~` пруд, `o` колодец,
+ * Легенда: `T` дерево, `#` стена домика, `D` дверь, `G` ворота на выход из поселения, `~` пруд,
  * `b` куст — непроходимо;
  * `.` трава, `=` тропинка, `*` цветы — проходимо.
  */
@@ -20,7 +20,7 @@ export const VILLAGE_MAP: readonly string[] = [
   "Tb.........=........bT",
   "T..~~~.....=.....*...T",
   "T.~~~~~..=====...b...T",
-  "T..~~~...==o==.......T",
+  "T..~~~...=====.......T",
   "T........=====...*...T",
   "T.*.b.....===.....b..T",
   "T..........=.........T",
@@ -30,7 +30,7 @@ export const VILLAGE_MAP: readonly string[] = [
 export const VILLAGE_W = 22
 export const VILLAGE_H = VILLAGE_MAP.length
 
-export type VillageTile = "tree" | "wall" | "door" | "gate" | "water" | "well" | "bush" | "grass" | "path" | "flowers"
+export type VillageTile = "tree" | "wall" | "door" | "gate" | "water" | "bush" | "grass" | "path" | "flowers"
 
 export const VILLAGE_LEGEND: Record<string, VillageTile> = {
   "T": "tree",
@@ -38,7 +38,6 @@ export const VILLAGE_LEGEND: Record<string, VillageTile> = {
   "D": "door",
   "G": "gate",
   "~": "water",
-  "o": "well",
   "b": "bush",
   ".": "grass",
   "=": "path",

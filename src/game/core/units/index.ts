@@ -21,12 +21,12 @@ import { BOSS_TITLES, EPITHETS, NAMES } from "@game/content/names"
 import { BREEDS } from "@game/content/breeds"
 import { PERSONALITIES } from "@game/content/personalities"
 import { ACCESSORIES, EYES, EYE_COLORS, FUR_PALETTES, PATTERNS } from "@game/content/appearance"
-import { COMBAT, MODEL_SCALE, ROSTER, gloryTier } from "@game/content/balance"
+import { COMBAT, MODEL_SCALE, ROSTER, recruitRarityWeights } from "@game/content/balance"
 import { factionDef } from "@game/content/factions"
 import { generateCharacter, validateCharacterRequest } from "@/server/character-model/generate"
 import { loadCharacterModel } from "@/server/character-model/model"
-import type { StatValues } from "@shared/character/leveling"
-import { CLASS_TIERS, availableClasses, canTakeClass, isUniqueClass, statsInClass } from "@shared/character/classes"
+import { levelOneStats, type StatValues } from "@shared/character/leveling"
+import { CHARACTER_CLASSES, CLASS_TIERS, availableClasses, canTakeClass, isUniqueClass, statsInClass } from "@shared/character/classes"
 import { rankAtLevel, rankIndex, ranksAtLevel, type Rank, type WeaponGrade, type WeaponSkill } from "@shared/character/skills"
 
 /* ---------- Статы: модель персонажа → бой ---------- */
@@ -206,6 +206,50 @@ export function equipWeapon(unit: UnitInstance, weaponId: string): UnitInstance 
   return withClassAssist(next, unit)
 }
 
+/* ---------- Перерождение ---------- */
+
+/** Перерождение доступно на 80-м уровне, пока у бойца меньше пяти звёзд. */
+export function canRebirth(unit: Pick<UnitInstance, "level" | "rarity">): boolean {
+  return unit.level >= MAX_LEVEL && unit.rarity < 5
+}
+
+/**
+ * Статы модели того же персонажа на другой звезде. Звезда масштабирует одну и ту же 5★-версию (`levelOneStat`):
+ * из статов 80-го уровня восстанавливаем 1-й уровень 5★ и строим из него новую звезду. Максимум кратен 5, как у
+ * модели, и не меньше прежнего.
+ */
+export function rescaleRarity(maxStats: StatValues, from: Rarity, to: Rarity): { baseStats: StatValues, maxStats: StatValues } {
+  const model = loadCharacterModel()
+  const a = model.rarities[from]
+  const b = model.rarities[to]
+  const max = { ...maxStats }
+  for (const s of Object.keys(maxStats) as (keyof StatValues)[]) {
+    const g = model.growth[s]
+    const base5 = maxStats[s] / (a.baseMultiplier + (g - 1) * a.growthMultiplier)
+    max[s] = Math.max(maxStats[s], Math.round((base5 * (b.baseMultiplier + (g - 1) * b.growthMultiplier)) / 5) * 5)
+  }
+  return { baseStats: levelOneStats(max, model.growth, b), maxStats: max }
+}
+
+/**
+ * Перерождение: боец 80-го уровня возвращается на 1-й и получает звезду — тот же персонаж с ростом следующей звезды.
+ * Класс, оружие, навыки, SP и история сохраняются; пул изучаемых навыков растёт по звезде (`RARITY_SKILL_POOL`).
+ */
+export function rebirthUnit(unit: UnitInstance): UnitInstance {
+  if (!canRebirth(unit)) throw new Error(`rebirth needs level ${MAX_LEVEL} and fewer than 5 stars`)
+  const rarity = (unit.rarity + 1) as Rarity
+  const extra = RARITY_SKILL_POOL[rarity] - RARITY_SKILL_POOL[unit.rarity]
+  let learnable = unit.learnable
+  if (extra > 0) {
+    const known = new Set([...unit.learned, ...unit.learnable])
+    const rng = createRng(unit.seed).fork(`rebirth:${rarity}`)
+    const cands = rng.shuffle(allowedSkillIds(unitClass(unit), unit.species).filter(id => !known.has(id)))
+    learnable = [...learnable, ...cands.slice(0, extra)]
+  }
+  invalidateKit(unit)
+  return { ...unit, ...rescaleRarity(unit.maxStats, unit.rarity, rarity), rarity, level: 1, xp: 0, learnable }
+}
+
 /* ---------- Пулы навыков ---------- */
 
 function passiveAllowed(p: PassiveDef, cls: ClassDef): boolean {
@@ -349,7 +393,7 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
   }
 
   // Персонаж модели: редкость — по весам игры, уровень и класс — из опций
-  const rarity: Rarity = opts.rarity ?? pickRarity(r.rarity, opts.rarityWeights ?? gloryTier(0).rarityWeights)
+  const rarity: Rarity = opts.rarity ?? pickRarity(r.rarity, opts.rarityWeights ?? recruitRarityWeights(1))
   const level = clamp(Math.round(opts.level), 1, MAX_LEVEL)
   const request = opts.classId ? { rarity, level, class: opts.classId } : { rarity, level }
   const character = generateCharacter(loadCharacterModel(), request, r.character.int(0, 0x7fffffff))
@@ -488,58 +532,57 @@ export function loadoutsAt(level: number): Loadout[] {
 export interface RosterOptions {
   seed: number
   glory: number
+  /** Высшая открытая перерождением звезда (`profile.maxRarity`); по умолчанию ★1. */
+  maxRarity?: Rarity
   size?: number
   now?: number
 }
 
 const MELEE: readonly WeaponSkill[] = ["sword", "spear", "axe", "gauntlet"]
 
-/** Запасной состав ростера на начальном ярусе, если случайный не прошёл проверку ролей. */
+/** Стартовые классы (ярус beginner): Soldier, Hunter, Mage, Healer, Gladiator. */
+export const STARTER_CLASSES: readonly string[] = CHARACTER_CLASSES.filter(c => c.tier === "beginner").map(c => c.id)
+
+/** Запасной состав ростера из стартовых классов, если случайный не прошёл проверку ролей. */
 const FALLBACK_ROSTER: readonly [string, WeaponSkill][] = [
-  ["diviner", "whiteMagic"],
+  ["healer", "whiteMagic"],
   ["gladiator", "sword"],
   ["soldier", "spear"],
   ["soldier", "axe"],
   ["hunter", "bow"],
-  ["diviner", "blackMagic"],
-  ["noble", "sword"],
+  ["mage", "blackMagic"],
   ["gladiator", "gauntlet"],
-  ["commoner", "axe"],
   ["hunter", "sword"]
 ]
 
-/** Стартовый ростер новой армии с гарантиями ролей. Детерминирован по seed; классы — из модели на стартовом уровне. */
+/**
+ * Стартовый ростер новой армии с гарантиями ролей. Детерминирован по seed. Все бойцы — в стартовых классах: сначала
+ * по одному каждого (`STARTER_CLASSES`), остальные — случайный стартовый; оружие класса и статы выбирает модель.
+ */
 export function generateRoster(opts: RosterOptions): UnitInstance[] {
-  const tier = gloryTier(opts.glory)
+  const maxRarity = opts.maxRarity ?? 1
+  const rarityWeights = recruitRarityWeights(maxRarity)
   const size = opts.size ?? (opts.glory >= 25 ? ROSTER.sizeWithGlory25 : ROSTER.size)
   const startLevel = opts.glory >= 75 ? ROSTER.startLevelWithGlory75 : ROSTER.startLevel
   const root = createRng(opts.seed)
-  const guaranteeFive = opts.glory >= 300
+  // Слава 300: в ростере есть боец высшей открытой звезды
+  const guaranteeTop = opts.glory >= 300 && maxRarity > 1
 
   for (let attempt = 0; attempt < 200; attempt++) {
     const rng = root.fork(`attempt:${attempt}`)
     const units: UnitInstance[] = []
     for (let i = 0; i < size; i++) {
       const seed = rng.int(0, 0x7fffffff)
-      let u = generateUnit({ seed, level: startLevel, rarityWeights: tier.rarityWeights, now: opts.now })
-      // Dancer в ростере — не больше одного
-      if (u.classId === DANCER_CLASS && units.some(x => x.classId === DANCER_CLASS))
-        u = generateUnit({
-          seed,
-          level: startLevel,
-          rarityWeights: tier.rarityWeights,
-          classId: "commoner",
-          now: opts.now
-        })
-      units.push(u)
+      const classId = STARTER_CLASSES[i] ?? rng.pick(STARTER_CLASSES)
+      units.push(generateUnit({ seed, level: startLevel, rarityWeights, classId, now: opts.now }))
     }
-    if (guaranteeFive && !units.some(u => u.rarity === 5)) {
+    if (guaranteeTop && !units.some(u => u.rarity === maxRarity)) {
       const idx = rng.int(0, units.length - 1)
       const old = units[idx] as UnitInstance
       units[idx] = generateUnit({
         seed: old.seed,
         level: startLevel,
-        rarity: 5,
+        rarity: maxRarity,
         classId: old.classId,
         weaponSkill: old.weaponSkill,
         now: opts.now
@@ -564,9 +607,9 @@ export function generateRoster(opts: RosterOptions): UnitInstance[] {
     generateUnit({
       seed: rng.int(0, 0x7fffffff),
       level: startLevel,
-      classId: startLevel >= 5 ? classId : "commoner",
+      classId,
       weaponSkill,
-      rarityWeights: tier.rarityWeights,
+      rarityWeights,
       species: i % 2 === 0 ? "cat" : "dog",
       now: opts.now
     })

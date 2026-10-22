@@ -7,6 +7,7 @@ import { MAP_H, MAP_W, MAX_LEVEL, posKey } from "@game/core/types"
 import { difficultyDef } from "@game/content/balance"
 import { BIOMES } from "@game/content/biomes"
 import { unitClass } from "@game/content/classes"
+import { generateUnit } from "@game/core/units"
 
 const ALL_BIOMES = BIOMES.map(b => b.id)
 
@@ -104,5 +105,37 @@ describe("generateMap", () => {
       ),
       { numRuns: 200 }
     )
+  })
+})
+
+describe("баланс карт и сложности", () => {
+  it("непроходимые для пехоты клетки (стены, горы, вода) — в среднем не больше 18 % поля", () => {
+    let blocked = 0
+    let cells = 0
+    for (const biomeId of ALL_BIOMES) {
+      for (let i = 0; i < 24; i++) {
+        const m = generateMap({ seed: 300 + i * 41, biomeId, difficulty: "normal", squadAvgLevel: 10, squadSize: 4, unlockedBiomes: ALL_BIOMES })
+        for (const row of m.tiles) {
+          for (const t of row) {
+            cells++
+            if (t === "wall" || t === "wall_breakable" || t === "mountain" || t === "water") blocked++
+          }
+        }
+      }
+    }
+    expect(blocked / cells).toBeLessThan(0.18)
+  })
+  it("на «Легко» статы врагов умножены на enemyStatMult, на остальных — как у модели", () => {
+    for (const difficulty of ["easy", "normal"] as Difficulty[]) {
+      const mult = difficultyDef(difficulty).enemyStatMult
+      const m = generateMap({ seed: 42, biomeId: "yard", difficulty, squadAvgLevel: 10, squadSize: 4, unlockedBiomes: ALL_BIOMES })
+      for (const { unit } of m.enemies) {
+        // Статы модели зависят только от seed, звезды, уровня и класса
+        const plain = generateUnit({ seed: unit.seed, level: unit.level, rarity: unit.rarity, classId: unit.classId, isEnemy: true })
+        for (const [k, v] of Object.entries(plain.maxStats))
+          expect(unit.maxStats[k as keyof typeof unit.maxStats]).toBe(Math.max(1, Math.round(v * mult)))
+      }
+    }
+    expect(difficultyDef("easy").enemyStatMult).toBeLessThan(1)
   })
 })

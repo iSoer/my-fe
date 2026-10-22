@@ -11,11 +11,12 @@ import {
   loadoutsAt,
   openClasses,
   reclassUnit,
+  STARTER_CLASSES,
   statsAtLevel,
   visibleStats,
   weaponMt
 } from "@game/core/units"
-import { MAX_LEVEL, STATS } from "@game/core/types"
+import { MAX_LEVEL, STATS, type Rarity } from "@game/core/types"
 import { CLASS_IDS, DANCER_CLASS, classDef, classWeapons, fwClass, unitClass } from "@game/content/classes"
 import { isMagicWeapon } from "@game/content/weapons"
 import { ROSTER } from "@game/content/balance"
@@ -82,7 +83,7 @@ describe("generateUnit", () => {
   })
   it("ранг оружия добавляет Mt: талант к 55-му уровню — S, +3", () => {
     const u = {
-      ...generateUnit({ seed: 4242, level: 55, classId: "commoner", weaponSkill: "sword" }),
+      ...generateUnit({ seed: 4242, level: 55, classId: "gladiator", weaponSkill: "sword" }),
       weaponSkill: "sword" as const,
       aptitudes: aptitudesOf(["sword"])
     }
@@ -104,8 +105,8 @@ describe("generateUnit", () => {
 describe("generateRoster", () => {
   it("гарантии состава выполняются для многих seed", () => {
     fc.assert(
-      fc.property(fc.integer({ min: 0, max: 0x7fffffff }), fc.integer({ min: 0, max: 700 }), (seed, glory) => {
-        const r = generateRoster({ seed, glory })
+      fc.property(fc.integer({ min: 0, max: 0x7fffffff }), fc.integer({ min: 0, max: 700 }), fc.constantFrom<Rarity>(1, 2, 3, 4, 5), (seed, glory, maxRarity) => {
+        const r = generateRoster({ seed, glory, maxRarity })
         expect(r.length).toBe(glory >= 25 ? ROSTER.sizeWithGlory25 : ROSTER.size)
         const weapons = r.map(u => unitClass(u).weaponSkill)
         expect(weapons).toContain("whiteMagic")
@@ -115,7 +116,10 @@ describe("generateRoster", () => {
         expect(r.filter(u => u.classId === DANCER_CLASS).length).toBeLessThanOrEqual(1)
         expect(r.some(u => u.species === "cat")).toBe(true)
         expect(r.some(u => u.species === "dog")).toBe(true)
-        if (glory >= 300) expect(r.some(u => u.rarity === 5)).toBe(true)
+        // Только открытые звёзды; Слава 300 — гарантирован боец высшей открытой
+        expect(r.every(u => STARTER_CLASSES.includes(u.classId))).toBe(true)
+        expect(r.every(u => u.rarity <= maxRarity)).toBe(true)
+        if (glory >= 300) expect(r.some(u => u.rarity === maxRarity)).toBe(true)
         expect(r.every(u => u.level === (glory >= 75 ? ROSTER.startLevelWithGlory75 : ROSTER.startLevel))).toBe(true)
         expect(new Set(r.map(u => u.id)).size).toBe(r.length)
       }),
@@ -160,7 +164,7 @@ describe("классы FW", () => {
         expect(u.weaponSkill).toBe(l.weaponSkill)
       }
     }
-    expect(loadoutsAt(1).every(l => l.cls.tier === "base")).toBe(true)
+    expect(loadoutsAt(1).every(l => l.cls.tier === "beginner")).toBe(true)
     expect(loadoutsAt(20).some(l => l.cls.moveType === "flier")).toBe(true)
   })
 })

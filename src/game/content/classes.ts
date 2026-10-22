@@ -147,8 +147,6 @@ export function classRole(classId: string): ClassRole {
   const top = [...classCombatBonus(classId)].filter(b => b.stat !== "hp").sort((a, b) => b.value - a.value)[0]?.stat
   if (classId === DANCER_CLASS)
     return { icon: "💃", role: tr("Dancer", "Танцор"), summary: tr("Dances to give an ally who has already acted one more turn.", "Танцем даёт союзнику, который уже ходил, ещё один ход.") }
-  if (fw.tier === "base")
-    return { icon: "🎒", role: tr("All-rounder", "Универсал"), summary: tr("Starter class with no bonuses: can use any weapon.", "Стартовый класс без бонусов: можно взять любое оружие.") }
   if (weapons.every(w => w === "whiteMagic"))
     return { icon: "🩹", role: tr("Healer", "Лекарь"), summary: tr("Heals allies with Assist from 2 tiles; hits weakly itself (damage ×0.5).", "Лечит союзников Поддержкой с 2 клеток, сам бьёт слабо (урон ×0.5).") }
   if (weapons.every(w => isMagicWeapon(w)))

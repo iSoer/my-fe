@@ -8,6 +8,8 @@ export interface DifficultyDef {
   enemies: [number, number]
   levelRange: [number, number]
   rarity: [Rarity, Rarity]
+  /** Множитель статов модели у врагов (HP, атака, защиты, скорость); 1 — без изменений. */
+  enemyStatMult: number
   /** Доля врагов в стойке hold. */
   holdRatio: number
   reinforcements: { turn: number, count: number }[]
@@ -42,10 +44,12 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
   {
     id: "easy",
     get name() { return tr("Easy", "Легко") },
-    get desc() { return tr("Enemies wait for you to come to them. Good for a new army.", "Враги ждут, пока вы подойдёте. Хорошо для новой армии.") },
+    get desc() { return tr("Enemies are a little weaker and wait for you to come to them. Good for a new army.", "Враги чуть слабее и ждут, пока вы подойдёте. Хорошо для новой армии.") },
     enemies: [3, 4],
     levelRange: [-3, 0],
     rarity: [1, 2],
+    // Враги на 7 % слабее: в автобоях отряд теряет ≈ на 20 % меньше HP (урон — разность атаки и защиты, эффект нелинейный)
+    enemyStatMult: 0.93,
     holdRatio: 1,
     reinforcements: [],
     objective: "rout",
@@ -72,6 +76,7 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     enemies: [4, 5],
     levelRange: [-1, 2],
     rarity: [2, 3],
+    enemyStatMult: 1,
     holdRatio: 0.5,
     reinforcements: [],
     objective: "rout",
@@ -98,6 +103,7 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     enemies: [5, 7],
     levelRange: [1, 4],
     rarity: [3, 4],
+    enemyStatMult: 1,
     holdRatio: 0,
     reinforcements: [{ turn: 3, count: 2 }],
     objective: "rout",
@@ -124,6 +130,7 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     enemies: [6, 8],
     levelRange: [3, 7],
     rarity: [4, 5],
+    enemyStatMult: 1,
     holdRatio: 0,
     reinforcements: [
       { turn: 2, count: 2 },
@@ -246,24 +253,37 @@ export const SHOP = {
 export const ROSTER = {
   size: 6,
   sizeWithGlory25: 7,
-  /** С 5-го уровня открыт начальный ярус классов FW (Gladiator, Hunter, Soldier, Diviner). */
+  /** Уровень стартового ростера; классы всегда стартовые (Soldier, Hunter, Mage, Healer, Gladiator). */
   startLevel: 5,
   startLevelWithGlory75: 10
 }
 
+/**
+ * Звёзды случайных бойцов игрока (стартовый ростер, магазин, награды). Новая игра — только ★1; каждая звезда
+ * открывается, когда первый боец перерождается в неё (80 ур. → 1 ур., +★). Вес звезды — только среди открытых.
+ */
+export const RECRUIT_RARITY_WEIGHTS: Record<Rarity, number> = { 1: 40, 2: 30, 3: 18, 4: 9, 5: 3 }
+
+/** Веса звёзд при открытых ★1…`maxRarity`; `boost` (награда за победу) удваивает вес высшей открытой звезды. */
+export function recruitRarityWeights(maxRarity: Rarity, boost = false): Record<Rarity, number> {
+  const w = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<Rarity, number>
+  for (const r of [1, 2, 3, 4, 5] as Rarity[]) if (r <= maxRarity) w[r] = RECRUIT_RARITY_WEIGHTS[r]
+  if (boost && maxRarity > 1) w[maxRarity] *= 2
+  return w
+}
+
 export interface GloryTier {
   glory: number
-  rarityWeights: Record<Rarity, number>
   bonus: string
 }
 
 export const GLORY_TIERS: readonly GloryTier[] = [
-  { glory: 0, rarityWeights: { 1: 40, 2: 40, 3: 20, 4: 0, 5: 0 }, bonus: "" },
-  { glory: 25, rarityWeights: { 1: 20, 2: 40, 3: 35, 4: 5, 5: 0 }, get bonus() { return tr("Starting Roster of 7 characters", "Стартовый ростер из 7 персонажей") } },
-  { glory: 75, rarityWeights: { 1: 10, 2: 30, 3: 45, 4: 15, 5: 0 }, get bonus() { return tr("Roster starts at level 10", "Ростер стартует с 10 уровня") } },
-  { glory: 150, rarityWeights: { 1: 0, 2: 25, 3: 50, 4: 22, 5: 3 }, get bonus() { return tr("Shop shows 5 candidates", "Витрина магазина из 5 кандидатов") } },
-  { glory: 300, rarityWeights: { 1: 0, 2: 10, 3: 50, 4: 32, 5: 8 }, get bonus() { return tr("Guaranteed ★5 in the starting Roster", "В стартовом ростере гарантированный ★5") } },
-  { glory: 600, rarityWeights: { 1: 0, 2: 0, 3: 40, 4: 45, 5: 15 }, get bonus() { return tr("500 starting Treats", "Стартовые Вкусняшки 500") } }
+  { glory: 0, bonus: "" },
+  { glory: 25, get bonus() { return tr("Starting Roster of 7 characters", "Стартовый ростер из 7 персонажей") } },
+  { glory: 75, get bonus() { return tr("Roster starts at level 10", "Ростер стартует с 10 уровня") } },
+  { glory: 150, get bonus() { return tr("Shop shows 5 candidates", "Витрина магазина из 5 кандидатов") } },
+  { glory: 300, get bonus() { return tr("Starting Roster has a fighter of your highest unlocked ★", "В стартовом ростере гарантирован боец высшей открытой ★") } },
+  { glory: 600, get bonus() { return tr("500 starting Treats", "Стартовые Вкусняшки 500") } }
 ]
 
 export function gloryTier(glory: number): GloryTier {
@@ -301,8 +321,8 @@ export const MODEL_SCALE = {
 
 export const TERRAIN_SHARE = {
   forest: [0.15, 0.25] as const,
-  walls: [0.05, 0.12] as const,
-  impassable: [0.0, 0.12] as const,
+  walls: [0.02, 0.05] as const,
+  impassable: [0.0, 0.06] as const,
   covers: [2, 4] as const,
-  breakable: [0, 3] as const
+  breakable: [0, 2] as const
 }

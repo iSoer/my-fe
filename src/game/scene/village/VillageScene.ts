@@ -27,13 +27,11 @@ import {
   GATE_H,
   HOUSE_ROOF_OVER,
   TREE_H,
-  WELL_H,
   villageFlowersSvg,
   villageGateSvg,
   villageHouseSvg,
   villagePathSvg,
-  villageTreeSvg,
-  villageWellSvg
+  villageTreeSvg
 } from "@game/art/village"
 import { ensureTexture } from "../svgTextures"
 import { ensureTextures } from "../textures"
@@ -87,7 +85,6 @@ const texKey = {
   water: (f: number) => `vg:water:${f}`,
   bush: "vg:bush",
   tree: (v: number) => `vg:tree:${v}`,
-  well: "vg:well",
   gate: "vg:gate",
   house: (id: string) => `vg:house:${id}`,
   npc: (id: string, pose: string) => `vg:npc:${id}:${pose}`
@@ -150,7 +147,6 @@ export class VillageScene extends Phaser.Scene {
     for (let f = 0; f < WATER_FRAMES; f++) jobs.push(t(texKey.water(f), tileSvg("yard", "water", f, 0), T, T))
     jobs.push(t(texKey.bush, tileSvg("yard", "forest", 0, 0), T, T))
     for (let v = 0; v < 3; v++) jobs.push(t(texKey.tree(v), villageTreeSvg(v), T, T * TREE_H))
-    jobs.push(t(texKey.well, villageWellSvg(), T, T * WELL_H))
     jobs.push(t(texKey.gate, villageGateSvg(GATE.w, GATE.sign), GATE.w * T, T * GATE_H))
     for (const h of HOUSES) jobs.push(t(texKey.house(h.npc), villageHouseSvg(h), h.w * T, (h.h + HOUSE_ROOF_OVER) * T))
     for (const n of NPCS) {
@@ -197,8 +193,6 @@ export class VillageScene extends Phaser.Scene {
         else if (tile === "bush") this.add.image(px, py, texKey.bush).setOrigin(0).setDisplaySize(T, T).setDepth(py + T)
         else if (tile === "tree")
           this.add.image(px + T / 2, py + T, texKey.tree(h % 3)).setOrigin(0.5, 1).setDisplaySize(T, T * TREE_H).setDepth(py + T)
-        else if (tile === "well")
-          this.add.image(px + T / 2, py + T, texKey.well).setOrigin(0.5, 1).setDisplaySize(T, T * WELL_H).setDepth(py + T)
       }
     }
     // За околицей: луг, дорога уходит от ворот на юг, редкие деревья по краям

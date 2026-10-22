@@ -17,6 +17,7 @@ import type {
 import { MAP_H, MAP_W, MAX_LEVEL, clamp, inBounds, posKey } from "../types"
 import { isPassable } from "./pathing"
 import { generateUnit, loadoutsAt, type Loadout } from "../units"
+import type { StatValues } from "@shared/character/leveling"
 import { enemyWeaponGrade } from "../items"
 import { BIOMES, biomeDef } from "@game/content/biomes"
 import { DIFFICULTIES, REWARDS, TERRAIN_SHARE, difficultyDef } from "@game/content/balance"
@@ -106,14 +107,20 @@ function growBlob(g: Grid, rng: Rng, terrain: TerrainId, size: number, allowed: 
   }
 }
 
-function wallSegment(g: Grid, rng: Rng, allowed: (p: Pos) => boolean): void {
+/** Отрезок стены 2–3 клетки; возвращает, сколько клеток реально стало стеной. */
+function wallSegment(g: Grid, rng: Rng, allowed: (p: Pos) => boolean): number {
   const len = rng.int(2, 3)
+  let placed = 0
   const horizontal = rng.chance(0.5)
   const start = { x: rng.int(0, MAP_W - (horizontal ? len : 1)), y: rng.int(1, MAP_H - 2 - (horizontal ? 0 : len - 1)) }
   for (let i = 0; i < len; i++) {
     const p = horizontal ? { x: start.x + i, y: start.y } : { x: start.x, y: start.y + i }
-    if (get(g, p) === "plain" && allowed(p)) set(g, p, "wall")
+    if (get(g, p) === "plain" && allowed(p)) {
+      set(g, p, "wall")
+      placed++
+    }
   }
+  return placed
 }
 
 function bfsReach(g: Grid, from: Pos, moveType: MoveType): Set<string> {
@@ -189,7 +196,7 @@ function makeEnemy(
   const species = rng.weighted(
     (Object.entries(faction.species) as [Species, number][]).map(([item, w]) => ({ item, w }))
   )
-  return generateUnit({
+  const unit = generateUnit({
     seed: rng.int(0, 0x7fffffff),
     level,
     rarity,
@@ -203,6 +210,12 @@ function makeEnemy(
     withTrait: isBoss || difficulty === "hard" || difficulty === "nightmare",
     now
   })
+  const mult = difficultyDef(difficulty).enemyStatMult
+  if (mult === 1) return unit
+  // Ослабление врагов сложностью: масштабируем статы модели, рост по уровням сохраняет пропорции
+  const scale = (s: StatValues): StatValues =>
+    Object.fromEntries(Object.entries(s).map(([k, v]) => [k, Math.max(1, Math.round(v * mult))])) as StatValues
+  return { ...unit, baseStats: scale(unit.baseStats), maxStats: scale(unit.maxStats) }
 }
 
 /** Мотивы раскладки поля: добавляют узнаваемую структуру поверх случайной местности. */
@@ -230,12 +243,12 @@ function pickMotif(rng: Rng, biomeId: string): MapMotif {
 function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boolean, waterLike: TerrainId): void {
   switch (motif) {
     case "river": {
-      // Полоса воды поперёк поля с 1–2 бродами
+      // Полоса воды поперёк поля с двумя бродами
       const horizontal = rng.chance(0.65)
       if (horizontal) {
         const y = rng.int(3, 4)
-        const fords = new Set([rng.int(0, MAP_W - 1)])
-        if (rng.chance(0.6)) fords.add(rng.int(0, MAP_W - 1))
+        const first = rng.int(0, MAP_W - 1)
+        const fords = new Set([first, (first + rng.int(2, MAP_W - 2)) % MAP_W])
         for (let x = 0; x < MAP_W; x++) {
           const p = { x, y }
           if (!allowed(p)) continue
@@ -258,7 +271,7 @@ function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boo
       const x1 = rng.int(1, 2)
       const x2 = rng.int(3, 4)
       const y0 = rng.int(2, 3)
-      const len = rng.int(2, 3)
+      const len = 2
       for (let i = 0; i < len; i++) {
         for (const x of [x1, x2]) {
           const p = { x, y: y0 + i }
@@ -269,8 +282,8 @@ function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boo
       break
     }
     case "islands": {
-      for (let i = 0; i < rng.int(3, 4); i++)
-        growBlob(g, rng, waterLike, rng.int(2, 3), p => allowed(p) && p.y > 1 && p.y < MAP_H - 2)
+      for (let i = 0; i < rng.int(2, 3); i++)
+        growBlob(g, rng, waterLike, 2, p => allowed(p) && p.y > 1 && p.y < MAP_H - 2)
       break
     }
     case "fort": {
@@ -333,15 +346,15 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
     )
     const wallShare = clamp(
       rng.next() * (TERRAIN_SHARE.walls[1] - TERRAIN_SHARE.walls[0]) + TERRAIN_SHARE.walls[0] + biome.bias.walls,
-      0.03,
-      0.18
+      0.02,
+      0.12
     )
     const impShare = clamp(
       rng.next() * (TERRAIN_SHARE.impassable[1] - TERRAIN_SHARE.impassable[0])
       + TERRAIN_SHARE.impassable[0]
       + biome.bias.impassable,
       0,
-      0.15
+      0.1
     )
 
     const forestCells = Math.round(total * forestShare)
@@ -352,7 +365,8 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
       placedForest += size
     }
     const wallCells = Math.round(total * wallShare)
-    for (let placed = 0; placed < wallCells; placed += 2) wallSegment(g, rng, allowed)
+    // Считаем поставленные клетки, а не попытки; попыток не больше 3× клеток — на тесном поле отрезок может не встать
+    for (let placed = 0, tries = 0; placed < wallCells && tries < wallCells * 3; tries++) placed += wallSegment(g, rng, allowed)
     const impCells = Math.round(total * impShare)
     let placedImp = 0
     while (placedImp < impCells) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { CLASS_IDS, MOVE_RANGE, classInfo, classWeapons } from "@game/content/classes"
-import { SKILL_LABELS, WEAPON_GRADE_LABELS } from "@shared/character/skills"
+import { SKILL_LABELS, WEAPON_GRADE_LABELS, aptitudesOf, type Skill } from "@shared/character/skills"
+import { CHARACTER_CLASSES, TIER_LEVELS, earliestLevelOf } from "@shared/character/classes"
 import { WEAPONS } from "@game/content/weapons"
 import { SPECIALS } from "@game/content/skills/specials"
 import { ASSISTS } from "@game/content/skills/assists"
@@ -10,7 +11,7 @@ import { BIOMES } from "@game/content/biomes"
 import { FACTIONS } from "@game/content/factions"
 import { BREEDS } from "@game/content/breeds"
 import { NAMES, EPITHETS } from "@game/content/names"
-import { COMMON_SKILLS, skillCost, slotOf } from "@game/core/units"
+import { COMMON_SKILLS, STARTER_CLASSES, generateUnit, skillCost, slotOf } from "@game/core/units"
 
 function uniqueIds(items: readonly { id: string }[]): void {
   const ids = items.map(i => i.id)
@@ -73,13 +74,34 @@ describe("пояснения классов", () => {
       for (const b of info.bonus) expect(Math.abs(b.value)).toBeLessThan(20)
     }
   })
-  it("роли совпадают с механикой: Dancer танцует, Priest лечит, латы — танк, базовые — универсалы", () => {
+  it("роли совпадают с механикой: Dancer танцует, Priest и Healer лечат, Mage колдует, латы — танк", () => {
     expect(classInfo("dancer").role).toBe("Dancer")
     expect(classInfo("priest").role).toBe("Healer")
     expect(classInfo("armored-knight").role).toBe("Tank")
-    expect(classInfo("commoner").role).toBe("All-rounder")
-    expect(classInfo("commoner").bonus).toEqual([])
+    expect(classInfo("healer").role).toBe("Healer")
+    expect(classInfo("mage").role).toBe("Mage")
+    expect(classInfo("soldier").tierLevel).toBe(1)
     expect(classInfo("light-cavalry").moveRange).toBe(3)
     expect(classInfo("wing-soldier").moveLabel).toBe("Pegasus")
+  })
+})
+
+describe("ярусы классов", () => {
+  it("стартовые классы — Soldier, Hunter, Mage, Healer, Gladiator; ярусы открываются с 1 / 10 / 20 / 35 / 60", () => {
+    expect(STARTER_CLASSES).toEqual(["soldier", "hunter", "mage", "healer", "gladiator"])
+    expect(TIER_LEVELS).toEqual({ beginner: 1, specialty: 10, advanced: 20, master: 35, divine: 60 })
+    for (const id of ["commoner", "noble", "diviner"]) expect(CLASS_IDS).not.toContain(id)
+  })
+  it("у любого персонажа на 1-м уровне есть стартовый класс, и других классов там нет", () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const u = generateUnit({ seed, level: 1 })
+      expect(STARTER_CLASSES).toContain(u.classId)
+    }
+  })
+  it("талант открывает класс ровно на уровне его яруса", () => {
+    for (const item of CHARACTER_CLASSES) {
+      const talents = [...Object.keys(item.all), ...Object.keys(item.any)] as Skill[]
+      expect(earliestLevelOf(item, aptitudesOf(talents)), item.id).toBe(TIER_LEVELS[item.tier])
+    }
   })
 })

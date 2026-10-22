@@ -38,7 +38,7 @@ export interface TestUnitSpec {
 
 /** Класс модели для типа движения (`movementOf`); `dancer_*` — класс Dancer. */
 const MOVE_CLASS: Record<MoveType | "dancer", string> = {
-  infantry: "commoner",
+  infantry: "gladiator",
   armored: "armored-knight",
   cavalry: "light-cavalry",
   flier: "wing-soldier",
@@ -51,7 +51,7 @@ function modelValue(target: number, toCombat: (v: number) => number, guess: numb
   throw new Error(`no model value for combat stat ${target}`)
 }
 
-/** Статы модели (без бонуса класса), при которых боевые статы равны `combat` на любом уровне. */
+/** Статы модели (без бонуса класса), при которых боевые статы равны `combat` на любом уровне (кроме совсем малых). */
 function pinnedModelStats(combat: Stats, cls: CharacterClass): StatValues {
   const { hpMul, hpAdd, statMul, statOffset } = MODEL_SCALE
   const hp = modelValue(combat.hp, v => Math.round(v * hpMul) + hpAdd, Math.round((combat.hp - hpAdd) / hpMul))
@@ -70,8 +70,8 @@ function pinnedModelStats(combat: Stats, cls: CharacterClass): StatValues {
   const bonus = classBonusOf(cls)
   const own = { ...inClass }
   for (const k of Object.keys(own) as (keyof StatValues)[]) {
-    own[k] = inClass[k] - bonus[k]
-    if (own[k] < 1) throw new Error(`class bonus ${bonus[k]} of ${cls.id} does not fit ${k} ${inClass[k]}`)
+    // У стартовых классов бонус не нулевой: стат ниже бонуса класса поднимается до минимума (1 у модели)
+    own[k] = Math.max(1, inClass[k] - bonus[k])
   }
   return own
 }
@@ -84,7 +84,7 @@ export function makeUnit(spec: TestUnitSpec, isEnemy: boolean): UnitInstance {
   const u = generateUnit({
     seed,
     level: spec.level ?? 1,
-    classId: "commoner",
+    classId: "gladiator",
     rarity: 3,
     isEnemy,
     species: spec.species,

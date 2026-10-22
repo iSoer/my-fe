@@ -358,6 +358,8 @@ export interface Profile {
   treats: number
   wins: Record<Difficulty, number>
   armiesCreated: number
+  /** Высшая звезда, открытая перерождением бойца: случайные бойцы (ростер, магазин, награды) — ★1…maxRarity. */
+  maxRarity: Rarity
 }
 
 /** Магазин: витрина персонажей за Вкусняшки, обновляется после каждого боя. */

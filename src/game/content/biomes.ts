@@ -86,7 +86,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xcfd8dc
     },
     bg: 0xff8a65,
-    bias: { forest: -0.05, walls: 0, impassable: 0.06, covers: 0, mountainVsWater: 0.5 }
+    bias: { forest: -0.05, walls: 0, impassable: 0.03, covers: 0, mountainVsWater: 0.5 }
   },
   {
     id: "basement",
@@ -113,7 +113,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0x5d4037
     },
     bg: 0x424242,
-    bias: { forest: 0, walls: 0.05, impassable: -0.03, covers: 0, mountainVsWater: 0.6 }
+    bias: { forest: 0, walls: 0.03, impassable: -0.03, covers: 0, mountainVsWater: 0.6 }
   },
   {
     id: "dump",
@@ -248,7 +248,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xeaf6ff
     },
     bg: 0xcfe9ff,
-    bias: { forest: 0, walls: 0.02, impassable: 0.06, covers: 0, mountainVsWater: 0.5 }
+    bias: { forest: 0, walls: 0.02, impassable: 0.03, covers: 0, mountainVsWater: 0.5 }
   },
   {
     id: "canyon",
@@ -275,7 +275,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xc47a52
     },
     bg: 0xffb07a,
-    bias: { forest: -0.04, walls: 0.06, impassable: 0.02, covers: 0, mountainVsWater: 0.7 }
+    bias: { forest: -0.04, walls: 0.03, impassable: 0.02, covers: 0, mountainVsWater: 0.7 }
   }
 ]
 

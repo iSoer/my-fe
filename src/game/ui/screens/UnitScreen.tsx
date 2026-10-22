@@ -3,6 +3,7 @@ import { useStore } from "@nanostores/react"
 import type { UnitSkills } from "@game/core/types"
 import { MAX_LEVEL, STATS } from "@game/core/types"
 import {
+  canRebirth,
   displayName,
   hasClassUpgrade,
   learnableNow,
@@ -27,6 +28,7 @@ import {
   $save,
   equipAction,
   learnSkillAction,
+  rebirthAction,
   reclassAction,
   releaseUnit,
   sharpenAction,
@@ -74,6 +76,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   const save = useStore($save)
   const [slot, setSlot] = useState<keyof UnitSkills | null>(null)
   const [release, setRelease] = useState<0 | 1 | 2>(0)
+  const [rebirthOpen, setRebirthOpen] = useState(false)
   const [classOpen, setClassOpen] = useState(false)
   const [gear, setGear] = useState<"weapon" | "talisman" | null>(null)
   const [toastEl, toast] = useToast()
@@ -128,6 +131,22 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     haptic("medium")
     celebrate()
     toast(tr("Weapon sharpened", "Оружие заточено"))
+  }
+  const nextStar = unit.rarity + 1
+  const onRebirth = () => {
+    setRebirthOpen(false)
+    const r = rebirthAction(unit.id)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
+    haptic("success")
+    celebrate()
+    toast(
+      r.unlocked
+        ? tr(
+            `Reborn as ★${r.unlocked}! ★${r.unlocked} fighters now appear in the Shop, rewards and new rosters.`,
+            `Перерождение: ★${r.unlocked}! Бойцы с ★${r.unlocked} теперь появляются в магазине, наградах и новых ростерах.`
+          )
+        : tr(`Reborn as ★${nextStar}! Back to level 1.`, `Перерождение: ★${nextStar}! Снова 1-й уровень.`)
+    )
   }
   const onRelease = () => {
     const r = releaseUnit(unit.id)
@@ -329,6 +348,13 @@ export function UnitScreen({ unitId }: { unitId: string }) {
             {" "}
             {sCost === null ? tr("(maxed)", "(предел)") : `(🦴 ${sCost}, Mt +2)`}
           </Button>
+          {unit.rarity < 5 && (
+            <Button block icon="🌟" onClick={() => setRebirthOpen(true)} disabled={!canRebirth(unit)}>
+              {tr(`Rebirth: Lv. 1, ★${nextStar}`, `Перерождение: 1 ур., ★${nextStar}`)}
+              {" "}
+              {canRebirth(unit) ? "" : tr(`(from Lv. ${MAX_LEVEL})`, `(с ${MAX_LEVEL} ур.)`)}
+            </Button>
+          )}
           <Button block danger onClick={() => setRelease(1)}>
             {tr("Release", "Отпустить")}
           </Button>
@@ -429,6 +455,21 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         onPick={onReclass}
       />
 
+      <ConfirmModal
+        open={rebirthOpen}
+        title={tr(`Rebirth as ★${nextStar}?`, `Переродить в ★${nextStar}?`)}
+        text={tr(
+          `${displayName(unit)} goes back to level 1 and gains a star: at level ${MAX_LEVEL} the stats will be higher than now. `
+          + "Class, weapon, skills and SP stay."
+          + (nextStar > save.profile.maxRarity ? ` ★${nextStar} fighters will start appearing in the Shop, rewards and new rosters.` : ""),
+          `${displayName(unit)} вернётся на 1-й уровень и получит звезду: к ${MAX_LEVEL}-му статы будут выше, чем сейчас. `
+          + "Класс, оружие, навыки и SP сохранятся."
+          + (nextStar > save.profile.maxRarity ? ` Бойцы с ★${nextStar} начнут появляться в магазине, наградах и новых ростерах.` : "")
+        )}
+        confirmLabel={tr("Rebirth", "Переродить")}
+        onConfirm={onRebirth}
+        onClose={() => setRebirthOpen(false)}
+      />
       <ConfirmModal
         open={release === 1}
         title={tr("Release this fighter?", "Отпустить бойца?")}

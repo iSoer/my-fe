@@ -19,7 +19,7 @@ import { BARRACKS_CAP, MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
 import { generateUnit, levelGains, unitClassName } from "../units"
 import { treatsMultiplier } from "../skills/engine"
 import { addAll, generateStore } from "../items"
-import { GLORY_TIERS, LOOT, PRICES, REWARDS, SHOP, XP, gloryTier } from "@game/content/balance"
+import { LOOT, PRICES, REWARDS, SHOP, XP, recruitRarityWeights } from "@game/content/balance"
 import { EPITAPHS } from "@game/content/epitaphs"
 import { personalityText } from "@game/content/personalities"
 import { biomeDef } from "@game/content/biomes"
@@ -234,11 +234,11 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
   if (mvp) summary.mvpId = mvp[0]
 
   // Витрина Казармы и Лавка обновляются после каждого боя; бесплатная награда — если ростер ещё жив
-  const shelter: Shelter = generateShop(rng.int(0, 0x7fffffff), nextArmy, profile.glory, now)
+  const shelter: Shelter = generateShop(rng.int(0, 0x7fffffff), nextArmy, profile, now)
   const store = generateStore(rng.int(0, 0x7fffffff), nextArmy, profile.glory)
   const inventory = addAll(save.inventory, state.pack ?? {})
   const rewardChoice = nextArmy
-    ? generateRewardChoice(rng.int(0, 0x7fffffff), nextArmy, profile.glory, result === "victory", now)
+    ? generateRewardChoice(rng.int(0, 0x7fffffff), nextArmy, profile, result === "victory", now)
     : undefined
 
   return { summary, army: nextArmy, profile, memorial: [...save.memorial, ...fallen], shelter, inventory, store, rewardChoice }
@@ -280,16 +280,21 @@ function candidates(seed: number, label: string, count: number, level: number, w
   )
 }
 
-/** Витрина магазина: персонажи около уровня ростера, редкость — по Славе. */
-export function generateShop(seed: number, army: Army | undefined, glory: number, now: number): Shelter {
-  const size = glory >= 150 ? SHOP.sizeWithGlory150 : SHOP.size
-  return { candidates: candidates(seed, "shop", size, rosterLevel(army), gloryTier(glory).rarityWeights, now), seed }
+/** Витрина магазина: персонажи около уровня ростера, звёзды — только открытые перерождением, размер — по Славе. */
+export function generateShop(seed: number, army: Army | undefined, profile: Pick<Profile, "glory" | "maxRarity">, now: number): Shelter {
+  const size = profile.glory >= 150 ? SHOP.sizeWithGlory150 : SHOP.size
+  return { candidates: candidates(seed, "shop", size, rosterLevel(army), recruitRarityWeights(profile.maxRarity), now), seed }
 }
 
-/** Бесплатная награда за бой: три кандидата; после победы — редкость следующего яруса Славы. */
-export function generateRewardChoice(seed: number, army: Army, glory: number, victory: boolean, now: number): UnitInstance[] {
-  const tier = GLORY_TIERS.indexOf(gloryTier(glory))
-  const weights = (GLORY_TIERS[victory ? Math.min(tier + 1, GLORY_TIERS.length - 1) : tier] ?? gloryTier(glory)).rarityWeights
+/** Бесплатная награда за бой: три кандидата открытых звёзд; после победы высшая открытая звезда вдвое чаще. */
+export function generateRewardChoice(
+  seed: number,
+  army: Army,
+  profile: Pick<Profile, "maxRarity">,
+  victory: boolean,
+  now: number
+): UnitInstance[] {
+  const weights = recruitRarityWeights(profile.maxRarity, victory)
   return candidates(seed, "reward", REWARDS.rewardChoices, rosterLevel(army), weights, now)
 }
 

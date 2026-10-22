@@ -88,9 +88,25 @@ describe("арт: миниатюры", () => {
     expect(new Set(svgs).size).toBe(CLASS_IDS.length)
     for (const pose of POSES) for (const id of CLASS_IDS) wellFormed(critterSvg(classCat(id, pose)))
   })
+  it("у каждого класса свой силуэтный признак, а не только цвет", () => {
+    const signature = (id: string): string => {
+      const o = CLASS_OUTFITS[id]!
+      const extra = [o.back, o.hand, o.neck, o.face, o.paws, o.shoulders, o.barding, o.mask ? "mask" : "", o.cape ? "cape" : ""]
+      return [o.hat, o.garb, mountOf(fwClass(id)) ?? "", ...extra].join("|")
+    }
+    const signatures = CLASS_IDS.map(signature)
+    expect(new Set(signatures).size).toBe(CLASS_IDS.length)
+    // признаки профессий доходят до SVG
+    expect(critterSvg(classCat("blacksmith"))).toContain("goggles")
+    expect(critterSvg(classCat("hunter"))).toContain("quiver")
+    expect(critterSvg(classCat("guardian"))).toContain("hand shield")
+    expect(critterSvg(classCat("pugilist"))).toContain("class=\"paws\"")
+    expect(critterSvg(classCat("wiseman"))).toContain("beard")
+    expect(critterSvg(classCat("cataphract"))).toContain("class=\"barding\"")
+  })
   it("ярус и животное видны: Divine — нимб, кавалерия — лошадь, летуны — крылья", () => {
     expect(critterSvg(classCat("the-blade"))).toContain("class=\"halo\"")
-    expect(critterSvg(classCat("commoner"))).not.toContain("class=\"halo\"")
+    expect(critterSvg(classCat("soldier"))).not.toContain("class=\"halo\"")
     expect(critterSvg(classCat("light-cavalry"))).toContain("class=\"mount\"")
     expect(critterSvg(classCat("wing-soldier"))).toContain("class=\"wings\"")
     expect(critterSvg(classCat("bau-lord"))).toContain("class=\"wings\"")

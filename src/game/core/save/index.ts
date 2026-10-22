@@ -13,7 +13,7 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
  * v6: деревня-хаб (позиция героя), признак начатой игры, инвентарь армии, Лавка, талисман бойца, рюкзак вылазки;
  * оружие — предмет, а не навык за SP (v5 и v4 мигрируют).
  */
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 const stat = z.number()
 const partialStats = z.object({
@@ -27,6 +27,7 @@ const pos = z.object({ x: z.number().int(), y: z.number().int() })
 /** Позиция героя в деревне дробная: движение свободное. */
 const freePos = z.object({ x: z.number(), y: z.number() })
 const difficulty = z.enum(["easy", "normal", "hard", "nightmare"])
+const rarity = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)])
 
 const unitSchema = z.object({
   id: z.string(),
@@ -40,7 +41,7 @@ const unitSchema = z.object({
   personalityId: z.string(),
   classId: classIdSchema,
   weaponSkill: z.enum(WEAPON_SKILLS),
-  rarity: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  rarity,
   level: z.number().int().min(1).max(MAX_LEVEL),
   xp: z.number(),
   sp: z.number(),
@@ -200,7 +201,9 @@ export const saveSchema = z.object({
     glory: z.number(),
     treats: z.number(),
     wins: z.object({ easy: z.number(), normal: z.number(), hard: z.number(), nightmare: z.number() }),
-    armiesCreated: z.number()
+    armiesCreated: z.number(),
+    // Сейвы до перерождений — открыта только ★1
+    maxRarity: rarity.default(1)
   }),
   army: armySchema.optional(),
   battle: battleSchema.optional(),
@@ -245,7 +248,8 @@ export function createEmptySave(now: number): SaveGame {
       glory: 0,
       treats: 0,
       wins: { easy: 0, normal: 0, hard: 0, nightmare: 0 },
-      armiesCreated: 0
+      armiesCreated: 0,
+      maxRarity: 1
     },
     shelter: { candidates: [], seed: 0 },
     inventory: {},
@@ -320,6 +324,29 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
     data["village"] = defaultVillage()
     data["version"] = 6
     return data
+  },
+  // v6 → v7: базовые классы Commoner и Noble и Diviner убраны — бойцы где угодно в сейве (ростер, магазин, награды,
+  // бой, Кладбище) переходят в стартовый класс по оружию в лапах: магия — Mage / Healer, лук — Hunter, копьё и
+  // топор — Soldier, остальное — Gladiator.
+  6: (old) => {
+    const removed = new Set(["commoner", "noble", "diviner"])
+    const starter: Record<string, string> = {
+      whiteMagic: "healer",
+      blackMagic: "mage",
+      bow: "hunter",
+      spear: "soldier",
+      axe: "soldier"
+    }
+    const walk = (v: unknown): unknown => {
+      if (Array.isArray(v)) return v.map(walk)
+      if (!v || typeof v !== "object") return v
+      const out: Record<string, unknown> = {}
+      for (const [k, x] of Object.entries(v)) out[k] = walk(x)
+      if (typeof out["classId"] === "string" && removed.has(out["classId"]))
+        out["classId"] = starter[String(out["weaponSkill"])] ?? "gladiator"
+      return out
+    }
+    return { ...(walk(old) as Record<string, unknown>), version: 7 }
   }
 }
 

@@ -4,6 +4,7 @@ import type {
   Facing,
   Inventory,
   Pos,
+  Rarity,
   BattleAction,
   BattleEvent,
   BattleState,
@@ -18,12 +19,14 @@ import { BARRACKS_CAP, MAX_LEVEL, SQUAD_SIZE } from "@game/core/types"
 import { createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { createRng, randomSeed } from "@game/core/rng"
 import {
+  canRebirth,
   canTakeClassNow,
   generateRoster,
   isUniqueClassId,
   learnSkill,
   equipSkill,
   equipWeapon,
+  rebirthUnit,
   reclassUnit,
   skillCost
 } from "@game/core/units"
@@ -159,11 +162,11 @@ export function ensureRoster(): void {
   const s = $save.get()
   if (s.army && s.army.units.length > 0) {
     if (s.shelter.candidates.length === 0)
-      updateSave(st => ({ ...st, shelter: generateShop(randomSeed(), st.army, st.profile.glory, Date.now()) }))
+      updateSave(st => ({ ...st, shelter: generateShop(randomSeed(), st.army, st.profile, Date.now()) }))
     return
   }
   const now = Date.now()
-  const units = generateRoster({ seed: randomSeed(), glory: s.profile.glory, now }).map(u => ({ ...u, createdAt: now }))
+  const units = generateRoster({ seed: randomSeed(), glory: s.profile.glory, maxRarity: s.profile.maxRarity, now }).map(u => ({ ...u, createdAt: now }))
   const army: Army = {
     id: `army_${now.toString(36)}`,
     units,
@@ -176,7 +179,7 @@ export function ensureRoster(): void {
     const next: SaveGame = {
       ...st,
       army,
-      shelter: generateShop(randomSeed(), army, st.profile.glory, now),
+      shelter: generateShop(randomSeed(), army, st.profile, now),
       profile: {
         ...st.profile,
         armiesCreated: st.profile.armiesCreated + 1,
@@ -366,6 +369,25 @@ export function reclassAction(unitId: string, classId: string): { ok: boolean, e
   const next = reclassUnit(unit, classId)
   updateSave(st => ({ ...st, army: replaceUnit(st.army as Army, next) }))
   return { ok: true }
+}
+
+/**
+ * Переродить бойца 80-го уровня: 1-й уровень и +★. Новая звезда, если её ещё не было, открывается для случайных
+ * бойцов (стартовый ростер, магазин, награды) — `unlocked` сообщает об этом экрану.
+ */
+export function rebirthAction(unitId: string): { ok: boolean, error?: string, unlocked?: Rarity } {
+  const s = $save.get()
+  const unit = s.army?.units.find(u => u.id === unitId)
+  if (!s.army || !unit) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (!canRebirth(unit)) return { ok: false, error: tr(`Rebirth needs level ${MAX_LEVEL}`, `Перерождение — с ${MAX_LEVEL} уровня`) }
+  const next = rebirthUnit(unit)
+  const unlocked = next.rarity > s.profile.maxRarity ? next.rarity : undefined
+  updateSave(st => ({
+    ...st,
+    army: replaceUnit(st.army as Army, next),
+    profile: unlocked ? { ...st.profile, maxRarity: unlocked } : st.profile
+  }))
+  return unlocked ? { ok: true, unlocked } : { ok: true }
 }
 
 /* ---------- Лавка и снаряжение ---------- */

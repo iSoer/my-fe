@@ -1,27 +1,25 @@
 import { STATS, type Stat } from "../api/schema/pokemon/generated"
 import { MAX_LEVEL, MIN_LEVEL, statsAtLevel, type StatValues } from "./leveling"
 import {
-  MOVEMENT_SKILLS, WEAPON_SKILLS, meanSkillShift, rankIndex, ranksAtLevel, type Aptitudes, type Rank, type Ranks, type Skill
+  MOVEMENT_SKILLS, WEAPON_SKILLS, meanSkillShift, rankAtLevel, rankIndex, ranksAtLevel, type Aptitudes, type Rank, type Ranks, type Skill
 } from "./skills"
 
 // Classes of Fire Emblem: Fortune's Weave and when a character may take them (docs/character-model.md, "Классы")
 
-export const CLASS_TIERS = ["base", "beginner", "specialty", "advanced", "master", "divine"] as const
+export const CLASS_TIERS = ["beginner", "specialty", "advanced", "master", "divine"] as const
 
 export type ClassTier = typeof CLASS_TIERS[number]
 
-/** Level a tier opens at: FW's ideal certification levels, divine at 60 */
+/** Level a tier opens at: every character starts in a beginner class, then 10 / 20 / 35, divine at 60 */
 export const TIER_LEVELS: Record<ClassTier, number> = {
-  base: MIN_LEVEL,
-  beginner: 5,
-  specialty: 20,
-  advanced: 35,
-  master: 45,
+  beginner: MIN_LEVEL,
+  specialty: 10,
+  advanced: 20,
+  master: 35,
   divine: 60
 }
 
 export const TIER_LABELS: Record<ClassTier, string> = {
-  base: "Base",
   beginner: "Beginner",
   specialty: "Specialty",
   advanced: "Advanced",
@@ -59,23 +57,32 @@ export type CharacterClass = {
   any: Requirement
 }
 
+/**
+ * A requirement never asks for more than a talent has when the tier opens (`rankAtLevel("talent", …)`): FW ranks
+ * are lowered to that, so a talented character can take the class right at `TIER_LEVELS`.
+ */
+const reachable = (name: ClassTier, requirement: Requirement): Requirement => {
+  const cap = rankAtLevel("talent", TIER_LEVELS[name])
+
+  return Object.fromEntries((Object.entries(requirement) as [Skill, Rank][])
+    .map(([skill, rank]) => [skill, rankIndex(rank) > rankIndex(cap) ? cap : rank]))
+}
+
 const tier = (name: ClassTier, classes: [string, string, Requirement, Requirement?][]): CharacterClass[] => classes
-  .map(([id, className, all, any = {}]) => ({ id, name: className, tier: name, all, any }))
+  .map(([id, className, all, any = {}]) => ({ id, name: className, tier: name, all: reachable(name, all), any: reachable(name, any) }))
 
 /**
  * Classes of FW except the enemy-only ones and the riders of anything but horses, pegasi and dragons
  * (Ornius, elephant and chariot classes); quest and route locks are left out
  */
 export const CHARACTER_CLASSES: CharacterClass[] = [
-  ...tier("base", [
-    ["commoner", "Commoner", {}],
-    ["noble", "Noble", {}]
-  ]),
+  // Starting classes: E+ is a normal skill at level 1, so only a weakness closes one (and a character has at most 3)
   ...tier("beginner", [
-    ["gladiator", "Gladiator", {}, { gauntlet: "D", axe: "D", sword: "D" }],
-    ["hunter", "Hunter", {}, { bow: "D", sword: "D" }],
-    ["soldier", "Soldier", {}, { axe: "D", spear: "D" }],
-    ["diviner", "Diviner", {}, { whiteMagic: "D", blackMagic: "D" }]
+    ["soldier", "Soldier", {}, { axe: "E+", spear: "E+" }],
+    ["hunter", "Hunter", {}, { bow: "E+", sword: "E+" }],
+    ["mage", "Mage", { blackMagic: "E+" }],
+    ["healer", "Healer", { whiteMagic: "E+" }],
+    ["gladiator", "Gladiator", {}, { gauntlet: "E+", axe: "E+", sword: "E+" }]
   ]),
   ...tier("specialty", [
     ["myrmidon", "Myrmidon", { sword: "C" }],
@@ -147,11 +154,11 @@ export const isUniqueClass = (item: CharacterClass) => item.tier === "divine"
 
 export const requiredSkillsOf = (item: CharacterClass) => [...Object.keys(item.all), ...Object.keys(item.any)] as Skill[]
 
-/** Weapons the class fights with; base classes take any weapon */
+/** Weapons the class fights with: the weapon skills it requires */
 export const weaponsOf = (item: CharacterClass) => {
   const required = requiredSkillsOf(item)
 
-  return item.tier === "base" ? [...WEAPON_SKILLS] : WEAPON_SKILLS.filter(skill => required.includes(skill))
+  return WEAPON_SKILLS.filter(skill => required.includes(skill))
 }
 
 export const movementOf = (item: CharacterClass): Movement => {
@@ -213,9 +220,8 @@ export const earliestLevelOf = (item: CharacterClass, aptitudes: Aptitudes) => {
 }
 
 // Class bonus: a flat part for the tier plus the profile shift of the class skills scaled by the tier
-const TIER_FLAT_BONUS: Record<ClassTier, number> = { base: 0, beginner: 2, specialty: 4, advanced: 6, master: 8, divine: 12 }
+const TIER_FLAT_BONUS: Record<ClassTier, number> = { beginner: 2, specialty: 4, advanced: 6, master: 8, divine: 12 }
 const TIER_SHAPE_BONUS: Record<ClassTier, number> = {
-  base: 0,
   beginner: 150,
   specialty: 250,
   advanced: 350,

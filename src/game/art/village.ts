@@ -1,4 +1,4 @@
-// Процедурный SVG деревни-хаба: тропинка, цветы, деревья, колодец и домики NPC. Свет сверху-слева, как у тайлов боя
+// Процедурный SVG деревни-хаба: тропинка, цветы, деревья и домики NPC. Свет сверху-слева, как у тайлов боя
 // (`art/tile.ts`); трава, кусты и пруд берутся оттуда же (биом yard). Без id и градиентов — копии не конфликтуют.
 
 /** Размер клетки в SVG-единицах (как `TILE_SIZE` поля боя). */
@@ -78,27 +78,6 @@ export function villageTreeSvg(variant = 0): string {
     + `<ellipse cx="${r1(cx - 7)}" cy="${r1(top + 13)}" rx="9" ry="7" fill="${light}" opacity=".85" />`
     + `<ellipse cx="${r1(cx - 15)}" cy="${r1(h - 57)}" rx="6" ry="5" fill="${light}" opacity=".7" />`
     + `<path d="M${r1(cx + 14)} ${r1(h - 38)} q6 -6 4 -14" stroke="${dark}" stroke-width="2" fill="none" opacity=".6" />`)
-}
-
-/** Колодец: каменное кольцо, вода, деревянная крыша на столбах и ведро. Высота 1.6 клетки. */
-export const WELL_H = 1.6
-
-export function villageWellSvg(): string {
-  const h = VT * WELL_H
-  const b = h - 10
-  return svg(VT, h, `<ellipse cx="33" cy="${b + 3}" rx="24" ry="6" fill="#000" opacity=".22" />`
-    + `<path d="M12 ${b - 20} L12 ${b - 4} Q32 ${b + 6} 52 ${b - 4} L52 ${b - 20} Z" fill="#8f8a84" />`
-    + `<path d="M12 ${b - 13} Q32 ${b - 5} 52 ${b - 13} M12 ${b - 7} Q32 ${b + 1} 52 ${b - 7}" stroke="#6f6a64" stroke-width="1.4" fill="none" />`
-    + `<ellipse cx="32" cy="${b - 20}" rx="20" ry="7" fill="#a9a39c" />`
-    + `<ellipse cx="32" cy="${b - 20}" rx="15" ry="4.6" fill="#3a6f9c" />`
-    + `<ellipse cx="28" cy="${b - 21}" rx="5" ry="1.2" fill="#bfe3ff" opacity=".7" />`
-    + `<rect x="13" y="${b - 58}" width="4" height="40" fill="#7a4e2d" />`
-    + `<rect x="47" y="${b - 58}" width="4" height="40" fill="#7a4e2d" />`
-    + `<path d="M6 ${b - 56} L32 ${b - 72} L58 ${b - 56} Z" fill="#9c3d2e" />`
-    + `<path d="M6 ${b - 56} L32 ${b - 72} L32 ${b - 68} L10 ${b - 55} Z" fill="#c0573f" />`
-    + `<line x1="15" y1="${b - 44}" x2="49" y2="${b - 44}" stroke="#6a4226" stroke-width="3" />`
-    + `<line x1="32" y1="${b - 44}" x2="32" y2="${b - 32}" stroke="#4b4038" stroke-width="1" />`
-    + `<path d="M28 ${b - 32} h8 l-1 6 h-6 z" fill="#8a6a45" />`)
 }
 
 export interface HouseArt {

@@ -32,4 +32,23 @@ describe("save", () => {
     expect(parseSave("{").ok).toBe(false)
     expect(parseSave("{\"version\":1}").ok).toBe(false)
   })
+  it("v6 → v7: Commoner / Noble / Diviner где угодно в сейве становятся стартовым классом по оружию", () => {
+    const s = createEmptySave(1)
+    const units = generateRoster({ seed: 9, glory: 0 }).slice(0, 4)
+    const old = [
+      { ...units[0]!, classId: "commoner", weaponSkill: "spear" as const },
+      { ...units[1]!, classId: "diviner", weaponSkill: "whiteMagic" as const },
+      { ...units[2]!, classId: "diviner", weaponSkill: "blackMagic" as const },
+      { ...units[3]!, classId: "noble", weaponSkill: "sword" as const }
+    ]
+    s.army = { id: "a", units: old, squadIds: [], createdAt: 1, battles: 0, wins: 0 }
+    s.shelter = { candidates: [{ ...units[0]!, classId: "commoner", weaponSkill: "bow" }], seed: 1 }
+    const raw = { ...JSON.parse(serializeSave(s)), version: 6 }
+    const r = parseSave(JSON.stringify(raw))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.save.version).toBe(7)
+    expect(r.save.army!.units.map(u => u.classId)).toEqual(["soldier", "healer", "mage", "gladiator"])
+    expect(r.save.shelter.candidates[0]!.classId).toBe("hunter")
+  })
 })
