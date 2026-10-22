@@ -108,7 +108,7 @@ export function MenuScreen() {
         <div className="paper-frame">
           <Diorama crew={crew} />
         </div>
-        <h1>{tr("Fluffy Carnage", "Пушистая Резня")}</h1>
+        <h1>Cat Emblem</h1>
         <span className="title-drip" dangerouslySetInnerHTML={{ __html: DRIP_SVG }} />
         <p className="muted">{tr("Tactics with kitties, doggos and mice", "Тактика про котиков, собачек и мышек")}</p>
       </div>

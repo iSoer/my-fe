@@ -64,7 +64,7 @@ function Splash({ onStart, ready }: { onStart: () => void, ready: boolean }) {
             <div key={i} className="critter-svg critter-svg--lg is-static" dangerouslySetInnerHTML={{ __html: svg }} />
           ))}
         </div>
-        <h1>{tr("Fluffy Carnage", "Пушистая Резня")}</h1>
+        <h1>Cat Emblem</h1>
         <p className="muted">{tr("Tactics with kitties, doggos and mice. Cute and bloody.", "Тактика про котиков, собачек и мышек. Милая и кровавая.")}</p>
       </div>
       <p className="splash-hint">{ready ? tr("Tap to start", "Нажмите, чтобы начать") : tr("Loading…", "Загрузка…")}</p>

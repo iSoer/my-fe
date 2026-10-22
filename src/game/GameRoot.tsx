@@ -13,7 +13,7 @@ import "./ui/styles.css"
 import "./ui/mobile.css"
 
 /**
- * Корень игры «Пушистая Резня» на маршруте /game. Только клиент: сейв в localStorage, хеш-роутер и Phaser
+ * Корень игры «Cat Emblem» на маршруте /game. Только клиент: сейв в localStorage, хеш-роутер и Phaser
  * читают window при импорте, поэтому страница грузит этот модуль через next/dynamic с ssr: false.
  */
 export default function GameRoot() {

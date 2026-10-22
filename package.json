@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Пушистая Резня — тактическая игра про котиков и собачек (Telegram Mini App + PWA)",
+  "description": "Cat Emblem — тактическая игра про котиков и собачек (Telegram Mini App + PWA)",
   "scripts": {
     "dev": "vite",
     "build": "pnpm typecheck && vite build && cp dist/index.html dist/404.html && node tools/check-sw.mjs",

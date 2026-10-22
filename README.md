@@ -1,4 +1,4 @@
-# Пушистая Резня (pawfield)
+# Cat Emblem (pawfield)
 
 Тактическая пошаговая игра в духе Fire Emblem Heroes про котиков и собачек — Telegram Mini App и PWA на чистом frontend (GitHub Pages).
 
