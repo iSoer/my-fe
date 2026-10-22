@@ -74,6 +74,34 @@ export const FACTIONS: readonly FactionDef[] = [
     get desc() { return tr("They howl at the sunset and bite anything that doesn't howl.", "Воют на закат и кусают всё, что не воет.") },
     palettes: [4, 5, 0, 7],
     species: { cat: 20, dog: 70, mouse: 10 }
+  },
+  {
+    id: "forest_lynxes",
+    get name() { return tr("Forest Lynxes", "Лесные Рыси") },
+    get desc() { return tr("They drop from the branches without a sound. The sound comes later.", "Падают с веток беззвучно. Звук бывает потом.") },
+    palettes: [0, 4, 5],
+    species: { cat: 60, dog: 20, mouse: 20 }
+  },
+  {
+    id: "couch_troops",
+    get name() { return tr("Couch Troops", "Диванные Войска") },
+    get desc() { return tr("Pampered house pets defending their sofa to the last pillow.", "Домашние любимцы, которые защищают диван до последней подушки.") },
+    palettes: [2, 3, 6, 8],
+    species: { cat: 50, dog: 35, mouse: 15 }
+  },
+  {
+    id: "assembly_dogs",
+    get name() { return tr("Assembly Dogs", "Цеховые Псы") },
+    get desc() { return tr("Grease on the fur, wrenches in the paws, overtime in the eyes.", "Мазут на шерсти, ключи в лапах, переработка в глазах.") },
+    palettes: [1, 7, 10],
+    species: { cat: 20, dog: 65, mouse: 15 }
+  },
+  {
+    id: "the_horde",
+    get name() { return tr("The Horde", "Орда") },
+    get desc() { return tr("Where the infection began. Everything here bites, and nothing here stays dead.", "Здесь началась зараза. Здесь кусается всё, и ничто не остаётся мёртвым.") },
+    palettes: [7, 9, 11],
+    species: { cat: 34, dog: 33, mouse: 33 }
   }
 ]
 

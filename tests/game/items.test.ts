@@ -197,7 +197,7 @@ describe("предметы в бою", () => {
   it("рюкзак: не больше packSize, списывается при старте боя, остаток возвращается после", () => {
     freshGame()
     $save.set({ ...$save.get(), inventory: { itm_bandage: 10 } })
-    expect(scoutBattle("easy", "yard").ok).toBe(true)
+    expect(scoutBattle("easy").ok).toBe(true)
     expect(setPackAction({ itm_bandage: ITEMS.packSize + 1 }).ok).toBe(false)
     expect(setPackAction({ itm_bandage: 3 }).ok).toBe(true)
     expect(startBattle($save.get().army!.squadIds).ok).toBe(true)

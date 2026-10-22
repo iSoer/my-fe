@@ -62,7 +62,6 @@ import {
 } from "@game/core/progression"
 import { difficultyDef } from "@game/content/balance"
 import { invalidateKit } from "@game/core/skills/engine"
-import { BIOMES } from "@game/content/biomes"
 import { clearLocal, loadLocal, saveLocal } from "@game/platform/storage"
 import { setHapticsEnabled } from "@game/platform/haptics"
 import { setLang, tr } from "@game/i18n"
@@ -92,11 +91,6 @@ export const $store = computed($save, s => s.store)
 export function gameStarted(save: SaveGame): boolean {
   return save.profile.startedAt !== undefined
 }
-
-export const $unlockedBiomes = computed($save, (s) => {
-  const totalWins = Object.values(s.profile.wins).reduce((a, b) => a + b, 0)
-  return BIOMES.filter(b => totalWins >= b.unlockWins).map(b => b.id)
-})
 
 export function difficultyUnlocked(save: SaveGame, d: Difficulty): boolean {
   const def = difficultyDef(d)
@@ -547,20 +541,20 @@ export function ensureSortieSeed(): number {
 }
 
 /**
- * Четыре вражеские команды на сложности: уровни — окна диапазона сложности (`teamLevels`), не уровень армии.
- * Детерминированы по `sortieSeed`: переключение сложности или биома туда-обратно не перебрасывает врагов.
+ * Четыре вражеские команды на сложности: уровни — окна диапазона сложности (`teamLevels`), не уровень армии;
+ * биом у каждой случайный из всех. Детерминированы по `sortieSeed`: переключение сложности туда-обратно
+ * не перебрасывает врагов.
  */
-export function enemyTeams(difficulty: Difficulty, biomeId: string | "random"): EnemyTeamOffer[] {
+export function enemyTeams(difficulty: Difficulty): EnemyTeamOffer[] {
   const s = $save.get()
   const sortie = s.sortieSeed ?? ensureSortieSeed()
-  const unlocked = $unlockedBiomes.get()
   const armyLevel = rosterLevel(s.army)
-  const key = `${sortie}:${difficulty}:${biomeId}:${unlocked.join(",")}:${armyLevel}`
+  const key = `${sortie}:${difficulty}:${armyLevel}`
   const cached = offerCache.get(key)
   if (cached) return cached
   const offers = Array.from({ length: ENEMY_TEAMS }, (_, team): EnemyTeamOffer => {
     const seed = createRng(sortie).fork(`${difficulty}:${team}`).int(0, 0x7fffffff)
-    const map = generateMap({ seed, biomeId, difficulty, team, squadSize: SQUAD_SIZE, unlockedBiomes: unlocked, now: Date.now() })
+    const map = generateMap({ seed, biomeId: "random", difficulty, team, squadSize: SQUAD_SIZE, now: Date.now() })
     const units = [...map.enemies.map(e => e.unit), ...map.reinforcements.flatMap(w => w.units.map(u => u.unit))]
     const lv = units.map(u => u.level)
     const levels: [number, number] = [Math.min(...lv), Math.max(...lv)]
@@ -582,19 +576,19 @@ export function enemyTeams(difficulty: Difficulty, biomeId: string | "random"): 
 }
 
 /**
- * Разведка: выбранная вражеская команда на сложности и биоме становится боем; отряд выбирается на следующем шаге.
- * Карта та же, что в предложении команды (тот же seed), рюкзак сохраняется.
+ * Разведка: выбранная вражеская команда на сложности становится боем; отряд выбирается на следующем шаге.
+ * Карта та же, что в предложении команды (тот же seed и случайный биом), рюкзак сохраняется.
  */
-export function scoutBattle(difficulty: Difficulty, biomeId: string | "random", team = 0): { ok: boolean, error?: string } {
+export function scoutBattle(difficulty: Difficulty, team = 0): { ok: boolean, error?: string } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
   if (!difficultyUnlocked(s, difficulty)) return { ok: false, error: tr("Difficulty locked", "Сложность закрыта") }
   const pb = s.pendingBattle
-  if (pb && pb.difficulty === difficulty && pb.biomeId === biomeId && pb.team === team) return { ok: true }
-  const offer = enemyTeams(difficulty, biomeId)[team]
+  if (pb && pb.difficulty === difficulty && pb.team === team) return { ok: true }
+  const offer = enemyTeams(difficulty)[team]
   if (!offer) return { ok: false, error: tr("No such enemy army", "Нет такой армии врагов") }
   const pack = pb?.pack
-  updateSave(st => ({ ...st, pendingBattle: { seed: offer.seed, difficulty, biomeId, team, map: offer.map, ...(pack ? { pack } : {}) } }))
+  updateSave(st => ({ ...st, pendingBattle: { seed: offer.seed, difficulty, biomeId: offer.map.biomeId, team, map: offer.map, ...(pack ? { pack } : {}) } }))
   return { ok: true }
 }
 

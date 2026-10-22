@@ -2106,20 +2106,6 @@ p {
   background: var(--gold);
   color: var(--ink);
 }
-.biome-chips {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* overflow-x: auto делает контейнер скроллируемым и по вертикали — задаём явную высоту под кнопки с тенью. */
-  min-height: 56px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 6px 8px 10px 6px;
-}
-.biome-chips .btn {
-  flex-shrink: 0;
-}
-
 .warning-box {
   border: none;
   background: var(--red);

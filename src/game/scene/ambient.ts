@@ -49,6 +49,37 @@ const DEFAULT: AmbientDef = {
 }
 
 const AMBIENT: Record<string, Partial<AmbientDef>> = {
+  deep_forest: {
+    clouds: 1,
+    cloudAlpha: 0.28,
+    rays: 4,
+    rayColor: 0xf6f0b0,
+    rayAlpha: 0.13,
+    rayAngle: 22,
+    grade: { color: 0x2f5a34, alpha: 0.14, mode: "multiply" },
+    fireflies: 6,
+    fireflyColor: 0xd8ff8a,
+    vignette: 0.5
+  },
+  indoors: { clouds: 0, rays: 3, rayColor: 0xfff0c8, rayAlpha: 0.16, rayAngle: 30, lamps: 2, lampColor: 0xffd27a, vignette: 0.4 },
+  factory: {
+    clouds: 0,
+    rays: 2,
+    rayColor: 0xd8e4f0,
+    rayAlpha: 0.1,
+    lamps: 3,
+    lampColor: 0xffb347,
+    grade: { color: 0x6a7480, alpha: 0.12, mode: "multiply" },
+    vignette: 0.5
+  },
+  infested: {
+    clouds: 3,
+    cloudAlpha: 0.32,
+    grade: { color: 0x7a5aa0, alpha: 0.16, mode: "multiply" },
+    fireflies: 8,
+    fireflyColor: 0x9fff5a,
+    vignette: 0.58
+  },
   yard: { clouds: 3, rays: 3, rayAlpha: 0.15, vignette: 0.36 },
   roofs: {
     clouds: 2,

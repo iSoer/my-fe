@@ -183,6 +183,11 @@
 .pawfield .team-name {
   min-width: 0;
 }
+.pawfield .team-biome {
+  display: block;
+  color: var(--text-paper);
+  font-weight: 700;
+}
 .pawfield .team-foes {
   display: flex;
   flex-wrap: wrap;

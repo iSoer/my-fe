@@ -8,7 +8,7 @@ import { ASSISTS } from "@game/content/skills/assists"
 import { PASSIVES } from "@game/content/skills/passives"
 import { TRAITS, traitDef, traitEffects } from "@game/content/traits"
 import { BIOMES } from "@game/content/biomes"
-import { FACTIONS } from "@game/content/factions"
+import { FACTIONS, factionDef } from "@game/content/factions"
 import { BREEDS } from "@game/content/breeds"
 import { NAMES, EPITHETS } from "@game/content/names"
 import { COMMON_SKILLS, STARTER_CLASSES, generateUnit, skillCost, slotOf } from "@game/core/units"
@@ -114,5 +114,13 @@ describe("особенности: плюсы и минусы", () => {
     }
     expect(traitEffects(traitDef("t_hydrophobe"))).toEqual({ pros: [], cons: [expect.any(String)] })
     expect(traitEffects(traitDef("t_glutton")).cons).toEqual([])
+  })
+})
+
+describe("биомы", () => {
+  it("у каждого биома есть фракция, а случайный биом открывается по победам", () => {
+    for (const b of BIOMES) expect(() => factionDef(b.factionId), b.id).not.toThrow()
+    for (const id of ["deep_forest", "indoors", "factory", "infested"]) expect(BIOMES.some(b => b.id === id)).toBe(true)
+    expect(new Set(BIOMES.map(b => b.id)).size).toBe(BIOMES.length)
   })
 })

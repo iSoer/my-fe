@@ -60,6 +60,15 @@ export function hex(n: number): string {
   return `#${(n >>> 0).toString(16).padStart(6, "0")}`
 }
 
+/** Смешать два hex-цвета: k = 0 — первый, 1 — второй. */
+export function mixColor(a: string, b: string, k: number): string {
+  const n = (c: string): number => parseInt(c.replace("#", ""), 16)
+  const x = n(a)
+  const y = n(b)
+  const ch = (sh: number): number => Math.round(((x >> sh) & 255) * (1 - k) + ((y >> sh) & 255) * k)
+  return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, "0")}`
+}
+
 /** Затемнить/осветлить hex-цвет (k < 0 — темнее, k > 0 — светлее). */
 export function shade(color: string, k: number): string {
   const c = color.replace("#", "")

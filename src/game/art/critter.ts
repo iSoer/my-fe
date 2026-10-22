@@ -4,7 +4,7 @@
  * С `classId` поверх зверька рисуется наряд класса FW и его верховое животное (art/outfits.ts).
  */
 import type { ClassTier, Mount } from "@shared/character/classes"
-import { BLUSH, INK, NOSE, shade, type FurArt } from "./palettes"
+import { BLUSH, INK, NOSE, mixColor, shade, type FurArt } from "./palettes"
 import { RIDER_TRANSFORM, hatLift, mountSvg, outfitAura, outfitBack, outfitBody, outfitCape, outfitHead, outfitHeadBack } from "./outfits"
 
 export type ArtSpecies = "cat" | "dog" | "mouse"
@@ -39,6 +39,8 @@ export interface CritterArt {
   boss?: boolean
   /** Хмурые брови (враги). */
   angry?: boolean
+  /** Зомби-вариант той же модели (все враги): гнилая шерсть, мутные глаза, швы и заплатка. */
+  zombie?: boolean
   pose?: Pose
   /** Класс FW (id модели): наряд класса из `CLASS_OUTFITS`. Без него — прежнее снаряжение по типу движения. */
   classId?: string
@@ -57,6 +59,16 @@ export const VIEW_BOX = `${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`
 const sw = "stroke-width=\"1.5\""
 
 /* ---------- Глаза ---------- */
+
+/** Глаз зомби: мутный белёсый, с крошечным зрачком, без блика, прикрыт веком; глаза разного размера. */
+function zombieEye(a: CritterArt, cx: number, cy: number, k: number): string {
+  const rx = (a.species === "mouse" ? 6.5 : 7.5) * k
+  const ry = (a.species === "mouse" ? 8 : 9.5) * k
+  return `<ellipse cx="${cx}" cy="${cy + 4}" rx="${rx + 1.5}" ry="3.5" fill="#5b3f63" opacity=".45" />
+    <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#eef4d6" stroke="${INK}" stroke-width="1.6" />
+    <circle cx="${cx + (k > 1 ? 1.5 : -1)}" cy="${cy + 2}" r="${1.8 * k}" fill="${INK}" />
+    <path d="M${cx - rx - 0.5} ${cy - ry * 0.25} a${rx + 0.5} ${ry} 0 0 1 ${(rx + 0.5) * 2} 0 z" fill="${a.fur.fur}" stroke="${a.fur.line}" stroke-width="1.2" />`
+}
 
 function openEyes(a: CritterArt, cx: number, cy: number, shiftIn: number, big = false): string {
   let rx = big ? 9.5 : 8
@@ -92,7 +104,7 @@ function eyesGroup(a: CritterArt, pose: Pose): string {
   const lx = 45
   const rx = 75
   const cross = a.eyes === 5 ? 2.2 : 0
-  const angry = a.angry || a.eyes === 3
+  const angry = (a.angry && !a.zombie) || a.eyes === 3
   const brows = angry
     ? `<g stroke="${INK}" stroke-width="3" stroke-linecap="round"><path d="M35 40 l15 6" /><path d="M85 40 l-15 6" /></g>`
     : ""
@@ -111,6 +123,7 @@ function eyesGroup(a: CritterArt, pose: Pose): string {
       <path d="M37 ${cy + 1} q8 3 16 0" /><path d="M67 ${cy + 1} q8 3 16 0" /></g>${brows}`
   }
   if (pose === "happy" && !a.animated) return happy.replace(" class=\"eyes-happy\"", "") + brows
+  if (a.zombie && pose !== "happy") return zombieEye(a, lx, cy, 1.15) + zombieEye(a, rx, cy, 0.9)
   const big = pose === "carried"
   const open = `<g class="eyes-open"${a.animated ? ` style="animation-delay:${(a.blinkDelay ?? 0).toFixed(2)}s"` : ""}>
       ${openEyes(a, lx, cy, cross, big)}${openEyes(a, rx, cy, -cross, big)}</g>`
@@ -375,7 +388,24 @@ function body(a: CritterArt): string {
   const rx = a.species === "mouse" ? 24 : a.species === "dog" ? 28 : 27
   const ry = a.species === "mouse" ? 16 : 18
   const cy = a.species === "mouse" ? 88 : 86
-  return `<ellipse cx="60" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f.fur}" stroke="${f.line}" ${sw} /><ellipse cx="60" cy="${cy + 4}" rx="15" ry="10" fill="${f.belly}" />${patternBody(a)}`
+  return `<ellipse cx="60" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f.fur}" stroke="${f.line}" ${sw} /><ellipse cx="60" cy="${cy + 4}" rx="15" ry="10" fill="${f.belly}" />${patternBody(a)}${a.zombie ? zombiePatch(cy) : ""}`
+}
+
+/** Лицо зомби вместо румянца: трупные пятна на щеках и шрам со швами через лоб. */
+function zombieFace(a: CritterArt, cy: number, r: number): string {
+  const top = cy - r * 0.62
+  return `<ellipse cx="33" cy="${cy + 9}" rx="7" ry="4.5" fill="#5f7a3e" opacity=".5" />
+    <ellipse cx="88" cy="${cy + 7}" rx="5" ry="3.5" fill="#6b4f72" opacity=".45" />
+    <path d="M70 ${top} q8 6 14 16" fill="none" stroke="${a.fur.line}" stroke-width="2" stroke-linecap="round" />
+    <g stroke="${INK}" stroke-width="1.4" stroke-linecap="round">
+      <path d="M71 ${top + 4} l5 -3 M74 ${top + 8} l5 -3 M77 ${top + 12} l5 -3" /></g>`
+}
+
+/** Заплатка со стежками на боку тела зомби. */
+function zombiePatch(cy: number): string {
+  return `<rect x="66" y="${cy - 10}" width="12" height="10" rx="1.5" fill="#a58b6b" stroke="#5c4632" stroke-width="1.2" transform="rotate(-12 72 ${cy - 5})" />
+    <g stroke="#3b2614" stroke-width="1" stroke-linecap="round" transform="rotate(-12 72 ${cy - 5})">
+      <path d="M66 ${cy - 8} h-2 M66 ${cy - 4} h-2 M78 ${cy - 8} h2 M78 ${cy - 4} h2 M69 ${cy - 10} v-2 M75 ${cy - 10} v-2" /></g>`
 }
 
 function head(a: CritterArt, pose: Pose): string {
@@ -389,16 +419,36 @@ function head(a: CritterArt, pose: Pose): string {
     ${ears(a, pose)}
     <circle cx="60" cy="${cy}" r="${r}" fill="${f.fur}" stroke="${f.line}" ${sw} />
     ${patternHead(a)}
-    <ellipse cx="34" cy="${blushY}" rx="8" ry="4.5" fill="${BLUSH}" opacity="${blush}" />
-    <ellipse cx="86" cy="${blushY}" rx="8" ry="4.5" fill="${BLUSH}" opacity="${blush}" />
+    ${a.zombie ? zombieFace(a, cy, r) : `<ellipse cx="34" cy="${blushY}" rx="8" ry="4.5" fill="${BLUSH}" opacity="${blush}" />
+    <ellipse cx="86" cy="${blushY}" rx="8" ry="4.5" fill="${BLUSH}" opacity="${blush}" />`}
     ${eyesGroup(a, pose)}
     ${mouth(a, pose)}
+    ${a.zombie && pose !== "dead" ? "<path d=\"M66 70 q1.5 5 0 8 a2.2 2.2 0 1 0 3 -1 q-1 -4 -1.5 -7 z\" fill=\"#9fd356\" stroke=\"#4f7a1f\" stroke-width=\".8\" />" : ""}
     ${whiskers(a)}
     ${accessory(a)}
     ${gearHead(a)}
     ${a.boss ? crown(hatLift(a.classId)) : ""}
     ${pose === "hurt" ? "<path d=\"M96 36 q4 -8 8 0 a4 4 0 1 1 -8 0 z\" fill=\"#8ecae6\" />" : ""}
   </g>`
+}
+
+/**
+ * Гнилая шерсть зомби из окраса модели: цвета смешиваются с болотно-зелёным, окрас угадывается;
+ * внутри ушей — синюшный. Без `zombie` — без изменений.
+ */
+export function zombieFur(f: FurArt): FurArt {
+  return {
+    ...f,
+    fur: mixColor(f.fur, "#7f9f62", 0.55),
+    belly: mixColor(f.belly, "#c4d3a0", 0.6),
+    line: mixColor(f.line, "#2f3d24", 0.5),
+    dark: mixColor(f.dark, "#3e5233", 0.5),
+    earInner: "#8f7a99"
+  }
+}
+
+function zombify(a: CritterArt): CritterArt {
+  return a.zombie ? { ...a, fur: zombieFur(a.fur) } : a
 }
 
 /** Сияние яруса и верховое животное — позади всадника. */
@@ -412,7 +462,8 @@ function onMount(a: CritterArt, inner: string): string {
 }
 
 /** Полный SVG миниатюры. */
-export function critterSvg(a: CritterArt): string {
+export function critterSvg(art: CritterArt): string {
+  const a = zombify(art)
   const pose: Pose = a.pose ?? "idle"
   const rigTransform
     = pose === "hurt"
@@ -460,7 +511,7 @@ function singleLeg(a: CritterArt, which: "front" | "back"): string {
  * без пересчёта координат. Голова — с крестиками в глазах, срезы отмечены кровью.
  */
 export function critterPartSvg(a: CritterArt, part: CritterPart): string {
-  const dead: CritterArt = { ...a, pose: "dead", animated: false }
+  const dead: CritterArt = { ...zombify(a), pose: "dead", animated: false }
   let inner = ""
   switch (part) {
     case "head":

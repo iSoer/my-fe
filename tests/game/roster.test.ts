@@ -112,18 +112,18 @@ describe("разведка, бой и награда", () => {
   beforeEach(() => freshGame())
 
   it("разведка показывает врагов до боя; seed закреплён, пока бой не начат", () => {
-    expect(scoutBattle("easy", "yard").ok).toBe(true)
+    expect(scoutBattle("easy").ok).toBe(true)
     const first = $save.get().pendingBattle!
     expect(first.map.enemies.length).toBeGreaterThan(0)
-    scoutBattle("normal", "yard")
-    scoutBattle("easy", "yard")
+    scoutBattle("normal")
+    scoutBattle("easy")
     const again = $save.get().pendingBattle!
     expect(again.seed).toBe(first.seed)
     expect(again.map.enemies.map(e => e.unit.id)).toEqual(first.map.enemies.map(e => e.unit.id))
   })
 
   it("четыре команды на сложности: уровни — окна диапазона сложности, разведка берёт ту же карту", () => {
-    const offers = enemyTeams("easy", "yard")
+    const offers = enemyTeams("easy")
     expect(offers.map(o => o.team)).toEqual([0, 1, 2, 3])
     const windows = [[1, 5], [6, 10], [11, 15], [16, 20]]
     offers.forEach((o, i) => {
@@ -132,9 +132,9 @@ describe("разведка, бой и награда", () => {
       expect(o.treats).toBeGreaterThan(0)
     })
     // команды не меняются от повторного запроса и переключения сложности
-    enemyTeams("normal", "yard")
-    expect(enemyTeams("easy", "yard").map(o => o.seed)).toEqual(offers.map(o => o.seed))
-    expect(scoutBattle("easy", "yard", 3).ok).toBe(true)
+    enemyTeams("normal")
+    expect(enemyTeams("easy").map(o => o.seed)).toEqual(offers.map(o => o.seed))
+    expect(scoutBattle("easy", 3).ok).toBe(true)
     const pb = $save.get().pendingBattle!
     expect(pb.team).toBe(3)
     expect(pb.map.enemies.map(e => e.unit.id)).toEqual(offers[3]!.map.enemies.map(e => e.unit.id))
@@ -144,16 +144,16 @@ describe("разведка, бой и награда", () => {
   })
 
   it("после боя — новые команды", () => {
-    const before = enemyTeams("easy", "yard").map(o => o.seed)
-    scoutBattle("easy", "yard", 0)
+    const before = enemyTeams("easy").map(o => o.seed)
+    scoutBattle("easy", 0)
     startBattle($save.get().army!.squadIds)
     surrenderFromMenu()
     expect($save.get().sortieSeed).toBeUndefined()
-    expect(enemyTeams("easy", "yard").map(o => o.seed)).not.toEqual(before)
+    expect(enemyTeams("easy").map(o => o.seed)).not.toEqual(before)
   })
 
   it("бой идёт против разведанных врагов выбранным отрядом", () => {
-    scoutBattle("easy", "yard")
+    scoutBattle("easy")
     const enemies = $save.get().pendingBattle!.map.enemies.map(e => e.unit.id)
     const squad = $save.get().army!.squadIds.slice(0, 3)
     expect(startBattle(squad).ok).toBe(true)
@@ -165,12 +165,12 @@ describe("разведка, бой и награда", () => {
 
   it("без разведки и с пустым отрядом бой не начинается", () => {
     expect(startBattle($save.get().army!.squadIds).ok).toBe(false)
-    scoutBattle("easy", "yard")
+    scoutBattle("easy")
     expect(startBattle([]).ok).toBe(false)
   })
 
   it("после боя: выбитые Вкусняшки, новая витрина и награда 1 из 3", () => {
-    scoutBattle("easy", "yard")
+    scoutBattle("easy")
     const shopBefore = $save.get().shelter.candidates.map(u => u.id)
     startBattle($save.get().army!.squadIds)
     dispatchBattle({ type: "retreat" })
@@ -190,7 +190,7 @@ describe("разведка, бой и награда", () => {
   })
 
   it("от награды можно отказаться", () => {
-    scoutBattle("easy", "yard")
+    scoutBattle("easy")
     startBattle($save.get().army!.squadIds)
     dispatchBattle({ type: "retreat" })
     finishBattle()
@@ -233,7 +233,7 @@ describe("сейв", () => {
 describe("опыт за победу", () => {
   beforeEach(() => freshGame())
   it("выжившие при победе получают хотя бы 1 опыта, даже не сражаясь", () => {
-    scoutBattle("easy", "yard", 0)
+    scoutBattle("easy", 0)
     const squad = $save.get().army!.squadIds
     startBattle(squad)
     const s = $save.get()

@@ -76,6 +76,8 @@ export function unitArt(unit: UnitInstance, opts: UnitArtOptions = {}): CritterA
   if (mount) art.mount = mount
   if (unit.isBoss) art.boss = true
   if (unit.isEnemy && !opts.friendly) art.angry = true
+  // Все враги — зомби-версии тех же моделей
+  if (unit.isEnemy) art.zombie = true
   if (opts.blinkDelay !== undefined) art.blinkDelay = opts.blinkDelay
   return art
 }

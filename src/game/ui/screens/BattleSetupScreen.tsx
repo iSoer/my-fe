@@ -5,7 +5,6 @@ import { DIFFICULTIES } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
 import {
   $save,
-  $unlockedBiomes,
   difficultyUnlocked,
   enemyTeams,
   ensureRoster,
@@ -33,7 +32,21 @@ export const DIFF_STYLE: Record<Difficulty, { icon: string, color: string, rgb: 
   nightmare: { icon: "💀", color: "#ff5a68", rgb: "255, 90, 104" }
 }
 
-const BIOME_ICON: Record<string, string> = { yard: "🏡", roofs: "🏙️", basement: "🕯️", dump: "🗑️", winter_park: "❄️" }
+const BIOME_ICON: Record<string, string> = {
+  yard: "🏡",
+  roofs: "🏙️",
+  basement: "🕯️",
+  dump: "🗑️",
+  winter_park: "❄️",
+  jungle: "🌴",
+  desert: "🏜️",
+  glacier: "🧊",
+  canyon: "🏞️",
+  deep_forest: "🌲",
+  indoors: "🛋️",
+  factory: "🏭",
+  infested: "☣️"
+}
 
 const TEAM_RANK = (team: number): string =>
   [tr("Recruits", "Новобранцы"), tr("Fighters", "Бойцы"), tr("Veterans", "Ветераны"), tr("Elite", "Элита")][team] ?? ""
@@ -68,6 +81,7 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
         <span className="team-name">
           <b>{TEAM_RANK(offer.team)}</b>
           <span className="muted small">{` · ${faction.name}`}</span>
+          <span className="team-biome small">{`${BIOME_ICON[offer.map.biomeId] ?? "🗺️"} ${biomeDef(offer.map.biomeId).name}`}</span>
         </span>
       </div>
       <div className="team-foes">
@@ -94,13 +108,11 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
   )
 }
 
-/** Вылазка, шаг 1 из 2: сложность, биом и вражеская команда. «Далее» разведывает бой и ведёт к выбору отряда. */
+/** Вылазка, шаг 1 из 2: сложность и вражеская команда (биом у каждой случайный). «Далее» разведывает бой и ведёт к выбору отряда. */
 export function BattleSetupScreen() {
   const save = useStore($save)
-  const biomes = useStore($unlockedBiomes)
   const pending = save.pendingBattle
   const [difficulty, setDifficulty] = useState<Difficulty>(pending?.difficulty ?? "easy")
-  const [biome, setBiome] = useState<string>(pending?.biomeId ?? "random")
   const [team, setTeam] = useState<number | null>(pending?.team ?? null)
   const [toastEl, toast] = useToast()
 
@@ -110,12 +122,12 @@ export function BattleSetupScreen() {
   }, [])
 
   // Команды появляются, когда есть зерно вылазки (создаётся при входе на экран)
-  const offers = save.sortieSeed !== undefined && save.army ? enemyTeams(difficulty, biome) : []
+  const offers = save.sortieSeed !== undefined && save.army ? enemyTeams(difficulty) : []
   const armyLevel = rosterLevel(save.army)
   const picked = team ?? closestTeam(offers, armyLevel)
 
   const onNext = () => {
-    const r = scoutBattle(difficulty, biome, picked)
+    const r = scoutBattle(difficulty, picked)
     if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("medium")
     navigate("/battle/squad")
@@ -175,18 +187,6 @@ export function BattleSetupScreen() {
               </div>
             )
           })}
-        </div>
-
-        <div className="section-title">{tr("Biome", "Биом")}</div>
-        <div className="biome-chips">
-          <Button sm primary={biome === "random"} icon="🎲" onClick={() => setBiome("random")}>
-            {tr("Random", "Случайно")}
-          </Button>
-          {biomes.map(id => (
-            <Button key={id} sm primary={biome === id} icon={BIOME_ICON[id] ?? "🗺️"} onClick={() => setBiome(id)}>
-              {biomeDef(id).name}
-            </Button>
-          ))}
         </div>
 
         <div className="row between">

@@ -13,7 +13,6 @@ export interface WeatherDef {
 export interface BiomeDef {
   id: string
   readonly name: string
-  unlockWins: number
   factionId: string
   weather: WeatherDef
   terrainNames: Record<TerrainId, string>
@@ -37,7 +36,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "yard",
     get name() { return tr("Yard", "Двор") },
-    unlockWins: 0,
     factionId: "yard_pack",
     weather: { kind: "petals", colors: [0xffb7c5, 0xffd1dc, 0xfff0f5], density: 6 },
     terrainNames: terrain({
@@ -64,7 +62,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "roofs",
     get name() { return tr("Rooftops", "Крыши") },
-    unlockWins: 3,
     factionId: "chimney_cats",
     weather: { kind: "motes", colors: [0x3b2f4a, 0x5a4a66], density: 5 },
     terrainNames: terrain({
@@ -91,7 +88,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "basement",
     get name() { return tr("Basement", "Подвал") },
-    unlockWins: 9,
     factionId: "red_dot_cult",
     weather: { kind: "motes", colors: [0xfff2b0, 0xe0d2a0], density: 10 },
     terrainNames: terrain({
@@ -118,7 +114,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "dump",
     get name() { return tr("Dump", "Свалка") },
-    unlockWins: 15,
     factionId: "scavengers",
     weather: { kind: "flies", colors: [0x2b2b2b, 0x444444], density: 8 },
     terrainNames: terrain({
@@ -145,7 +140,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "winter_park",
     get name() { return tr("Winter Park", "Зимний парк") },
-    unlockWins: 24,
     factionId: "snow_strays",
     weather: { kind: "snow", colors: [0xffffff, 0xeaf4ff], density: 24 },
     terrainNames: terrain({
@@ -172,7 +166,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "jungle",
     get name() { return tr("Jungle", "Джунгли") },
-    unlockWins: 6,
     factionId: "swamp_cats",
     weather: { kind: "leaves", colors: [0x7bc96f, 0xc9d94a, 0x3f8f45], density: 10 },
     terrainNames: terrain({
@@ -199,7 +192,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "desert",
     get name() { return tr("Desert", "Пустыня") },
-    unlockWins: 12,
     factionId: "sand_dogs",
     weather: { kind: "sand", colors: [0xf3dfae, 0xe8c98a], density: 14 },
     terrainNames: terrain({
@@ -226,7 +218,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "glacier",
     get name() { return tr("Glacier", "Ледник") },
-    unlockWins: 18,
     factionId: "polar_mice",
     weather: { kind: "snow", colors: [0xffffff, 0xd8f0ff], density: 18 },
     terrainNames: terrain({
@@ -253,7 +244,6 @@ export const BIOMES: readonly BiomeDef[] = [
   {
     id: "canyon",
     get name() { return tr("Canyon", "Каньон") },
-    unlockWins: 21,
     factionId: "canyon_coyotes",
     weather: { kind: "sand", colors: [0xe6b48c, 0xd99a6c], density: 8 },
     terrainNames: terrain({
@@ -276,6 +266,110 @@ export const BIOMES: readonly BiomeDef[] = [
     },
     bg: 0xffb07a,
     bias: { forest: -0.04, walls: 0.03, impassable: 0.02, covers: 0, mountainVsWater: 0.7 }
+  },
+  {
+    id: "deep_forest",
+    get name() { return tr("Deep Forest", "Густой лес") },
+    factionId: "forest_lynxes",
+    weather: { kind: "leaves", colors: [0x8a9a3a, 0xc08a3a, 0x6b8f3a], density: 7 },
+    terrainNames: terrain({
+      plain: ["Moss", "Мох"],
+      forest: ["Thicket", "Чаща"],
+      mountain: ["Boulder", "Валун"],
+      water: ["Stream", "Ручей"],
+      wall: ["Ancient trunk", "Вековой ствол"],
+      wall_breakable: ["Rotten log", "Гнилое бревно"],
+      cover: ["Stump", "Пень"]
+    }),
+    colors: {
+      plain: 0x4f7a3a,
+      forest: 0x1f4a26,
+      mountain: 0x7d7f73,
+      water: 0x3f8fa6,
+      wall: 0x5a3e28,
+      wall_breakable: 0x7a5a3a,
+      cover: 0x8a6440
+    },
+    bg: 0x2f5a34,
+    bias: { forest: 0.1, walls: 0, impassable: 0, covers: 1, mountainVsWater: 0.5 }
+  },
+  {
+    id: "indoors",
+    get name() { return tr("Indoors", "В доме") },
+    factionId: "couch_troops",
+    weather: { kind: "motes", colors: [0xfff3c0, 0xffffff], density: 5 },
+    terrainNames: terrain({
+      plain: ["Floorboards", "Паркет"],
+      forest: ["Houseplants", "Цветы в горшках"],
+      mountain: ["Wardrobe", "Шкаф"],
+      water: ["Bathtub", "Ванна"],
+      wall: ["Wall", "Стена"],
+      wall_breakable: ["Door", "Дверь"],
+      cover: ["Armchair", "Кресло"]
+    }),
+    colors: {
+      plain: 0xb9875a,
+      forest: 0x3f8f4a,
+      mountain: 0x6b4a32,
+      water: 0x8fd3f0,
+      wall: 0xd9c7a8,
+      wall_breakable: 0xa0703f,
+      cover: 0x8a3b4a
+    },
+    bg: 0xf1e3c8,
+    bias: { forest: -0.08, walls: 0.04, impassable: 0, covers: 1, mountainVsWater: 0.8 }
+  },
+  {
+    id: "factory",
+    get name() { return tr("Factory", "Завод") },
+    factionId: "assembly_dogs",
+    weather: { kind: "embers", colors: [0xffb347, 0xff7a29], density: 6 },
+    terrainNames: terrain({
+      plain: ["Concrete floor", "Бетонный пол"],
+      forest: ["Cable tangle", "Клубок кабелей"],
+      mountain: ["Machinery", "Станок"],
+      water: ["Oil pool", "Масляная лужа"],
+      wall: ["Steel wall", "Стальная стена"],
+      wall_breakable: ["Rusty grate", "Ржавая решётка"],
+      cover: ["Barrels", "Бочки"]
+    }),
+    colors: {
+      plain: 0x8a8d8f,
+      forest: 0x3a3f45,
+      mountain: 0x5a6670,
+      water: 0x2a2630,
+      wall: 0x4a5560,
+      wall_breakable: 0xa0603a,
+      cover: 0xc9a227
+    },
+    bg: 0x5a5f66,
+    bias: { forest: -0.06, walls: 0.03, impassable: 0.01, covers: 1, mountainVsWater: 0.6 }
+  },
+  {
+    id: "infested",
+    get name() { return tr("Infested Zone", "Заражённая зона") },
+    factionId: "the_horde",
+    weather: { kind: "motes", colors: [0x9fff5a, 0xc6ff8a, 0xb07aff], density: 9 },
+    terrainNames: terrain({
+      plain: ["Blighted ground", "Гниющая земля"],
+      forest: ["Dead brush", "Мёртвый кустарник"],
+      mountain: ["Bone pile", "Груда костей"],
+      water: ["Toxic ooze", "Ядовитая жижа"],
+      wall: ["Barricade", "Баррикада"],
+      wall_breakable: ["Broken barricade", "Разбитая баррикада"],
+      cover: ["Gravestone", "Надгробие"]
+    }),
+    colors: {
+      plain: 0x5a5e3f,
+      forest: 0x3d3a2a,
+      mountain: 0xd8d0b8,
+      water: 0x7fe04a,
+      wall: 0x5a4632,
+      wall_breakable: 0x7a6248,
+      cover: 0x8a8a8f
+    },
+    bg: 0x3a3048,
+    bias: { forest: 0, walls: 0.02, impassable: 0.02, covers: 1, mountainVsWater: 0.4 }
   }
 ]
 

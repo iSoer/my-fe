@@ -39,16 +39,14 @@ describe("generateMap", () => {
       biomeId: "yard",
       difficulty: "normal",
       team: 1,
-      squadSize: 4,
-      unlockedBiomes: ALL_BIOMES
+      squadSize: 4
     })
     const b = generateMap({
       seed: 99,
       biomeId: "yard",
       difficulty: "normal",
       team: 1,
-      squadSize: 4,
-      unlockedBiomes: ALL_BIOMES
+      squadSize: 4
     })
     expect(a).toEqual(b)
   })
@@ -66,8 +64,7 @@ describe("generateMap", () => {
             biomeId,
             difficulty,
             team,
-            squadSize: 4,
-            unlockedBiomes: ALL_BIOMES
+            squadSize: 4
           })
           const d = difficultyDef(difficulty)
           expect(m.tiles.length).toBe(MAP_H)
@@ -115,7 +112,7 @@ describe("баланс карт и сложности", () => {
     let cells = 0
     for (const biomeId of ALL_BIOMES) {
       for (let i = 0; i < 24; i++) {
-        const m = generateMap({ seed: 300 + i * 41, biomeId, difficulty: "normal", team: 1, squadSize: 4, unlockedBiomes: ALL_BIOMES })
+        const m = generateMap({ seed: 300 + i * 41, biomeId, difficulty: "normal", team: 1, squadSize: 4})
         for (const row of m.tiles) {
           for (const t of row) {
             cells++
@@ -129,7 +126,7 @@ describe("баланс карт и сложности", () => {
   it("на «Легко» статы врагов умножены на enemyStatMult, на остальных — как у модели", () => {
     for (const difficulty of ["easy", "normal"] as Difficulty[]) {
       const mult = difficultyDef(difficulty).enemyStatMult
-      const m = generateMap({ seed: 42, biomeId: "yard", difficulty, team: 1, squadSize: 4, unlockedBiomes: ALL_BIOMES })
+      const m = generateMap({ seed: 42, biomeId: "yard", difficulty, team: 1, squadSize: 4})
       for (const { unit } of m.enemies) {
         // Статы модели зависят только от seed, звезды, уровня и класса
         const plain = generateUnit({ seed: unit.seed, level: unit.level, rarity: unit.rarity, classId: unit.classId, isEnemy: true })
@@ -154,5 +151,14 @@ describe("команды врагов", () => {
       // команда сильнее — награда больше
       for (let t = 1; t < ENEMY_TEAMS; t++) expect(teamTreats(def, t)).toBeGreaterThan(teamTreats(def, t - 1))
     }
+  })
+})
+
+describe("случайный биом", () => {
+  it("выпадает любой из всех биомов — без привязки к прогрессии", () => {
+    const seen = new Set<string>()
+    for (let seed = 0; seed < 400 && seen.size < ALL_BIOMES.length; seed++)
+      seen.add(generateMap({ seed, biomeId: "random", difficulty: "easy", team: 0, squadSize: 4 }).biomeId)
+    expect([...seen].sort()).toEqual([...ALL_BIOMES].sort())
   })
 })

@@ -4,6 +4,7 @@ import {
   backdropSvg,
   critterSvg,
   tileSvg,
+  unitArt,
   unitSvg,
   unitPartSvg,
   unitArtKey,
@@ -15,6 +16,7 @@ import {
 } from "@game/art/index"
 import { BIOMES } from "@game/content/biomes"
 import { WEAPONS } from "@game/content/weapons"
+import { zombieFur } from "@game/art/critter"
 import { TALISMANS } from "@game/content/items"
 import { ringSvg, weaponIconSvg } from "@game/art/gear"
 import { gearAlerts } from "@game/ui/components/UnitPanels"
@@ -220,5 +222,21 @@ describe("арт: снаряжение", () => {
     expect(gearAlerts(u, { sword_steel: 1, tal_bell: 1 })).toEqual({ weapon: true, talisman: true })
     expect(gearAlerts({ ...u, accessory: "tal_fang", skills: { ...u.skills, weapon: "sword_steel" } }, { axe_silver: 1, tal_bell: 1 }))
       .toEqual({ weapon: false, talisman: false })
+  })
+})
+
+describe("арт: враги-зомби", () => {
+  it("враг — зомби-вариант той же модели, боец игрока — нет; все позы и части тела корректны", () => {
+    const u = generateUnit({ seed: 77, level: 20 })
+    const enemy = { ...u, isEnemy: true }
+    expect(unitArt(u).zombie).toBeUndefined()
+    expect(unitArt(enemy).zombie).toBe(true)
+    expect(unitSvg(enemy)).not.toBe(unitSvg(u))
+    // окрас угадывается, но шерсть другая
+    const f = unitArt(u).fur
+    expect(zombieFur(f).fur).not.toBe(f.fur)
+    for (const pose of POSES) wellFormed(unitSvg(enemy, { pose }))
+    for (const part of CRITTER_PARTS) wellFormed(unitPartSvg(enemy, part))
+    expect(unitSvg({ ...enemy, isBoss: true })).toContain("eef4d6")
   })
 })

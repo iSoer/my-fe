@@ -20,8 +20,7 @@ describe("save", () => {
       biomeId: "yard",
       difficulty: "hard",
       team: 0,
-      squadSize: 4,
-      unlockedBiomes: ["yard"]
+      squadSize: 4
     })
     s.battle = createBattle({ map, squad: units, seed: 3, now: 1 }).state
     const r = parseSave(serializeSave(s))

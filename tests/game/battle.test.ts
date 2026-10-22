@@ -226,8 +226,7 @@ describe("полные бои: ИИ не падает и бой завершае
           biomeId: BIOMES[i % BIOMES.length]!.id,
           difficulty: d,
           team: 1,
-          squadSize: 4,
-          unlockedBiomes: BIOMES.map(b => b.id)
+          squadSize: 4
         })
         const { state } = createBattle({ map, squad, seed, now: 1 })
         const end = autoPlay(state, 40)

@@ -27,12 +27,12 @@ import { factionDef } from "@game/content/factions"
 
 export interface GenerateMapOptions {
   seed: number
+  /** «random» — любой из всех биомов (биомы не завязаны на прогрессию). */
   biomeId: string | "random"
   difficulty: Difficulty
   /** Вражеская команда 0…ENEMY_TEAMS−1: окно уровней внутри диапазона сложности (`teamLevels`). */
   team: number
   squadSize: number
-  unlockedBiomes: string[]
   now?: number
 }
 
@@ -232,7 +232,11 @@ const MOTIF_WEIGHTS: Record<string, Partial<Record<MapMotif, number>>> = {
   jungle: { open: 2, river: 4, islands: 2, ruins: 3, corridor: 1 },
   desert: { open: 5, corridor: 2, ruins: 2, fort: 1 },
   glacier: { open: 2, islands: 4, river: 2, corridor: 1 },
-  canyon: { open: 2, corridor: 5, fort: 2, ruins: 1 }
+  canyon: { open: 2, corridor: 5, fort: 2, ruins: 1 },
+  deep_forest: { open: 3, river: 3, islands: 1, ruins: 1 },
+  indoors: { open: 2, corridor: 4, fort: 2, ruins: 1 },
+  factory: { open: 2, corridor: 4, fort: 1, ruins: 2 },
+  infested: { open: 2, river: 1, islands: 2, ruins: 4 }
 }
 
 function pickMotif(rng: Rng, biomeId: string): MapMotif {
@@ -317,15 +321,11 @@ function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boo
   }
 }
 
-export function availableBiomes(unlocked: string[]): string[] {
-  return BIOMES.filter(b => unlocked.includes(b.id) || b.unlockWins === 0).map(b => b.id)
-}
-
 export function generateMap(opts: GenerateMapOptions): MapDef {
   const root = createRng(opts.seed)
   const diff = difficultyDef(opts.difficulty)
   const biomeId
-    = opts.biomeId === "random" ? root.fork("biome").pick(availableBiomes(opts.unlockedBiomes)) : opts.biomeId
+    = opts.biomeId === "random" ? root.fork("biome").pick(BIOMES.map(b => b.id)) : opts.biomeId
   const biome = biomeDef(biomeId)
   const playerSpawns = playerSpawnsFor(opts.squadSize)
   const enemyCount = root.fork("count").int(diff.enemies[0], diff.enemies[1])
