@@ -121,7 +121,8 @@ describe("generateRoster", () => {
       }),
       { numRuns: 150 }
     )
-  })
+    // generateRoster собирает состав отбраковкой (~10 попыток в среднем) — на медленном CI 150 прогонов не влезают в 5 с
+  }, 30_000)
   it("детерминирован", () => {
     expect(generateRoster({ seed: 5, glory: 0 })).toEqual(generateRoster({ seed: 5, glory: 0 }))
   })
