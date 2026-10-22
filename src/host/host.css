@@ -36,7 +36,9 @@
 /* Фатальная ошибка рисуется вместо игры (вне .pawfield), поэтому со своими цветами. */
 .fatal {
   min-height: 100dvh;
-  padding: 40px 16px 24px;
+  /* Экран ошибки — вне .pawfield: безопасные зоны берём напрямую (хост Telegram или системные) */
+  padding: calc(40px + var(--host-safe-top, env(safe-area-inset-top, 0px))) 16px
+    calc(24px + var(--host-safe-bottom, env(safe-area-inset-bottom, 0px)));
   display: flex;
   flex-direction: column;
   gap: 12px;

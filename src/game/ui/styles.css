@@ -279,7 +279,8 @@ p {
 .screen.center {
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  /* Свои поля экрана — поверх безопасных зон (вырез, статус-бар, кнопки Telegram), а не вместо них */
+  padding: calc(16px + var(--tg-safe-top)) 16px calc(16px + var(--tg-safe-bottom));
 }
 
 .stack {
@@ -1150,7 +1151,7 @@ p {
 /* ---------- Меню ---------- */
 .menu {
   justify-content: space-between;
-  padding: 16px;
+  padding: calc(16px + var(--tg-safe-top)) 16px calc(16px + var(--tg-safe-bottom));
   background:
     radial-gradient(ellipse at 50% 120%, rgba(230, 57, 70, 0.35), transparent 55%),
     var(--stripes),
@@ -1350,7 +1351,7 @@ p {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 24px;
+  padding: calc(24px + var(--tg-safe-top)) 24px calc(24px + var(--tg-safe-bottom));
   gap: 40px;
   background:
     radial-gradient(ellipse at 50% 30%, rgba(230, 57, 70, 0.35), transparent 60%),

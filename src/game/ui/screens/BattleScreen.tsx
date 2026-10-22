@@ -23,13 +23,18 @@ const TOP_BAND = 76
 const BOARD_TOP_INSET = 84
 const BOARD_BOTTOM_INSET = 150
 
+/**
+ * Отступ безопасной зоны в пикселях. Значение переменной не читаем строкой: env() внутри пользовательской
+ * CSS-переменной вычисляется не везде (Safari отдаёт текст), поэтому меряем невидимый элемент такой высоты.
+ */
 function safeInset(name: "--tg-safe-top" | "--tg-safe-bottom"): number {
-  if (typeof window === "undefined") return 0
-  return (
-    parseFloat(
-      getComputedStyle(document.querySelector(".pawfield") ?? document.documentElement).getPropertyValue(name)
-    ) || 0
-  )
+  if (typeof document === "undefined") return 0
+  const probe = document.createElement("div")
+  probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;height:var(${name})`
+  ;(document.querySelector(".pawfield") ?? document.body).appendChild(probe)
+  const h = probe.getBoundingClientRect().height
+  probe.remove()
+  return h
 }
 
 /**

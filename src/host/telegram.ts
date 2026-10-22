@@ -68,7 +68,9 @@ export function userNamespace(): string {
 }
 
 export function initTelegram(): void {
-  if (!tg) return;
+  // SDK подключён в index.html всегда, и вне Telegram объект WebApp тоже есть (с нулевыми отступами):
+  // настраиваемся только внутри Telegram, иначе нули перекроют системный env(safe-area-inset-*) в PWA
+  if (!tg || !isTelegram) return;
   try {
     tg.ready();
     tg.expand();
