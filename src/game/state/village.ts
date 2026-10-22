@@ -27,8 +27,8 @@ export function closeNpc(): void {
 }
 
 /**
- * «!» над NPC: Казарма — ростер пуст, отряд неполон, ждёт награда или кому-то есть что изучить;
- * Лавка — ассортимент обновился; Вылазки — незаконченный бой.
+ * «!» на здании: Казарма — ростер пуст, отряд неполон, ждёт награда или кому-то есть что изучить;
+ * Лавка — ассортимент обновился; Вылазки — незаконченный бой; Кладбище — никогда.
  */
 export function npcAlerts(save: SaveGame): Record<NpcId, boolean> {
   const army = save.army
@@ -36,8 +36,20 @@ export function npcAlerts(save: SaveGame): Record<NpcId, boolean> {
   return {
     barracks: !army || army.units.length < SQUAD_SIZE || army.squadIds.length < SQUAD_SIZE || !!save.rewardChoice || learn,
     store: save.store.fresh,
+    graveyard: false,
     sorties: !!save.battle && !save.battle.result
   }
+}
+
+/**
+ * Следующий шаг игрока — над этим местом прыгает стрелка, его кнопка в панели подсвечена: идёт бой — к воротам;
+ * нет отряда или ждёт награда — в Казарму; иначе — на вылазку.
+ */
+export function villageGuide(save: SaveGame): NpcId {
+  if (save.battle && !save.battle.result) return "sorties"
+  const army = save.army
+  if (!army || army.units.length === 0 || army.squadIds.length === 0 || save.rewardChoice) return "barracks"
+  return "sorties"
 }
 
 /** Управление сценой деревни (регистрирует смонтированная сцена) — для смоук-тестов через `window.__pf.village`. */

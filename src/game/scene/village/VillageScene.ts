@@ -12,23 +12,28 @@ import {
 } from "@game/core/village"
 import {
   GATE,
+  GRAVEYARD,
   HERO_SPEED,
   HOUSES,
   NPCS,
+  PLACES,
   VILLAGE_H,
   VILLAGE_W,
   type NpcDef,
-  type NpcId
+  type NpcId,
+  type PlaceDef
 } from "@game/content/village"
 import { critterSvg, eyeArt, furArt, tileSvg } from "@game/art/index"
 import { TILE_FRAME_COUNT } from "@game/art/tile"
 import { HERO_ANCHOR, HERO_IDLE_FRAMES, HERO_VIEW, HERO_WALK_FRAMES, heroArtKey, heroSvg } from "@game/art/hero"
 import {
   GATE_H,
+  GRAVEYARD_H_OVER,
   HOUSE_ROOF_OVER,
   TREE_H,
   villageFlowersSvg,
   villageGateSvg,
+  villageGraveyardSvg,
   villageHouseSvg,
   villagePathSvg,
   villageTreeSvg
@@ -50,13 +55,17 @@ const WATER_FRAMES = TILE_FRAME_COUNT.water ?? 1
 /** Высота героя и NPC на экране (в клетках). */
 const HERO_H = 1.2
 const NPC_W = 1.25
-/** Сколько рядов «за околицей» дорисовано под воротами (не проходимо): камера может показать ворота над HUD. */
-const OUTSIDE_ROWS = 2
+/** Сколько рядов «за околицей» дорисовано под воротами (не проходимо): дорога уходит из города. */
+const OUTSIDE_ROWS = 1
 
 export interface VillageSceneOptions {
   start: VillageState
-  /** «!» над NPC — опрашивается раз в полсекунды. */
+  /** «!» на вывеске места — опрашивается раз в полсекунды. */
   alerts: () => Record<NpcId, boolean>
+  /** Следующий шаг игрока: над этим местом прыгает стрелка. */
+  guide: () => NpcId
+  /** Сколько экранных пикселей сверху и снизу заняты HUD: город целиком вписывается между ними. */
+  insets: () => { top: number, bottom: number }
   /** Сцена на паузе, пока открыт разговор с NPC. */
   paused: () => boolean
   /** Устройство без клавиатуры: подсказку «E — поговорить» не показываем, есть кнопка в HUD. */
@@ -71,9 +80,19 @@ interface NpcView {
   def: NpcDef
   img: Phaser.GameObjects.Image
   label: Phaser.GameObjects.Text
-  alert: Phaser.GameObjects.Text
   prompt: Phaser.GameObjects.Text
   baseY: number
+}
+
+/** Вывеска места: плашка «иконка + название» и что внутри, значок «!» и стрелка следующего шага. */
+interface PlaceView {
+  def: PlaceDef
+  plaque: Phaser.GameObjects.Container
+  frame: Phaser.GameObjects.Graphics
+  w: number
+  h: number
+  badge: Phaser.GameObjects.Container
+  arrow: Phaser.GameObjects.Text
 }
 
 type Keys = Record<"W" | "A" | "S" | "D" | "UP" | "DOWN" | "LEFT" | "RIGHT" | "E" | "SPACE" | "ENTER", Phaser.Input.Keyboard.Key>
@@ -86,6 +105,7 @@ const texKey = {
   bush: "vg:bush",
   tree: (v: number) => `vg:tree:${v}`,
   gate: "vg:gate",
+  graveyard: "vg:graveyard",
   house: (id: string) => `vg:house:${id}`,
   npc: (id: string, pose: string) => `vg:npc:${id}:${pose}`
 }
@@ -98,6 +118,8 @@ export class VillageScene extends Phaser.Scene {
   private facing: Facing
   private hero?: Phaser.GameObjects.Image
   private npcs: NpcView[] = []
+  private places: PlaceView[] = []
+  private guided: NpcId | undefined
   private water: Phaser.GameObjects.Image[] = []
   private keys?: Keys
   private path: Pos[] = []
@@ -147,7 +169,8 @@ export class VillageScene extends Phaser.Scene {
     for (let f = 0; f < WATER_FRAMES; f++) jobs.push(t(texKey.water(f), tileSvg("yard", "water", f, 0), T, T))
     jobs.push(t(texKey.bush, tileSvg("yard", "forest", 0, 0), T, T))
     for (let v = 0; v < 3; v++) jobs.push(t(texKey.tree(v), villageTreeSvg(v), T, T * TREE_H))
-    jobs.push(t(texKey.gate, villageGateSvg(GATE.w, GATE.sign), GATE.w * T, T * GATE_H))
+    jobs.push(t(texKey.gate, villageGateSvg(GATE.w), GATE.w * T, T * GATE_H))
+    jobs.push(t(texKey.graveyard, villageGraveyardSvg(GRAVEYARD.w, GRAVEYARD.h), GRAVEYARD.w * T, (GRAVEYARD.h + GRAVEYARD_H_OVER) * T))
     for (const h of HOUSES) jobs.push(t(texKey.house(h.npc), villageHouseSvg(h), h.w * T, (h.h + HOUSE_ROOF_OVER) * T))
     for (const n of NPCS) {
       for (const pose of ["idle", "blink", "happy"] as const) {
@@ -219,6 +242,12 @@ export class VillageScene extends Phaser.Scene {
         .setDisplaySize(h.w * T, (h.h + HOUSE_ROOF_OVER) * T)
         .setDepth(bottom)
     }
+    const graveBottom = (GRAVEYARD.y + GRAVEYARD.h) * T
+    this.add
+      .image(GRAVEYARD.x * T, graveBottom, texKey.graveyard)
+      .setOrigin(0, 1)
+      .setDisplaySize(GRAVEYARD.w * T, (GRAVEYARD.h + GRAVEYARD_H_OVER) * T)
+      .setDepth(graveBottom)
     const gateBottom = (GATE.y + 1) * T
     this.add
       .image(GATE.x * T, gateBottom, texKey.gate)
@@ -226,6 +255,7 @@ export class VillageScene extends Phaser.Scene {
       .setDisplaySize(GATE.w * T, T * GATE_H)
       .setDepth(gateBottom)
     for (const def of NPCS) this.npcs.push(this.makeNpc(def))
+    for (const def of PLACES) this.places.push(this.makePlace(def))
 
     const heroH = T * HERO_H
     this.hero = this.add
@@ -250,12 +280,12 @@ export class VillageScene extends Phaser.Scene {
     const x = def.pos.x * T
     const y = def.pos.y * T
     const img = this.add.image(x, y + h * 0.14, texKey.npc(def.id, "idle")).setOrigin(0.5, 1).setDisplaySize(w, h).setDepth(y)
+    // Назначение места — на вывеске здания; над жителем только имя
     const label = this.add
-      .text(x, y - h * 0.78, `${def.name}\n${def.title}`, { ...textStyle(11, "#ffffff", true, 3), lineSpacing: -2 })
+      .text(x, y - h * 0.78, def.name, textStyle(12, "#ffffff", true, 3))
       .setOrigin(0.5, 1)
-      .setDepth(10000)
-    const alert = this.add.text(x, y - h * 0.78 - 30, "!", textStyle(22, "#ffd166", true, 4)).setOrigin(0.5, 1).setDepth(10001)
-    alert.setVisible(false)
+      .setResolution(2)
+      .setDepth(9000)
     const prompt = this.add
       .text(x, y + 10, tr("E / Space — talk", "E / Пробел — поговорить"), {
         ...textStyle(11, "#15121a", true, 0),
@@ -268,28 +298,72 @@ export class VillageScene extends Phaser.Scene {
     if (!reducedMotion()) {
       const duration = 900 + (hash(def.pos.x, 3) % 300)
       this.tweens.add({ targets: img, y: img.y - 2, duration, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
-      this.tweens.add({ targets: alert, y: alert.y - 6, duration: 420, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
     }
-    return { def, img, label, alert, prompt, baseY: img.y }
+    return { def, img, label, prompt, baseY: img.y }
+  }
+
+  /** Вывеска над зданием: крупная плашка — это и есть пункт меню города (тап по ней или по зданию ведёт туда). */
+  private makePlace(def: PlaceDef): PlaceView {
+    const x = (def.rect.x + def.rect.w / 2) * T
+    const y = (def.rect.y + 0.55) * T
+    const title = this.add.text(0, -8, `${def.icon} ${def.name}`, textStyle(19, "#3b2614", true, 0)).setOrigin(0.5).setResolution(2)
+    const hint = this.add.text(0, 12, def.hint, textStyle(13, "#6d4c2f", true, 0)).setOrigin(0.5).setResolution(2)
+    const w = Math.max(title.width, hint.width) + 24
+    const h = 50
+    const frame = this.add.graphics()
+    const plaque = this.add.container(x, y, [frame, title, hint]).setDepth(9500)
+    const badgeBg = this.add.circle(0, 0, 13, 0xe63946).setStrokeStyle(3, 0xffffff)
+    const badgeText = this.add.text(0, 0, "!", textStyle(17, "#ffffff", true, 0)).setOrigin(0.5).setResolution(2)
+    const badge = this.add.container(x + w / 2 - 4, y - h / 2 + 2, [badgeBg, badgeText]).setDepth(9501).setVisible(false)
+    const arrow = this.add
+      .text(x, y - h / 2 - 4, "▼", { ...textStyle(26, "#ffd166", true, 5), stroke: "#3b2614" })
+      .setOrigin(0.5, 1)
+      .setResolution(2)
+      .setDepth(9502)
+      .setVisible(false)
+    if (!reducedMotion()) {
+      this.tweens.add({ targets: arrow, y: arrow.y - 9, duration: 480, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+      this.tweens.add({ targets: badge, scale: 1.15, duration: 520, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+    }
+    const view: PlaceView = { def, plaque, frame, w, h, badge, arrow }
+    this.drawPlaque(view, false)
+    return view
+  }
+
+  private drawPlaque(v: PlaceView, guided: boolean): void {
+    const { frame, w, h } = v
+    frame.clear()
+    frame.fillStyle(0x000000, 0.25).fillRoundedRect(-w / 2 + 2, -h / 2 + 4, w, h, 10)
+    frame.fillStyle(0xf3e2c0, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 10)
+    frame.lineStyle(guided ? 4 : 3, guided ? 0xffb703 : 0x5a3b22, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, 10)
   }
 
   /* ---------- Камера ---------- */
 
+  /**
+   * Город целиком на экране между верхней панелью и нижней (как меню — всё видно сразу). На очень маленьком
+   * экране, где город не влез бы мельче 0.55, камера следует за героем.
+   */
   private setupCamera(): void {
     const cam = this.cameras.main
     if (!this.hero) return
+    const { top, bottom } = this.opts.insets()
     const worldW = VILLAGE_W * T
-    const worldH = (VILLAGE_H + OUTSIDE_ROWS) * T
-    const fit = Math.min(this.scale.width / worldW, this.scale.height / worldH)
-    const zoom = Phaser.Math.Clamp(fit, 0.9, 1.6)
+    // Сверху — полклетки на крону деревьев первого ряда
+    const worldTop = -T * 0.5
+    const worldH = (VILLAGE_H + OUTSIDE_ROWS) * T - worldTop
+    const availH = Math.max(1, this.scale.height - top - bottom)
+    const fit = Math.min(this.scale.width / worldW, availH / worldH)
+    const zoom = Phaser.Math.Clamp(fit, 0.55, 1.6)
     cam.setZoom(zoom)
-    if (worldW * zoom <= this.scale.width + 1 && worldH * zoom <= this.scale.height + 1) {
+    if (fit >= 0.55) {
       cam.stopFollow()
       cam.removeBounds()
-      cam.centerOn(worldW / 2, worldH / 2)
+      // Центр видимой области смещён вниз на top и вверх на bottom
+      cam.centerOn(worldW / 2, worldTop + worldH / 2 - (top - bottom) / 2 / zoom)
     }
     else {
-      cam.setBounds(0, 0, worldW, worldH)
+      cam.setBounds(0, worldTop, worldW, worldH)
       cam.startFollow(this.hero, true, 0.14, 0.14)
     }
   }
@@ -349,6 +423,9 @@ export class VillageScene extends Phaser.Scene {
   private tapAt(p: Pos): void {
     const npc = NPCS.find(n => Math.abs(n.pos.x - p.x) < 0.7 && p.y > n.pos.y - 1.3 && p.y < n.pos.y + 0.5)
     if (npc) return this.walkTo(npc.id)
+    // Тап по зданию или его вывеске — как пункт меню: герой идёт к жителю и заговаривает
+    const place = PLACES.find(({ rect: r }) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h)
+    if (place) return this.walkTo(place.id)
     this.talkOnArrive = undefined
     this.path = findVillagePath(this.pos, p)
     this.showMarker(this.path[this.path.length - 1])
@@ -522,6 +599,12 @@ export class VillageScene extends Phaser.Scene {
 
   private refreshAlerts(): void {
     const alerts = this.opts.alerts()
-    for (const n of this.npcs) n.alert.setVisible(alerts[n.def.id])
+    const guide = this.opts.guide()
+    for (const v of this.places) {
+      v.badge.setVisible(alerts[v.def.id])
+      v.arrow.setVisible(v.def.id === guide)
+      if (this.guided !== guide) this.drawPlaque(v, v.def.id === guide)
+    }
+    this.guided = guide
   }
 }

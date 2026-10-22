@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react"
 import { useStore } from "@nanostores/react"
 import { SQUAD_SIZE } from "@game/core/types"
-import { NPCS, type NpcDef, type NpcId } from "@game/content/village"
+import { NPCS, PLACES, type NpcDef, type NpcId } from "@game/content/village"
+import { spotNear } from "@game/core/village"
 import { critterSvg, eyeArt, furArt } from "@game/art/index"
 import { $save, ensureRoster, ensureStore, gameStarted, setHeroPosition } from "@game/state/save"
-import { $villageUi, closeNpc, npcAlerts, openNpc, setNearNpc, villageControl } from "@game/state/village"
+import { $villageUi, closeNpc, npcAlerts, openNpc, setNearNpc, villageControl, villageGuide } from "@game/state/village"
 import { navigate } from "@game/state/router"
 import type { VillageGameHandle } from "@game/scene/village/index"
 import { haptic } from "@game/platform/haptics"
@@ -91,6 +92,20 @@ function NpcDialog({ id }: { id: NpcId }) {
       </Button>
     )
   }
+  else if (id === "graveyard") {
+    const fallen = save.memorial.length
+    lines = [fallen === 0
+      ? tr("No one rests here yet. Let’s keep it that way.", "Здесь пока никто не лежит. Пусть так и останется.")
+      : tr(
+          `${fallen} ${fallen === 1 ? "fighter rests" : "fighters rest"} here. Each one has a story.`,
+          `Павших здесь: ${fallen}. У каждого своя история.`
+        )]
+    actions = (
+      <Button big primary block icon="🪦" onClick={() => go("/memorial")} disabled={fallen === 0}>
+        {tr("Read the gravestones", "Прочитать надгробия")}
+      </Button>
+    )
+  }
   else if (battleOn) {
     lines = [tr(
       `The battle’s still on: turn ${save.battle?.turn ?? 1}. Your squad awaits orders.`,
@@ -150,6 +165,8 @@ export function VillageScreen() {
   const save = useStore($save)
   const ui = useStore($villageUi)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const topRef = useRef<HTMLDivElement>(null)
+  const dockRef = useRef<HTMLElement>(null)
   const started = gameStarted(save)
 
   useEffect(() => {
@@ -169,6 +186,14 @@ export function VillageScreen() {
         handle = m.mountVillageGame(el, {
           start: $save.get().village,
           alerts: () => npcAlerts($save.get()),
+          guide: () => villageGuide($save.get()),
+          // Город вписывается между верхней панелью и нижней — меряем их относительно холста
+          insets: () => {
+            const box = el.getBoundingClientRect()
+            const top = topRef.current?.getBoundingClientRect().bottom ?? box.top
+            const dock = dockRef.current?.getBoundingClientRect().top ?? box.bottom
+            return { top: Math.max(0, top - box.top + 6), bottom: Math.max(0, box.bottom - dock + 6) }
+          },
           paused: () => !!$villageUi.get().talking,
           touch,
           onNear: setNearNpc,
@@ -188,13 +213,21 @@ export function VillageScreen() {
   }, [])
 
   if (!started) return <div className="vl-root" />
-  const near = ui.near ? npcDef(ui.near) : undefined
+  const alerts = npcAlerts(save)
+  const guide = villageGuide(save)
+  const battleOn = !!save.battle && !save.battle.result
+  // Панель — те же места, что вывески города: сразу к жителю (герой переносится к нему) и разговор
+  const goPlace = (id: NpcId) => {
+    haptic("select")
+    if (ui.near !== id) villageControl()?.teleport(spotNear(npcDef(id)))
+    openNpc(id)
+  }
 
   return (
     <div className="vl-root">
       <div className="vl-canvas" ref={canvasRef} />
       <div className="vl-hud">
-        <div className="vl-top">
+        <div className="vl-top" ref={topRef}>
           <button type="button" className="icon-btn" aria-label={tr("Main menu", "Главное меню")} title={tr("Main menu", "Главное меню")} onClick={() => navigate("/")}>
             🏠
           </button>
@@ -210,22 +243,25 @@ export function VillageScreen() {
             ⚙️
           </button>
         </div>
-        <div className="vl-bottom">
-          {near && !ui.talking
-            ? (
-                <Button big primary block glow icon="💬" onClick={() => openNpc(near.id)}>
-                  {`${tr("Talk", "Поговорить")}: ${near.name}`}
-                </Button>
-              )
-            : (
-                <div className="vl-hint">
-                  {tr(
-                    "WASD or arrows — walk · tap the ground — go there · tap a villager — talk",
-                    "WASD или стрелки — идти · тап по земле — дойти туда · тап по жителю — поговорить"
-                  )}
-                </div>
-              )}
-        </div>
+        <nav className="vl-dock" ref={dockRef} aria-label={tr("Town", "Город")}>
+          {PLACES.map((p) => {
+            const main = p.id === "sorties"
+            const label = main && battleOn ? tr("Back to battle", "Вернуться в бой") : p.name
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`vl-dock-btn${main ? " is-main" : ""}${guide === p.id ? " is-guide" : ""}${ui.near === p.id ? " is-near" : ""}`}
+                onClick={() => goPlace(p.id)}
+              >
+                <span className="vl-dock-ico" aria-hidden="true">{ui.near === p.id ? "💬" : p.icon}</span>
+                <span className="vl-dock-name">{label}</span>
+                {!main && <span className="vl-dock-hint">{p.hint}</span>}
+                {alerts[p.id] && <i className="vl-badge" aria-label={tr("New", "Новое")}>!</i>}
+              </button>
+            )
+          })}
+        </nav>
       </div>
       <BottomSheet open={!!ui.talking} onClose={closeNpc}>
         {ui.talking && <NpcDialog id={ui.talking} />}
