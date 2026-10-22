@@ -142,3 +142,96 @@
   padding: 10px 0 2px;
   background: linear-gradient(to top, var(--ink) 70%, transparent);
 }
+
+/* Вылазка, шаг 1: вражеские команды — уровни героев крупно, кто в команде, награда и опыт */
+.pawfield .team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 3px solid transparent;
+  background: var(--paper);
+  color: var(--text-paper);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 5px 5px 0 var(--ink-3);
+}
+.pawfield .team-card.selected {
+  border-color: var(--red);
+  box-shadow: 5px 5px 0 var(--red);
+}
+.pawfield .team-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pawfield .team-levels {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 900;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+.pawfield .team-card.selected .team-levels {
+  background: var(--red);
+}
+.pawfield .team-name {
+  min-width: 0;
+}
+.pawfield .team-foes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.pawfield .team-foe {
+  position: relative;
+}
+.pawfield .team-foe-lv {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  padding: 0 4px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 10px;
+  font-weight: 900;
+}
+.pawfield .team-more {
+  color: var(--muted-paper);
+  font-weight: 900;
+}
+.pawfield .team-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.pawfield .team-reward {
+  color: var(--gold-text);
+  font-weight: 900;
+}
+.pawfield .team-reward small {
+  color: var(--muted-paper);
+  font-weight: 700;
+}
+.pawfield .team-xp {
+  padding: 1px 8px;
+  background: var(--paper-3);
+  color: var(--muted-paper);
+  font-size: 11px;
+  font-weight: 800;
+}
+.pawfield .team-xp.less {
+  background: #fff1e0;
+  color: var(--warn-text);
+}
+.pawfield .team-xp.more {
+  background: #e3f6ec;
+  color: var(--ok-text);
+}

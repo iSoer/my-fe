@@ -6,7 +6,8 @@ export interface DifficultyDef {
   name: string
   desc: string
   enemies: [number, number]
-  levelRange: [number, number]
+  /** Уровни врагов на этой сложности (не зависят от уровня армии): делятся на `ENEMY_TEAMS` команд. */
+  levels: [number, number]
   rarity: [Rarity, Rarity]
   /** Множитель статов модели у врагов (HP, атака, защиты, скорость); 1 — без изменений. */
   enemyStatMult: number
@@ -46,7 +47,7 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     get name() { return tr("Easy", "Легко") },
     get desc() { return tr("Enemies are a little weaker and wait for you to come to them. Good for a new army.", "Враги чуть слабее и ждут, пока вы подойдёте. Хорошо для новой армии.") },
     enemies: [3, 4],
-    levelRange: [-3, 0],
+    levels: [1, 20],
     rarity: [1, 2],
     // Враги на 7 % слабее: в автобоях отряд теряет ≈ на 20 % меньше HP (урон — разность атаки и защиты, эффект нелинейный)
     enemyStatMult: 0.93,
@@ -74,7 +75,7 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     get name() { return tr("Normal", "Нормально") },
     get desc() { return tr("Half the enemies charge right away. A fair fight.", "Половина врагов идёт на вас сразу. Честный бой.") },
     enemies: [4, 5],
-    levelRange: [-1, 2],
+    levels: [15, 40],
     rarity: [2, 3],
     enemyStatMult: 1,
     holdRatio: 0.5,
@@ -101,7 +102,7 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     get name() { return tr("Hard", "Сложно") },
     get desc() { return tr("Every enemy is aggressive; reinforcements arrive on turn 3.", "Все враги агрессивны, на 3-м ходу приходит подкрепление.") },
     enemies: [5, 7],
-    levelRange: [1, 4],
+    levels: [35, 60],
     rarity: [3, 4],
     enemyStatMult: 1,
     holdRatio: 0,
@@ -128,7 +129,7 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     get name() { return tr("Nightmare", "Кошмар") },
     get desc() { return tr("A Leader, two waves of surprise reinforcements and an AI that wants you dead.", "Вожак, две волны подкреплений без предупреждения и ИИ, который хочет вас убить.") },
     enemies: [6, 8],
-    levelRange: [3, 7],
+    levels: [55, 80],
     rarity: [4, 5],
     enemyStatMult: 1,
     holdRatio: 0,
@@ -154,6 +155,26 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
     }
   }
 ]
+
+/** Сколько вражеских команд предлагает вылазка на каждой сложности. */
+export const ENEMY_TEAMS = 4
+
+/**
+ * Уровни героев команды `team` (0 — самая слабая): диапазон сложности делится на `ENEMY_TEAMS` почти равных окон,
+ * «Легко» 1–20 → 1–5, 6–10, 11–15, 16–20.
+ */
+export function teamLevels(d: Pick<DifficultyDef, "levels">, team: number): [number, number] {
+  const [min, max] = d.levels
+  const span = (max - min + 1) / ENEMY_TEAMS
+  const t = Math.max(0, Math.min(ENEMY_TEAMS - 1, Math.floor(team)))
+  return [min + Math.floor(t * span), t === ENEMY_TEAMS - 1 ? max : min + Math.floor((t + 1) * span) - 1]
+}
+
+/** Вкусняшки карты команды: (treatsBase + treatsPerLevel × средний уровень окна) × множитель сложности. */
+export function teamTreats(d: Pick<DifficultyDef, "levels" | "treatsMult">, team: number): number {
+  const [lo, hi] = teamLevels(d, team)
+  return Math.round((REWARDS.treatsBase + REWARDS.treatsPerLevel * ((lo + hi) / 2)) * d.treatsMult)
+}
 
 export function difficultyDef(id: Difficulty): DifficultyDef {
   const d = DIFFICULTIES.find(x => x.id === id)
@@ -199,7 +220,12 @@ export const XP = {
   perLevel: 50,
   combatBase: 20,
   combatPerLevelDiff: 2,
-  combatMin: 4,
+  /** Опыт за схватку и убийство не меньше единицы — даже против намного более слабого врага. */
+  combatMin: 1,
+  /** Боец выше врага по уровню: опыт за схватку и убийство −10 % за каждый уровень разницы (но не меньше `combatMin`). */
+  overlevelPenalty: 0.1,
+  /** Выжившие при победе получают хотя бы столько опыта, даже если не дрались. */
+  victoryMin: 1,
   combatMax: 40,
   killBonus: 10,
   assist: 10,

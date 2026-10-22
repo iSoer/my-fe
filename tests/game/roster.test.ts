@@ -9,8 +9,10 @@ import {
   finishBattle,
   freeSlots,
   releaseUnit,
+  enemyTeams,
   scoutBattle,
   skipRewardAction,
+  surrenderFromMenu,
   startBattle,
   toggleSquad
 } from "@game/state/save"
@@ -118,9 +120,36 @@ describe("разведка, бой и награда", () => {
     const again = $save.get().pendingBattle!
     expect(again.seed).toBe(first.seed)
     expect(again.map.enemies.map(e => e.unit.id)).toEqual(first.map.enemies.map(e => e.unit.id))
-    // уровень врагов — от ростера, а не от выбранного отряда
-    const level = rosterLevel($save.get().army)
-    for (const e of again.map.enemies) expect(Math.abs(e.unit.level - level)).toBeLessThanOrEqual(3)
+  })
+
+  it("четыре команды на сложности: уровни — окна диапазона сложности, разведка берёт ту же карту", () => {
+    const offers = enemyTeams("easy", "yard")
+    expect(offers.map(o => o.team)).toEqual([0, 1, 2, 3])
+    const windows = [[1, 5], [6, 10], [11, 15], [16, 20]]
+    offers.forEach((o, i) => {
+      expect(o.levels[0]).toBeGreaterThanOrEqual(windows[i]![0]!)
+      expect(o.levels[1]).toBeLessThanOrEqual(windows[i]![1]!)
+      expect(o.treats).toBeGreaterThan(0)
+    })
+    // команды не меняются от повторного запроса и переключения сложности
+    enemyTeams("normal", "yard")
+    expect(enemyTeams("easy", "yard").map(o => o.seed)).toEqual(offers.map(o => o.seed))
+    expect(scoutBattle("easy", "yard", 3).ok).toBe(true)
+    const pb = $save.get().pendingBattle!
+    expect(pb.team).toBe(3)
+    expect(pb.map.enemies.map(e => e.unit.id)).toEqual(offers[3]!.map.enemies.map(e => e.unit.id))
+    // армия 5-го уровня против команды 16–20 — больше опыта, против 1–5 — обычный
+    expect(rosterLevel($save.get().army)).toBe(5)
+    expect(offers[3]!.xp).toBe("more")
+  })
+
+  it("после боя — новые команды", () => {
+    const before = enemyTeams("easy", "yard").map(o => o.seed)
+    scoutBattle("easy", "yard", 0)
+    startBattle($save.get().army!.squadIds)
+    surrenderFromMenu()
+    expect($save.get().sortieSeed).toBeUndefined()
+    expect(enemyTeams("easy", "yard").map(o => o.seed)).not.toEqual(before)
   })
 
   it("бой идёт против разведанных врагов выбранным отрядом", () => {
@@ -200,3 +229,22 @@ describe("сейв", () => {
     for (const version of [1, 2, 3]) expect(parseSave(JSON.stringify({ ...old, version })).ok).toBe(false)
   })
 })
+
+describe("опыт за победу", () => {
+  beforeEach(() => freshGame())
+  it("выжившие при победе получают хотя бы 1 опыта, даже не сражаясь", () => {
+    scoutBattle("easy", "yard", 0)
+    const squad = $save.get().army!.squadIds
+    startBattle(squad)
+    const s = $save.get()
+    $save.set({ ...s, battle: { ...s.battle!, result: "victory" } })
+    const before = new Map(s.army!.units.map(u => [u.id, u.xp + u.level * 1000]))
+    const summary = finishBattle()!
+    for (const id of squad) {
+      const u = $save.get().army!.units.find(x => x.id === id)!
+      expect(u.xp + u.level * 1000).toBeGreaterThan(before.get(id)!)
+      expect(summary.xp[id]).toBeGreaterThanOrEqual(1)
+    }
+  })
+})
+

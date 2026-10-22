@@ -143,6 +143,8 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
   const survivors: UnitInstance[] = []
   const levelUps: LevelUpSummary[] = []
   const nextUnits: UnitInstance[] = []
+  // Победа даёт выжившим хотя бы `XP.victoryMin` опыта — даже бойцу, который не дрался или бил только слабых
+  const xpGained = { ...state.stats.xpGained }
 
   for (const u of army.units) {
     const bu = state.units[u.id]
@@ -151,9 +153,14 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
       nextUnits.push(u)
       continue
     }
-    const merged: UnitInstance = {
+    let merged: UnitInstance = {
       ...roster,
       history: { ...roster.history, battles: roster.history.battles + 1 }
+    }
+    const short = XP.victoryMin - (xpGained[u.id] ?? 0)
+    if (bu.alive && result === "victory" && short > 0) {
+      merged = gainXp(merged, short).unit
+      xpGained[u.id] = XP.victoryMin
     }
     if (bu.alive) {
       survivors.push(merged)
@@ -224,13 +231,13 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
     kills: state.stats.kills,
     damage: state.stats.damage,
     fallen,
-    xp: state.stats.xpGained,
+    xp: xpGained,
     levelUps,
     rewards: { treats, loot, lost: loot - kept, glory, flawless },
     survivors,
     armyFell
   }
-  const mvp = Object.entries(state.stats.xpGained).sort((a, b) => b[1] - a[1])[0]
+  const mvp = Object.entries(xpGained).sort((a, b) => b[1] - a[1])[0]
   if (mvp) summary.mvpId = mvp[0]
 
   // Витрина Казармы и Лавка обновляются после каждого боя; бесплатная награда — если ростер ещё жив

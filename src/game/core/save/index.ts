@@ -232,10 +232,13 @@ export const saveSchema = z.object({
       seed: z.number(),
       difficulty,
       biomeId: z.string(),
+      // Разведки до выбора команды — самая слабая команда
+      team: z.number().int().min(0).default(0),
       map: mapSchema,
       pack: z.record(z.string(), z.number()).optional()
     })
     .optional(),
+  sortieSeed: z.number().optional(),
   rewardChoice: z.array(unitSchema).optional(),
   lastBattle: summarySchema.optional()
 })

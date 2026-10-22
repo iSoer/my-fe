@@ -4,7 +4,7 @@ import { generateMap } from "@game/core/map/generate"
 import { isPassable } from "@game/core/map/pathing"
 import type { Difficulty, Pos, TerrainId } from "@game/core/types"
 import { MAP_H, MAP_W, MAX_LEVEL, posKey } from "@game/core/types"
-import { difficultyDef } from "@game/content/balance"
+import { ENEMY_TEAMS, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
 import { BIOMES } from "@game/content/biomes"
 import { unitClass } from "@game/content/classes"
 import { generateUnit } from "@game/core/units"
@@ -38,7 +38,7 @@ describe("generateMap", () => {
       seed: 99,
       biomeId: "yard",
       difficulty: "normal",
-      squadAvgLevel: 5,
+      team: 1,
       squadSize: 4,
       unlockedBiomes: ALL_BIOMES
     })
@@ -46,7 +46,7 @@ describe("generateMap", () => {
       seed: 99,
       biomeId: "yard",
       difficulty: "normal",
-      squadAvgLevel: 5,
+      team: 1,
       squadSize: 4,
       unlockedBiomes: ALL_BIOMES
     })
@@ -59,13 +59,13 @@ describe("generateMap", () => {
         fc.integer({ min: 0, max: 0x7fffffff }),
         fc.constantFrom<Difficulty>("easy", "normal", "hard", "nightmare"),
         fc.constantFrom(...ALL_BIOMES),
-        fc.integer({ min: 1, max: 80 }),
-        (seed, difficulty, biomeId, lvl) => {
+        fc.integer({ min: 0, max: 3 }),
+        (seed, difficulty, biomeId, team) => {
           const m = generateMap({
             seed,
             biomeId,
             difficulty,
-            squadAvgLevel: lvl,
+            team,
             squadSize: 4,
             unlockedBiomes: ALL_BIOMES
           })
@@ -89,10 +89,11 @@ describe("generateMap", () => {
           // проходимых клеток ≥ 65 %
           const passable = m.tiles.flat().filter(t => isPassable(t, "infantry")).length
           expect(passable / (MAP_W * MAP_H)).toBeGreaterThanOrEqual(0.65)
-          // уровни врагов в диапазоне
-          for (const e of m.enemies) {
-            expect(e.unit.level).toBeGreaterThanOrEqual(Math.min(MAX_LEVEL, Math.max(1, lvl + d.levelRange[0])))
-            expect(e.unit.level).toBeLessThanOrEqual(Math.max(1, Math.min(MAX_LEVEL, lvl + d.levelRange[1])))
+          // уровни врагов — в окне команды внутри диапазона сложности
+          const [lo, hi] = teamLevels(d, team)
+          for (const e of [...m.enemies, ...m.reinforcements.flatMap(w => w.units)]) {
+            expect(e.unit.level).toBeGreaterThanOrEqual(lo)
+            expect(e.unit.level).toBeLessThanOrEqual(Math.min(MAX_LEVEL, hi))
             expect(e.unit.isEnemy).toBe(true)
           }
           expect(m.reinforcements.length).toBe(d.reinforcements.length)
@@ -114,7 +115,7 @@ describe("баланс карт и сложности", () => {
     let cells = 0
     for (const biomeId of ALL_BIOMES) {
       for (let i = 0; i < 24; i++) {
-        const m = generateMap({ seed: 300 + i * 41, biomeId, difficulty: "normal", squadAvgLevel: 10, squadSize: 4, unlockedBiomes: ALL_BIOMES })
+        const m = generateMap({ seed: 300 + i * 41, biomeId, difficulty: "normal", team: 1, squadSize: 4, unlockedBiomes: ALL_BIOMES })
         for (const row of m.tiles) {
           for (const t of row) {
             cells++
@@ -128,7 +129,7 @@ describe("баланс карт и сложности", () => {
   it("на «Легко» статы врагов умножены на enemyStatMult, на остальных — как у модели", () => {
     for (const difficulty of ["easy", "normal"] as Difficulty[]) {
       const mult = difficultyDef(difficulty).enemyStatMult
-      const m = generateMap({ seed: 42, biomeId: "yard", difficulty, squadAvgLevel: 10, squadSize: 4, unlockedBiomes: ALL_BIOMES })
+      const m = generateMap({ seed: 42, biomeId: "yard", difficulty, team: 1, squadSize: 4, unlockedBiomes: ALL_BIOMES })
       for (const { unit } of m.enemies) {
         // Статы модели зависят только от seed, звезды, уровня и класса
         const plain = generateUnit({ seed: unit.seed, level: unit.level, rarity: unit.rarity, classId: unit.classId, isEnemy: true })
@@ -137,5 +138,21 @@ describe("баланс карт и сложности", () => {
       }
     }
     expect(difficultyDef("easy").enemyStatMult).toBeLessThan(1)
+  })
+})
+
+describe("команды врагов", () => {
+  it("уровни закреплены за сложностью: 4 окна подряд покрывают диапазон, «Легко» — 1–20", () => {
+    expect(difficultyDef("easy").levels).toEqual([1, 20])
+    expect([0, 1, 2, 3].map(t => teamLevels(difficultyDef("easy"), t))).toEqual([[1, 5], [6, 10], [11, 15], [16, 20]])
+    for (const d of ["easy", "normal", "hard", "nightmare"] as Difficulty[]) {
+      const def = difficultyDef(d)
+      const windows = Array.from({ length: ENEMY_TEAMS }, (_, t) => teamLevels(def, t))
+      expect(windows[0]![0]).toBe(def.levels[0])
+      expect(windows[ENEMY_TEAMS - 1]![1]).toBe(def.levels[1])
+      for (let t = 1; t < ENEMY_TEAMS; t++) expect(windows[t]![0]).toBe(windows[t - 1]![1] + 1)
+      // команда сильнее — награда больше
+      for (let t = 1; t < ENEMY_TEAMS; t++) expect(teamTreats(def, t)).toBeGreaterThan(teamTreats(def, t - 1))
+    }
   })
 })

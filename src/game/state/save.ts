@@ -3,6 +3,7 @@ import type {
   Army,
   Facing,
   Inventory,
+  MapDef,
   Pos,
   Rarity,
   BattleAction,
@@ -44,7 +45,7 @@ import {
   unitGear
 } from "@game/core/items"
 import { isConsumableId, isTalismanId } from "@game/content/items"
-import { ITEMS } from "@game/content/balance"
+import { ENEMY_TEAMS, ITEMS, REWARDS } from "@game/content/balance"
 import { HERO_RETURN } from "@game/content/village"
 import { generateMap } from "@game/core/map/generate"
 import { applyAction, createBattle } from "@game/core/battle/reducer"
@@ -517,29 +518,83 @@ export function releaseUnit(unitId: string): { ok: boolean, armyFell?: boolean }
 
 /* ---------- Бой ---------- */
 
+/** Вражеская команда вылазки: карта с врагами, их реальные уровни и награда за победу. */
+export interface EnemyTeamOffer {
+  team: number
+  seed: number
+  map: MapDef
+  /** Минимальный и максимальный уровень героев команды (с подкреплениями). */
+  levels: [number, number]
+  /** Сколько врагов на поле и в подкреплениях. */
+  count: number
+  reinforcements: number
+  /** Вкусняшки за победу (без выбитого из врагов) и Слава. */
+  treats: number
+  glory: number
+  /** Опыт против этой команды для армии: меньше (армия выше), обычный, больше (армия ниже). */
+  xp: "less" | "normal" | "more"
+}
+
+const offerCache = new Map<string, EnemyTeamOffer[]>()
+
+/** Зерно команд вылазки: создаётся при первом заходе и держится до конца следующего боя. */
+export function ensureSortieSeed(): number {
+  const s = $save.get()
+  if (s.sortieSeed !== undefined) return s.sortieSeed
+  const seed = randomSeed()
+  updateSave(st => ({ ...st, sortieSeed: seed }))
+  return seed
+}
+
 /**
- * Разведка: карта и враги боя на выбранной сложности и биоме. Уровень врагов — по уровню ростера (`rosterLevel`),
- * поэтому разведка не зависит от того, кого игрок возьмёт в отряд. Seed закреплён до начала боя: смена настроек
- * туда-обратно не перебрасывает врагов.
+ * Четыре вражеские команды на сложности: уровни — окна диапазона сложности (`teamLevels`), не уровень армии.
+ * Детерминированы по `sortieSeed`: переключение сложности или биома туда-обратно не перебрасывает врагов.
  */
-export function scoutBattle(difficulty: Difficulty, biomeId: string | "random"): { ok: boolean, error?: string } {
+export function enemyTeams(difficulty: Difficulty, biomeId: string | "random"): EnemyTeamOffer[] {
+  const s = $save.get()
+  const sortie = s.sortieSeed ?? ensureSortieSeed()
+  const unlocked = $unlockedBiomes.get()
+  const armyLevel = rosterLevel(s.army)
+  const key = `${sortie}:${difficulty}:${biomeId}:${unlocked.join(",")}:${armyLevel}`
+  const cached = offerCache.get(key)
+  if (cached) return cached
+  const offers = Array.from({ length: ENEMY_TEAMS }, (_, team): EnemyTeamOffer => {
+    const seed = createRng(sortie).fork(`${difficulty}:${team}`).int(0, 0x7fffffff)
+    const map = generateMap({ seed, biomeId, difficulty, team, squadSize: SQUAD_SIZE, unlockedBiomes: unlocked, now: Date.now() })
+    const units = [...map.enemies.map(e => e.unit), ...map.reinforcements.flatMap(w => w.units.map(u => u.unit))]
+    const lv = units.map(u => u.level)
+    const levels: [number, number] = [Math.min(...lv), Math.max(...lv)]
+    return {
+      team,
+      seed,
+      map,
+      levels,
+      count: units.length,
+      reinforcements: units.length - map.enemies.length,
+      treats: Math.round(map.rewards.treats * REWARDS.victoryShare),
+      glory: map.rewards.glory,
+      xp: armyLevel > levels[1] ? "less" : armyLevel < levels[0] ? "more" : "normal"
+    }
+  })
+  offerCache.clear()
+  offerCache.set(key, offers)
+  return offers
+}
+
+/**
+ * Разведка: выбранная вражеская команда на сложности и биоме становится боем; отряд выбирается на следующем шаге.
+ * Карта та же, что в предложении команды (тот же seed), рюкзак сохраняется.
+ */
+export function scoutBattle(difficulty: Difficulty, biomeId: string | "random", team = 0): { ok: boolean, error?: string } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
   if (!difficultyUnlocked(s, difficulty)) return { ok: false, error: tr("Difficulty locked", "Сложность закрыта") }
   const pb = s.pendingBattle
-  if (pb && pb.difficulty === difficulty && pb.biomeId === biomeId) return { ok: true }
+  if (pb && pb.difficulty === difficulty && pb.biomeId === biomeId && pb.team === team) return { ok: true }
+  const offer = enemyTeams(difficulty, biomeId)[team]
+  if (!offer) return { ok: false, error: tr("No such enemy army", "Нет такой армии врагов") }
   const pack = pb?.pack
-  const seed = pb?.seed ?? randomSeed()
-  const map = generateMap({
-    seed,
-    biomeId,
-    difficulty,
-    squadAvgLevel: rosterLevel(s.army),
-    squadSize: SQUAD_SIZE,
-    unlockedBiomes: $unlockedBiomes.get(),
-    now: Date.now()
-  })
-  updateSave(st => ({ ...st, pendingBattle: { seed, difficulty, biomeId, map, ...(pack ? { pack } : {}) } }))
+  updateSave(st => ({ ...st, pendingBattle: { seed: offer.seed, difficulty, biomeId, team, map: offer.map, ...(pack ? { pack } : {}) } }))
   return { ok: true }
 }
 
@@ -625,6 +680,8 @@ export function finishBattle(): BattleSummary | null {
       }
     }
     delete next.battle
+    // Новый бой — новые вражеские команды
+    delete next.sortieSeed
     if (res.army) next.army = res.army
     else delete next.army
     if (res.rewardChoice) next.rewardChoice = res.rewardChoice

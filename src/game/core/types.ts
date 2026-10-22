@@ -373,6 +373,8 @@ export interface PendingBattle {
   seed: number
   difficulty: Difficulty
   biomeId: string
+  /** Выбранная вражеская команда 0…ENEMY_TEAMS−1. */
+  team: number
   map: MapDef
   /** Выбранные в рюкзак расходники (ещё в инвентаре, списываются при старте боя). */
   pack?: Inventory
@@ -451,6 +453,8 @@ export interface SaveGame {
   settings: Settings
   stats: GlobalStats
   pendingBattle?: PendingBattle
+  /** Зерно вражеских команд вылазки: держится до конца следующего боя, смена сложности не перебрасывает врагов. */
+  sortieSeed?: number
   /** Бесплатная награда за бой: три кандидата, игрок забирает одного. */
   rewardChoice?: UnitInstance[]
   lastBattle?: BattleSummary

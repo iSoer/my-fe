@@ -3,7 +3,19 @@ import { useStore } from "@nanostores/react"
 import type { Difficulty } from "@game/core/types"
 import { DIFFICULTIES } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
-import { $save, $unlockedBiomes, difficultyUnlocked, ensureRoster, scoutBattle } from "@game/state/save"
+import {
+  $save,
+  $unlockedBiomes,
+  difficultyUnlocked,
+  enemyTeams,
+  ensureRoster,
+  ensureSortieSeed,
+  scoutBattle,
+  type EnemyTeamOffer
+} from "@game/state/save"
+import { rosterLevel } from "@game/core/progression"
+import { factionDef } from "@game/content/factions"
+import { UnitAvatar } from "../components/UnitAvatar"
 import { navigate } from "@game/state/router"
 import { Button } from "../components/Button"
 import { TopBar } from "../components/TopBar"
@@ -23,21 +35,87 @@ export const DIFF_STYLE: Record<Difficulty, { icon: string, color: string, rgb: 
 
 const BIOME_ICON: Record<string, string> = { yard: "🏡", roofs: "🏙️", basement: "🕯️", dump: "🗑️", winter_park: "❄️" }
 
-/** Вылазка, шаг 1 из 2: сложность и биом. «Далее» разведывает бой и ведёт к выбору отряда. */
+const TEAM_RANK = (team: number): string =>
+  [tr("Recruits", "Новобранцы"), tr("Fighters", "Бойцы"), tr("Veterans", "Ветераны"), tr("Elite", "Элита")][team] ?? ""
+
+/** Команда, ближайшая к уровню армии: её окно содержит уровень или ближе всех к нему. */
+function closestTeam(offers: EnemyTeamOffer[], level: number): number {
+  let best = 0
+  let bestGap = Infinity
+  for (const o of offers) {
+    const gap = level < o.levels[0] ? o.levels[0] - level : level > o.levels[1] ? level - o.levels[1] : 0
+    if (gap < bestGap) {
+      best = o.team
+      bestGap = gap
+    }
+  }
+  return best
+}
+
+/** Карточка вражеской команды: уровни героев, кто в ней, награда за победу и сколько опыта даст. */
+function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, selected: boolean, onPick: () => void, index: number }) {
+  const faction = factionDef(offer.map.factionId)
+  const shown = offer.map.enemies.slice(0, 6)
+  const xp = offer.xp === "less"
+    ? { cls: "less", text: tr("less XP — you outlevel them", "меньше опыта — вы сильнее") }
+    : offer.xp === "more"
+      ? { cls: "more", text: tr("more XP — they outlevel you", "больше опыта — они сильнее") }
+      : { cls: "", text: tr("XP as usual", "обычный опыт") }
+  return (
+    <button type="button" className={`team-card pop-in ${selected ? "selected" : ""}`} style={stagger(index, 50)} onClick={onPick}>
+      <div className="team-head">
+        <span className="team-levels">{`${tr("Lv.", "Ур.")} ${offer.levels[0]}–${offer.levels[1]}`}</span>
+        <span className="team-name">
+          <b>{TEAM_RANK(offer.team)}</b>
+          <span className="muted small">{` · ${faction.name}`}</span>
+        </span>
+      </div>
+      <div className="team-foes">
+        {shown.map(e => (
+          <span key={e.unit.id} className="team-foe">
+            <UnitAvatar unit={e.unit} size="sm" />
+            <span className="team-foe-lv">{e.unit.level}</span>
+          </span>
+        ))}
+        {offer.count > shown.length && <span className="team-more">{`+${offer.count - shown.length}`}</span>}
+      </div>
+      <div className="team-foot">
+        <span className="small">
+          {tr(`${offer.count} enemies`, `врагов: ${offer.count}`)}
+          {offer.reinforcements > 0 ? tr(` (${offer.reinforcements} as reinforcements)`, ` (из них ${offer.reinforcements} — подкрепление)`) : ""}
+        </span>
+        <span className="team-reward">
+          {`🦴 ${offer.treats} · ✦ ${offer.glory}`}
+          <small>{tr(" for victory + loot", " за победу + добыча")}</small>
+        </span>
+        <span className={`team-xp ${xp.cls}`}>{xp.text}</span>
+      </div>
+    </button>
+  )
+}
+
+/** Вылазка, шаг 1 из 2: сложность, биом и вражеская команда. «Далее» разведывает бой и ведёт к выбору отряда. */
 export function BattleSetupScreen() {
   const save = useStore($save)
   const biomes = useStore($unlockedBiomes)
   const pending = save.pendingBattle
   const [difficulty, setDifficulty] = useState<Difficulty>(pending?.difficulty ?? "easy")
   const [biome, setBiome] = useState<string>(pending?.biomeId ?? "random")
+  const [team, setTeam] = useState<number | null>(pending?.team ?? null)
   const [toastEl, toast] = useToast()
 
   useEffect(() => {
     ensureRoster()
+    ensureSortieSeed()
   }, [])
 
+  // Команды появляются, когда есть зерно вылазки (создаётся при входе на экран)
+  const offers = save.sortieSeed !== undefined && save.army ? enemyTeams(difficulty, biome) : []
+  const armyLevel = rosterLevel(save.army)
+  const picked = team ?? closestTeam(offers, armyLevel)
+
   const onNext = () => {
-    const r = scoutBattle(difficulty, biome)
+    const r = scoutBattle(difficulty, biome, picked)
     if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("medium")
     navigate("/battle/squad")
@@ -72,13 +150,17 @@ export function BattleSetupScreen() {
                   if (!unlocked) return toast(`${tr("Unlocks", "Откроется")} ${unlockText}`)
                   haptic("select")
                   setDifficulty(d.id)
+                  setTeam(null)
                 }}
               >
                 <span className="diff-ico" aria-hidden="true">
                   {unlocked ? st.icon : "🔒"}
                 </span>
                 <div className="diff-body">
-                  <b>{d.name}</b>
+                  <b>
+                    {d.name}
+                    <span className="muted small">{`  ·  ${tr("Lv.", "ур.")} ${d.levels[0]}–${d.levels[1]}`}</span>
+                  </b>
                   <div className="muted small">{unlocked ? d.desc : `${tr("Locked", "Закрыто")}: ${unlockText}`}</div>
                   <div className="diff-meta">
                     <span className="chip">{`🦴 ×${d.treatsMult}`}</span>
@@ -107,7 +189,30 @@ export function BattleSetupScreen() {
           ))}
         </div>
 
-        <p className="muted small">{tr("Enemies and reinforcements are revealed on the next step — before you pick your squad.", "Враги и подкрепления будут видны на следующем шаге — до выбора отряда.")}</p>
+        <div className="row between">
+          <div className="section-title">{tr("Enemy army", "Армия врага")}</div>
+          <span className="muted small">{tr(`your army: Lv. ${armyLevel}`, `ваша армия: ур. ${armyLevel}`)}</span>
+        </div>
+        <div className="stack">
+          {offers.map((o, i) => (
+            <TeamCard
+              key={`${difficulty}:${o.team}`}
+              offer={o}
+              index={i}
+              selected={picked === o.team}
+              onPick={() => {
+                haptic("select")
+                setTeam(o.team)
+              }}
+            />
+          ))}
+        </div>
+        <p className="muted small">
+          {tr(
+            "Teams stay the same until your next battle. Beating a weaker team gives less XP (at least 1).",
+            "Команды не меняются до следующего боя. Победа над более слабой командой даёт меньше опыта (минимум 1)."
+          )}
+        </p>
         <div className="sticky-cta">
           <Button big primary block icon="🔎" onClick={onNext}>
             {tr("Next", "Далее")}

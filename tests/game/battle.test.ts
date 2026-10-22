@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { applyAction, createBattle } from "@game/core/battle/reducer"
+import { applyAction, createBattle, xpForCombat } from "@game/core/battle/reducer"
 import { nextEnemyAction } from "@game/core/ai"
 import { attackOptions, reachableTiles } from "@game/core/map/pathing"
 import { generateMap } from "@game/core/map/generate"
@@ -225,7 +225,7 @@ describe("полные бои: ИИ не падает и бой завершае
           seed,
           biomeId: BIOMES[i % BIOMES.length]!.id,
           difficulty: d,
-          squadAvgLevel: 10,
+          team: 1,
           squadSize: 4,
           unlockedBiomes: BIOMES.map(b => b.id)
         })
@@ -244,4 +244,17 @@ describe("полные бои: ИИ не падает и бой завершае
       }
     })
   }
+})
+
+describe("опыт за схватку", () => {
+  it("против более слабого — меньше и меньше с разницей, но не ниже 1; против сильного — больше", () => {
+    const even = xpForCombat(10, 10, false)
+    expect(xpForCombat(10, 14, false)).toBeGreaterThan(even)
+    expect(xpForCombat(13, 10, false)).toBeLessThan(even)
+    expect(xpForCombat(13, 10, true)).toBeLessThan(xpForCombat(10, 10, true))
+    // убийство намного более слабого врага — тоже почти ничего
+    expect(xpForCombat(40, 5, true)).toBe(1)
+    expect(xpForCombat(40, 5, false)).toBe(1)
+    for (let gap = 0; gap < 40; gap++) expect(xpForCombat(10 + gap, 10, true)).toBeGreaterThanOrEqual(1)
+  })
 })

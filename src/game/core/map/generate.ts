@@ -20,7 +20,7 @@ import { generateUnit, loadoutsAt, type Loadout } from "../units"
 import type { StatValues } from "@shared/character/leveling"
 import { enemyWeaponGrade } from "../items"
 import { BIOMES, biomeDef } from "@game/content/biomes"
-import { DIFFICULTIES, REWARDS, TERRAIN_SHARE, difficultyDef } from "@game/content/balance"
+import { DIFFICULTIES, TERRAIN_SHARE, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
 import { DANCER_CLASS, unitClass } from "@game/content/classes"
 import { weaponRange } from "@game/content/weapons"
 import { factionDef } from "@game/content/factions"
@@ -29,7 +29,8 @@ export interface GenerateMapOptions {
   seed: number
   biomeId: string | "random"
   difficulty: Difficulty
-  squadAvgLevel: number
+  /** Вражеская команда 0…ENEMY_TEAMS−1: окно уровней внутри диапазона сложности (`teamLevels`). */
+  team: number
   squadSize: number
   unlockedBiomes: string[]
   now?: number
@@ -427,8 +428,8 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
   const bossIndex = diff.boss ? 0 : -1
   const sortedSpawns = [...enemySpawns].sort((a, b) => b.y - a.y || a.x - b.x) // ближние к игроку — первыми (ближники)
 
-  const levelOf = (): number =>
-    clamp(opts.squadAvgLevel + erng.int(diff.levelRange[0], diff.levelRange[1]), 1, MAX_LEVEL)
+  const [minLevel, maxLevel] = teamLevels(diff, opts.team)
+  const levelOf = (): number => clamp(erng.int(minLevel, maxLevel), 1, MAX_LEVEL)
   const loadoutFor = (i: number, level: number): Loadout => {
     let loadout = pickEnemyLoadout(erng, level, roles, opts.difficulty)
     // не более 60 % одного оружия
@@ -499,7 +500,7 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
   }
 
   const objective: ObjectiveKind = diff.objective
-  const treats = Math.round((REWARDS.treatsBase + REWARDS.treatsPerLevel * opts.squadAvgLevel) * diff.treatsMult)
+  const treats = teamTreats(diff, opts.team)
 
   return {
     seed: opts.seed,

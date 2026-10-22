@@ -196,12 +196,20 @@ function grantXp(state: BattleState, unitId: string, xp: number, sp: number, eve
   state.roster[unitId] = next
 }
 
-function xpForCombat(selfLevel: number, foeLevel: number, killed: boolean): number {
+/**
+ * Опыт за схватку: выше от сильного врага, ниже от слабого. Если боец выше врага по уровню, опыт за схватку и
+ * убийство режется на `overlevelPenalty` за каждый уровень разницы — фарм слабых команд почти ничего не даёт,
+ * но не меньше `combatMin`.
+ */
+export function xpForCombat(selfLevel: number, foeLevel: number, killed: boolean): number {
   const base = Math.max(
     XP.combatMin,
     Math.min(XP.combatMax, XP.combatBase + XP.combatPerLevelDiff * (foeLevel - selfLevel))
   )
-  return killed ? base * 2 + XP.killBonus : base
+  const raw = killed ? base * 2 + XP.killBonus : base
+  const over = selfLevel - foeLevel
+  const mult = over > 0 ? Math.max(0, 1 - over * XP.overlevelPenalty) : 1
+  return Math.max(XP.combatMin, Math.round(raw * mult))
 }
 
 function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"]): void {

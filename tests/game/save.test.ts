@@ -19,7 +19,7 @@ describe("save", () => {
       seed: 3,
       biomeId: "yard",
       difficulty: "hard",
-      squadAvgLevel: 1,
+      team: 0,
       squadSize: 4,
       unlockedBiomes: ["yard"]
     })
