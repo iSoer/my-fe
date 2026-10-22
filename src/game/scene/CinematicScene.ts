@@ -26,6 +26,7 @@ import {
 } from "./svgTextures"
 import { FUR_PALETTES } from "@game/content/appearance"
 import { tr } from "@game/i18n"
+import { $boardInsets } from "@game/state/boardLayout"
 
 export const CINEMATIC_SCENE_KEY = "Cinematic"
 
@@ -148,7 +149,8 @@ export class CinematicScene extends Phaser.Scene {
     const h = this.scale.height
     const biome = biomeDef(before.map.biomeId)
     const feetY = h * 0.62
-    const size = Math.min(w, h) * 0.6
+    // Бойцы помельче — оба целиком помещаются на одном поле и не упираются друг в друга
+    const size = Math.min(w, h) * 0.42
 
     // Подложка с запасом (канвас может изменить размер во время сцены) и чёрное затемнение.
     const groundCol = Phaser.Display.Color.IntegerToColor(biome.colors.plain)
@@ -165,15 +167,15 @@ export class CinematicScene extends Phaser.Scene {
     const attackerLeft = aBu.side === "player" || aBu.side === dBu.side
     const leftPos: Pos = attackerLeft ? event.attackerPos : event.defenderPos
     const rightPos: Pos = attackerLeft ? event.defenderPos : event.attackerPos
-    const leftTerrain = terrainAt(before, leftPos)
-    const rightTerrain = terrainAt(before, rightPos)
+    // Одно поле на двоих — местность клетки защищающегося, там и идёт схватка
+    const terrain = terrainAt(before, attackerLeft ? rightPos : leftPos)
 
-    // Фон по клеткам бойцов и текстуры поз — пока экран затемнён.
-    const halfW = Math.ceil(w / 2) + 1
+    // Фон и текстуры поз — пока экран затемнён. Фон — одна картина шириной не больше 0.8 высоты (иначе срез по
+    // ширине раздувает его на широком экране); если экран шире, по бокам — её зеркальные копии, стык без шва.
+    const bgW = Math.min(Math.ceil(w), Math.round(h * 0.8))
     await withTimeout(
       Promise.all([
-        ensureBackdropTexture(this, biome.id, leftTerrain, "left", halfW, h),
-        ensureBackdropTexture(this, biome.id, rightTerrain, "right", halfW, h),
+        ensureBackdropTexture(this, biome.id, terrain, "left", bgW, h),
         ensureUnitTextures(this, aUnit, "cine"),
         ensureUnitTextures(this, dUnit, "cine"),
         // Части тела только тем, кто погибнет: нужны для разлёта и «хвоста из лужи».
@@ -188,7 +190,7 @@ export class CinematicScene extends Phaser.Scene {
     )
     if (!this.sys || !this.sys.isActive()) return
 
-    this.drawBackdrop(biome.id, leftTerrain, rightTerrain, w, h, halfW)
+    this.drawBackdrop(biome.id, terrain, w, h, bgW)
     // Та же погода, что на поле, но реже: над фоном, под бойцами.
     this.weather?.destroy()
     this.weather = new WeatherLayer(this, biome.weather, {
@@ -198,8 +200,10 @@ export class CinematicScene extends Phaser.Scene {
       windDir: before.map.seed % 2 === 0 ? 1 : -1
     })
 
-    const leftX = w * 0.27
-    const rightX = w * 0.73
+    const leftX = w * 0.3
+    const rightX = w * 0.7
+    // Имена и HP — под верхней панелью боя (её высоту экран боя публикует в $boardInsets); имя — над полосой
+    const topY = Math.max(h * 0.07, $boardInsets.get().top + 24)
     const mk = (id: string, unit: UnitInstance, bu: BattleUnit, hpBefore: number, onLeft: boolean): Fighter => {
       const x = onLeft ? leftX : rightX
       const idleKey = unitTexKey(unit, "idle", "cine")
@@ -218,7 +222,6 @@ export class CinematicScene extends Phaser.Scene {
       const weaponColor = WEAPON_COLOR_HEX[WEAPON_COLOR[unit.weaponSkill]]
       const barW = w * 0.42
       const barX = onLeft ? w * 0.04 : w * 0.54
-      const topY = h * 0.07
       this.add
         .text(
           barX + (onLeft ? 0 : barW),
@@ -268,7 +271,6 @@ export class CinematicScene extends Phaser.Scene {
       this.drawBar(f, topY)
       return f
     }
-    const topY = h * 0.07
     this.topY = topY
     const fa = mk(event.attackerId, aUnit, aBu, event.attackerHpBefore, attackerLeft)
     const fd = mk(event.defenderId, dUnit, dBu, event.defenderHpBefore, !attackerLeft)
@@ -336,42 +338,34 @@ export class CinematicScene extends Phaser.Scene {
     this.finish()
   }
 
-  /** Две половины фона: слева — клетка левого бойца, справа — правого. */
-  private drawBackdrop(
-    biomeId: string,
-    leftTerrain: ReturnType<typeof terrainAt>,
-    rightTerrain: ReturnType<typeof terrainAt>,
-    w: number,
-    h: number,
-    halfW: number
-  ): void {
+  /** Фон — одно поле без разделителя: картина по центру, на широком экране — зеркальные копии по бокам. */
+  private drawBackdrop(biomeId: string, terrain: ReturnType<typeof terrainAt>, w: number, h: number, bgW: number): void {
     const biome = biomeDef(biomeId)
-    const draw = (terrain: ReturnType<typeof terrainAt>, side: "left" | "right", x: number): void => {
-      const key = backdropTexKey(biomeId, terrain, side, halfW, Math.round(h))
-      if (hasTexture(this, key)) {
-        // С запасом по ширине — под сдвиг параллакса
-        const img = this.add
-          .image(x - halfW * 0.03, 0, key)
-          .setOrigin(0, 0)
-          .setDisplaySize(halfW * 1.06, h)
-          .setDepth(0)
-        this.backdrops.push(img)
-      }
-      else {
-        // Фолбэк: простой градиент биома.
-        const g = this.add.graphics().setDepth(0)
-        const sky = Phaser.Display.Color.IntegerToColor(biome.bg)
-        const dark = sky.clone().darken(45).color
-        g.fillGradientStyle(dark, dark, biome.bg, biome.bg, 1)
-        g.fillRect(x, 0, halfW, h * 0.52)
-        g.fillStyle(biome.colors[terrain] ?? biome.colors.plain, 1)
-        g.fillRect(x, h * 0.52, halfW, h * 0.48)
-      }
+    const key = backdropTexKey(biomeId, terrain, "left", bgW, Math.round(h))
+    if (!hasTexture(this, key)) {
+      // Фолбэк: простой градиент биома.
+      const g = this.add.graphics().setDepth(0)
+      const sky = Phaser.Display.Color.IntegerToColor(biome.bg)
+      const dark = sky.clone().darken(45).color
+      g.fillGradientStyle(dark, dark, biome.bg, biome.bg, 1)
+      g.fillRect(0, 0, w, h * 0.52)
+      g.fillStyle(biome.colors[terrain] ?? biome.colors.plain, 1)
+      g.fillRect(0, h * 0.52, w, h * 0.48)
+      return
     }
-    draw(leftTerrain, "left", 0)
-    draw(rightTerrain, "right", Math.floor(w / 2) - 1)
-    // Разделитель
-    this.add.rectangle(w / 2, h / 2, 2, h, 0x000000, 0.35).setDepth(1)
+    // С запасом 3 % с каждой стороны — под сдвиг параллакса
+    const pad = w * 0.03
+    const left = (w - bgW) / 2
+    const copies = Math.ceil(Math.max(0, left + pad) / bgW)
+    for (let i = -copies; i <= copies; i++) {
+      const img = this.add
+        .image(left + i * bgW + bgW / 2, 0, key)
+        .setOrigin(0.5, 0)
+        .setDisplaySize(bgW + 1, h)
+        .setFlipX(i % 2 !== 0)
+        .setDepth(0)
+      this.backdrops.push(img)
+    }
   }
 
   private drawBar(f: Fighter, topY: number): void {
