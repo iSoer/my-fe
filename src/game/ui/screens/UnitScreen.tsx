@@ -1,29 +1,26 @@
 import { useEffect, useState } from "react"
 import { useStore } from "@nanostores/react"
 import type { UnitSkills } from "@game/core/types"
-import { MAX_LEVEL, STATS } from "@game/core/types"
+import { MAX_LEVEL } from "@game/core/types"
 import {
   canRebirth,
   displayName,
   hasClassUpgrade,
+  openClasses,
   learnableNow,
   skillCost,
   slotOf,
-  statsAtLevel,
   unitClass,
   unitClassName,
   visibleStats,
-  weaponMt,
   levelGains
 } from "@game/core/units"
 import { XP } from "@game/content/balance"
-import { TIER_LABELS } from "@shared/character/classes"
+import { CLASS_TIERS, TIER_LEVELS } from "@shared/character/classes"
 import { sharpenCost, trainCost } from "@game/core/progression"
 import { skillInfo } from "@game/content/index"
-import { traitDef } from "@game/content/traits"
 import { breedDef } from "@game/content/breeds"
 import { personalityText } from "@game/content/personalities"
-import { talismanDef } from "@game/content/items"
 import {
   $save,
   equipAction,
@@ -43,10 +40,12 @@ import { MoveBadge, RarityStars, WeaponBadge } from "../components/Badges"
 import { StatBar, StatsGrid } from "../components/Stats"
 import { BottomSheet, ConfirmModal } from "../components/Sheet"
 import { useToast } from "../components/Toast"
-import { ClassSheet, SkillRanks, aptitudeLine, weaponLine } from "../components/CharacterPanels"
+import { ClassSheet } from "../components/CharacterPanels"
+import { GearRow, MasteryGrid, MasterySheet, SkillGrid, TraitBlock } from "../components/UnitPanels"
+import type { Skill } from "@shared/character/skills"
 import { TalismanSheet, WeaponSheet } from "../components/GearSheet"
-import { ClassInfoBlock } from "../components/ClassInfo"
-import { STAT_LABELS, atkLabel, fmtGains, speciesName } from "../lib/format"
+import { ClassPanel } from "../components/ClassInfo"
+import { atkLabel, fmtGains, speciesName } from "../lib/format"
 import { useReplay } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
 import { tr } from "@game/i18n"
@@ -69,14 +68,13 @@ const SLOT_ICONS: Record<keyof UnitSkills, string> = {
   b: "B",
   c: "C"
 }
-/** Оружие — предмет (блок «Снаряжение»), в навыках — только изучаемое за SP. */
-const SLOTS: (keyof UnitSkills)[] = ["assist", "special", "a", "b", "c"]
 
 export function UnitScreen({ unitId }: { unitId: string }) {
   const save = useStore($save)
   const [slot, setSlot] = useState<keyof UnitSkills | null>(null)
   const [release, setRelease] = useState<0 | 1 | 2>(0)
   const [rebirthOpen, setRebirthOpen] = useState(false)
+  const [mastery, setMastery] = useState<Skill | null>(null)
   const [classOpen, setClassOpen] = useState(false)
   const [gear, setGear] = useState<"weapon" | "talisman" | null>(null)
   const [toastEl, toast] = useToast()
@@ -97,12 +95,9 @@ export function UnitScreen({ unitId }: { unitId: string }) {
 
   const cls = unitClass(unit)
   const stats = visibleStats(unit)
-  const trait = unit.traitId ? traitDef(unit.traitId) : undefined
   const tCost = trainCost(unit.level)
   const sCost = sharpenCost(unit.weaponTier)
   const learnable = learnableNow(unit)
-  const own = statsAtLevel(unit, unit.level)
-  const atMax = statsAtLevel(unit, MAX_LEVEL)
 
   const celebrate = (): void => {
     replayBounce()
@@ -217,123 +212,51 @@ export function UnitScreen({ unitId }: { unitId: string }) {
                 /
                 {XP.perLevel}
               </span>
-              <span className="gold">
-                SP
-                {unit.sp}
-              </span>
+              <span className="gold">{`SP ${unit.sp}`}</span>
             </div>
           </div>
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "60ms" }}>
+          <b>{tr("Stats", "Характеристики")}</b>
+          <StatsGrid stats={stats} animate atkLabel={atkLabel(unit)} />
+        </div>
+
+        {unit.traitId && <TraitBlock traitId={unit.traitId} />}
+
+        <div className="card stack pop-in" style={{ animationDelay: "70ms" }}>
           <div className="row between">
-            <b>{tr("Stats", "Характеристики")}</b>
-            <span className="muted small">
-              {tr("Weapon Mt", "Mt оружия")}
-              {" "}
-              {weaponMt(unit)}
-              {unit.weaponTier ? ` · ${tr("sharpened", "заточка")} ${"I".repeat(unit.weaponTier)}` : ""}
+            <b>{tr("Weapon mastery", "Владение оружием")}</b>
+            <span className="muted small">{tr("tap for details", "тап — подробнее")}</span>
+          </div>
+          <MasteryGrid unit={unit} onPick={setMastery} />
+        </div>
+
+        <div className="card stack pop-in" style={{ animationDelay: "75ms" }}>
+          <b>{tr("Gear", "Снаряжение")}</b>
+          <GearRow unit={unit} onWeapon={() => setGear("weapon")} onTalisman={() => setGear("talisman")} />
+        </div>
+
+        <div className="card stack pop-in" style={{ animationDelay: "78ms" }}>
+          <div className="row between">
+            <b>{tr("Skills", "Навыки")}</b>
+            <span className="gold small">
+              <b>{unit.sp}</b>
+              {" SP"}
             </span>
           </div>
-          <StatsGrid stats={stats} animate atkLabel={atkLabel(unit)} />
-          <div className="stack" style={{ gap: 4 }}>
-            {STATS.map((s, i) => (
-              <div key={s} className="row small">
-                <span className="muted" style={{ width: 32 }}>
-                  {s === "atk" ? atkLabel(unit) : STAT_LABELS[s]}
-                </span>
-                <div className="grow">
-                  <StatBar value={own[s]} max={Math.max(1, atMax[s])} kind="growth" animate delay={120 + i * 60} />
-                </div>
-                <span className="muted" style={{ width: 52, textAlign: "right" }}>
-                  {own[s]}
-                  →
-                  {atMax[s]}
-                </span>
-              </div>
-            ))}
-            <div className="muted small">
-              {tr(
-                `Stats grow linearly up to level ${MAX_LEVEL} (character model, rarity ${unit.rarity}★); on the right — the value at level ${MAX_LEVEL} in this class.`,
-                `Статы растут линейно до ${MAX_LEVEL} уровня (модель персонажа, редкость ${unit.rarity}★); справа — сколько будет на ${MAX_LEVEL}-м в этом классе.`
-              )}
-            </div>
-          </div>
+          <SkillGrid unit={unit} onSlot={setSlot} />
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "80ms" }}>
-          <div className="row between">
-            <b>
-              {tr("Class:", "Класс:")}
-              {" "}
-              {unitClassName(unit)}
-              {" "}
-              <span className="muted small">
-                ·
-                {TIER_LABELS[cls.tier]}
-              </span>
-            </b>
-            {hasClassUpgrade(unit) && <span className="chip red pop">{tr("Promotion", "Повышение")}</span>}
-          </div>
-          <ClassInfoBlock classId={unit.classId} unit={unit} tier={false} />
-          <div className="muted small">{`${weaponLine(unit)} · ${aptitudeLine(unit)}`}</div>
-          <SkillRanks unit={unit} />
-          <Button block icon="🎓" onClick={() => setClassOpen(true)}>
-            {tr("Change class", "Сменить класс")}
-          </Button>
-        </div>
-
-        {trait && (
-          <div className="card pop-in" style={{ animationDelay: "100ms" }}>
-            <b>
-              {tr("★ Trait:", "★ Особенность:")}
-              {trait.name}
-            </b>
-            <div className="muted small">{trait.desc}</div>
-          </div>
-        )}
-
-        <div className="card stack pop-in" style={{ animationDelay: "120ms" }}>
-          <b>{tr("Gear", "Снаряжение")}</b>
-          <div className="slot" onClick={() => setGear("weapon")}>
-            <span className="slot-ico">⚔️</span>
-            <span className="slot-text">
-              <div className="slot-name">{tr("Weapon", "Оружие")}</div>
-              <div className="slot-value">{weaponLine(unit)}</div>
-            </span>
-            <span className="muted">›</span>
-          </div>
-          <div className="slot" onClick={() => setGear("talisman")}>
-            <span className="slot-ico">🔮</span>
-            <span className="slot-text">
-              <div className="slot-name">{tr("Talisman", "Талисман")}</div>
-              <div className={`slot-value ${unit.accessory ? "" : "empty"}`}>
-                {unit.accessory ? `${talismanDef(unit.accessory).icon} ${talismanDef(unit.accessory).name}` : tr("— empty —", "— пусто —")}
-              </div>
-            </span>
-            <span className="muted">›</span>
-          </div>
-        </div>
-
-        <div className="card stack pop-in" style={{ animationDelay: "140ms" }}>
-          <b>{tr("Skills", "Навыки")}</b>
-          {SLOTS.map((s) => {
-            const id = unit.skills[s]
-            const info = id ? skillInfo(id) : undefined
-            const hasLearnable = learnable.some(l => slotOf(l) === s && skillCost(l) <= unit.sp)
-            const letter = s === "a" || s === "b" || s === "c"
-            return (
-              <div key={s} className="slot" onClick={() => setSlot(s)}>
-                <span className={`slot-ico ${letter ? "letter" : ""}`}>{SLOT_ICONS[s]}</span>
-                <span className="slot-text">
-                  <div className="slot-name">{slotName(s)}</div>
-                  <div className={`slot-value ${info ? "" : "empty"}`}>{info?.name ?? tr("— empty —", "— пусто —")}</div>
-                </span>
-                {hasLearnable && <span className="chip red pop">{tr("New", "Новое")}</span>}
-                <span className="muted">›</span>
-              </div>
-            )
-          })}
+          <b>{tr("Class", "Класс")}</b>
+          <ClassPanel
+            unit={unit}
+            openCount={openClasses(unit).length}
+            upgrade={hasClassUpgrade(unit)}
+            nextTierLevel={CLASS_TIERS.map(t => TIER_LEVELS[t]).find(l => l > unit.level)}
+            onChange={() => setClassOpen(true)}
+          />
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "180ms" }}>
@@ -444,6 +367,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         )}
       </BottomSheet>
 
+      <MasterySheet unit={unit} skill={mastery} onClose={() => setMastery(null)} />
       <WeaponSheet unit={unit} open={gear === "weapon"} onClose={() => setGear(null)} toast={toast} />
       <TalismanSheet unit={unit} open={gear === "talisman"} onClose={() => setGear(null)} toast={toast} />
 

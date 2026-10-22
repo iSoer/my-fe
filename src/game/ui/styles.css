@@ -2881,46 +2881,409 @@ p {
   padding: 10px;
 }
 
-/* Ранги навыков модели персонажа (карточка бойца) */
-.rank-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 10px;
-}
-.rank-cell {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 6px;
-  padding: 3px 6px;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-.rank-cell .rank-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.rank-cell.talent .rank-name {
-  color: var(--gold-text);
-  font-weight: 700;
-}
-.rank-cell.weak .rank-name {
-  color: var(--muted-paper);
-}
-.rank-cell.current {
-  background: var(--paper-3);
-  box-shadow: inset 3px 0 0 var(--red);
-}
-.rank-cell .rank-value {
-  font-family: var(--font-head);
-  font-style: italic;
-}
-
 /* Награда за бой и выбитые Вкусняшки в HUD */
 .reward-card {
   border-left: 6px solid var(--gold);
 }
 .bf-loot {
   color: var(--gold);
+}
+
+/* ---------- Карточка бойца: владение оружием, снаряжение, навыки ---------- */
+.gear-icon {
+  display: inline-block;
+  flex-shrink: 0;
+}
+.gear-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Ранги навыков: чёрные плашки, как статы; буква ранга — главное */
+.mastery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.mastery-grid--move {
+  grid-template-columns: repeat(3, 1fr);
+}
+.mastery-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 2px 5px;
+  border: 2px solid transparent;
+  background: var(--ink);
+  color: var(--paper);
+  font: inherit;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.mastery-cell:active {
+  transform: translateY(1px);
+}
+.mastery-rank {
+  font-size: 22px;
+  font-style: italic;
+  font-weight: 900;
+  line-height: 1;
+}
+.mastery-name {
+  max-width: 100%;
+  color: var(--muted-ink);
+  font-size: 9px;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+}
+.mastery-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  color: var(--muted-paper);
+  font-size: 11px;
+  font-weight: 700;
+}
+.mastery-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.mastery-swatch {
+  width: 12px;
+  height: 12px;
+  background: var(--red-deep);
+}
+.mastery-legend .gold {
+  color: var(--gold-text);
+}
+.mastery-legend .danger {
+  color: var(--red-deep);
+}
+.mastery-emoji {
+  font-size: 22px;
+  line-height: 30px;
+}
+.mastery-mark {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: 12px;
+}
+.mastery-cell.talent {
+  border-color: var(--gold);
+}
+.mastery-cell.talent .mastery-mark,
+.mastery-cell.talent .mastery-rank {
+  color: var(--gold);
+}
+.mastery-cell.weak {
+  opacity: 0.55;
+}
+.mastery-cell.weak .mastery-mark {
+  color: var(--red-hot);
+}
+/* Оружие в лапах — красная подложка */
+.mastery-cell.current {
+  background: var(--red-deep);
+}
+.mastery-cell.current .mastery-name {
+  color: var(--paper);
+}
+.mastery-grades {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.mastery-grade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  background: var(--paper-2);
+  border: 2px solid var(--border);
+}
+.mastery-grade.is-ok b {
+  color: var(--ok-text);
+}
+.mastery-grade.is-short {
+  opacity: 0.6;
+}
+.mastery-grade.is-short b {
+  color: var(--red-deep);
+}
+
+/* Снаряжение одной строкой: крупная иконка, «!» — есть что надеть */
+.gear-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.gear-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 6px 8px;
+  border: 3px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--text-paper);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.gear-tile:active {
+  transform: translateY(1px);
+}
+.gear-tile.empty {
+  border-style: dashed;
+  border-color: var(--grey);
+}
+.gear-tile.attention {
+  border-color: var(--red);
+  border-style: solid;
+  animation: gear-pulse 1.4s ease-in-out infinite;
+}
+.gear-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.gear-slot {
+  color: var(--muted-paper);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.gear-name {
+  font-size: 14px;
+  line-height: 1.2;
+}
+.gear-sub {
+  color: var(--muted-paper);
+  font-size: 11px;
+  line-height: 1.25;
+}
+.gear-sub.danger {
+  color: var(--red-deep);
+  font-weight: 700;
+}
+.gear-cta {
+  margin-top: 3px;
+  padding: 2px 8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.gear-badge {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-style: normal;
+  font-weight: 900;
+}
+@keyframes gear-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(230, 57, 70, 0.35);
+  }
+}
+
+/* Навыки: цвет плитки — тип слота; золотая плашка — можно изучить прямо сейчас */
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.skill-tile {
+  --slot: var(--ink-3);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  grid-column: span 2;
+  min-width: 0;
+  padding: 0 0 8px;
+  border: 3px solid var(--slot);
+  background: var(--paper);
+  color: var(--text-paper);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.skill-tile--special,
+.skill-tile--assist {
+  grid-column: span 3;
+}
+.skill-tile--special {
+  --slot: #e85d04;
+}
+.skill-tile--assist {
+  --slot: #2a9d8f;
+}
+.skill-tile--a {
+  --slot: #c0392b;
+}
+.skill-tile--b {
+  --slot: #3d6fb6;
+}
+.skill-tile--c {
+  --slot: #7b2cbf;
+}
+.skill-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 3px 6px;
+  background: var(--slot);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.skill-tile-ico {
+  font-weight: 900;
+}
+.skill-tile-name {
+  max-width: 100%;
+  padding: 2px 6px 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+}
+.skill-tile.empty {
+  border-style: dashed;
+  background: var(--paper-2);
+}
+.skill-tile.empty .skill-tile-name {
+  color: var(--muted-paper);
+}
+.skill-tile-hint {
+  padding: 0 6px;
+  color: var(--muted-paper);
+  font-size: 10px;
+}
+.skill-tile-learn,
+.skill-tile-more {
+  margin: 2px 6px 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 900;
+}
+.skill-tile-learn {
+  background: var(--gold);
+  color: #3b2614;
+  animation: gear-pulse 1.4s ease-in-out infinite;
+}
+.skill-tile-more {
+  background: var(--paper-3);
+  color: var(--muted-paper);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gear-tile.attention,
+  .skill-tile-learn {
+    animation: none;
+  }
+}
+
+/* Особенность: плюсы зелёным, минусы красным; с недостатком — красная рамка и пометка */
+.trait-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 3px solid var(--ink);
+  border-left-width: 8px;
+  background: var(--paper);
+  color: var(--text-paper);
+}
+.trait-block.trait-good {
+  border-left-color: var(--ok-text);
+}
+.trait-block.trait-mixed,
+.trait-block.trait-bad {
+  border-color: var(--red);
+  background: #fff5f5;
+}
+.trait-block.compact {
+  padding: 8px 10px;
+  border-width: 2px;
+  border-left-width: 6px;
+}
+.trait-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.trait-kind {
+  color: var(--muted-paper);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.trait-name {
+  font-size: 16px;
+}
+.trait-flag {
+  padding: 1px 8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.trait-effects {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+.trait-effects .pro {
+  color: var(--ok-text);
+}
+.trait-effects .con {
+  align-self: flex-start;
+  padding: 1px 6px;
+  background: #ffe1e4;
+  color: var(--red-deep);
+}
+.chip.trait-chip {
+  background: #ffe1e4;
+  color: var(--red-deep);
 }

@@ -59,11 +59,6 @@
   }
 
   /* Пояснение класса */
-  .class-info {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
   .class-role {
     display: flex;
     align-items: center;
@@ -141,5 +136,194 @@
   }
   .class-legend {
     font-size: 13px;
+  }
+
+  /* Панель класса в карточке бойца: шапка, передвижение, бонус, оружие, смена класса */
+  .class-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .class-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .class-role-ico.big {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    background: var(--ink);
+    font-size: 26px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+  }
+  .class-panel-head .grow {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .class-panel-tier {
+    color: var(--muted-paper);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .class-panel-name {
+    font-size: 18px;
+    line-height: 1.1;
+  }
+  .class-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .class-section-title {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .bonus-chip.big {
+    padding: 3px 8px;
+    font-size: 14px;
+  }
+  .class-move {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .class-move-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .class-move-ico {
+    font-size: 28px;
+    line-height: 1;
+  }
+  .class-move-head .grow {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  /* Дальность хода квадратиками: закрашено столько, сколько клеток */
+  .class-move-range {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .class-move-range i {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--ink);
+    background: transparent;
+  }
+  .class-move-range i.on {
+    background: var(--red);
+  }
+  .class-move-range .small {
+    margin-left: 4px;
+    font-weight: 800;
+  }
+  .class-terrains {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+  .class-terrain {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 2px;
+    border: 2px solid var(--border);
+    background: var(--paper-2);
+  }
+  .class-terrain-name {
+    color: var(--muted-paper);
+    font-size: 10px;
+  }
+  .class-terrain b {
+    font-size: 12px;
+  }
+  .class-terrain.ok b {
+    color: var(--ok-text);
+  }
+  .class-terrain.slow b {
+    color: var(--warn-text);
+  }
+  .class-terrain.no {
+    opacity: 0.6;
+  }
+  .class-terrain.no b {
+    color: var(--red-deep);
+  }
+  .class-weak {
+    align-self: flex-start;
+    padding: 2px 8px;
+    background: #fff1f2;
+    color: var(--red-deep);
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .class-weapons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .class-weapon {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px 2px 2px;
+    background: var(--paper-3);
+  }
+  .class-weapon b {
+    font-style: italic;
+  }
+  /* Смена класса: повышение — красная кнопка с пульсом, иначе спокойная */
+  .class-change {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 3px solid var(--ink);
+    background: var(--paper);
+    color: var(--text-paper);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+  .class-change .grow {
+    display: flex;
+    flex-direction: column;
+  }
+  .class-change .small {
+    color: var(--muted-paper);
+  }
+  .class-change-ico {
+    font-size: 22px;
+  }
+  .class-change.upgrade {
+    background: var(--accent-grad);
+    color: #fff;
+    box-shadow: 4px 4px 0 var(--ink);
+    animation: gear-pulse 1.4s ease-in-out infinite;
+  }
+  .class-change.upgrade .small {
+    color: rgba(255, 255, 255, 0.85);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .class-change.upgrade {
+      animation: none;
+    }
   }
 }

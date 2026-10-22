@@ -2,13 +2,11 @@ import type { UnitInstance } from "@game/core/types"
 import { canTakeClassNow, isUniqueClassId, openClasses, unitWeapon, weaponRank } from "@game/core/units"
 import { CLASS_IDS, classInfo, fwClass } from "@game/content/classes"
 import { CLASS_TIERS, TIER_LABELS, TIER_LEVELS, earliestLevelOf } from "@shared/character/classes"
-import { SKILLS, SKILL_LABELS, rankAtLevel, skillsWith } from "@shared/character/skills"
+import { SKILL_LABELS, skillsWith } from "@shared/character/skills"
 import { Button } from "./Button"
 import { ClassFacts, ClassRoleLine, classRoleText } from "./ClassInfo"
 import { BottomSheet } from "./Sheet"
 import { tr } from "@game/i18n"
-
-const APTITUDE_MARK = { talent: "★", normal: "", weak: "▼" } as const
 
 /** «Таланты: Sword, Flying · Слабости: Bow» — склонности персонажа модели. */
 export function aptitudeLine(unit: UnitInstance): string {
@@ -23,26 +21,6 @@ export function aptitudeLine(unit: UnitInstance): string {
 /** Оружие бойца: оружие в лапах и ранг навыка, которым он им владеет. */
 export function weaponLine(unit: UnitInstance): string {
   return `${unitWeapon(unit).name} · ${SKILL_LABELS[unit.weaponSkill]} ${weaponRank(unit)}`
-}
-
-/** Ранги всех навыков на уровне бойца; ★ — талант, ▼ — слабость. */
-export function SkillRanks({ unit }: { unit: UnitInstance }) {
-  return (
-    <div className="rank-grid">
-      {SKILLS.map((s) => {
-        const aptitude = unit.aptitudes[s]
-        return (
-          <div key={s} className={`rank-cell ${aptitude} ${s === unit.weaponSkill ? "current" : ""}`}>
-            <span className="rank-name">
-              {APTITUDE_MARK[aptitude]}
-              {SKILL_LABELS[s]}
-            </span>
-            <b className="rank-value">{rankAtLevel(aptitude, unit.level)}</b>
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 
 interface ClassSheetProps {

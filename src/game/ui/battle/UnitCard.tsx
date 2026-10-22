@@ -1,4 +1,4 @@
-import type { BattleState, BattleUnit, UnitInstance } from "@game/core/types"
+import type { BattleState, BattleUnit, Stats, UnitInstance } from "@game/core/types"
 import { displayName, unitClass, unitClassName, unitWeapon } from "@game/core/units"
 import { unitStatsInBattle } from "@game/core/battle/reducer"
 import { skillInfo } from "@game/content/index"
@@ -6,7 +6,7 @@ import { specialDef } from "@game/content/skills/specials"
 import { WEAPON_COLOR } from "@game/content/weapons"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { classRoleText, moveText } from "../components/ClassInfo"
-import { COLOR_CSS, atkLabel } from "../lib/format"
+import { COLOR_CSS, STAT_LABELS, atkLabel } from "../lib/format"
 import { tr } from "@game/i18n"
 
 /** Компактная карточка бойца в нижней полосе: аватар, имя, HP, статы, спецприём. */
@@ -28,8 +28,26 @@ export function UnitCard({
   const special = unit.skills.special ? specialDef(unit.skills.special) : undefined
   const pct = bu.maxHp > 0 ? Math.max(0, Math.min(100, (bu.hp / bu.maxHp) * 100)) : 0
   const hpCls = pct <= 25 ? "crit" : pct <= 50 ? "low" : ""
-  const hasBonus = Object.values(bu.bonuses).some(v => v)
-  const hasPenalty = Object.values(bu.penalties).some(v => v)
+  // Временные изменения статов: штраф держится до хода бойца, усиление — до начала его фазы
+  const statName = (k: keyof Stats): string => (k === "atk" ? atkLabel(unit) : STAT_LABELS[k])
+  const changes = (m: Partial<Stats>): string =>
+    (Object.entries(m) as [keyof Stats, number][])
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${statName(k)} ${v > 0 ? "+" : "−"}${Math.abs(v)}`)
+      .join(", ")
+  const down = changes(bu.penalties)
+  const up = changes(bu.bonuses)
+  const stat = (k: Exclude<keyof Stats, "hp">, label: string) => {
+    const d = (bu.bonuses[k] ?? 0) + (bu.penalties[k] ?? 0)
+    return (
+      <span className={d < 0 ? "bf-stat-down" : d > 0 ? "bf-stat-up" : ""}>
+        {label}
+        {" "}
+        <b>{st?.[k]}</b>
+        {d !== 0 && <small>{d > 0 ? `+${d}` : `−${Math.abs(d)}`}</small>}
+      </span>
+    )
+  }
   const skills = enemy
     ? Object.values(unit.skills)
         .filter((id): id is string => !!id && id !== unit.skills.weapon)
@@ -82,28 +100,22 @@ export function UnitCard({
         <div className="bf-muted bf-role">{`${classRoleText(unit.classId)} · ${moveText(unit.classId)}`}</div>
         {st && (
           <div className="bf-stats">
-            <span>
-              {atkLabel(unit)}
-              {" "}
-              <b>{st.atk}</b>
-            </span>
-            <span>
-              Spd
-              {" "}
-              <b>{st.spd}</b>
-            </span>
-            <span>
-              Def
-              {" "}
-              <b>{st.def}</b>
-            </span>
-            <span>
-              Res
-              {" "}
-              <b>{st.res}</b>
-            </span>
-            {hasBonus && <span className="bf-up">▲</span>}
-            {hasPenalty && <span className="bf-down">▼</span>}
+            {stat("atk", atkLabel(unit))}
+            {stat("spd", "Spd")}
+            {stat("def", "Def")}
+            {stat("res", "Res")}
+          </div>
+        )}
+        {down && (
+          <div className="bf-status bf-status-down">
+            {`▼ ${tr("Weakened", "Ослаблен")}: ${down}`}
+            <small>{tr(" · until it acts", " · до его хода")}</small>
+          </div>
+        )}
+        {up && (
+          <div className="bf-status bf-status-up">
+            {`▲ ${tr("Boosted", "Усилен")}: ${up}`}
+            <small>{tr(" · until its next phase", " · до начала его фазы")}</small>
           </div>
         )}
         {enemy && skills.length > 0 && <div className="bf-muted bf-skills">{skills.join(" · ")}</div>}

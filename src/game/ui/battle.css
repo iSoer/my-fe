@@ -697,11 +697,44 @@
   font-size: 12px;
   font-style: italic;
 }
-.bf-up {
-  color: var(--bf-teal-text) !important;
+/* Временно изменённые статы: значение цветом и величина изменения рядом */
+.bf-stats small {
+  margin-left: 2px;
+  font-size: 10px;
+  font-weight: 900;
 }
-.bf-down {
-  color: var(--bf-blood-text) !important;
+.bf-stats > .bf-stat-down::before {
+  background: #f1e4ff;
+}
+.bf-stats > .bf-stat-down b,
+.bf-stats > .bf-stat-down small {
+  color: #7b2cbf;
+}
+.bf-stats > .bf-stat-up::before {
+  background: #e3f6ec;
+}
+.bf-stats > .bf-stat-up b,
+.bf-stats > .bf-stat-up small {
+  color: var(--bf-teal-text);
+}
+/* Строка статуса: что ослаблено или усилено и до каких пор */
+.bf-status {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 900;
+  color: #fff;
+}
+.bf-status small {
+  font-weight: 700;
+  opacity: 0.85;
+}
+.bf-status-down {
+  background: #7b2cbf;
+}
+.bf-status-up {
+  background: #2d8a4e;
 }
 .bf-skills,
 .bf-caption {

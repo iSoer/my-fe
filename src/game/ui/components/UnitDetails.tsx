@@ -1,7 +1,7 @@
 import type { UnitInstance } from "@game/core/types"
 import { displayName, unitClass, unitClassName, visibleStats } from "@game/core/units"
 import { skillInfo } from "@game/content/index"
-import { traitDef } from "@game/content/traits"
+import { TraitBlock } from "./UnitPanels"
 import { breedDef } from "@game/content/breeds"
 import { personalityText } from "@game/content/personalities"
 import { UnitAvatar } from "./UnitAvatar"
@@ -15,7 +15,6 @@ import { tr } from "@game/i18n"
 export function UnitDetails({ unit, compact = false }: { unit: UnitInstance, compact?: boolean }) {
   const cls = unitClass(unit)
   const stats = visibleStats(unit)
-  const trait = unit.traitId ? traitDef(unit.traitId) : undefined
   const skillIds = Object.values(unit.skills).filter((id): id is string => !!id)
   return (
     <div className="stack">
@@ -51,15 +50,7 @@ export function UnitDetails({ unit, compact = false }: { unit: UnitInstance, com
         ·
         {aptitudeLine(unit)}
       </div>
-      {trait && (
-        <div className="card" style={{ padding: 10 }}>
-          <b>
-            {tr("Trait:", "Особенность:")}
-            {trait.name}
-          </b>
-          <div className="muted small">{trait.desc}</div>
-        </div>
-      )}
+      {unit.traitId && <TraitBlock traitId={unit.traitId} compact />}
       <div className="stack" style={{ gap: 6 }}>
         <b className="small muted">{tr("Skills", "Навыки")}</b>
         {skillIds.map((id) => {

@@ -590,6 +590,7 @@ export class MapScene extends Phaser.Scene {
       view.setHp(bu.hp, bu.maxHp)
       view.setCd(bu.specialCd)
       view.setActed(bu.acted && st.phase === bu.side)
+      view.setStatus(bu.bonuses, bu.penalties)
     }
     for (const [id, view] of this.units) {
       if (!alive.has(id)) {

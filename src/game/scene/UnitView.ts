@@ -1,9 +1,9 @@
 import Phaser from "phaser"
-import type { Side, UnitInstance } from "@game/core/types"
+import type { Side, Stats, UnitInstance } from "@game/core/types"
 import type { Pose } from "@game/art/index"
 import { FUR_PALETTES } from "@game/content/appearance"
 import { unitClass } from "@game/content/classes"
-import { weaponDef } from "@game/content/weapons"
+import { isMagicWeapon, weaponDef } from "@game/content/weapons"
 import { TEX } from "./textures"
 import { MOVE_GLYPH, WEAPON_COLOR_HEX, hexCss, hpColor, textStyle } from "./style"
 import { ensureUnitTexture, ensureUnitTextures, hasTexture, unitTexKey } from "./svgTextures"
@@ -59,6 +59,9 @@ export class UnitView extends Phaser.GameObjects.Container {
   private readonly cdBadge: Phaser.GameObjects.Container
   private readonly cdBg: Phaser.GameObjects.Image
   private readonly cdText: Phaser.GameObjects.Text
+  /** Плашки статуса над головой: штраф (фиолетовая «▼ Def −5») и усиление (зелёная «▲»). */
+  private readonly debuffTag: Phaser.GameObjects.Text
+  private readonly buffTag: Phaser.GameObjects.Text
   private size = 48
   private hp = 1
   private maxHp = 1
@@ -146,7 +149,14 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.cdBg = scene.add.image(0, 0, TEX.disc).setTint(0x222222)
     this.cdText = scene.add.text(0, 0, "", textStyle(9, "#ffd166", true, 2)).setOrigin(0.5)
     this.cdBadge = scene.add.container(0, 0, [this.cdBg, this.cdText])
-    this.add([this.moveGlyph, this.hpBar, this.hpText, this.cdBadge])
+    const tagStyle = (bg: string): Phaser.Types.GameObjects.Text.TextStyle => ({
+      ...textStyle(9, "#ffffff", true, 0),
+      backgroundColor: bg,
+      padding: { x: 3, y: 1 }
+    })
+    this.debuffTag = scene.add.text(0, 0, "", tagStyle("#7b2cbf")).setOrigin(0, 0.5).setResolution(2).setVisible(false)
+    this.buffTag = scene.add.text(0, 0, "", tagStyle("#2d8a4e")).setOrigin(0, 0.5).setResolution(2).setVisible(false)
+    this.add([this.moveGlyph, this.hpBar, this.hpText, this.cdBadge, this.debuffTag, this.buffTag])
     scene.add.existing(this)
     this.resize(opts.size)
     this.startLife()
@@ -360,6 +370,10 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.cdBg.setDisplaySize(badge, badge)
     this.cdText.setFontSize(Math.max(8, Math.round(size * 0.18)))
     this.cdBadge.setPosition(size * 0.36, -size * 0.36)
+    const tagFont = `${Math.max(8, Math.round(size * 0.17))}px`
+    this.debuffTag.setFontSize(tagFont).setPosition(-size * 0.5, -size * 0.42)
+    this.buffTag.setFontSize(tagFont)
+    this.placeBuffTag()
     this.redrawHp()
     this.hpBar.setVisible(this.showHp)
     this.hpText.setVisible(this.showHp)
@@ -432,6 +446,35 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.cdText.setText(String(cd))
     this.cdText.setColor(cd <= 0 ? "#ffd166" : "#ffffff")
     this.cdBg.setTint(cd <= 0 ? 0x7a5c00 : 0x222222)
+  }
+
+  /**
+   * Статус бойца на поле: самый сильный штраф («▼ Def −5», при нескольких — «+1») и усиление («▲ Spd +4»,
+   * рядом со штрафом — просто «▲»).
+   * Видно до тех пор, пока эффект действует: штраф снимается после хода бойца, усиление — в начале его фазы.
+   */
+  setStatus(bonuses: Partial<Stats>, penalties: Partial<Stats>): void {
+    if (!this.scene) return
+    const label = (k: keyof Stats): string =>
+      k === "atk" ? (isMagicWeapon(this.unit.weaponSkill) ? "Mag" : "Str") : k === "hp" ? "HP" : k[0]!.toUpperCase() + k.slice(1)
+    const tag = (stats: Partial<Stats>, mark: string): string => {
+      const list = (Object.entries(stats) as [keyof Stats, number][]).filter(([, v]) => v)
+      if (list.length === 0) return ""
+      const [k, v] = list.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0]!
+      return `${mark}${label(k)}${v > 0 ? "+" : "−"}${Math.abs(v)}${list.length > 1 ? ` +${list.length - 1}` : ""}`
+    }
+    const down = tag(penalties, "▼")
+    // Оба эффекта сразу — усиление коротким «▲», чтобы плашки не вылезали на соседнюю клетку (подробно — в карточке)
+    const up = down && tag(bonuses, "▲") ? "▲" : tag(bonuses, "▲")
+    this.debuffTag.setText(down).setVisible(this.showBadges && !this.dead && down !== "")
+    this.buffTag.setText(up).setVisible(this.showBadges && !this.dead && up !== "")
+    this.placeBuffTag()
+  }
+
+  /** Усиление — справа от штрафа или на его месте, если штрафа нет. */
+  private placeBuffTag(): void {
+    const x = this.debuffTag.visible ? this.debuffTag.x + this.debuffTag.width + 2 : -this.size * 0.5
+    this.buffTag.setPosition(x, -this.size * 0.42)
   }
 
   /** «Уже ходил»: фигурка обесцвечивается и чуть гаснет, без потери читаемости. */
@@ -888,6 +931,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.hpText.setVisible(false)
     this.cdBadge.setVisible(false)
     this.moveGlyph.setVisible(false)
+    this.debuffTag.setVisible(false)
+    this.buffTag.setVisible(false)
     this.shadow.setAlpha(0)
   }
 

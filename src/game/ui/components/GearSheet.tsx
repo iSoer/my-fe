@@ -10,6 +10,8 @@ import { haptic } from "@game/platform/haptics"
 import { BottomSheet } from "./Sheet"
 import { Button } from "./Button"
 import { tr } from "@game/i18n"
+import { ringSvg, weaponIconSvg } from "@game/art/gear"
+import { GearIcon } from "./UnitPanels"
 
 type Toast = (msg: string, error?: boolean) => void
 
@@ -44,6 +46,7 @@ export function WeaponSheet({ unit, open, onClose, toast }: GearSheetProps) {
     const note = rankNote(unit, id)
     return (
       <div key={id} className={`skill-item ${id === unit.skills.weapon ? "equipped" : ""}`}>
+        <GearIcon svg={weaponIconSvg(w.kind, w.grade, w.variant)} size={40} />
         <div className="txt">
           <div>
             <b>{w.name}</b>
@@ -99,9 +102,10 @@ export function TalismanSheet({ unit, open, onClose, toast }: GearSheetProps) {
       <div className="stack">
         {worn && (
           <div className="skill-item equipped">
+            <GearIcon svg={ringSvg(worn.id)} size={40} />
             <div className="txt">
               <div>
-                <b>{`${worn.icon} ${worn.name}`}</b>
+                <b>{worn.name}</b>
                 {" "}
                 <span className="chip squad">{tr("Worn", "Надет")}</span>
               </div>
@@ -114,9 +118,10 @@ export function TalismanSheet({ unit, open, onClose, toast }: GearSheetProps) {
         )}
         {owned.map(t => (
           <div key={t.id} className="skill-item">
+            <GearIcon svg={ringSvg(t.id)} size={40} />
             <div className="txt">
               <div>
-                <b>{`${t.icon} ${t.name}`}</b>
+                <b>{t.name}</b>
                 {itemCount(inventory, t.id) > 1 && <span className="muted">{` ×${itemCount(inventory, t.id)}`}</span>}
               </div>
               <div className="desc">{t.desc}</div>

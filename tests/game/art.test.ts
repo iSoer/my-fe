@@ -14,6 +14,10 @@ import {
   type Pose
 } from "@game/art/index"
 import { BIOMES } from "@game/content/biomes"
+import { WEAPONS } from "@game/content/weapons"
+import { TALISMANS } from "@game/content/items"
+import { ringSvg, weaponIconSvg } from "@game/art/gear"
+import { gearAlerts } from "@game/ui/components/UnitPanels"
 import { CLASS_IDS, classDef, classWeapons, fwClass } from "@game/content/classes"
 import { generateUnit } from "@game/core/units"
 import type { TerrainId } from "@game/core/types"
@@ -197,5 +201,24 @@ describe("арт: фоны и тайлы", () => {
         wellFormed(layers.near)
       }
     }
+  })
+})
+
+describe("арт: снаряжение", () => {
+  it("иконка есть у каждого оружия и талисмана; деревянное — коричневое, разные материалы — разные цвета", () => {
+    for (const w of WEAPONS) wellFormed(weaponIconSvg(w.kind, w.grade, w.variant))
+    for (const t of TALISMANS) wellFormed(ringSvg(t.id))
+    wellFormed(ringSvg())
+    expect(weaponIconSvg("sword", "wood")).toContain("#a0673a")
+    const grades = new Set(["wood", "iron", "steel", "silver"].map(g => weaponIconSvg("sword", g as "wood")))
+    expect(grades.size).toBe(4)
+    expect(new Set(TALISMANS.map(t => ringSvg(t.id))).size).toBe(TALISMANS.length)
+  })
+  it("«!» на снаряжении: деревянное оружие при лучшем в инвентаре, пустой талисман при свободном", () => {
+    const u = generateUnit({ seed: 3, level: 5 })
+    expect(gearAlerts(u, {})).toEqual({ weapon: false, talisman: false })
+    expect(gearAlerts(u, { sword_steel: 1, tal_bell: 1 })).toEqual({ weapon: true, talisman: true })
+    expect(gearAlerts({ ...u, accessory: "tal_fang", skills: { ...u.skills, weapon: "sword_steel" } }, { axe_silver: 1, tal_bell: 1 }))
+      .toEqual({ weapon: false, talisman: false })
   })
 })

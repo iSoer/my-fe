@@ -28,12 +28,16 @@ export const TRAITS: readonly TraitDef[] = [
     id: "t_coward",
     get name() { return tr("Coward", "Трус") },
     get desc() { return tr("−2 Str/Mag always, +4 Spd when HP < 50%.", "−2 Str/Mag всегда, +4 Spd при HP < 50 %.") },
+    get pros() { return [tr("+4 Spd when HP < 50%", "+4 Spd при HP < 50 %")] },
+    get cons() { return [tr("−2 Str/Mag always", "−2 Str/Mag всегда")] },
     hooks: { statBonus: { atk: -2 }, combatStatMod: ctx => (hpPct(ctx.self.bu) < 0.5 ? { spd: 4 } : undefined) }
   },
   {
     id: "t_hydrophobe",
     get name() { return tr("Hydrophobe", "Боязнь воды") },
     get desc() { return tr("−2 to all stats next to water.", "−2 ко всем статам рядом с водой.") },
+    pros: [],
+    get cons() { return [tr("−2 to all stats next to water", "−2 ко всем статам рядом с водой")] },
     hooks: {
       combatStatMod: ctx =>
         neighbors(ctx.self.bu.pos).some(p => terrainAt(ctx.state, p) === "water")
@@ -74,7 +78,14 @@ export const TRAITS: readonly TraitDef[] = [
     hooks: { combatStatMod: ctx => (ctx.state.map.biomeId === "basement" ? { spd: 2 } : undefined) }
   },
   { id: "t_glutton", get name() { return tr("Glutton", "Прожорливый") }, get desc() { return tr("+10% Treats from battles.", "+10 % Вкусняшек с боя.") }, hooks: { treatsMultiplier: 1.1 } },
-  { id: "t_lazy", get name() { return tr("Lazy", "Ленивый") }, get desc() { return tr("−1 move, +4 Def.", "−1 движение, +4 Def.") }, hooks: { moveBonus: -1, statBonus: { def: 4 } } },
+  {
+    id: "t_lazy",
+    get name() { return tr("Lazy", "Ленивый") },
+    get desc() { return tr("−1 move, +4 Def.", "−1 движение, +4 Def.") },
+    pros: ["+4 Def"],
+    get cons() { return [tr("−1 move (tile per turn)", "−1 к ходу (клетка за ход)")] },
+    hooks: { moveBonus: -1, statBonus: { def: 4 } }
+  },
   {
     id: "t_loud",
     get name() { return tr("Loud", "Громкий") },
@@ -105,6 +116,8 @@ export const TRAITS: readonly TraitDef[] = [
     id: "t_homebody",
     get name() { return tr("Homebody", "Домашний") },
     get desc() { return tr("−2 Str/Mag, +3 HP, +20% XP.", "−2 Str/Mag, +3 HP, +20 % XP.") },
+    pros: ["+3 HP", "+20% XP"],
+    cons: ["−2 Str/Mag"],
     hooks: { statBonus: { atk: -2, hp: 3 }, xpMultiplier: 1.2 }
   },
   { id: "t_stray", get name() { return tr("Stray", "Бродяга") }, get desc() { return tr("Not slowed by Thicket.", "Заросли не замедляют.") }, hooks: { ignoreForestSlow: true } },
@@ -112,6 +125,8 @@ export const TRAITS: readonly TraitDef[] = [
     id: "t_tiny",
     get name() { return tr("Tiny", "Мелкий") },
     get desc() { return tr("+2 Spd, −1 Def. Mice only.", "+2 Spd, −1 Def. Только мыши.") },
+    pros: ["+2 Spd"],
+    cons: ["−1 Def"],
     onlySpecies: "mouse",
     hooks: { statBonus: { spd: 2, def: -1 } }
   },
@@ -129,4 +144,9 @@ export function traitDef(id: string): TraitDef {
   const t = MAP.get(id)
   if (!t) throw new Error(`unknown trait ${id}`)
   return t
+}
+
+/** Плюсы и минусы особенности для интерфейса: без явных списков вся особенность — один плюс (`desc`). */
+export function traitEffects(t: TraitDef): { pros: string[], cons: string[] } {
+  return { pros: t.pros ?? [t.desc], cons: t.cons ?? [] }
 }

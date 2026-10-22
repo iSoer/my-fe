@@ -190,6 +190,12 @@ export interface TraitDef {
   id: string
   name: string
   desc: string
+  /**
+   * Плюсы и минусы по отдельности — у особенностей с недостатком (интерфейс показывает минусы красным).
+   * Без них вся особенность — плюс, текст — `desc`.
+   */
+  pros?: string[]
+  cons?: string[]
   hooks: SkillHooks
   onlySpecies?: Species
   rare?: boolean

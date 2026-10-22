@@ -13,6 +13,8 @@ import { TopBar } from "../components/TopBar"
 import { ResourceBar } from "../components/ResourceBar"
 import { useToast } from "../components/Toast"
 import { stagger } from "../lib/animate"
+import { ringSvg, weaponIconSvg } from "@game/art/gear"
+import { GearIcon } from "../components/UnitPanels"
 import { tr } from "@game/i18n"
 import "../village.css"
 
@@ -83,7 +85,11 @@ export function StoreScreen() {
             const w = tab === "weapon" ? weaponDef(id) : undefined
             return (
               <div key={id} className="card store-item pop-in" style={stagger(i, 40)}>
-                <span className="store-ico" aria-hidden="true">{info.icon}</span>
+                {w
+                  ? <GearIcon svg={weaponIconSvg(w.kind, w.grade, w.variant)} size={44} />
+                  : tab === "talisman"
+                    ? <GearIcon svg={ringSvg(id)} size={44} />
+                    : <span className="store-ico" aria-hidden="true">{info.icon}</span>}
                 <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
                   <div className="row wrap" style={{ gap: 6 }}>
                     <b>{info.name}</b>

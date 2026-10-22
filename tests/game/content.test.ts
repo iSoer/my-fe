@@ -6,7 +6,7 @@ import { WEAPONS } from "@game/content/weapons"
 import { SPECIALS } from "@game/content/skills/specials"
 import { ASSISTS } from "@game/content/skills/assists"
 import { PASSIVES } from "@game/content/skills/passives"
-import { TRAITS } from "@game/content/traits"
+import { TRAITS, traitDef, traitEffects } from "@game/content/traits"
 import { BIOMES } from "@game/content/biomes"
 import { FACTIONS } from "@game/content/factions"
 import { BREEDS } from "@game/content/breeds"
@@ -103,5 +103,16 @@ describe("ярусы классов", () => {
       const talents = [...Object.keys(item.all), ...Object.keys(item.any)] as Skill[]
       expect(earliestLevelOf(item, aptitudesOf(talents)), item.id).toBe(TIER_LEVELS[item.tier])
     }
+  })
+})
+
+describe("особенности: плюсы и минусы", () => {
+  it("особенность, которая снижает стат или ход, объявляет минусы — интерфейс покажет их красным", () => {
+    for (const t of TRAITS) {
+      const lowers = Object.values(t.hooks.statBonus ?? {}).some(v => (v ?? 0) < 0) || (t.hooks.moveBonus ?? 0) < 0
+      if (lowers) expect(traitEffects(t).cons.length, t.id).toBeGreaterThan(0)
+    }
+    expect(traitEffects(traitDef("t_hydrophobe"))).toEqual({ pros: [], cons: [expect.any(String)] })
+    expect(traitEffects(traitDef("t_glutton")).cons).toEqual([])
   })
 })
