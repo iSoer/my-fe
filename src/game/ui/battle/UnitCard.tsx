@@ -9,21 +9,64 @@ import { classRoleText, moveText } from "../components/ClassInfo"
 import { COLOR_CSS, STAT_LABELS, statChanges } from "../lib/format"
 import { terrainInfo } from "@game/content/terrain"
 import { tr } from "@game/i18n"
+import { useStore } from "@nanostores/react"
+import { haptic } from "@game/platform/haptics"
+import { $unitCardOpen, toggleUnitCard } from "./cardState"
 
-/** Компактная карточка бойца в нижней полосе: аватар, имя, HP, статы, спецприём. */
+/**
+ * Карточка бойца в нижней полосе: аватар, имя, HP, статы, спецприём.
+ * `collapsible` — карточка выбранного бойца: свёрнута до аватара, имени и класса, тап разворачивает и сворачивает.
+ */
 export function UnitCard({
   state,
   bu,
   unit,
   enemy = false,
+  collapsible = false,
   extra
 }: {
   state: BattleState
   bu: BattleUnit
   unit: UnitInstance
   enemy?: boolean
+  collapsible?: boolean
   extra?: React.ReactNode
 }) {
+  const open = useStore($unitCardOpen) || !collapsible
+  const toggle = collapsible
+    ? {
+        role: "button",
+        tabIndex: 0,
+        "aria-expanded": open,
+        "aria-label": open ? tr("Hide fighter details", "Скрыть подробности о бойце") : tr("Show fighter details", "Подробнее о бойце"),
+        onClick: () => {
+          haptic("light")
+          toggleUnitCard()
+        },
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key !== "Enter" && e.key !== " ") return
+          e.preventDefault()
+          toggleUnitCard()
+        }
+      }
+    : {}
+  if (!open) {
+    return (
+      <div className={`bf-card bf-unit compact ${enemy ? "enemy" : ""}`} {...toggle}>
+        <div className="bf-unit-avatar">
+          <UnitAvatar unit={unit} size="sm" animated={!enemy} />
+        </div>
+        <div className="bf-unit-body">
+          <b className="bf-unit-name">
+            {unit.isBoss ? "👑 " : ""}
+            {displayName(unit)}
+          </b>
+          <span className="bf-muted">{`${unitClassName(unit)} ${tr("· Lv.", "· Ур.")}${unit.level}`}</span>
+        </div>
+        <span className="bf-unit-toggle" aria-hidden="true">▲</span>
+      </div>
+    )
+  }
   const st = unitStatsInBattle(state, bu.unitId)
   const cls = unitClass(unit)
   const special = unit.skills.special ? specialDef(unit.skills.special) : undefined
@@ -52,7 +95,7 @@ export function UnitCard({
         .filter(Boolean)
     : []
   return (
-    <div className={`bf-card bf-unit ${enemy ? "enemy" : ""}`}>
+    <div className={`bf-card bf-unit ${collapsible ? "expandable" : ""} ${enemy ? "enemy" : ""}`} {...toggle}>
       <div className="bf-unit-avatar">
         <UnitAvatar unit={unit} size="sm" animated={!enemy} />
       </div>
@@ -127,6 +170,7 @@ export function UnitCard({
         )}
         {enemy && skills.length > 0 && <div className="bf-muted bf-skills">{skills.join(" · ")}</div>}
         {extra}
+        {collapsible && <div className="bf-unit-hide" aria-hidden="true">{`▼ ${tr("Hide", "Скрыть")}`}</div>}
       </div>
     </div>
   )

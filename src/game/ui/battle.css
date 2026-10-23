@@ -448,6 +448,37 @@
   background: var(--bf-red);
   transform: skewX(var(--bf-skew));
 }
+/* Свёрнутая карточка выбранного бойца: аватар, имя и класс одной полосой */
+.bf-unit.compact {
+  align-items: center;
+  padding: 6px 12px 6px 10px;
+  cursor: pointer;
+}
+.bf-unit.compact .bf-unit-avatar {
+  height: 44px;
+}
+.bf-unit.compact .bf-unit-body {
+  gap: 1px;
+}
+.bf-unit.expandable {
+  cursor: pointer;
+}
+/* Стрелка «развернуть / свернуть» */
+.bf-unit-toggle {
+  flex: none;
+  align-self: center;
+  font-size: 12px;
+  color: var(--bf-on-ink-muted);
+}
+.bf-unit-hide {
+  align-self: flex-end;
+  margin-top: -2px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bf-on-ink-muted);
+}
 .bf-unit.enemy::before {
   background: var(--bf-paper);
 }

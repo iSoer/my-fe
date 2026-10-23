@@ -78,7 +78,7 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
   const isPlayer = battle.phase === "player"
   const sel = ui.selectedId ? battle.units[ui.selectedId] : undefined
   const selUnit = ui.selectedId ? battle.roster[ui.selectedId] : undefined
-  const card = sel && selUnit ? <UnitCard state={battle} bu={sel} unit={selUnit} /> : null
+  const card = sel && selUnit ? <UnitCard state={battle} bu={sel} unit={selUnit} collapsible /> : null
   const hint = (text: string, cls = "") => <div className={`bf-hint ${cls}`}>{text}</div>
   if (ui.dragging) {
     const bad = !!ui.dragHover && !ui.dragValid
