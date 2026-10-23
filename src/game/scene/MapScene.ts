@@ -679,14 +679,18 @@ export class MapScene extends Phaser.Scene {
     for (let b = 0; b < branches; b++) {
       const pts: { x: number, y: number }[] = []
       let x = o.x + t * (0.3 + rnd() * 0.4)
-      let y = o.y + t * (b === 0 ? 0.04 : 0.2 + rnd() * 0.5)
+      // Препятствие стоит посреди клетки: трещины не выходят на землю вокруг него
+      let y = o.y + t * (b === 0 ? 0.3 : 0.4 + rnd() * 0.3)
       pts.push({ x, y })
-      const steps = b === 0 ? 6 : 3
+      const steps = b === 0 ? 5 : 3
       const dir = rnd() < 0.5 ? -1 : 1
       for (let i = 0; i < steps; i++) {
-        x += (b === 0 ? (rnd() - 0.5) * 0.24 : dir * (0.08 + rnd() * 0.1)) * t
-        y += (b === 0 ? 0.15 : (rnd() - 0.3) * 0.16) * t
-        pts.push({ x: Phaser.Math.Clamp(x, o.x + 2, o.x + t - 2), y: Phaser.Math.Clamp(y, o.y + 2, o.y + t - 2) })
+        x += (b === 0 ? (rnd() - 0.5) * 0.2 : dir * (0.06 + rnd() * 0.08)) * t
+        y += (b === 0 ? 0.1 : (rnd() - 0.3) * 0.12) * t
+        pts.push({
+          x: Phaser.Math.Clamp(x, o.x + t * 0.15, o.x + t * 0.85),
+          y: Phaser.Math.Clamp(y, o.y + t * 0.25, o.y + t * 0.82)
+        })
       }
       const w = Math.max(1.5, t * (b === 0 ? 0.05 : 0.032))
       // Светлая кромка, затем тёмная щель поверх со сдвигом

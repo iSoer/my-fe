@@ -73,6 +73,7 @@ function evaluateAttacks(
       score -= taken * diff.wTaken
       if (out.attacker.died) score -= 200
       if (terrainAt(state, node.pos) === "cover") score += 8
+      else if (terrainAt(state, node.pos) === "forest") score += 3
       score -= (threat.get(posKey(node.pos)) ?? 0) * diff.wExposure
       // Добивать раненых, бить в преимущество треугольника и тех, кто не ответит
       score += (1 - hpPct(target)) * diff.focusLowHp
@@ -165,6 +166,7 @@ function retreatMove(state: BattleState, bu: BattleUnit, reach: ReachMap, threat
     let score = Math.min(d, 5) * 10 - (threat.get(posKey(node.pos)) ?? 0) * 12
     if (healer) score -= manhattan(healer.pos, node.pos) * 4
     if (terrainAt(state, node.pos) === "cover") score += 6
+    else if (terrainAt(state, node.pos) === "forest") score += 2
     score += jitter(bu.unitId, state.turn, node.pos)
     if (!best || score > best.score) best = { pos: node.pos, score }
   }
@@ -207,6 +209,7 @@ function advanceMove(
       score = -approach * 10 - (threat.get(posKey(node.pos)) ?? 0) * diff.wExposure
       score -= Math.max(0, nearAlly - 2) * diff.cohesion
       if (terrainAt(state, node.pos) === "cover") score += 3
+      else if (terrainAt(state, node.pos) === "forest") score += 1
     }
     score += jitter(bu.unitId, state.turn, node.pos)
     if (!best || score > best.score) best = { pos: node.pos, score }

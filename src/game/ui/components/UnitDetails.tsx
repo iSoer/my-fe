@@ -1,7 +1,6 @@
 import type { UnitInstance } from "@game/core/types"
 import { displayName, unitClass, unitClassName, visibleStats } from "@game/core/units"
 import { skillInfo } from "@game/content/index"
-import { TraitBlock } from "./UnitPanels"
 import { breedDef } from "@game/content/breeds"
 import { personalityText } from "@game/content/personalities"
 import { UnitAvatar } from "./UnitAvatar"
@@ -50,7 +49,6 @@ export function UnitDetails({ unit, compact = false }: { unit: UnitInstance, com
         ·
         {aptitudeLine(unit)}
       </div>
-      {unit.traitId && <TraitBlock traitId={unit.traitId} compact />}
       <div className="stack" style={{ gap: 6 }}>
         <b className="small muted">{tr("Skills", "Навыки")}</b>
         {skillIds.map((id) => {

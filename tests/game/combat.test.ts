@@ -118,6 +118,22 @@ describe("simulateCombat", () => {
     expect(out.strikes[0]!.damage).toBe(Math.floor(Math.max(0, atk - res) * 0.5))
   })
 
+  it("Заросли дают стоящему в них +1 Def и +1 Res", () => {
+    const make = (tiles?: ReturnType<typeof plainTiles>) =>
+      makeBattle(
+        [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: flat }],
+        [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: flat }],
+        tiles ? { tiles } : {}
+      )
+    const plain = make()
+    const forest = make(plainTiles({ "2,3": "forest" }))
+    const outPlain = simulateCombat(plain.state, plain.players[0]!.id, plain.enemies[0]!.id, { x: 2, y: 4 })
+    const outForest = simulateCombat(forest.state, forest.players[0]!.id, forest.enemies[0]!.id, { x: 2, y: 4 })
+    expect(outForest.defender.stats.def).toBe(outPlain.defender.stats.def + 1)
+    expect(outForest.defender.stats.res).toBe(outPlain.defender.stats.res + 1)
+    expect(outForest.attacker.stats).toEqual(outPlain.attacker.stats)
+  })
+
   it("спецприём срабатывает при кулдауне 0 и сбрасывается", () => {
     const b = makeBattle(
       [

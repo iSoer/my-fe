@@ -6,6 +6,7 @@ import {
   cancel,
   chooseAttack,
   chooseMove,
+  confirm,
   dragHover,
   endDrag,
   enterBattleScreen,
@@ -14,7 +15,7 @@ import {
   waitHere
 } from "@game/state/battleUi"
 import { createEmptySave } from "@game/core/save"
-import { makeBattle } from "./helpers"
+import { makeBattle, plainTiles } from "./helpers"
 
 const flat = { hp: 20, atk: 10, spd: 5, def: 5, res: 5 }
 
@@ -81,6 +82,35 @@ describe("контроллер боя: контекстное меню", () => {
     await waitHere()
     expect($battleUi.get().mode).toBe("idle")
     expect($save.get().battle?.units[b.players[0]!.id]?.acted).toBe(true)
+  })
+})
+
+describe("контроллер боя: хлипкие препятствия", () => {
+  it("боец бьёт стену с места, а на следующем ходу — ещё раз и ломает её", async () => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 7 }, baseStats: flat }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 0 }, baseStats: flat, stance: "hold" }],
+      { tiles: plainTiles({ "2,6": "wall_breakable" }) }
+    )
+    const id = b.players[0]!.id
+    const save = createEmptySave(1)
+    save.battle = b.state
+    $save.set(save)
+    enterBattleScreen()
+    for (const hpAfter of [1, 0]) {
+      tapTile({ x: 2, y: 7 })
+      expect($battleUi.get().actions.attack).toBe(true)
+      chooseAttack()
+      expect($battleUi.get().mode).toBe("wallPreview")
+      expect($battleUi.get().movedTo).toEqual({ x: 2, y: 7 })
+      await confirm()
+      const st = $save.get().battle!
+      expect(st.walls["2,6"]).toBe(hpAfter)
+      expect(st.units[id]!.pos).toEqual({ x: 2, y: 7 })
+      // Новый ход: боец снова может действовать
+      st.units[id]!.acted = false
+      enterBattleScreen()
+    }
   })
 })
 

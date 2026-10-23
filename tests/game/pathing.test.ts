@@ -4,12 +4,8 @@ import { posKey } from "@game/core/types"
 import { makeBattle, plainTiles } from "./helpers"
 
 describe("moveCost", () => {
-  it("заросли: пехота 2, броня 1, кавалерия нельзя, летун 1", () => {
-    expect(moveCost("forest", "infantry")).toBe(2)
-    expect(moveCost("forest", "armored")).toBe(1)
-    expect(moveCost("forest", "cavalry")).toBeNull()
-    expect(moveCost("forest", "flier")).toBe(1)
-    expect(moveCost("forest", "infantry", true)).toBe(1)
+  it("заросли не мешают идти никому", () => {
+    for (const m of ["infantry", "armored", "cavalry", "flier"] as const) expect(moveCost("forest", m)).toBe(1)
   })
   it("вода/гора только летунам, стены никому", () => {
     expect(moveCost("water", "infantry")).toBeNull()
@@ -52,7 +48,7 @@ describe("reachableTiles", () => {
     expect(r.has(posKey({ x: 3, y: 7 }))).toBe(false)
     expect(r.has(posKey({ x: 4, y: 7 }))).toBe(false)
   })
-  it("заросли заканчивают движение пехоты", () => {
+  it("заросли проходятся как равнина", () => {
     const b = makeBattle(
       [{ classId: "infantry_sword", pos: { x: 2, y: 7 } }],
       [{ classId: "infantry_sword", pos: { x: 2, y: 0 } }],
@@ -61,8 +57,8 @@ describe("reachableTiles", () => {
       }
     )
     const r = reachableTiles(b.state, b.state.units[b.players[0]!.id]!)
-    expect(r.has(posKey({ x: 2, y: 6 }))).toBe(true)
-    expect(r.has(posKey({ x: 2, y: 5 }))).toBe(false)
+    expect(r.get(posKey({ x: 2, y: 6 }))?.cost).toBe(1)
+    expect(r.has(posKey({ x: 2, y: 5 }))).toBe(true)
     expect(r.has(posKey({ x: 1, y: 6 }))).toBe(true)
   })
 })

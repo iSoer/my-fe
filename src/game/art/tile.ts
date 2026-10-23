@@ -293,38 +293,29 @@ function waterDeco(biomeId: string, base: string, frame = 0): string {
 }
 
 /** Стена стоит отдельным объектом на земле биома (а не заливает клетку целиком). */
-function wallOnGround(biomeId: string, broken: boolean): boolean {
-  if (["dump", "winter_park", "infested"].includes(biomeId)) return true
-  // Гнилое бревно лежит на мху, сквозь ржавую решётку виден бетон
-  return broken && (biomeId === "deep_forest" || biomeId === "factory")
+function wallOnGround(biomeId: string): boolean {
+  return ["dump", "winter_park", "infested"].includes(biomeId)
 }
 
-function wallDeco(biomeId: string, base: string, broken: boolean, variant = 0): string {
+function wallDeco(biomeId: string, base: string, variant = 0): string {
   const mortar = shade(base, -0.35)
-  const crack = broken
-    ? "<path d=\"M30 4 l6 14 l-6 10 l8 16 l-4 14\" fill=\"none\" stroke=\"#1a1a1a\" stroke-width=\"2.5\" stroke-linejoin=\"round\" />"
-    : ""
   switch (biomeId) {
     case "jungle":
-      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.4">${[0, 1, 2, 3, 4].map(i => `<rect x="${i * 12 + 3}" y="2" width="8" height="60" rx="4" />`).join("")}</g><g stroke="${mortar}" stroke-width="1.6">${[0, 1, 2, 3, 4].map(i => `<path d="M${i * 12 + 3} 22 h8 M${i * 12 + 3} 44 h8" />`).join("")}</g><path d="M0 14 q32 10 64 -2 M0 50 q32 -10 64 2" fill="none" stroke="#6b4a2c" stroke-width="2" />${broken ? `<path d="M26 2 l4 20 l-6 8 l8 16" fill="none" stroke="#3a2a14" stroke-width="2.5" /><rect x="39" y="2" width="8" height="26" fill="${hex(biomeDef(biomeId).colors.plain)}" />` : ""}`
+      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.4">${[0, 1, 2, 3, 4].map(i => `<rect x="${i * 12 + 3}" y="2" width="8" height="60" rx="4" />`).join("")}</g><g stroke="${mortar}" stroke-width="1.6">${[0, 1, 2, 3, 4].map(i => `<path d="M${i * 12 + 3} 22 h8 M${i * 12 + 3} 44 h8" />`).join("")}</g><path d="M0 14 q32 10 64 -2 M0 50 q32 -10 64 2" fill="none" stroke="#6b4a2c" stroke-width="2" />`
     case "desert":
-      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.2">${[0, 1, 2, 3, 4].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 13 + 1}" width="22" height="11" rx="2" />`).join("")).join("")}</g><g stroke="${mortar}" stroke-width="2" opacity=".7"><path d="M8 8 h4 M30 34 h6 M50 60 h5" /></g>${crack}`
+      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.2">${[0, 1, 2, 3, 4].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 13 + 1}" width="22" height="11" rx="2" />`).join("")).join("")}</g><g stroke="${mortar}" stroke-width="2" opacity=".7"><path d="M8 8 h4 M30 34 h6 M50 60 h5" /></g>`
     case "glacier":
-      return `<g fill="${base}" stroke="#e8f6ff" stroke-width="1.5">${[0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 16 + 1}" width="22" height="14" rx="3" />`).join("")).join("")}</g><g stroke="#fff" stroke-width="1" opacity=".8"><path d="M6 6 l6 4 M30 22 l6 4 M44 54 l6 4" /></g>${crack}`
+      return `<g fill="${base}" stroke="#e8f6ff" stroke-width="1.5">${[0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 16 + 1}" width="22" height="14" rx="3" />`).join("")).join("")}</g><g stroke="#fff" stroke-width="1" opacity=".8"><path d="M6 6 l6 4 M30 22 l6 4 M44 54 l6 4" /></g>`
     case "canyon":
-      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.2"><rect x="0" y="0" width="64" height="64" /><path d="M0 12 q32 4 64 -2 M0 26 q32 -4 64 2 M0 40 q32 4 64 -2 M0 54 q32 -4 64 2" fill="none" stroke="${shade(base, 0.2)}" stroke-width="3" /></g>${broken ? `<g fill="${shade(base, -0.2)}"><circle cx="20" cy="20" r="5" /><circle cx="44" cy="36" r="4" /><circle cx="30" cy="50" r="6" /><circle cx="52" cy="12" r="3" /></g>` : ""}`
+      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.2"><rect x="0" y="0" width="64" height="64" /><path d="M0 12 q32 4 64 -2 M0 26 q32 -4 64 2 M0 40 q32 4 64 -2 M0 54 q32 -4 64 2" fill="none" stroke="${shade(base, 0.2)}" stroke-width="3" /></g>`
     case "dump":
-      return `<rect x="12" y="4" width="40" height="56" rx="3" fill="#dfe6ea" stroke="#8a949b" stroke-width="2" /><path d="M12 28 h40" stroke="#8a949b" stroke-width="2" /><rect x="44" y="10" width="3" height="12" rx="1.5" fill="#8a949b" /><rect x="44" y="34" width="3" height="18" rx="1.5" fill="#8a949b" />${broken ? "<path d=\"M14 6 l10 18 l-8 12 l12 16\" fill=\"none\" stroke=\"#5a5a5a\" stroke-width=\"2\" />" : ""}`
+      return `<rect x="12" y="4" width="40" height="56" rx="3" fill="#dfe6ea" stroke="#8a949b" stroke-width="2" /><path d="M12 28 h40" stroke="#8a949b" stroke-width="2" /><rect x="44" y="10" width="3" height="12" rx="1.5" fill="#8a949b" /><rect x="44" y="34" width="3" height="18" rx="1.5" fill="#8a949b" />`
     case "winter_park":
-      return `<g fill="#eef5fb" stroke="#b9cfe0" stroke-width="1.5">${[0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 16 + 1}" width="22" height="14" rx="3" />`).join("")).join("")}</g>${crack}`
+      return `<g fill="#eef5fb" stroke="#b9cfe0" stroke-width="1.5">${[0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 16 + 1}" width="22" height="14" rx="3" />`).join("")).join("")}</g>`
     case "yard":
-      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.5">${[0, 1, 2, 3].map(i => `<rect x="${i * 16 + 1}" y="2" width="12" height="60" rx="2" />`).join("")}<rect x="0" y="18" width="64" height="5" /><rect x="0" y="42" width="64" height="5" /></g>${broken ? `<rect x="33" y="2" width="12" height="26" fill="${hex(biomeDef(biomeId).colors.plain)}" /><path d="M20 4 l-4 24 l6 -4 l-3 26" fill="none" stroke="#3a2a14" stroke-width="2" />` : ""}`
+      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.5">${[0, 1, 2, 3].map(i => `<rect x="${i * 16 + 1}" y="2" width="12" height="60" rx="2" />`).join("")}<rect x="0" y="18" width="64" height="5" /><rect x="0" y="42" width="64" height="5" /></g>`
     case "deep_forest": {
       const dk = shade(base, -0.45)
-      if (broken) {
-        // Гнилое бревно на мху: трухлявые дыры, грибы-трутовики, срез с кольцами
-        return `<rect x="0" y="14" width="60" height="36" rx="8" fill="${base}" stroke="${dk}" stroke-width="2" /><g stroke="${shade(base, -0.3)}" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M4 22 q20 -2 46 1 M2 32 q24 2 50 -1 M6 42 q22 -2 44 1" /></g><path d="M4 18 q24 -3 50 0" stroke="${shade(base, 0.3)}" stroke-width="2" fill="none" /><ellipse cx="56" cy="32" rx="7" ry="18" fill="${shade(base, 0.25)}" stroke="${dk}" stroke-width="1.8" /><g fill="none" stroke="${shade(base, -0.15)}" stroke-width="1"><ellipse cx="56" cy="32" rx="4.5" ry="12" /><ellipse cx="56" cy="32" rx="2" ry="5" /></g><g fill="#2a1a10"><ellipse cx="22" cy="30" rx="6" ry="4" /><ellipse cx="38" cy="40" rx="4" ry="2.6" /><ellipse cx="56" cy="36" rx="3" ry="5" /></g><g fill="#d8b070" stroke="#7a5a2a" stroke-width="1"><path d="M30 14 q5 -6 10 0 z" /><path d="M38 14 q4 -5 8 0 z" /><path d="M10 50 q5 6 10 0 z" /></g><g fill="#5f9a45" opacity=".9"><ellipse cx="12" cy="18" rx="7" ry="3" /><ellipse cx="46" cy="47" rx="6" ry="2.6" /></g>`
-      }
       // Вековой ствол: кора с глубокими бороздами, дупло-сучок, мох, корни уходят в землю
       let furrows = ""
       for (let i = 0; i < 6; i++) {
@@ -336,11 +327,6 @@ function wallDeco(biomeId: string, base: string, broken: boolean, variant = 0): 
     case "indoors": {
       const paper = "#d9c7a8"
       const wallpaper = `<rect x="0" y="0" width="64" height="64" fill="${paper}" />${[0, 1, 2, 3, 4, 5, 6, 7].map(i => `<rect x="${i * 8 + 2}" y="0" width="4" height="56" fill="${shade(paper, -0.08)}" />`).join("")}<g fill="${shade(paper, 0.18)}">${[0, 1, 2, 3].map(i => [0, 1, 2].map(k => `<path d="M${i * 16 + 8} ${k * 16 + 10} l3 4 l-3 4 l-3 -4 z" />`).join("")).join("")}</g><rect x="0" y="0" width="64" height="5" fill="${shade(paper, 0.2)}" stroke="${shade(paper, -0.35)}" stroke-width="1" /><rect x="0" y="52" width="64" height="12" fill="#f3ece0" stroke="#a89878" stroke-width="1.2" /><path d="M0 56 h64" stroke="#c8b898" stroke-width="1" />`
-      if (broken) {
-        // Дверь: филёнки, латунная ручка; по нижней филёнке пошла трещина — выбьют
-        const dk = shade(base, -0.4)
-        return `${wallpaper}<rect x="12" y="2" width="40" height="62" fill="${shade(base, -0.2)}" stroke="${dk}" stroke-width="1.6" /><rect x="16" y="5" width="32" height="59" fill="${base}" stroke="${dk}" stroke-width="1.4" /><g fill="${shade(base, 0.1)}" stroke="${dk}" stroke-width="1.2"><rect x="20" y="9" width="24" height="20" rx="1" /><rect x="20" y="35" width="24" height="24" rx="1" /></g><path d="M18 7 v54" stroke="#fff" stroke-width="1.2" opacity=".25" /><circle cx="43" cy="32" r="2.6" fill="#e0b060" stroke="#8a6420" stroke-width="1" /><path d="M22 40 l6 6 l-3 4 l8 5 l4 4" fill="none" stroke="#2a1a10" stroke-width="2" stroke-linejoin="round" /><path d="M36 37 l-3 6" stroke="#2a1a10" stroke-width="1.4" />`
-      }
       // Стена с обоями и плинтусом: на одной — картина, на другой — бра с тёплым светом
       const hang = variant % 2
         ? "<circle cx=\"32\" cy=\"26\" r=\"16\" fill=\"#ffe9a8\" opacity=\".35\" /><circle cx=\"32\" cy=\"26\" r=\"9\" fill=\"#fff3c8\" opacity=\".45\" /><path d=\"M25 22 h14 l-3 9 h-8 z\" fill=\"#f4d27a\" stroke=\"#a07a30\" stroke-width=\"1.2\" /><rect x=\"30\" y=\"31\" width=\"4\" height=\"5\" fill=\"#a07a30\" />"
@@ -349,11 +335,6 @@ function wallDeco(biomeId: string, base: string, broken: boolean, variant = 0): 
     }
     case "factory": {
       const dk = shade(base, -0.45)
-      if (broken) {
-        // Ржавая решётка на бетоне: рама, прутья в рыжих пятнах, один погнут
-        const bars = [12, 22, 42, 52].map(x => `<rect x="${x - 1.8}" y="4" width="3.6" height="56" fill="${base}" stroke="${shade(base, -0.45)}" stroke-width=".8" />`).join("")
-        return `<rect x="3" y="3" width="58" height="58" rx="2" fill="none" stroke="${shade(base, -0.45)}" stroke-width="6" /><rect x="3" y="3" width="58" height="58" rx="2" fill="none" stroke="${base}" stroke-width="3.6" />${bars}<path d="M32 4 v14 q0 8 6 12 q-6 6 -6 14 v16" fill="none" stroke="${shade(base, -0.45)}" stroke-width="5.4" /><path d="M32 4 v14 q0 8 6 12 q-6 6 -6 14 v16" fill="none" stroke="${base}" stroke-width="3.6" /><g fill="${base}" stroke="${shade(base, -0.45)}" stroke-width=".8"><rect x="4" y="22" width="56" height="3.6" /><rect x="4" y="42" width="56" height="3.6" /></g><g fill="#5a2a14" opacity=".75"><circle cx="12" cy="34" r="2" /><circle cx="44" cy="12" r="1.6" /><circle cx="22" cy="52" r="2.2" /><circle cx="52" cy="44" r="1.8" /></g><g fill="#e08a4a" opacity=".7"><circle cx="21" cy="14" r="1.2" /><circle cx="53" cy="30" r="1.2" /></g>`
-      }
       // Стальная стена: клёпаные листы, сварной шов, на одном варианте ржавые потёки
       const panels = [0, 1].map(r => [0, 1].map(c => `<rect x="${c * 32 + 1}" y="${r * 32 + 1}" width="30" height="30" fill="${shade(base, (r + c) % 2 ? -0.05 : 0.06)}" stroke="${dk}" stroke-width="1.4" />`).join("")).join("")
       const rivets = [4, 28, 36, 60].map(x => [4, 28, 36, 60].map(y => `<circle cx="${x}" cy="${y}" r="1.8" fill="${shade(base, 0.35)}" stroke="${dk}" stroke-width=".8" />`).join("")).join("")
@@ -361,19 +342,122 @@ function wallDeco(biomeId: string, base: string, broken: boolean, variant = 0): 
     }
     case "infested": {
       const dk = shade(base, -0.5)
-      const plank = (x: number, y: number, w: number, h: number, a: number, c: string): string =>
-        `<g transform="rotate(${a} ${x + w / 2} ${y + h / 2})"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1" fill="${c}" stroke="${dk}" stroke-width="1.4" /><path d="M${x + 3} ${y + h * 0.4} h${w - 8}" stroke="${shade(c, -0.25)}" stroke-width="1" /><path d="M${x + 1} ${y + 1.4} h${w - 2}" stroke="#fff" stroke-width="1" opacity=".2" /><g fill="#2a2420"><circle cx="${x + 3}" cy="${y + h / 2}" r="1" /><circle cx="${x + w - 3}" cy="${y + h / 2}" r="1" /></g></g>`
-      const wire = (d: string): string => `<path d="${d}" fill="none" stroke="#2a2a2a" stroke-width="1.6" /><path d="${d}" fill="none" stroke="#a8acb0" stroke-width=".8" />`
-      if (broken) {
-        // Разбитая баррикада: обломки досок, провисшая проволока
-        return `${plank(2, 30, 60, 11, -6, base)}<path d="M4 14 l18 -4 l2 6 l-3 4 l-17 3 z" fill="${shade(base, 0.08)}" stroke="${dk}" stroke-width="1.4" /><path d="M40 46 l18 6 l-2 8 l-14 -3 l-4 -5 l3 -2 z" fill="${base}" stroke="${dk}" stroke-width="1.4" />${wire("M0 22 q20 22 40 10 t24 12")}<g stroke="#2a2a2a" stroke-width="1.2">${[10, 22, 34, 46].map(x => `<path d="M${x - 2} ${30 - 2} l4 4 M${x + 2} ${30 - 2} l-4 4" />`).join("")}</g>`
-      }
       // Баррикада: доски накрест, гвозди, колючая проволока сверху
-      return `${plank(0, 10, 64, 12, -3, shade(base, 0.08))}${plank(0, 26, 64, 12, 2, base)}${plank(0, 42, 64, 12, -2, shade(base, 0.04))}${plank(6, 28, 52, 9, 38, shade(base, 0.15))}${wire("M0 7 l8 -3 l8 3 l8 -3 l8 3 l8 -3 l8 3 l8 -3 l8 3")}<g stroke="#2a2a2a" stroke-width="1.2">${[8, 24, 40, 56].map(x => `<path d="M${x - 2} 2 l4 4 M${x + 2} 2 l-4 4" />`).join("")}</g><ellipse cx="46" cy="50" rx="5" ry="2" fill="#7fe04a" opacity=".5" />`
+      return `${plank(0, 10, 64, 12, -3, shade(base, 0.08), dk)}${plank(0, 26, 64, 12, 2, base, dk)}${plank(0, 42, 64, 12, -2, shade(base, 0.04), dk)}${plank(6, 28, 52, 9, 38, shade(base, 0.15), dk)}${barbedWire("M0 7 l8 -3 l8 3 l8 -3 l8 3 l8 -3 l8 3 l8 -3 l8 3")}<g stroke="#2a2a2a" stroke-width="1.2">${[8, 24, 40, 56].map(x => `<path d="M${x - 2} 2 l4 4 M${x + 2} 2 l-4 4" />`).join("")}</g><ellipse cx="46" cy="50" rx="5" ry="2" fill="#7fe04a" opacity=".5" />`
     }
     default:
-      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.5">${[0, 1, 2, 3, 4].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 13 + 1}" width="22" height="11" />`).join("")).join("")}</g>${crack}`
+      return `<g fill="${base}" stroke="${mortar}" stroke-width="1.5">${[0, 1, 2, 3, 4].map(r => [0, 1, 2].map(c => `<rect x="${c * 24 + (r % 2 ? 12 : 0) - 10}" y="${r * 13 + 1}" width="22" height="11" />`).join("")).join("")}</g>`
   }
+}
+
+/** Доска, повёрнутая на `a`° вокруг центра: прожилка, блик и гвозди по концам. */
+function plank(x: number, y: number, w: number, h: number, a: number, c: string, dk: string): string {
+  return `<g transform="rotate(${a} ${f1(x + w / 2)} ${f1(y + h / 2)})"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1" fill="${c}" stroke="${dk}" stroke-width="1.4" /><path d="M${x + 3} ${f1(y + h * 0.4)} h${w - 8}" stroke="${shade(c, -0.25)}" stroke-width="1" /><path d="M${x + 1} ${y + 1.4} h${w - 2}" stroke="#fff" stroke-width="1" opacity=".2" /><g fill="#2a2420"><circle cx="${x + 3}" cy="${f1(y + h / 2)}" r="1" /><circle cx="${x + w - 3}" cy="${f1(y + h / 2)}" r="1" /></g></g>`
+}
+
+/** Колючая проволока: тёмная жила со светлым бликом. */
+function barbedWire(d: string): string {
+  return `<path d="${d}" fill="none" stroke="#2a2a2a" stroke-width="1.6" /><path d="${d}" fill="none" stroke="#a8acb0" stroke-width=".8" />`
+}
+
+/**
+ * Хлипкое препятствие — отдельный предмет посреди клетки: вокруг видна земля, под ним тень. Так оно читается
+ * как преграда, которую можно сломать, а не как сплошная стена во всю клетку.
+ */
+function barricadeDeco(biomeId: string, base: string): string {
+  const dk = shade(base, -0.45)
+  const lt = shade(base, 0.25)
+  const shadow = "<ellipse cx=\"32\" cy=\"53\" rx=\"25\" ry=\"6\" fill=\"#000\" opacity=\".22\" />"
+  let body: string
+  switch (biomeId) {
+    case "yard": {
+      // Обломок штакетника: колья на двух поперечинах, один выбит и покосился
+      const picket = (x: number, top: number, a = 0): string =>
+        `<g transform="rotate(${a} ${x + 5} 52)"><path d="M${x} ${top + 5} l5 -6 l5 6 V52 h-10 z" fill="${base}" stroke="${dk}" stroke-width="1.4" /><path d="M${x + 2} ${top + 6} V50" stroke="${lt}" stroke-width="1.2" opacity=".6" /><g fill="#2a2420"><circle cx="${x + 5}" cy="25" r="1" /><circle cx="${x + 5}" cy="41" r="1" /></g></g>`
+      body = `<g fill="${shade(base, -0.12)}" stroke="${dk}" stroke-width="1.3"><rect x="7" y="22" width="50" height="6" rx="1" /><rect x="7" y="38" width="50" height="6" rx="1" /></g>${picket(9, 14)}${picket(21, 11)}${picket(34, 16, 10)}${picket(45, 13)}`
+      break
+    }
+    case "roofs": {
+      // Кусок парапета: два ряда кирпича под бетонной плитой, один кирпич выпал
+      let bricks = ""
+      for (let r = 0; r < 2; r++) {
+        for (let x = r ? -1 : 6; x < 58; x += 14) {
+          const x0 = Math.max(7, x)
+          const x1 = Math.min(57, x + 13)
+          bricks += `<rect x="${x0}" y="${30 + r * 11}" width="${x1 - x0}" height="10" rx="1" />`
+        }
+      }
+      body = `<g fill="${base}" stroke="${dk}" stroke-width="1.3">${bricks}</g><rect x="5" y="23" width="54" height="7" rx="1.5" fill="${lt}" stroke="${dk}" stroke-width="1.4" /><path d="M7 25 h50" stroke="#fff" stroke-width="1" opacity=".35" /><path d="M30 31 l3 6 l-3 4 l4 6" fill="none" stroke="${dk}" stroke-width="1.6" /><rect x="46" y="49" width="12" height="7" rx="1" fill="${base}" stroke="${dk}" stroke-width="1.3" transform="rotate(14 52 52)" />`
+      break
+    }
+    case "basement": {
+      // Трухлявая перегородка: три гнилые доски на косой распорке, плесень и дыры
+      const board = (x: number, top: number): string =>
+        `<path d="M${x} 52 V${top + 3} l3 -3 l3 2 l4 -2 l1 3 V52 z" fill="${base}" stroke="${dk}" stroke-width="1.4" /><path d="M${x + 3} ${top + 6} V48" stroke="${shade(base, -0.2)}" stroke-width="1" />`
+      body = `${board(10, 12)}${board(22, 9)}${board(34, 14)}${board(46, 11)}${plank(8, 28, 50, 8, -24, shade(base, -0.1), dk)}<g fill="#1a100a"><ellipse cx="16" cy="44" rx="2.4" ry="3.4" /><ellipse cx="40" cy="22" rx="2" ry="3" /></g><g fill="#6a8a4a" opacity=".75"><circle cx="27" cy="46" r="2.6" /><circle cx="31" cy="48" r="1.8" /><circle cx="51" cy="20" r="2" /></g>`
+      break
+    }
+    case "dump": {
+      // Ржавый холодильник, поваленный набок: вмятина, рыжие пятна, ручки
+      body = `<rect x="5" y="25" width="54" height="28" rx="4" fill="#dfe6ea" stroke="#8a949b" stroke-width="2" /><path d="M22 25 v28" stroke="#8a949b" stroke-width="2" /><rect x="11" y="44" width="8" height="3" rx="1.5" fill="#8a949b" /><rect x="28" y="44" width="16" height="3" rx="1.5" fill="#8a949b" /><path d="M8 28 h48" stroke="#fff" stroke-width="1.6" opacity=".5" /><g fill="#a0603a" opacity=".8"><ellipse cx="50" cy="35" rx="5" ry="3.4" /><ellipse cx="13" cy="33" rx="2.6" ry="2" /><circle cx="36" cy="38" r="1.6" /></g><path d="M30 31 q3 4 0 8" fill="none" stroke="#8a949b" stroke-width="1.4" /><path d="M56 22 l-3 4 l5 1 z" fill="#8a949b" />`
+      break
+    }
+    case "winter_park": {
+      // Рыхлая крепость: снежные кирпичи в два ряда, шапка снега, снежок у подножия
+      const block = (x: number, y: number, w: number): string =>
+        `<rect x="${x}" y="${y}" width="${w}" height="12" rx="4" fill="#eef5fb" stroke="#b9cfe0" stroke-width="1.5" />`
+      body = `${block(6, 40, 17)}${block(23, 40, 18)}${block(41, 40, 17)}${block(12, 28, 19)}${block(31, 28, 20)}${block(22, 16, 18)}<path d="M23 18 q9 -5 17 0" stroke="#fff" stroke-width="2" fill="none" /><circle cx="54" cy="54" r="4" fill="#f4f9fd" stroke="#b9cfe0" stroke-width="1.2" />`
+      break
+    }
+    case "jungle": {
+      // Трухлявый бамбук: стебли разной высоты, перехваченные лианой
+      const stalk = (x: number, top: number): string =>
+        `<rect x="${x}" y="${top}" width="8" height="${52 - top}" rx="3" fill="${base}" stroke="${dk}" stroke-width="1.3" /><g stroke="${dk}" stroke-width="1.4">${[top + 10, top + 22, top + 34].filter(y => y < 50).map(y => `<path d="M${x} ${y} h8" />`).join("")}</g><path d="M${x + 2} ${top + 3} V50" stroke="${lt}" stroke-width="1.2" opacity=".6" />`
+      body = `${stalk(10, 14)}${stalk(19, 8)}${stalk(28, 12)}${stalk(37, 6)}${stalk(46, 15)}<g fill="none" stroke="#6b4a2c" stroke-width="2.2"><path d="M8 26 q24 6 48 0" /><path d="M8 42 q24 -5 48 1" /></g><path d="M44 22 q8 -6 14 -2 q-6 6 -14 2 z" fill="#4f8f45" stroke="#2f5a26" stroke-width=".8" /><ellipse cx="32" cy="46" rx="3" ry="2" fill="#2a1c12" opacity=".8" />`
+      break
+    }
+    case "desert": {
+      // Глиняный обломок стены: оплывшие края, глубокие трещины, соломинки в саману
+      body = `<path d="M7 53 V31 q0 -8 8 -9 l9 -2 q7 -7 14 -2 l10 2 q9 1 9 10 V53 z" fill="${base}" stroke="${dk}" stroke-width="1.8" /><path d="M10 30 q2 -5 7 -6 l8 -2 q6 -6 12 -2" fill="none" stroke="${lt}" stroke-width="2" /><g fill="none" stroke="${dk}" stroke-width="1.6" stroke-linejoin="round"><path d="M30 20 l-3 10 l5 6 l-4 10 l3 7" /><path d="M46 28 l-5 8 l3 6" /><path d="M14 38 l6 4" /></g><g stroke="#e8d08a" stroke-width="1"><path d="M18 46 l4 -1 M38 44 l3 2 M50 46 l4 -1" /></g><path d="M50 52 l5 -3 l4 2 l-2 3 z" fill="${base}" stroke="${dk}" stroke-width="1" />`
+      break
+    }
+    case "glacier": {
+      // Хрупкий лёд: связка ледяных клыков, светлые грани и сеть трещинок
+      const shard = (d: string, c: string): string => `<path d="${d}" fill="${c}" stroke="#e8f6ff" stroke-width="1.5" stroke-linejoin="round" />`
+      body = `${shard("M10 53 L15 26 L23 18 L28 53 z", shade(base, -0.06))}${shard("M24 53 L30 8 L39 15 L42 53 z", base)}${shard("M38 53 L44 24 L53 30 L54 53 z", shade(base, -0.1))}<g stroke="#fff" stroke-width="1.4" opacity=".85" fill="none"><path d="M30 12 L28 48" /><path d="M16 30 L14 48" /><path d="M45 29 L43 48" /></g><path d="M33 22 l3 6 l-4 5 l4 7" fill="none" stroke="${shade(base, -0.35)}" stroke-width="1.2" />`
+      break
+    }
+    case "canyon": {
+      // Осыпь: куча валунов, верхний еле держится
+      const rock = (cx: number, cy: number, rx: number, ry: number, k: number): string =>
+        `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${shade(base, k)}" stroke="${dk}" stroke-width="1.5" /><path d="M${cx - rx * 0.6} ${f1(cy - ry * 0.4)} q${f1(rx * 0.5)} ${f1(-ry * 0.5)} ${f1(rx)} ${f1(-ry * 0.2)}" stroke="#fff" stroke-width="1.3" fill="none" opacity=".35" />`
+      body = `${rock(17, 45, 12, 9, -0.08)}${rock(42, 46, 14, 9, 0)}${rock(28, 32, 12, 9, 0.06)}${rock(49, 32, 7, 6, -0.12)}${rock(13, 31, 6, 5, 0.02)}${rock(32, 19, 7, 6, 0.1)}<g fill="${dk}" opacity=".6"><circle cx="8" cy="54" r="1.4" /><circle cx="56" cy="55" r="1.2" /><circle cx="30" cy="56" r="1" /></g>`
+      break
+    }
+    case "deep_forest": {
+      // Гнилое бревно поперёк клетки: кора с бороздами, трухлявые дыры, трутовики, срез с кольцами
+      body = `<rect x="5" y="26" width="48" height="24" rx="7" fill="${base}" stroke="${dk}" stroke-width="2" /><g stroke="${shade(base, -0.3)}" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M9 32 q18 -2 38 1 M8 39 q20 2 40 -1 M10 45 q18 -2 36 1" /></g><path d="M9 29 q20 -3 40 0" stroke="${shade(base, 0.3)}" stroke-width="1.8" fill="none" /><ellipse cx="53" cy="38" rx="6" ry="12" fill="${shade(base, 0.25)}" stroke="${dk}" stroke-width="1.8" /><g fill="none" stroke="${shade(base, -0.15)}" stroke-width="1"><ellipse cx="53" cy="38" rx="3.8" ry="8" /><ellipse cx="53" cy="38" rx="1.6" ry="3.4" /></g><g fill="#2a1a10"><ellipse cx="20" cy="38" rx="5" ry="3" /><ellipse cx="36" cy="44" rx="3" ry="2" /></g><g fill="#d8b070" stroke="#7a5a2a" stroke-width="1"><path d="M26 27 q4 -5 8 0 z" /><path d="M33 27 q3 -4 6 0 z" /></g><g fill="#5f9a45" opacity=".9"><ellipse cx="12" cy="27" rx="6" ry="2.6" /><ellipse cx="42" cy="50" rx="5" ry="2.2" /></g>`
+      break
+    }
+    case "indoors": {
+      // Опрокинутый шкаф: дверцы с ручками, сверху — коробка со старьём
+      body = `<rect x="5" y="30" width="54" height="22" rx="2" fill="${base}" stroke="${dk}" stroke-width="1.8" /><g fill="${shade(base, 0.1)}" stroke="${dk}" stroke-width="1.2"><rect x="9" y="33" width="22" height="16" rx="1" /><rect x="33" y="33" width="22" height="16" rx="1" /></g><g fill="#e0b060" stroke="#7a5a2a" stroke-width=".8"><circle cx="29" cy="41" r="1.6" /><circle cx="35" cy="41" r="1.6" /></g><path d="M7 32 h50" stroke="#fff" stroke-width="1" opacity=".25" /><g transform="rotate(-6 30 22)"><rect x="17" y="13" width="26" height="17" rx="1" fill="#c9924f" stroke="#7a5a2a" stroke-width="1.4" /><path d="M17 17 h26 M30 13 v4" stroke="#7a5a2a" stroke-width="1.2" /><rect x="26" y="20" width="8" height="5" fill="#f1e3c8" stroke="#7a5a2a" stroke-width=".8" /></g>`
+      break
+    }
+    case "factory": {
+      // Секция ржавой решётки на опорах: рама, прутья в рыжих пятнах, один погнут
+      const bars = [16, 24, 40, 48].map(x => `<rect x="${x - 1.6}" y="12" width="3.2" height="34" fill="${base}" stroke="${dk}" stroke-width=".8" />`).join("")
+      body = `<rect x="9" y="10" width="46" height="38" rx="2" fill="none" stroke="${dk}" stroke-width="5" /><rect x="9" y="10" width="46" height="38" rx="2" fill="none" stroke="${base}" stroke-width="3" />${bars}<path d="M32 12 v10 q0 5 5 8 q-5 4 -5 9 v7" fill="none" stroke="${dk}" stroke-width="4.6" /><path d="M32 12 v10 q0 5 5 8 q-5 4 -5 9 v7" fill="none" stroke="${base}" stroke-width="3" /><g fill="#e8c22a" stroke="#2a2a2a" stroke-width="1"><rect x="6" y="47" width="16" height="6" rx="1" /><rect x="42" y="47" width="16" height="6" rx="1" /></g><g stroke="#2a2a2a" stroke-width="2"><path d="M10 47 l-3 6 M16 47 l-3 6 M46 47 l-3 6 M52 47 l-3 6" /></g><g fill="#5a2a14" opacity=".75"><circle cx="16" cy="30" r="1.8" /><circle cx="48" cy="20" r="1.5" /><circle cx="24" cy="40" r="1.8" /></g>`
+      break
+    }
+    default: {
+      // Козлы-баррикада: две доски на крестовинах, сверху колючая проволока
+      const legs = "M6 54 L18 18 M18 54 L6 18 M46 54 L58 18 M58 54 L46 18"
+      const slime = biomeId === "infested" ? "<ellipse cx=\"40\" cy=\"52\" rx=\"6\" ry=\"2.2\" fill=\"#7fe04a\" opacity=\".5\" />" : ""
+      body = `<path d="${legs}" stroke="${dk}" stroke-width="4.4" stroke-linecap="round" /><path d="${legs}" stroke="${shade(base, -0.1)}" stroke-width="2.6" stroke-linecap="round" />${plank(4, 24, 56, 9, -4, shade(base, 0.08), dk)}${plank(4, 36, 56, 9, 3, base, dk)}${barbedWire("M4 19 l7 -3 l7 3 l7 -3 l7 3 l7 -3 l7 3 l7 -3 l7 3")}<g stroke="#2a2a2a" stroke-width="1.2">${[11, 25, 39, 53].map(x => `<path d="M${x - 2} 14 l4 4 M${x + 2} 14 l-4 4" />`).join("")}</g>${slime}`
+    }
+  }
+  return `${shadow}${body}`
 }
 
 function coverDeco(biomeId: string, base: string): string {
@@ -435,7 +519,7 @@ function coverDeco(biomeId: string, base: string): string {
 export const TILE_FRAME_COUNT: Partial<Record<TerrainId, number>> = { water: 4, forest: 2 }
 
 /** Сколько вариантов внешнего вида у местности: фактура и зеркальный объект, чтобы поле не было «плиткой». */
-export const TILE_VARIANTS: Partial<Record<TerrainId, number>> = { plain: 3, forest: 2, mountain: 2, cover: 2, wall: 2 }
+export const TILE_VARIANTS: Partial<Record<TerrainId, number>> = { plain: 3, forest: 2, mountain: 2, cover: 2, wall: 2, wall_breakable: 2 }
 
 /** Вода заливает клетку целиком (а не лежит лужей на земле): у такой воды есть берега с пеной. */
 export function waterFillsTile(biomeId: string): boolean {
@@ -726,13 +810,16 @@ export function tileSvg(biomeId: string, terrain: TerrainId, frame = 0, variant 
       shadowed = false
       break
     }
-    case "wall":
-    case "wall_breakable": {
-      const broken = terrain === "wall_breakable"
-      const onGround = wallOnGround(biomeId, broken)
+    case "wall_breakable":
+      base = plain
+      ground = groundTexture(biomeId, plain, r, 0.6, 0)
+      deco = barricadeDeco(biomeId, own)
+      break
+    case "wall": {
+      const onGround = wallOnGround(biomeId)
       base = onGround ? plain : shade(own, -0.1)
       ground = onGround ? groundTexture(biomeId, plain, r, 0.4, 0) : ""
-      deco = wallDeco(biomeId, own, broken, variant)
+      deco = wallDeco(biomeId, own, variant)
       break
     }
     case "cover":

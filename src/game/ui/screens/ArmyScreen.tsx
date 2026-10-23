@@ -19,7 +19,6 @@ import { TopBar } from "../components/TopBar"
 import { ResourceBar } from "../components/ResourceBar"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { RarityStars, WeaponBadge } from "../components/Badges"
-import { traitDef, traitEffects } from "@game/content/traits"
 import { ShopSheet } from "../components/ShopSheet"
 import { RewardPicker } from "../components/RewardPicker"
 import { useToast } from "../components/Toast"
@@ -46,9 +45,6 @@ function FilledSlot({
   const cls = unitClass(unit)
   const st = visibleStats(unit)
   const canLearn = learnableNow(unit).some(id => skillCost(id) <= unit.sp)
-  // Особенность с недостатком — красный значок прямо в списке
-  const trait = unit.traitId ? traitDef(unit.traitId) : undefined
-  const flaw = trait && traitEffects(trait).cons.length > 0 ? trait : undefined
   return (
     <div
       className={`card slot-card filled clickable ${justHired ? "just-hired" : "pop-in"}`}
@@ -75,7 +71,6 @@ function FilledSlot({
         <WeaponBadge skill={cls.weaponSkill} />
         {canLearn && <span className="chip red pop">{tr("New skill", "Есть навык")}</span>}
         {hasClassUpgrade(unit) && <span className="chip gold pop">{tr("New class", "Новый класс")}</span>}
-        {flaw && <span className="chip trait-chip" title={flaw.desc}>{`⚠ ${flaw.name}`}</span>}
         <button
           type="button"
           className={`chip squad-toggle ${inSquad ? "squad" : ""}`}

@@ -102,7 +102,6 @@ export interface SkillHooks {
   flatDamage?: (ctx: CombatCtx, strike: StrikeInfo) => number
   damageMultiplier?: (ctx: CombatCtx) => number
   passThrough?: boolean
-  ignoreForestSlow?: boolean
   moveBonus?: number
   cdMod?: number
   wrathfulStaff?: boolean
@@ -184,21 +183,6 @@ export interface PassiveDef {
   hooks: SkillHooks
   /** Ограничения по классам. */
   allow?: { moveTypes?: MoveType[], weaponSkills?: WeaponSkill[] }
-}
-
-export interface TraitDef {
-  id: string
-  name: string
-  desc: string
-  /**
-   * Плюсы и минусы по отдельности — у особенностей с недостатком (интерфейс показывает минусы красным).
-   * Без них вся особенность — плюс, текст — `desc`.
-   */
-  pros?: string[]
-  cons?: string[]
-  hooks: SkillHooks
-  onlySpecies?: Species
-  rare?: boolean
 }
 
 /** Расходник Лавки: используется в бою командой «Предмет» на себя или соседнего союзника. */

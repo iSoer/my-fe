@@ -1,18 +1,16 @@
 import type { BattleState, BattleUnit, MoveType, Pos, Side, TerrainId } from "../types"
 import { inBounds, manhattan, posKey } from "../types"
 import { livingUnits, otherSide, terrainAt, unitAt } from "../battle/query"
-import { hasPassThrough, ignoresForest, moveRange } from "../skills/engine"
+import { hasPassThrough, moveRange } from "../skills/engine"
 import { unitClass } from "@game/content/classes"
 import { weaponDef } from "@game/content/weapons"
 
-export function moveCost(terrain: TerrainId, moveType: MoveType, ignoreForest = false): number | null {
+/** Заросли и укрытия не мешают идти — они только дают бонус стоящему в них (`TERRAIN_BONUS`). */
+export function moveCost(terrain: TerrainId, moveType: MoveType): number | null {
   switch (terrain) {
     case "plain":
     case "cover":
-      return 1
     case "forest":
-      if (moveType === "cavalry") return null
-      if (moveType === "infantry" && !ignoreForest) return 2
       return 1
     case "mountain":
     case "water":
@@ -57,7 +55,6 @@ export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?
   const cls = unitClass(unit)
   const budget = moveRange(unit)
   const pass = hasPassThrough(unit)
-  const ignoreForest = ignoresForest(unit)
   const start = fromOverride ?? bu.pos
   const result: ReachMap = new Map()
   result.set(posKey(start), { pos: start, cost: 0, canStop: true })
@@ -66,7 +63,7 @@ export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?
     frontier.sort((a, b) => a.cost - b.cost)
     const cur = frontier.shift() as ReachNode
     for (const n of orthoNeighbors(cur.pos)) {
-      const c = moveCost(terrainAt(state, n), cls.moveType, ignoreForest)
+      const c = moveCost(terrainAt(state, n), cls.moveType)
       if (c === null) continue
       const total = cur.cost + c
       if (total > budget) continue
@@ -125,12 +122,31 @@ export function targetsFrom(state: BattleState, bu: BattleUnit, from: Pos): Batt
   return livingUnits(state, otherSide(bu.side)).filter(u => manhattan(u.pos, from) === range)
 }
 
+/** Целое (ещё не сломанное) хлипкое препятствие на клетке. */
+export function isBreakableWall(state: BattleState, p: Pos): boolean {
+  return state.map.tiles[p.y]?.[p.x] === "wall_breakable" && (state.walls[posKey(p)] ?? 0) > 0
+}
+
 /** Хлипкие стены, атакуемые с клетки from. */
 export function wallsFrom(state: BattleState, bu: BattleUnit, from: Pos): Pos[] {
   const range = weaponRange(state, bu)
-  return tilesAtDistance(from, range).filter(
-    p => state.map.tiles[p.y]?.[p.x] === "wall_breakable" && (state.walls[posKey(p)] ?? 0) > 0
-  )
+  return tilesAtDistance(from, range).filter(p => isBreakableWall(state, p))
+}
+
+export interface WallOption {
+  wall: Pos
+  from: Pos
+}
+
+/** Все пары (стена, клетка) для юнита с учётом движения — в том числе с места, где он уже стоит. */
+export function wallOptions(state: BattleState, bu: BattleUnit, reach?: ReachMap): WallOption[] {
+  const r = reach ?? reachableTiles(state, bu)
+  const out: WallOption[] = []
+  for (const node of r.values()) {
+    if (!node.canStop) continue
+    for (const w of wallsFrom(state, bu, node.pos)) out.push({ wall: w, from: node.pos })
+  }
+  return out
 }
 
 export interface AttackOption {

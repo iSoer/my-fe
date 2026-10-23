@@ -37,7 +37,6 @@ const unitSchema = z.object({
   gender: z.enum(["m", "f"]),
   species: z.enum(["cat", "dog", "mouse"]),
   breedId: z.string(),
-  traitId: z.string().optional(),
   personalityId: z.string(),
   classId: classIdSchema,
   weaponSkill: z.enum(WEAPON_SKILLS),

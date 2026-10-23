@@ -27,7 +27,6 @@ export interface TestUnitSpec {
   seed?: number
   pos: Pos
   skills?: Partial<UnitSkills>
-  traitId?: string | null
   species?: "cat" | "dog"
   stance?: Stance
   /** Боевые статы (шкала FEH), одинаковые на любом уровне. */
@@ -88,7 +87,6 @@ export function makeUnit(spec: TestUnitSpec, isEnemy: boolean): UnitInstance {
     rarity: 3,
     isEnemy,
     species: spec.species,
-    withTrait: false,
     isBoss: spec.isBoss
   })
   // Комплект ставится напрямую, в обход ярусов: бою не важно, открыт ли класс на уровне
@@ -104,8 +102,6 @@ export function makeUnit(spec: TestUnitSpec, isEnemy: boolean): UnitInstance {
     u.baseStats = own
     u.maxStats = { ...own }
   }
-  if (spec.traitId === null) delete u.traitId
-  else if (spec.traitId) u.traitId = spec.traitId
   if (spec.skills) u.skills = { ...u.skills, ...spec.skills }
   if (spec.weaponTier !== undefined) u.weaponTier = spec.weaponTier
   // убрать стартовые пассивки/спецприёмы, если явно не заданы — чтобы тесты были предсказуемы

@@ -208,7 +208,6 @@ function makeEnemy(
     isEnemy: true,
     factionId,
     isBoss,
-    withTrait: isBoss || difficulty === "hard" || difficulty === "nightmare",
     now
   })
   const mult = difficultyDef(difficulty).enemyStatMult

@@ -4,7 +4,7 @@ import type { CombatCtx, CombatUnitView, StrikeInfo } from "../skills/types"
 import { counterAnyRange, negatesEffective, specialMaxCd, unitKit, wrathfulStaff } from "../skills/engine"
 import { visibleStats } from "../units"
 import { livingUnits, terrainAt } from "../battle/query"
-import { COMBAT } from "@game/content/balance"
+import { COMBAT, TERRAIN_BONUS } from "@game/content/balance"
 
 export interface CombatSideResult {
   unitId: string
@@ -69,7 +69,7 @@ function makeView(state: BattleState, bu: BattleUnit, isInitiator: boolean): Com
 
 function applyCombatMods(state: BattleState, self: CombatUnitView, foe: CombatUnitView): void {
   const ctx: CombatCtx = { state, self, foe }
-  let mod: Stats = emptyStats()
+  let mod: Stats = addStats(emptyStats(), TERRAIN_BONUS[terrainAt(state, self.bu.pos)] ?? {})
   for (const h of unitKit(self.unit).hooks) {
     const m = h.combatStatMod?.(ctx)
     if (m) mod = addStats(mod, m)

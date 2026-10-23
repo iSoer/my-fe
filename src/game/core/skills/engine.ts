@@ -1,4 +1,4 @@
-import type { AssistDef, ClassDef, PassiveDef, SkillHooks, SpecialDef, TalismanDef, TraitDef, WeaponDef } from "./types"
+import type { AssistDef, ClassDef, PassiveDef, SkillHooks, SpecialDef, TalismanDef, WeaponDef } from "./types"
 import type { Stats, UnitInstance } from "../types"
 import { addStats, emptyStats } from "../types"
 import { unitClass } from "@game/content/classes"
@@ -6,7 +6,6 @@ import { weaponDef } from "@game/content/weapons"
 import { passiveDef } from "@game/content/skills/passives"
 import { specialDef } from "@game/content/skills/specials"
 import { assistDef } from "@game/content/skills/assists"
-import { traitDef } from "@game/content/traits"
 import { talismanDef } from "@game/content/items"
 import { MOVE_RANGE } from "@game/content/classes"
 
@@ -14,7 +13,6 @@ export interface UnitKit {
   cls: ClassDef
   weapon: WeaponDef
   passives: PassiveDef[]
-  trait?: TraitDef
   talisman?: TalismanDef
   special?: SpecialDef
   assist?: AssistDef
@@ -34,19 +32,17 @@ export function unitKit(unit: UnitInstance): UnitKit {
     const id = unit.skills[slot]
     if (id) passives.push(passiveDef(id))
   }
-  const trait = unit.traitId ? traitDef(unit.traitId) : undefined
   const special = unit.skills.special ? specialDef(unit.skills.special) : undefined
   const assist = unit.skills.assist ? assistDef(unit.skills.assist) : undefined
   const talisman = unit.accessory ? talismanDef(unit.accessory) : undefined
   const hooks: SkillHooks[] = passives.map(p => p.hooks)
-  if (trait) hooks.push(trait.hooks)
   if (talisman) hooks.push(talisman.hooks)
-  const kit: UnitKit = { cls, weapon, passives, trait, talisman, special, assist, hooks }
+  const kit: UnitKit = { cls, weapon, passives, talisman, special, assist, hooks }
   kitCache.set(unit, kit)
   return kit
 }
 
-/** Постоянные бонусы к статам от навыков, черты, талисмана и оружия (без Mt). */
+/** Постоянные бонусы к статам от навыков, талисмана и оружия (без Mt). */
 export function permanentBonus(unit: UnitInstance): Stats {
   const kit = unitKit(unit)
   let s = emptyStats()
@@ -64,10 +60,6 @@ export function moveRange(unit: UnitInstance): number {
 
 export function hasPassThrough(unit: UnitInstance): boolean {
   return unitKit(unit).hooks.some(h => h.passThrough)
-}
-
-export function ignoresForest(unit: UnitInstance): boolean {
-  return unitKit(unit).hooks.some(h => h.ignoreForestSlow)
 }
 
 export function counterAnyRange(unit: UnitInstance): boolean {

@@ -16,7 +16,6 @@ import { gradeWeaponId, isMagicWeapon, isWeaponId, weaponDef } from "@game/conte
 import { SPECIALS } from "@game/content/skills/specials"
 import { ASSISTS } from "@game/content/skills/assists"
 import { PASSIVES } from "@game/content/skills/passives"
-import { TRAITS } from "@game/content/traits"
 import { BOSS_TITLES, EPITHETS, NAMES } from "@game/content/names"
 import { BREEDS } from "@game/content/breeds"
 import { PERSONALITIES } from "@game/content/personalities"
@@ -334,8 +333,6 @@ export interface GenerateUnitOptions {
   isEnemy?: boolean
   factionId?: string
   isBoss?: boolean
-  /** Выдавать ли Особенность (у игрока — всегда). */
-  withTrait?: boolean
   now?: number
 }
 
@@ -356,7 +353,7 @@ function pickAppearance(rng: Rng, build: 0 | 1 | 2, palettes?: number[]): Appear
 
 /**
  * Боец = персонаж модели (редкость, статы 1-го и 80-го уровня, склонности, уровень, класс FW)
- * + звериное оформление (вид, порода, имя, Особенность, характер, внешность) и навыки боя.
+ * + звериное оформление (вид, порода, имя, характер, внешность) и навыки боя.
  */
 export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
   const root = createRng(opts.seed)
@@ -367,8 +364,7 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
     rarity: root.fork("rarity"),
     weapon: root.fork("weapon"),
     skills: root.fork("skills"),
-    look: root.fork("look"),
-    trait: root.fork("trait")
+    look: root.fork("look")
   }
 
   const species: Species
@@ -444,14 +440,6 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
   const poolCands = r.skills.shuffle(allowed.filter(id => !learned.includes(id)))
   const learnable = poolCands.slice(0, RARITY_SKILL_POOL[rarity])
 
-  // Особенность
-  let traitId: string | undefined
-  const withTrait = opts.withTrait ?? !opts.isEnemy
-  if (withTrait || opts.isBoss) {
-    const traits = TRAITS.filter(t => !t.onlySpecies || t.onlySpecies === species)
-    traitId = r.trait.weighted(traits.map(t => ({ item: t.id, w: t.rare ? 1 : 4 })))
-  }
-
   const palettes = opts.factionId ? factionDef(opts.factionId).palettes : undefined
   const appearance = pickAppearance(r.look, breed.build, palettes)
   const personality = r.look.pick(PERSONALITIES)
@@ -483,7 +471,6 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
     createdAt: opts.now ?? 0
   }
   if (epithet) unit.epithet = epithet
-  if (traitId) unit.traitId = traitId
   if (opts.isEnemy) unit.isEnemy = true
   if (opts.isBoss) unit.isBoss = true
   if (opts.factionId) unit.factionId = opts.factionId

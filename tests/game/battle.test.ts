@@ -129,30 +129,27 @@ describe("редьюсер боя", () => {
     expect(livingUnits(s, "enemy").length).toBe(1)
   })
 
-  it("боевые бонусы (черта, Шерсть к шерсти) не ломают статы", () => {
+  it("боевые бонусы (Шерсть к шерсти) не ломают статы", () => {
     const b = makeBattle(
       [
         {
           classId: "infantry_sword",
           pos: { x: 2, y: 4 },
           baseStats: flat,
-          traitId: "t_berserk",
           skills: { c: "c_spur_atk" }
         },
-        { classId: "infantry_sword", pos: { x: 3, y: 4 }, baseStats: flat, traitId: "t_biter" }
+        { classId: "infantry_sword", pos: { x: 3, y: 4 }, baseStats: flat }
       ],
       [
         {
           classId: "infantry_sword",
           pos: { x: 2, y: 3 },
           baseStats: { ...flat, hp: 40 },
-          traitId: "t_loyal",
           species: "dog"
         }
       ]
     )
     const p = b.players[1]!.id
-    b.state.units[b.players[0]!.id]!.hp = 5 // берсерк активен
     const { state } = applyAction(b.state, {
       type: "attack",
       unitId: b.players[0]!.id,

@@ -1979,14 +1979,6 @@ p {
   white-space: nowrap;
   padding-right: 24px;
 }
-.roster-card .trait {
-  font-size: 12px;
-  color: var(--gold-text);
-  font-weight: 700;
-}
-.roster-card.selected .trait {
-  color: var(--gold);
-}
 .roster-card .skills {
   font-size: 11px;
   color: var(--muted-paper);
@@ -3202,74 +3194,3 @@ p {
   }
 }
 
-/* Особенность: плюсы зелёным, минусы красным; с недостатком — красная рамка и пометка */
-.trait-block {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border: 3px solid var(--ink);
-  border-left-width: 8px;
-  background: var(--paper);
-  color: var(--text-paper);
-}
-.trait-block.trait-good {
-  border-left-color: var(--ok-text);
-}
-.trait-block.trait-mixed,
-.trait-block.trait-bad {
-  border-color: var(--red);
-  background: #fff5f5;
-}
-.trait-block.compact {
-  padding: 8px 10px;
-  border-width: 2px;
-  border-left-width: 6px;
-}
-.trait-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-.trait-kind {
-  color: var(--muted-paper);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.trait-name {
-  font-size: 16px;
-}
-.trait-flag {
-  padding: 1px 8px;
-  background: var(--red);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-.trait-effects {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 14px;
-  font-weight: 700;
-}
-.trait-effects .pro {
-  color: var(--ok-text);
-}
-.trait-effects .con {
-  align-self: flex-start;
-  padding: 1px 6px;
-  background: #ffe1e4;
-  color: var(--red-deep);
-}
-.chip.trait-chip {
-  background: #ffe1e4;
-  color: var(--red-deep);
-}

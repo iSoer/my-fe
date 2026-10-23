@@ -304,7 +304,7 @@ export const BIOMES: readonly BiomeDef[] = [
       mountain: ["Wardrobe", "Шкаф"],
       water: ["Bathtub", "Ванна"],
       wall: ["Wall", "Стена"],
-      wall_breakable: ["Door", "Дверь"],
+      wall_breakable: ["Toppled cupboard", "Опрокинутый шкаф"],
       cover: ["Armchair", "Кресло"]
     }),
     colors: {

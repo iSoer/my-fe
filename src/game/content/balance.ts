@@ -1,4 +1,4 @@
-import type { Difficulty, ObjectiveKind, Rarity } from "@game/core/types"
+import type { Difficulty, ObjectiveKind, Rarity, Stats, TerrainId } from "@game/core/types"
 import { tr } from "@game/i18n"
 
 export interface DifficultyDef {
@@ -333,6 +333,11 @@ export function gloryTier(glory: number): GloryTier {
   let t = GLORY_TIERS[0] as GloryTier
   for (const tier of GLORY_TIERS) if (glory >= tier.glory) t = tier
   return t
+}
+
+/** Бонус к статам бойцу, стоящему на клетке местности (по ним можно ходить, как по равнине). */
+export const TERRAIN_BONUS: Partial<Record<TerrainId, Partial<Stats>>> = {
+  forest: { def: 1, res: 1 }
 }
 
 export const COMBAT = {

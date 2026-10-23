@@ -4,10 +4,12 @@ import { manhattan, posKey, samePos } from "@game/core/types"
 import {
   attackOptions,
   dangerZone,
+  isBreakableWall,
   reachableTiles,
   targetsFrom,
   threatCounts,
   threatTiles,
+  wallOptions,
   wallsFrom,
   weaponRange,
   type ReachMap
@@ -203,6 +205,7 @@ function bestTileForTarget(
     let score = 0
     if (preferred && samePos(node.pos, preferred)) score += 100
     if (terrainAt(st, node.pos) === "cover") score += 10
+    else if (terrainAt(st, node.pos) === "forest") score += 4
     score -= (threats.get(posKey(node.pos)) ?? 0) * 3
     score -= manhattan(node.pos, bu.pos) * 0.1
     if (!best || score > best.score) best = { pos: node.pos, score }
@@ -213,7 +216,7 @@ function bestTileForTarget(
 /** Контекстные действия для юнита, стоящего на `at` (исходная клетка или movedTo). */
 function actionsAt(st: BattleState, bu: BattleUnit, reach: ReachMap, at: Pos, atOrigin: boolean): ContextActions {
   const attack = atOrigin
-    ? attackOptions(st, bu, reach).length > 0
+    ? attackOptions(st, bu, reach).length > 0 || wallOptions(st, bu, reach).length > 0
     : targetsFrom(st, bu, at).length > 0 || wallsFrom(st, bu, at).length > 0
   let assist = false
   if (atOrigin) {
@@ -237,6 +240,7 @@ function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiStat
     const t = st.units[o.targetId]
     if (t) attackTiles.add(posKey(t.pos))
   }
+  for (const o of wallOptions(st, bu, reach)) attackTiles.add(posKey(o.wall))
   const assistTiles = new Set<string>()
   for (const node of reach.values()) {
     if (!node.canStop) continue
@@ -269,6 +273,7 @@ function previewAt(st: BattleState, bu: BattleUnit, to: Pos): void {
   if (!ui.reach) return
   const attackTiles = new Set<string>()
   for (const t of targetsFrom(st, bu, to)) attackTiles.add(posKey(t.pos))
+  for (const w of wallsFrom(st, bu, to)) attackTiles.add(posKey(w))
   const assistTiles = new Set<string>()
   for (const a of assistTargetsFrom(st, bu, to)) assistTiles.add(posKey(a.pos))
   patch({
@@ -328,6 +333,39 @@ function showAssist(st: BattleState, bu: BattleUnit, from: Pos, targetId: string
   return true
 }
 
+function showWall(from: Pos, wall: Pos): void {
+  const ui = $battleUi.get()
+  patch({
+    mode: "wallPreview",
+    movedTo: { ...from },
+    path: ui.reach ? pathFor(ui.reach, from) : [from],
+    wallPos: { ...wall },
+    targetId: undefined,
+    forecast: undefined,
+    assistPlan: undefined,
+    dragging: false,
+    dragHover: undefined,
+    dragValid: false
+  })
+  haptic("select")
+}
+
+/**
+ * Удар по хлипкой стене: с `from`, если стена оттуда достаёт, иначе с лучшей достижимой клетки
+ * (предпочтительно — где юнит уже стоит, чтобы добивать стену с места и на следующих ходах).
+ */
+function tryWall(st: BattleState, bu: BattleUnit, reach: ReachMap, wall: Pos, from?: Pos): boolean {
+  if (!isBreakableWall(st, wall)) return false
+  if (from && wallsFrom(st, bu, from).some(w => samePos(w, wall))) {
+    showWall(from, wall)
+    return true
+  }
+  const tile = bestTileForTarget(st, bu, reach, wall, weaponRange(st, bu), from ?? bu.pos)
+  if (!tile) return false
+  showWall(tile, wall)
+  return true
+}
+
 function selected(st: BattleState): BattleUnit | undefined {
   const ui = $battleUi.get()
   return ui.selectedId ? st.units[ui.selectedId] : undefined
@@ -365,6 +403,7 @@ export function chooseAttack(): void {
       const t = st.units[o.targetId]
       if (t) attackTiles.add(posKey(t.pos))
     }
+    for (const o of wallOptions(st, sel, ui.reach)) attackTiles.add(posKey(o.wall))
   }
   else if (ui.movedTo) {
     for (const t of targetsFrom(st, sel, ui.movedTo)) attackTiles.add(posKey(t.pos))
@@ -459,6 +498,7 @@ export function tapTile(pos: Pos): void {
         if (!occupant.acted) return selectUnit(st, occupant)
         return clearSelection()
       }
+      if (!occupant && tryWall(st, sel, ui.reach, pos)) return
       const node = ui.reach.get(posKey(pos))
       if (node && node.canStop) return previewAt(st, sel, pos)
       if (ui.mode === "moveTargeting") return selectUnit(st, sel)
@@ -474,15 +514,7 @@ export function tapTile(pos: Pos): void {
         const tile = bestTileForTarget(st, sel, ui.reach, occupant.pos, range, from)
         if (tile) return showForecast(st, sel, tile, occupant.unitId)
       }
-      if (
-        !occupant
-        && from
-        && ui.attackTiles?.has(posKey(pos))
-        && wallsFrom(st, sel, from).some(w => samePos(w, pos))
-      ) {
-        patch({ mode: "wallPreview", wallPos: pos })
-        return
-      }
+      if (!occupant && ui.attackTiles?.has(posKey(pos)) && tryWall(st, sel, ui.reach, pos, from)) return
       return backFromTargeting(st, sel)
     }
     case "assistTargeting": {
@@ -523,10 +555,7 @@ export function tapTile(pos: Pos): void {
         if (from && showAssist(st, sel, from, occupant.unitId)) return
         return
       }
-      if (wallsFrom(st, sel, ui.movedTo).some(w => samePos(w, pos))) {
-        patch({ mode: "wallPreview", wallPos: pos, targetId: undefined, forecast: undefined, assistPlan: undefined })
-        return
-      }
+      if (!occupant && tryWall(st, sel, ui.reach, pos, ui.movedTo)) return
       // Тап по исходной клетке — вернуть юнита
       if (ui.origin && samePos(pos, ui.origin)) return selectUnit(st, sel)
       const node = ui.reach.get(posKey(pos))

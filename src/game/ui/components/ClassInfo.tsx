@@ -2,7 +2,7 @@ import type { MoveType, TerrainId, UnitInstance } from "@game/core/types"
 import { classInfo, classRole } from "@game/content/classes"
 import { SKILL_LABELS, rankAtLevel } from "@shared/character/skills"
 import { moveCost } from "@game/core/map/pathing"
-import { ignoresForest } from "@game/core/skills/engine"
+import { TERRAIN_BONUS } from "@game/content/balance"
 import { unitClassName } from "@game/core/units"
 import { tileSvg } from "@game/art/tile"
 import { weaponIconSvg } from "@game/art/gear"
@@ -98,10 +98,9 @@ function moveWeakness(m: MoveType): string | undefined {
   }
 }
 
-/** Передвижение наглядно: дальность хода клетками и цена каждой местности по правилам боя (`moveCost`). */
-export function MovePanel({ classId, unit }: { classId: string, unit?: UnitInstance }) {
+/** Передвижение наглядно: дальность хода клетками и цена каждой местности по правилам боя (`moveCost`) и бонус стоящему на ней. */
+export function MovePanel({ classId }: { classId: string }) {
   const info = classInfo(classId)
-  const ignore = unit ? ignoresForest({ ...unit, classId }) : false
   const weakness = moveWeakness(info.moveType)
   return (
     <div className="class-move">
@@ -117,12 +116,15 @@ export function MovePanel({ classId, unit }: { classId: string, unit?: UnitInsta
       </div>
       <div className="class-terrains">
         {TERRAINS.map((t) => {
-          const cost = moveCost(t, info.moveType, ignore)
+          const cost = moveCost(t, info.moveType)
+          const bonus = TERRAIN_BONUS[t]
           return (
             <div key={t} className={`class-terrain ${cost === null ? "no" : cost > 1 ? "slow" : "ok"}`}>
               <GearIcon svg={tileSvg("yard", t)} size={34} />
               <span className="class-terrain-name">{terrainName(t)}</span>
-              <b>{cost === null ? "✕" : cost > 1 ? tr(`${cost} pts`, `${cost} оч.`) : "✓"}</b>
+              <b title={bonus ? tr(`+${bonus.def} Def, +${bonus.res} Res`, `+${bonus.def} Def, +${bonus.res} Res`) : undefined}>
+                {cost === null ? "✕" : cost > 1 ? tr(`${cost} pts`, `${cost} оч.`) : bonus ? `🛡+${bonus.def}` : "✓"}
+              </b>
             </div>
           )
         })}
@@ -160,7 +162,7 @@ export function ClassPanel({ unit, openCount, upgrade, nextTierLevel, onChange }
 
       <div className="class-section">
         <span className="class-section-title">{tr("Movement", "Передвижение")}</span>
-        <MovePanel classId={unit.classId} unit={unit} />
+        <MovePanel classId={unit.classId} />
       </div>
 
       <div className="class-section">

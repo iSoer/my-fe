@@ -102,7 +102,6 @@ export interface UnitInstance {
   gender: Gender
   species: Species
   breedId: string
-  traitId?: string
   personalityId: string
   /** Класс Fortune's Weave (`CHARACTER_CLASSES`); тип движения выводится из него. */
   classId: string

@@ -6,7 +6,6 @@ import { itemCount } from "@game/core/items"
 import { WEAPONS } from "@game/content/weapons"
 import { TALISMANS, talismanDef } from "@game/content/items"
 import { skillInfo } from "@game/content/index"
-import { traitDef, traitEffects } from "@game/content/traits"
 import { COMBAT } from "@game/content/balance"
 import { ringSvg, weaponIconSvg } from "@game/art/gear"
 import {
@@ -263,33 +262,6 @@ export function SkillGrid({ unit, onSlot }: { unit: UnitInstance, onSlot: (s: ke
           </button>
         )
       })}
-    </div>
-  )
-}
-
-/* ---------- Особенность ---------- */
-
-/**
- * Особенность бойца: плюсы зелёным «▲», минусы красным «▼». С недостатком — красная рамка и пометка, чтобы минус
- * не терялся в общей строке (и был виден до найма в магазине и наградах).
- */
-export function TraitBlock({ traitId, compact = false }: { traitId: string, compact?: boolean }) {
-  const trait = traitDef(traitId)
-  const { pros, cons } = traitEffects(trait)
-  const tone = cons.length === 0 ? "good" : pros.length === 0 ? "bad" : "mixed"
-  return (
-    <div className={`trait-block trait-${tone} ${compact ? "compact" : ""}`}>
-      <div className="trait-head">
-        <span className="trait-kind">{tr("Trait", "Особенность")}</span>
-        <b className="trait-name">{trait.name}</b>
-        {tone !== "good" && (
-          <span className="trait-flag">{tone === "bad" ? tr("⚠ Flaw", "⚠ Недостаток") : tr("⚠ Has a downside", "⚠ С недостатком")}</span>
-        )}
-      </div>
-      <ul className="trait-effects">
-        {pros.map(p => <li key={p} className="pro">{`▲ ${p}`}</li>)}
-        {cons.map(c => <li key={c} className="con">{`▼ ${c}`}</li>)}
-      </ul>
     </div>
   )
 }

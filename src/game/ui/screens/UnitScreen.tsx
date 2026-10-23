@@ -41,7 +41,7 @@ import { StatBar, StatsGrid } from "../components/Stats"
 import { BottomSheet, ConfirmModal } from "../components/Sheet"
 import { useToast } from "../components/Toast"
 import { ClassSheet } from "../components/CharacterPanels"
-import { GearRow, MasteryGrid, MasterySheet, SkillGrid, TraitBlock } from "../components/UnitPanels"
+import { GearRow, MasteryGrid, MasterySheet, SkillGrid } from "../components/UnitPanels"
 import type { Skill } from "@shared/character/skills"
 import { TalismanSheet, WeaponSheet } from "../components/GearSheet"
 import { ClassPanel } from "../components/ClassInfo"
@@ -222,7 +222,6 @@ export function UnitScreen({ unitId }: { unitId: string }) {
           <StatsGrid stats={stats} animate atkLabel={atkLabel(unit)} />
         </div>
 
-        {unit.traitId && <TraitBlock traitId={unit.traitId} />}
 
         <div className="card stack pop-in" style={{ animationDelay: "70ms" }}>
           <div className="row between">
