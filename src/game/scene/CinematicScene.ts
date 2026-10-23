@@ -684,7 +684,7 @@ export class CinematicScene extends Phaser.Scene {
     // Вариант гибели: тот же seed, что и на карте (юнит + ход), с уклоном под оружие убийцы.
     const killer = [...this.fighters.values()].find(o => o.id !== f.id)
     const killerKind = killer ? weaponKindOfUnit(killer.unit) : undefined
-    const variant = pickDeathVariant(deathSeed(f.id, this.cine.before.turn), killerKind, unitClass(f.unit).moveType)
+    const variant = pickDeathVariant(deathSeed(f.id, this.cine.before.turn), killerKind, unitClass(f.unit).moveType, f.unit.isEnemy)
     let pooled = false
     const ctx: DeathCtx = {
       scene: this,

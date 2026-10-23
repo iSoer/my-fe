@@ -93,3 +93,8 @@ export function unitArtKey(unit: UnitInstance, pose: Pose): string {
 export function unitPartSvg(unit: UnitInstance, part: CritterPart): string {
   return critterPartSvg(unitArt(unit, { pose: "dead" }), part)
 }
+
+/** Боец сидит верхом (части тела в SVG сдвинуты `RIDER_TRANSFORM`). */
+export function unitMounted(unit: UnitInstance): boolean {
+  return !!mountOf(fwClass(unit.classId))
+}

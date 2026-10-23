@@ -539,7 +539,7 @@ export class GamePresenter implements Presenter {
       view.setDead()
       view.hideHud()
       const feet = view.feetWorld()
-      const variant = pickDeathVariant(deathSeed(unitId, after.turn), killerKind, unitClass(unit).moveType)
+      const variant = pickDeathVariant(deathSeed(unitId, after.turn), killerKind, unitClass(unit).moveType, unit.isEnemy)
       const ctx: DeathCtx = {
         scene: map,
         variant,
