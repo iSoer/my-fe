@@ -16,13 +16,22 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
 export const SAVE_VERSION = 7
 
 const stat = z.number()
-const partialStats = z.object({
-  hp: stat.optional(),
-  atk: stat.optional(),
-  spd: stat.optional(),
-  def: stat.optional(),
-  res: stat.optional()
-})
+/** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
+const partialStats = z.preprocess(
+  (v) => {
+    if (!v || typeof v !== "object" || !("atk" in v)) return v
+    const { atk, ...rest } = v as Record<string, unknown>
+    return { str: atk, mag: atk, ...rest }
+  },
+  z.object({
+    hp: stat.optional(),
+    str: stat.optional(),
+    mag: stat.optional(),
+    spd: stat.optional(),
+    def: stat.optional(),
+    res: stat.optional()
+  })
+)
 const pos = z.object({ x: z.number().int(), y: z.number().int() })
 /** Позиция героя в деревне дробная: движение свободное. */
 const freePos = z.object({ x: z.number(), y: z.number() })
@@ -119,7 +128,8 @@ const battleUnitSchema = z.object({
   penalties: partialStats,
   stance,
   flags: z.record(z.string(), z.number()),
-  spawnedTurn: z.number()
+  spawnedTurn: z.number(),
+  turnStart: pos.optional()
 })
 
 const battleSchema = z.object({

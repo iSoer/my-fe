@@ -18,7 +18,7 @@ export function EndTurnButton({ battle, ui }: { battle: BattleState, ui: BattleU
   const isPlayer = battle.phase === "player"
   const players = livingUnits(battle, "player")
   const left = players.filter(u => !u.acted).length
-  const notMoved = plural(left, ["fighter hasn’t", "fighters haven’t"], ["боец не ходил", "бойца не ходили", "бойцов не ходили"])
+  const notActed = plural(left, ["fighter hasn’t", "fighters haven’t"], ["боец не действовал", "бойца не действовали", "бойцов не действовали"])
   const show = isPlayer && !ui.busy && ui.mode === "idle"
   // Пока всплыло предложение завершить ход — плавающую кнопку не дублируем.
   if (!show || shouldOfferEndTurn(battle, ui, settings.autoEndTurn, dismissed)) return null
@@ -47,7 +47,7 @@ export function EndTurnButton({ battle, ui }: { battle: BattleState, ui: BattleU
       <ConfirmModal
         open={ask}
         title={tr("End turn?", "Завершить ход?")}
-        text={tr(`${left} ${notMoved} moved yet. The enemy gets the turn.`, `Ещё ${left} ${notMoved}. Враг получит ход.`)}
+        text={tr(`${left} ${notActed} acted yet — they stay where they stand. The enemy gets the turn.`, `Ещё ${left} ${notActed} — останутся на своих клетках. Враг получит ход.`)}
         confirmLabel={tr("End", "Завершить")}
         onConfirm={() => {
           setAsk(false)

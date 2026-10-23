@@ -12,11 +12,11 @@ import type {
   Stats,
   UnitInstance
 } from "../types"
-import { STATS, manhattan, posKey } from "../types"
+import { MAP_H, MAP_W, STATS, manhattan, posKey, samePos } from "../types"
 import { livingUnits, otherSide, unitAt } from "./query"
 import { planAssist } from "./assist"
 import { itemTargetsFrom, planItem } from "./items"
-import { pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
+import { moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
 import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
@@ -220,6 +220,7 @@ export function xpForHeal(healed: number, byItem = false): number {
 
 function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"]): void {
   bu.acted = true
+  delete bu.turnStart
   bu.penalties = {}
   if (newStance) bu.stance = newStance
 }
@@ -284,6 +285,7 @@ function startPhase(state: BattleState, side: Side, events: BattleEvent[]): void
   for (const u of livingUnits(state, side)) {
     u.acted = false
     u.bonuses = {}
+    delete u.turnStart
   }
   if (side === "enemy") spawnReinforcements(state, events)
   events.push({ type: "phaseChanged", phase: side, turn: state.turn })
@@ -298,7 +300,10 @@ function startPhase(state: BattleState, side: Side, events: BattleEvent[]): void
 
 function endPhase(state: BattleState, events: BattleEvent[]): void {
   const side = state.phase
-  for (const u of livingUnits(state, side)) if (!u.acted) u.penalties = {}
+  for (const u of livingUnits(state, side)) {
+    if (!u.acted) u.penalties = {}
+    delete u.turnStart
+  }
   if (side === "player") startPhase(state, "enemy", events)
   else {
     state.turn++
@@ -307,13 +312,25 @@ function endPhase(state: BattleState, events: BattleEvent[]): void {
   }
 }
 
+/**
+ * Перемещение в пределах хода от клетки начала хода (`moveOrigin`): боец может переставляться несколько раз,
+ * пока не совершит действие. Путь для анимации — от клетки, где он стоит сейчас.
+ */
 function moveUnit(state: BattleState, bu: BattleUnit, to: Pos, events: BattleEvent[]): void {
   if (manhattan(bu.pos, to) === 0) return
+  const origin = moveOrigin(bu)
   const reach = reachableTiles(state, bu)
   const node = reach.get(posKey(to))
   if (!node || !node.canStop) throw new Error(tr("tile unreachable", "клетка недостижима"))
-  const path = pathTo(reach, to)
+  let path = pathTo(reach, to)
+  if (!samePos(bu.pos, origin)) {
+    // Уже переставлен: идём от текущей клетки (с запасом хода — дорогу назад бюджет не ограничивает)
+    const here = reachableTiles(state, bu, bu.pos, MAP_W * MAP_H)
+    path = here.has(posKey(to)) ? pathTo(here, to) : [{ ...bu.pos }, { ...to }]
+  }
   bu.pos = { ...to }
+  if (samePos(to, origin)) delete bu.turnStart
+  else bu.turnStart = { ...origin }
   events.push({ type: "moved", unitId: bu.unitId, path })
 }
 
@@ -340,6 +357,11 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       state.result = "retreat"
       events.push({ type: "battleEnded", result: "retreat" })
       break
+    case "move": {
+      const bu = validateActor(state, action.unitId)
+      moveUnit(state, bu, action.to, events)
+      break
+    }
     case "wait": {
       const bu = validateActor(state, action.unitId)
       moveUnit(state, bu, action.to, events)
@@ -419,7 +441,9 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
         else if (state.roster[bu.unitId]?.skills.special) bu.specialCd = Math.max(0, bu.specialCd - 1)
       }
       if (plan.refresh) {
+        // Танец: союзник снова действует — и ходит заново от клетки, где стоит
         target.acted = false
+        delete target.turnStart
       }
       events.push({
         type: "assist",

@@ -3,7 +3,7 @@ import type { Side, Stats, UnitInstance } from "@game/core/types"
 import type { Pose } from "@game/art/index"
 import { FUR_PALETTES } from "@game/content/appearance"
 import { unitClass } from "@game/content/classes"
-import { isMagicWeapon, weaponDef } from "@game/content/weapons"
+import { weaponDef } from "@game/content/weapons"
 import { TEX } from "./textures"
 import { MOVE_GLYPH, WEAPON_COLOR_HEX, hexCss, hpColor, textStyle } from "./style"
 import { ensureUnitTexture, ensureUnitTextures, hasTexture, unitTexKey } from "./svgTextures"
@@ -455,13 +455,14 @@ export class UnitView extends Phaser.GameObjects.Container {
    */
   setStatus(bonuses: Partial<Stats>, penalties: Partial<Stats>): void {
     if (!this.scene) return
-    const label = (k: keyof Stats): string =>
-      k === "atk" ? (isMagicWeapon(this.unit.weaponSkill) ? "Mag" : "Str") : k === "hp" ? "HP" : k[0]!.toUpperCase() + k.slice(1)
+    const label = (k: keyof Stats): string => (k === "hp" ? "HP" : k[0]!.toUpperCase() + k.slice(1))
     const tag = (stats: Partial<Stats>, mark: string): string => {
-      const list = (Object.entries(stats) as [keyof Stats, number][]).filter(([, v]) => v)
+      // Одинаковая прибавка к Str и Mag (навыки «Str/Mag») — одна запись
+      const both = !!stats.str && stats.str === stats.mag
+      const list = (Object.entries(stats) as [keyof Stats, number][]).filter(([k, v]) => v && !(both && k === "mag"))
       if (list.length === 0) return ""
       const [k, v] = list.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0]!
-      return `${mark}${label(k)}${v > 0 ? "+" : "−"}${Math.abs(v)}${list.length > 1 ? ` +${list.length - 1}` : ""}`
+      return `${mark}${both && k === "str" ? "Str/Mag" : label(k)}${v > 0 ? "+" : "−"}${Math.abs(v)}${list.length > 1 ? ` +${list.length - 1}` : ""}`
     }
     const down = tag(penalties, "▼")
     // Оба эффекта сразу — усиление коротким «▲», чтобы плашки не вылезали на соседнюю клетку (подробно — в карточке)

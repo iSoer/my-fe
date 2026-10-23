@@ -2,6 +2,7 @@ import type { Stat, Stats } from "@game/core/types"
 import { STATS } from "@game/core/types"
 import { STAT_LABELS } from "../lib/format"
 import { stagger } from "../lib/animate"
+import { tr } from "@game/i18n"
 
 export function StatsGrid({
   stats,
@@ -9,25 +10,25 @@ export function StatsGrid({
   flaw,
   delta,
   animate = false,
-  atkLabel
+  main
 }: {
   stats: Stats
   asset?: Stat
   flaw?: Stat
   delta?: Partial<Stats>
   animate?: boolean
-  /** Подпись атаки бойца (Str или Mag модели); без неё — «Str/Mag». */
-  atkLabel?: string
+  /** Стат, которым бьёт оружие бойца (Str или Mag): подпись выделена золотом. */
+  main?: Stat
 }) {
   return (
     <div className="grid-stats">
       {STATS.map((s, i) => (
         <div
           key={s}
-          className={`stat ${asset === s ? "asset" : ""} ${flaw === s ? "flaw" : ""} ${animate ? "pop-in" : ""}`}
+          className={`stat ${asset === s ? "asset" : ""} ${flaw === s ? "flaw" : ""} ${main === s ? "main" : ""} ${animate ? "pop-in" : ""}`}
           style={animate ? stagger(i, 50) : undefined}
         >
-          <div className="label">{s === "atk" && atkLabel ? atkLabel : STAT_LABELS[s]}</div>
+          <div className="label" title={s === main ? tr("Your weapon hits with this stat", "Этим статом бьёт оружие") : undefined}>{STAT_LABELS[s]}</div>
           <div className="value">{stats[s]}</div>
           {delta && delta[s]
             ? (

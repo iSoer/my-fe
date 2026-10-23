@@ -1,6 +1,7 @@
 import type { PassiveDef } from "@game/core/skills/types"
 import { alliesWithin, foesWithin, hpPct, unitsWithinOf } from "@game/core/battle/query"
 import type { Effect, WeaponSkill } from "@game/core/types"
+import { bothAttacks } from "@game/core/types"
 import { SKILL_LABELS, WEAPON_SKILLS } from "@shared/character/skills"
 import { weaponRange } from "../weapons"
 import { tr } from "@game/i18n"
@@ -42,7 +43,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     tier: 1,
     spCost: 120,
     stage: "mvp",
-    hooks: { statBonus: { atk: 3 } }
+    hooks: { statBonus: { ...bothAttacks(3) } }
   },
   {
     id: "a_spd3",
@@ -93,7 +94,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     spCost: 200,
     stage: "v1",
     hooks: {
-      statBonus: { atk: 3, spd: 3, def: 3, res: 3 },
+      statBonus: { ...bothAttacks(3), spd: 3, def: 3, res: 3 },
       afterCombat: ctx => [{ type: "damage", unitId: ctx.self.bu.unitId, amount: 6 }]
     }
   },
@@ -105,7 +106,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     tier: 2,
     spCost: 200,
     stage: "mvp",
-    hooks: { combatStatMod: ctx => (ctx.self.isInitiator ? { atk: 6 } : undefined) }
+    hooks: { combatStatMod: ctx => (ctx.self.isInitiator ? { ...bothAttacks(6) } : undefined) }
   },
   {
     id: "a_life_death",
@@ -115,7 +116,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     tier: 2,
     spCost: 200,
     stage: "v1",
-    hooks: { statBonus: { atk: 5, spd: 5, def: -5, res: -5 } }
+    hooks: { statBonus: { ...bothAttacks(5), spd: 5, def: -5, res: -5 } }
   },
   {
     id: "a_close_counter",
@@ -196,7 +197,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     stage: "mvp",
     hooks: {
       afterCombat: (ctx, info) =>
-        info.foeDied ? [] : [{ type: "debuff", unitId: ctx.foe.bu.unitId, stats: { atk: -7 } }]
+        info.foeDied ? [] : [{ type: "debuff", unitId: ctx.foe.bu.unitId, stats: { ...bothAttacks(-7) } }]
     }
   },
   {
@@ -223,7 +224,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     stage: "mvp",
     hooks: {
       onTurnStart: (state, self) =>
-        alliesWithin(state, self, 1).map((a): Effect => ({ type: "buff", unitId: a.unitId, stats: { atk: 4 } }))
+        alliesWithin(state, self, 1).map((a): Effect => ({ type: "buff", unitId: a.unitId, stats: { ...bothAttacks(4) } }))
     }
   },
   {
@@ -275,7 +276,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     stage: "v1",
     hooks: {
       onTurnStart: (state, self) =>
-        foesWithin(state, self, 2).map((f): Effect => ({ type: "debuff", unitId: f.unitId, stats: { atk: -5 } }))
+        foesWithin(state, self, 2).map((f): Effect => ({ type: "debuff", unitId: f.unitId, stats: { ...bothAttacks(-5) } }))
     }
   },
   {
@@ -286,7 +287,7 @@ export const PASSIVES: readonly PassiveDef[] = [
     tier: 1,
     spCost: 120,
     stage: "mvp",
-    hooks: { allyCombatStatMod: { range: 1, stats: { atk: 3 } } }
+    hooks: { allyCombatStatMod: { range: 1, stats: { ...bothAttacks(3) } } }
   },
   {
     id: "c_drive_spd",

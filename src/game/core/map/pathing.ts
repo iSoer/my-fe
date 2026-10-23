@@ -48,14 +48,22 @@ function orthoNeighbors(p: Pos): Pos[] {
   return out
 }
 
-/** Все клетки, достижимые юнитом (Дейкстра с бюджетом движения). */
-export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?: Pos): ReachMap {
+/** Клетка, от которой считается ход бойца: где он начал ход (если уже передвигался) или где стоит. */
+export function moveOrigin(bu: BattleUnit): Pos {
+  return bu.turnStart ?? bu.pos
+}
+
+/**
+ * Все клетки, достижимые юнитом (Дейкстра с бюджетом движения). Без `fromOverride` — от клетки начала хода
+ * (`moveOrigin`): переставленный боец может встать куда угодно в пределах хода, в том числе вернуться.
+ */
+export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?: Pos, budgetOverride?: number): ReachMap {
   const unit = state.roster[bu.unitId]
   if (!unit) return new Map()
   const cls = unitClass(unit)
-  const budget = moveRange(unit)
+  const budget = budgetOverride ?? moveRange(unit)
   const pass = hasPassThrough(unit)
-  const start = fromOverride ?? bu.pos
+  const start = fromOverride ?? moveOrigin(bu)
   const result: ReachMap = new Map()
   result.set(posKey(start), { pos: start, cost: 0, canStop: true })
   const frontier: ReachNode[] = [{ pos: start, cost: 0, canStop: true }]

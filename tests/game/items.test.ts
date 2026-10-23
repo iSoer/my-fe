@@ -19,7 +19,7 @@ import { generateStore, itemPrice } from "@game/core/items"
 import { lootShare, resolveBattle } from "@game/core/progression"
 import { applyAction } from "@game/core/battle/reducer"
 import { simulateCombat } from "@game/core/combat"
-import { openClasses, visibleStats, weaponMt, weaponShortfall } from "@game/core/units"
+import { attackOf, openClasses, weaponMt, weaponShortfall } from "@game/core/units"
 import { ITEMS, REWARDS } from "@game/content/balance"
 import { weaponDef } from "@game/content/weapons"
 import type { SaveGame, UnitInstance } from "@game/core/types"
@@ -114,9 +114,9 @@ describe("снаряжение", () => {
   it("талисман: бонус к статам в прогнозе, прежний возвращается, отпущенный оставляет снаряжение", () => {
     $save.set({ ...$save.get(), inventory: { tal_fang: 1, tal_bell: 1, sword_steel: 1 } })
     const u = firstUnit()
-    const atk = visibleStats(u).atk
+    const atk = attackOf(u)
     expect(equipTalismanAction(u.id, "tal_fang").ok).toBe(true)
-    expect(visibleStats(firstUnit()).atk).toBe(atk + 3)
+    expect(attackOf(firstUnit())).toBe(atk + 3)
     expect(equipTalismanAction(u.id, "tal_bell").ok).toBe(true)
     expect($save.get().inventory.tal_fang).toBe(1)
     equipWeaponAction(u.id, "sword_steel")
@@ -126,7 +126,7 @@ describe("снаряжение", () => {
   })
 
   it("талисман работает в бою: прогноз учитывает бонус, «фольга» снимает эффективность", () => {
-    const flat = { hp: 40, atk: 20, spd: 5, def: 5, res: 5 }
+    const flat = { hp: 40, str: 20, mag: 20, spd: 5, def: 5, res: 5 }
     const b = makeBattle(
       [{ classId: "infantry_bow", pos: { x: 2, y: 5 }, baseStats: flat }],
       [{ classId: "flier_sword", pos: { x: 2, y: 3 }, baseStats: flat }]
@@ -187,7 +187,7 @@ describe("предметы в бою", () => {
     const r = applyAction(st, { type: "item", unitId: a, to: { x: 2, y: 5 }, targetId: a, itemId: "itm_stew" })
     expect(r.state.units[a]!.hp).toBe(18)
     expect(r.state.units[n]!.hp).toBe(18)
-    r.state.units[n]!.penalties = { atk: -4 }
+    r.state.units[n]!.penalties = { str: -4, mag: -4 }
     const v = applyAction(r.state, { type: "item", unitId: n, to: { x: 2, y: 6 }, targetId: n, itemId: "itm_valerian" })
     expect(v.state.units[n]!.penalties).toEqual({})
     expect(v.state.pack).toEqual({})

@@ -1,6 +1,8 @@
 import type { BattleState } from "@game/core/types"
 import { displayName } from "@game/core/units"
-import { cancel, confirm, type BattleUiState } from "@game/state/battleUi"
+import { packItems } from "@game/core/battle/items"
+import { terrainInfo } from "@game/content/terrain"
+import { cancel, chooseItems, confirm, type BattleUiState } from "@game/state/battleUi"
 import { haptic } from "@game/platform/haptics"
 import { UnitCard } from "./UnitCard"
 import { tr } from "@game/i18n"
@@ -78,12 +80,6 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
   const selUnit = ui.selectedId ? battle.roster[ui.selectedId] : undefined
   const card = sel && selUnit ? <UnitCard state={battle} bu={sel} unit={selUnit} /> : null
   const hint = (text: string, cls = "") => <div className={`bf-hint ${cls}`}>{text}</div>
-  const cancelRow = (
-    <div className="bf-actions">
-      <Pill label={tr("Cancel", "Отмена")} onClick={cancel} />
-    </div>
-  )
-
   if (ui.dragging) {
     const bad = !!ui.dragHover && !ui.dragValid
     return (
@@ -123,31 +119,41 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
         </>
       )
     }
+    case "tileInfo": {
+      if (!ui.infoPos) return null
+      const info = terrainInfo(battle, ui.infoPos)
+      return (
+        <>
+          <div className="bf-card bf-assist" role="status">
+            <div className="bf-tile-head">
+              <span className="bf-tile-ico" aria-hidden="true">{info.icon}</span>
+              <b className="grow">{info.name}</b>
+              <span className="bf-muted bf-tile-kind">{tr("Tile", "Клетка")}</span>
+            </div>
+            {info.bonus && <div className="bf-status bf-status-terrain">{`${tr("Standing here", "Стоящему здесь")}: ${info.bonus}`}</div>}
+            <div className="bf-muted">{`🐾 ${info.move}`}</div>
+            {info.notes.map(n => <div key={n} className="bf-muted">{n}</div>)}
+          </div>
+          <div className="bf-actions">
+            <Pill label={tr("Close", "Закрыть")} onClick={cancel} />
+          </div>
+        </>
+      )
+    }
     case "unitSelected":
-    case "movedPreview":
-      return card
-    case "moveTargeting":
       return (
         <>
           {card}
-          {hint(tr("Pick a tile or drag the fighter", "Выберите клетку или перетащите бойца"))}
-          {cancelRow}
-        </>
-      )
-    case "attackTargeting":
-      return (
-        <>
-          {card}
-          {hint(tr("Pick a target", "Выберите цель"), "accent")}
-          {cancelRow}
-        </>
-      )
-    case "assistTargeting":
-      return (
-        <>
-          {card}
-          {hint(tr("Pick an ally", "Выберите союзника"), "accent")}
-          {cancelRow}
+          {hint(
+            sel?.turnStart
+              ? tr("Move again, or tap a target to act", "Можно переставить ещё раз или выбрать цель")
+              : tr("Tap a tile to move, a target to act", "Тап по клетке — идти, по цели — действовать")
+          )}
+          {packItems(battle).length > 0 && (
+            <div className="bf-actions">
+              <Pill label={tr("Items", "Предметы")} onClick={chooseItems} />
+            </div>
+          )}
         </>
       )
     case "forecast":
@@ -183,7 +189,7 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
       )
     default:
       return isPlayer
-        ? hint(tr("Tap a fighter for actions, drag to move", "Тап по бойцу — меню действий, перетащите его — ход"), "thin")
+        ? hint(tr("Tap or drag a fighter to move", "Тап или перетаскивание бойца — ход"), "thin")
         : hint(tr("Enemy turn…", "Ход противника…"), "thin")
   }
 }

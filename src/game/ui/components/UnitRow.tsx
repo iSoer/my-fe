@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import type { UnitInstance } from "@game/core/types"
-import { displayName, unitClass, unitClassName, visibleStats } from "@game/core/units"
+import { attackOf, displayName, unitClass, unitClassName, visibleStats } from "@game/core/units"
 import { UnitAvatar } from "./UnitAvatar"
 import { WeaponBadge, RarityStars } from "./Badges"
 import { MOVE_EMOJI, atkLabel } from "../lib/format"
@@ -61,7 +61,7 @@ export function UnitRow({
           <span>
             {atkLabel(unit)}
             {" "}
-            <b>{st.atk}</b>
+            <b>{attackOf(unit, st)}</b>
           </span>
           <span>
             Spd

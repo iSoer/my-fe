@@ -5,22 +5,24 @@ import { isMagicWeapon } from "@game/content/weapons"
 import { CHARACTER_STAT_LABELS as L } from "@shared/character/leveling"
 import { lang, tr } from "@game/i18n"
 
-/** Подписи боевых статов — подписи модели; атака — Str или Mag модели, без бойца — «Str/Mag». */
+/** Подписи боевых статов — подписи модели. */
 export const STAT_LABELS: Record<Stat, string> = {
   hp: L.hp,
-  atk: `${L.attack}/${L.specialAttack}`,
+  str: L.attack,
+  mag: L.specialAttack,
   spd: L.speed,
   def: L.defense,
   res: L.specialDefense
 }
 
-/** Подпись атаки бойца: Mag для магии, иначе Str. */
+/** Подпись стата, которым бьёт оружие бойца: Mag для магии, иначе Str. */
 export function atkLabel(unit: { weaponSkill: Parameters<typeof isMagicWeapon>[0] }): string {
   return isMagicWeapon(unit.weaponSkill) ? L.specialAttack : L.attack
 }
 export const STAT_FULL: Record<Stat, string> = {
   get hp() { return tr("HP", "Здоровье") },
-  get atk() { return tr("Attack", "Атака") },
+  get str() { return tr("Strength", "Сила") },
+  get mag() { return tr("Magic", "Магия") },
   get spd() { return tr("Speed", "Скорость") },
   get def() { return tr("Defense", "Защита") },
   get res() { return tr("Resistance", "Сопротивление") }
@@ -92,5 +94,20 @@ export function fmtDate(ts: number): string {
 }
 
 export function statTotal(s: Stats): number {
-  return s.hp + s.atk + s.spd + s.def + s.res
+  return STATS.reduce((sum, k) => sum + s[k], 0)
+}
+
+/**
+ * Изменения статов строкой: «Str/Mag −7, Def +3». Одинаковая прибавка к Str и Mag (навыки «Str/Mag»)
+ * — одной записью.
+ */
+export function statChanges(m: Partial<Stats>): string {
+  const both = !!m.str && m.str === m.mag
+  return STATS.filter(k => m[k] && !(both && k === "mag"))
+    .map((k) => {
+      const v = m[k] as number
+      const name = both && k === "str" ? `${L.attack}/${L.specialAttack}` : STAT_LABELS[k]
+      return `${name} ${v > 0 ? "+" : "−"}${Math.abs(v)}`
+    })
+    .join(", ")
 }

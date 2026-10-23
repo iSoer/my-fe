@@ -6,7 +6,7 @@ import { hpPct, livingUnits, terrainAt } from "../battle/query"
 import { planAssist } from "../battle/assist"
 import { distanceField, reachableTiles, targetsFrom, threatCounts, threatTiles, type ReachMap } from "../map/pathing"
 import { simulateCombat } from "../combat"
-import { visibleStats } from "../units"
+import { attackOf, visibleStats } from "../units"
 import { difficultyDef } from "@game/content/balance"
 import { DANCER_CLASS, unitClass } from "@game/content/classes"
 
@@ -15,10 +15,11 @@ function isSupport(unit: UnitInstance): boolean {
   return unit.weaponSkill === "whiteMagic" || unit.classId === DANCER_CLASS
 }
 
-/** Видимый стат бойца из ростера боя (0, если бойца нет). */
+/** Видимый стат бойца из ростера боя (0, если бойца нет); `atk` — Str или Mag по его оружию. */
 function rosterStat(state: BattleState, unitId: string, stat: "atk" | "spd"): number {
   const unit = state.roster[unitId]
-  return unit ? visibleStats(unit)[stat] : 0
+  if (!unit) return 0
+  return stat === "atk" ? attackOf(unit) : visibleStats(unit).spd
 }
 
 /** Порядок хода врагов: ближе к игроку — раньше; затем выше Spd; затем id. */

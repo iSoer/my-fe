@@ -1,12 +1,12 @@
 import { atom } from "nanostores"
 import type { BattleAction, BattleEvent, BattleState, BattleUnit, Pos } from "@game/core/types"
-import { manhattan, posKey, samePos } from "@game/core/types"
+import { MAP_H, MAP_W, manhattan, posKey, samePos } from "@game/core/types"
 import {
   attackOptions,
   dangerZone,
   isBreakableWall,
+  moveOrigin,
   reachableTiles,
-  targetsFrom,
   threatCounts,
   threatTiles,
   wallOptions,
@@ -15,7 +15,6 @@ import {
   type ReachMap
 } from "@game/core/map/pathing"
 import { assistTargetsFrom, planAssist, type AssistPlan } from "@game/core/battle/assist"
-import { packItems } from "@game/core/battle/items"
 import { simulateCombat, type CombatOutcome } from "@game/core/combat"
 import { allPlayerUnitsActed } from "@game/core/battle/reducer"
 import { nextEnemyAction } from "@game/core/ai"
@@ -24,51 +23,37 @@ import { $save, dispatchBattle } from "./save"
 import { haptic } from "@game/platform/haptics"
 
 /**
- * Режимы ввода (SPEC 10.2 + контекстное меню и перетаскивание):
- * idle → unitSelected (юнит выбран, видны зоны, меню действий для исходной клетки)
- *   → moveTargeting (выбрана опция «Передвинуться»: ждём клетку)
- *   → attackTargeting / assistTargeting (ждём цель)
- *   → movedPreview (юнит стоит на клетке назначения, меню действий для неё)
- *   → forecast / assistPreview / wallPreview → подтверждение.
- * Перетаскивание: beginDrag → dragHover* → endDrag даёт тот же movedPreview/forecast.
+ * Управление в духе Fire Emblem Heroes, без меню действий и «Ждать»:
+ * idle → unitSelected (видны дальность хода и цели) → тап по клетке передвигает бойца, и он остаётся выбранным:
+ *   переставлять его можно сколько угодно, дальность всегда считается от клетки начала хода;
+ * тап по врагу / союзнику / хлипкой стене → forecast / assistPreview / wallPreview, повторный тап (или кнопка)
+ *   подтверждает — это и завершает ход бойца. Не действовавшие бойцы просто стоят до конца хода.
+ * Перетаскивание: beginDrag → dragHover* → endDrag ставит бойца на клетку или открывает прогноз по цели.
+ * Тап по пустой клетке вне хода бойца — tileInfo: справка о местности (бонусы, проходимость).
  */
 export type UiMode
   = | "idle"
     | "unitSelected"
-    | "moveTargeting"
-    | "attackTargeting"
-    | "assistTargeting"
-    | "movedPreview"
     | "forecast"
     | "assistPreview"
     | "wallPreview"
     | "itemSelect"
     | "enemyInfo"
+    | "tileInfo"
     | "busy"
     | "ended"
-
-/** Какие кнопки показывать в контекстном меню. */
-export interface ContextActions {
-  move: boolean
-  attack: boolean
-  assist: boolean
-  wait: boolean
-  /** В рюкзаке вылазки есть расходники. */
-  items: boolean
-}
-
-const NO_ACTIONS: ContextActions = { move: false, attack: false, assist: false, wait: false, items: false }
 
 export interface BattleUiState {
   mode: UiMode
   selectedId?: string
-  /** Исходная клетка выбранного юнита. */
+  /** Клетка, где выбранный боец стоит сейчас. */
   origin?: Pos
-  /** Клетка, куда юнит переместится перед действием (для предпросмотра вид стоит там). */
+  /** Клетка, с которой боец выполнит действие (для предпросмотра вид стоит там). */
   movedTo?: Pos
   path?: Pos[]
+  /** Достижимые клетки от клетки начала хода. */
   reach?: ReachMap
-  /** Клетки врагов, которых можно атаковать (с учётом движения или только с movedTo в режиме цели). */
+  /** Клетки врагов и хлипких стен, по которым можно ударить с учётом движения. */
   attackTiles?: Set<string>
   assistTiles?: Set<string>
   targetId?: string
@@ -77,8 +62,9 @@ export interface BattleUiState {
   wallPos?: Pos
   infoId?: string
   infoThreat?: Set<string>
-  actions: ContextActions
-  /** На юните зажата кнопка/палец (ещё не перетаскивание): меню скрыты, накладки не перехватывают курсор. */
+  /** Клетка, о которой показана справка (режим tileInfo). */
+  infoPos?: Pos
+  /** На юните зажата кнопка/палец (ещё не перетаскивание): накладки не перехватывают курсор. */
   pressedId?: string
   /** Юнита держат за шкирку. */
   dragging: boolean
@@ -94,13 +80,22 @@ export interface BattleUiState {
 
 const BASE: BattleUiState = {
   mode: "idle",
-  actions: NO_ACTIONS,
   dragging: false,
   dragValid: false,
   dangerOn: false,
   dangerTiles: new Set(),
   busy: false,
   fastForward: false
+}
+
+/** Сбросить предпросмотр действия (цель, прогноз, клетку действия). */
+const NO_PREVIEW: Partial<BattleUiState> = {
+  movedTo: undefined,
+  path: undefined,
+  targetId: undefined,
+  forecast: undefined,
+  assistPlan: undefined,
+  wallPos: undefined
 }
 
 export const $battleUi = atom<BattleUiState>({ ...BASE })
@@ -189,7 +184,22 @@ function pathFor(reach: ReachMap, to: Pos): Pos[] {
   return path
 }
 
-/** Лучшая клетка для действия по цели: предпочтительная → укрытие → меньше угроз → ближе. */
+/** Стрелка пути для предпросмотра: от клетки, где боец стоит сейчас (а не от клетки начала хода). */
+function previewPath(st: BattleState, bu: BattleUnit, reach: ReachMap, to: Pos): Pos[] {
+  if (samePos(bu.pos, moveOrigin(bu))) return pathFor(reach, to)
+  const here = reachableTiles(st, bu, bu.pos, MAP_W * MAP_H)
+  return here.has(posKey(to)) ? pathFor(here, to) : [bu.pos, to]
+}
+
+/** Достижимые клетки бойца; клетка, где он стоит, всегда среди них (даже если его туда сдвинула Поддержка). */
+function reachOf(st: BattleState, bu: BattleUnit): ReachMap {
+  const reach = reachableTiles(st, bu)
+  const here = reach.get(posKey(bu.pos))
+  if (!here || !here.canStop) reach.set(posKey(bu.pos), { pos: { ...bu.pos }, cost: 0, canStop: true })
+  return reach
+}
+
+/** Лучшая клетка для действия по цели: предпочтительная → укрытие → заросли → меньше угроз → ближе. */
 function bestTileForTarget(
   st: BattleState,
   bu: BattleUnit,
@@ -213,28 +223,8 @@ function bestTileForTarget(
   return best?.pos ?? null
 }
 
-/** Контекстные действия для юнита, стоящего на `at` (исходная клетка или movedTo). */
-function actionsAt(st: BattleState, bu: BattleUnit, reach: ReachMap, at: Pos, atOrigin: boolean): ContextActions {
-  const attack = atOrigin
-    ? attackOptions(st, bu, reach).length > 0 || wallOptions(st, bu, reach).length > 0
-    : targetsFrom(st, bu, at).length > 0 || wallsFrom(st, bu, at).length > 0
-  let assist = false
-  if (atOrigin) {
-    for (const node of reach.values()) {
-      if (!node.canStop) continue
-      if (assistTargetsFrom(st, bu, node.pos).length > 0) {
-        assist = true
-        break
-      }
-    }
-  }
-  else assist = assistTargetsFrom(st, bu, at).length > 0
-  const move = [...reach.values()].some(n => n.canStop && !samePos(n.pos, bu.pos))
-  return { move, attack, assist, wait: true, items: bu.side === "player" && packItems(st).length > 0 }
-}
-
 function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiState> = {}): void {
-  const reach = reachableTiles(st, bu)
+  const reach = reachOf(st, bu)
   const attackTiles = new Set<string>()
   for (const o of attackOptions(st, bu, reach)) {
     const t = st.units[o.targetId]
@@ -255,7 +245,6 @@ function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiStat
     reach,
     attackTiles,
     assistTiles,
-    actions: actionsAt(st, bu, reach, bu.pos, true),
     pressedId: cur.pressedId,
     dangerOn: cur.dangerOn,
     dangerTiles: cur.dangerTiles,
@@ -267,44 +256,16 @@ function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiStat
   haptic("select")
 }
 
-/** Поставить юнита (предпросмотр) на клетку и показать меню действий для неё. */
-function previewAt(st: BattleState, bu: BattleUnit, to: Pos): void {
-  const ui = $battleUi.get()
-  if (!ui.reach) return
-  const attackTiles = new Set<string>()
-  for (const t of targetsFrom(st, bu, to)) attackTiles.add(posKey(t.pos))
-  for (const w of wallsFrom(st, bu, to)) attackTiles.add(posKey(w))
-  const assistTiles = new Set<string>()
-  for (const a of assistTargetsFrom(st, bu, to)) assistTiles.add(posKey(a.pos))
-  patch({
-    mode: "movedPreview",
-    movedTo: { ...to },
-    path: pathFor(ui.reach, to),
-    attackTiles,
-    assistTiles,
-    actions: actionsAt(st, bu, ui.reach, to, false),
-    targetId: undefined,
-    forecast: undefined,
-    assistPlan: undefined,
-    wallPos: undefined,
-    dragging: false,
-    dragHover: undefined,
-    dragValid: false
-  })
-  haptic("select")
-}
-
 function showForecast(st: BattleState, bu: BattleUnit, from: Pos, targetId: string): void {
   const ui = $battleUi.get()
   const forecast = simulateCombat(st, bu.unitId, targetId, from)
   patch({
+    ...NO_PREVIEW,
     mode: "forecast",
     movedTo: { ...from },
-    path: ui.reach ? pathFor(ui.reach, from) : [from],
+    path: ui.reach ? previewPath(st, bu, ui.reach, from) : [from],
     targetId,
     forecast,
-    assistPlan: undefined,
-    wallPos: undefined,
     dragging: false,
     dragHover: undefined,
     dragValid: false
@@ -318,13 +279,12 @@ function showAssist(st: BattleState, bu: BattleUnit, from: Pos, targetId: string
   if (!plan.valid) return false
   const ui = $battleUi.get()
   patch({
+    ...NO_PREVIEW,
     mode: "assistPreview",
     movedTo: { ...from },
-    path: ui.reach ? pathFor(ui.reach, from) : [from],
+    path: ui.reach ? previewPath(st, bu, ui.reach, from) : [from],
     targetId,
     assistPlan: plan,
-    forecast: undefined,
-    wallPos: undefined,
     dragging: false,
     dragHover: undefined,
     dragValid: false
@@ -333,16 +293,14 @@ function showAssist(st: BattleState, bu: BattleUnit, from: Pos, targetId: string
   return true
 }
 
-function showWall(from: Pos, wall: Pos): void {
+function showWall(st: BattleState, bu: BattleUnit, from: Pos, wall: Pos): void {
   const ui = $battleUi.get()
   patch({
+    ...NO_PREVIEW,
     mode: "wallPreview",
     movedTo: { ...from },
-    path: ui.reach ? pathFor(ui.reach, from) : [from],
+    path: ui.reach ? previewPath(st, bu, ui.reach, from) : [from],
     wallPos: { ...wall },
-    targetId: undefined,
-    forecast: undefined,
-    assistPlan: undefined,
     dragging: false,
     dragHover: undefined,
     dragValid: false
@@ -350,19 +308,30 @@ function showWall(from: Pos, wall: Pos): void {
   haptic("select")
 }
 
-/**
- * Удар по хлипкой стене: с `from`, если стена оттуда достаёт, иначе с лучшей достижимой клетки
- * (предпочтительно — где юнит уже стоит, чтобы добивать стену с места и на следующих ходах).
- */
-function tryWall(st: BattleState, bu: BattleUnit, reach: ReachMap, wall: Pos, from?: Pos): boolean {
+/** Прогноз удара по врагу с лучшей клетки (предпочтительно — где боец уже стоит). */
+function tryAttack(st: BattleState, bu: BattleUnit, reach: ReachMap, target: BattleUnit): boolean {
+  const from = bestTileForTarget(st, bu, reach, target.pos, weaponRange(st, bu), bu.pos)
+  if (!from) return false
+  showForecast(st, bu, from, target.unitId)
+  return true
+}
+
+/** Поддержка союзника с лучшей соседней клетки. */
+function tryAssist(st: BattleState, bu: BattleUnit, reach: ReachMap, target: BattleUnit): boolean {
+  const from = bestTileForTarget(st, bu, reach, target.pos, 1, bu.pos)
+  return !!from && showAssist(st, bu, from, target.unitId)
+}
+
+/** Удар по хлипкой стене с лучшей клетки (предпочтительно — где боец уже стоит). */
+function tryWall(st: BattleState, bu: BattleUnit, reach: ReachMap, wall: Pos): boolean {
   if (!isBreakableWall(st, wall)) return false
-  if (from && wallsFrom(st, bu, from).some(w => samePos(w, wall))) {
-    showWall(from, wall)
+  if (wallsFrom(st, bu, bu.pos).some(w => samePos(w, wall))) {
+    showWall(st, bu, bu.pos, wall)
     return true
   }
-  const tile = bestTileForTarget(st, bu, reach, wall, weaponRange(st, bu), from ?? bu.pos)
+  const tile = bestTileForTarget(st, bu, reach, wall, weaponRange(st, bu), bu.pos)
   if (!tile) return false
-  showWall(tile, wall)
+  showWall(st, bu, tile, wall)
   return true
 }
 
@@ -371,93 +340,37 @@ function selected(st: BattleState): BattleUnit | undefined {
   return ui.selectedId ? st.units[ui.selectedId] : undefined
 }
 
-/** Куда вернуться из режима выбора цели/клетки: к movedTo или к исходной клетке. */
-function backFromTargeting(st: BattleState, sel: BattleUnit): void {
-  const ui = $battleUi.get()
-  if (ui.movedTo && ui.origin && !samePos(ui.movedTo, ui.origin)) previewAt(st, sel, ui.movedTo)
-  else selectUnit(st, sel)
-}
-
-/* ---------- Контекстное меню ---------- */
-
-export function chooseMove(): void {
-  const st = state()
-  const ui = $battleUi.get()
-  if (!st || !canAct(st, ui)) return
-  const sel = selected(st)
-  if (!sel || !ui.reach) return
-  patch({ mode: "moveTargeting", targetId: undefined, forecast: undefined, assistPlan: undefined, wallPos: undefined })
-  haptic("select")
-}
-
-export function chooseAttack(): void {
-  const st = state()
-  const ui = $battleUi.get()
-  if (!st || !canAct(st, ui)) return
-  const sel = selected(st)
-  if (!sel || !ui.reach || !ui.actions.attack) return
-  const atOrigin = !ui.movedTo || (ui.origin && samePos(ui.movedTo, ui.origin))
-  const attackTiles = new Set<string>()
-  if (atOrigin) {
-    for (const o of attackOptions(st, sel, ui.reach)) {
-      const t = st.units[o.targetId]
-      if (t) attackTiles.add(posKey(t.pos))
-    }
-    for (const o of wallOptions(st, sel, ui.reach)) attackTiles.add(posKey(o.wall))
-  }
-  else if (ui.movedTo) {
-    for (const t of targetsFrom(st, sel, ui.movedTo)) attackTiles.add(posKey(t.pos))
-    for (const w of wallsFrom(st, sel, ui.movedTo)) attackTiles.add(posKey(w))
-  }
-  // Единственная цель — сразу прогноз
-  if (attackTiles.size === 1) {
-    const [k] = [...attackTiles]
-    const [x, y] = (k as string).split(",").map(Number)
-    tapTile({ x: x as number, y: y as number })
-    return
-  }
-  patch({
-    mode: "attackTargeting",
-    attackTiles,
-    targetId: undefined,
-    forecast: undefined,
-    assistPlan: undefined,
-    wallPos: undefined
-  })
-  haptic("select")
-}
-
-export function chooseAssist(): void {
-  const st = state()
-  const ui = $battleUi.get()
-  if (!st || !canAct(st, ui)) return
-  const sel = selected(st)
-  if (!sel || !ui.reach || !ui.actions.assist) return
-  const atOrigin = !ui.movedTo || (ui.origin && samePos(ui.movedTo, ui.origin))
-  const assistTiles = new Set<string>()
-  if (atOrigin) {
-    for (const node of ui.reach.values())
-      if (node.canStop) for (const a of assistTargetsFrom(st, sel, node.pos)) assistTiles.add(posKey(a.pos))
-  }
-  else if (ui.movedTo) for (const a of assistTargetsFrom(st, sel, ui.movedTo)) assistTiles.add(posKey(a.pos))
-  if (assistTiles.size === 1) {
-    const [k] = [...assistTiles]
-    const [x, y] = (k as string).split(",").map(Number)
-    tapTile({ x: x as number, y: y as number })
-    return
-  }
-  patch({
-    mode: "assistTargeting",
-    assistTiles,
-    targetId: undefined,
-    forecast: undefined,
-    assistPlan: undefined,
-    wallPos: undefined
-  })
-  haptic("select")
-}
-
 /* ---------- Тапы ---------- */
+
+/** Тап, когда боец выбран: цель → предпросмотр действия, свободная клетка в пределах хода → встать туда. */
+function tapWithSelection(st: BattleState, sel: BattleUnit, reach: ReachMap, pos: Pos): void {
+  const occupant = unitAt(st, pos)
+  if (occupant && occupant.unitId === sel.unitId) return clearSelection()
+  if (occupant && occupant.side !== sel.side) {
+    if (tryAttack(st, sel, reach, occupant)) return
+    clearSelection({ mode: "enemyInfo", infoId: occupant.unitId, infoThreat: threatTiles(st, occupant) })
+    haptic("select")
+    return
+  }
+  if (occupant) {
+    if (tryAssist(st, sel, reach, occupant)) return
+    if (!occupant.acted) return selectUnit(st, occupant)
+    return clearSelection()
+  }
+  if (tryWall(st, sel, reach, pos)) return
+  const node = reach.get(posKey(pos))
+  if (node && node.canStop) {
+    void moveTo(sel.unitId, pos, true)
+    return
+  }
+  showTileInfo(pos)
+}
+
+/** Справка о клетке: местность, бонусы стоящему, проходимость. */
+function showTileInfo(pos: Pos): void {
+  clearSelection({ mode: "tileInfo", infoPos: { ...pos } })
+  haptic("select")
+}
 
 export function tapTile(pos: Pos): void {
   const st = state()
@@ -467,8 +380,12 @@ export function tapTile(pos: Pos): void {
 
   switch (ui.mode) {
     case "idle":
-    case "enemyInfo": {
-      if (!occupant) return clearSelection()
+    case "enemyInfo":
+    case "tileInfo": {
+      if (!occupant) {
+        if (ui.mode === "tileInfo" && ui.infoPos && samePos(ui.infoPos, pos)) return clearSelection()
+        return showTileInfo(pos)
+      }
       if (occupant.side === "player" && !occupant.acted) return selectUnit(st, occupant)
       if (ui.mode === "enemyInfo" && ui.infoId === occupant.unitId) return clearSelection()
       const threat = occupant.side === "enemy" ? threatTiles(st, occupant) : new Set<string>()
@@ -476,92 +393,22 @@ export function tapTile(pos: Pos): void {
       haptic("select")
       return
     }
-    case "unitSelected":
-    case "moveTargeting": {
+    case "unitSelected": {
       const sel = selected(st)
       if (!sel || !ui.reach) return clearSelection()
-      if (occupant && occupant.unitId === sel.unitId) {
-        // Повторный тап по себе: меню действий на месте
-        previewAt(st, sel, sel.pos)
-        return
-      }
-      if (occupant && occupant.side !== sel.side) {
-        const range = weaponRange(st, sel)
-        const from = bestTileForTarget(st, sel, ui.reach, occupant.pos, range)
-        if (from) return showForecast(st, sel, from, occupant.unitId)
-        clearSelection({ mode: "enemyInfo", infoId: occupant.unitId, infoThreat: threatTiles(st, occupant) })
-        return
-      }
-      if (occupant && occupant.side === sel.side) {
-        const from = bestTileForTarget(st, sel, ui.reach, occupant.pos, 1, sel.pos)
-        if (from && showAssist(st, sel, from, occupant.unitId)) return
-        if (!occupant.acted) return selectUnit(st, occupant)
-        return clearSelection()
-      }
-      if (!occupant && tryWall(st, sel, ui.reach, pos)) return
-      const node = ui.reach.get(posKey(pos))
-      if (node && node.canStop) return previewAt(st, sel, pos)
-      if (ui.mode === "moveTargeting") return selectUnit(st, sel)
-      return clearSelection()
+      return tapWithSelection(st, sel, ui.reach, pos)
     }
-    case "attackTargeting": {
-      const sel = selected(st)
-      if (!sel || !ui.reach) return clearSelection()
-      const from = ui.movedTo && ui.origin && !samePos(ui.movedTo, ui.origin) ? ui.movedTo : undefined
-      if (occupant && occupant.side !== sel.side && ui.attackTiles?.has(posKey(pos))) {
-        const range = weaponRange(st, sel)
-        if (from && manhattan(from, occupant.pos) === range) return showForecast(st, sel, from, occupant.unitId)
-        const tile = bestTileForTarget(st, sel, ui.reach, occupant.pos, range, from)
-        if (tile) return showForecast(st, sel, tile, occupant.unitId)
-      }
-      if (!occupant && ui.attackTiles?.has(posKey(pos)) && tryWall(st, sel, ui.reach, pos, from)) return
-      return backFromTargeting(st, sel)
-    }
-    case "assistTargeting": {
-      const sel = selected(st)
-      if (!sel || !ui.reach) return clearSelection()
-      const from = ui.movedTo && ui.origin && !samePos(ui.movedTo, ui.origin) ? ui.movedTo : undefined
-      if (
-        occupant
-        && occupant.side === sel.side
-        && occupant.unitId !== sel.unitId
-        && ui.assistTiles?.has(posKey(pos))
-      ) {
-        if (from && manhattan(from, occupant.pos) === 1 && showAssist(st, sel, from, occupant.unitId)) return
-        const tile = bestTileForTarget(st, sel, ui.reach, occupant.pos, 1, from ?? sel.pos)
-        if (tile && showAssist(st, sel, tile, occupant.unitId)) return
-      }
-      return backFromTargeting(st, sel)
-    }
-    case "movedPreview":
     case "forecast":
     case "assistPreview":
     case "wallPreview": {
       const sel = selected(st)
-      if (!sel || !ui.reach || !ui.movedTo) return clearSelection()
-      if (ui.mode === "forecast" && occupant && occupant.unitId === ui.targetId) return void confirm()
-      if (ui.mode === "assistPreview" && occupant && occupant.unitId === ui.targetId) return void confirm()
+      if (!sel || !ui.reach) return clearSelection()
+      // Повторный тап по цели подтверждает действие
+      if ((ui.mode === "forecast" || ui.mode === "assistPreview") && occupant && occupant.unitId === ui.targetId)
+        return void confirm()
       if (ui.mode === "wallPreview" && ui.wallPos && samePos(ui.wallPos, pos)) return void confirm()
-      if (occupant && occupant.side !== sel.side) {
-        const range = weaponRange(st, sel)
-        if (manhattan(ui.movedTo, occupant.pos) === range) return showForecast(st, sel, ui.movedTo, occupant.unitId)
-        const from = bestTileForTarget(st, sel, ui.reach, occupant.pos, range, ui.movedTo)
-        if (from) return showForecast(st, sel, from, occupant.unitId)
-        return
-      }
-      if (occupant && occupant.side === sel.side && occupant.unitId !== sel.unitId) {
-        if (manhattan(ui.movedTo, occupant.pos) === 1 && showAssist(st, sel, ui.movedTo, occupant.unitId)) return
-        const from = bestTileForTarget(st, sel, ui.reach, occupant.pos, 1, ui.movedTo)
-        if (from && showAssist(st, sel, from, occupant.unitId)) return
-        return
-      }
-      if (!occupant && tryWall(st, sel, ui.reach, pos, ui.movedTo)) return
-      // Тап по исходной клетке — вернуть юнита
-      if (ui.origin && samePos(pos, ui.origin)) return selectUnit(st, sel)
-      const node = ui.reach.get(posKey(pos))
-      if (node && node.canStop) return previewAt(st, sel, pos)
-      selectUnit(st, sel)
-      return
+      patch({ ...NO_PREVIEW, mode: "unitSelected" })
+      return tapWithSelection(st, sel, ui.reach, pos)
     }
     default:
       return
@@ -585,18 +432,7 @@ export function beginDrag(unitId: string): boolean {
   const bu = st.units[unitId]
   if (!bu || !bu.alive || bu.side !== "player" || bu.acted) return false
   if (ui.selectedId !== unitId || !ui.reach) selectUnit(st, bu)
-  patch({
-    mode: "moveTargeting",
-    dragging: true,
-    dragHover: { ...bu.pos },
-    dragValid: true,
-    movedTo: undefined,
-    path: undefined,
-    targetId: undefined,
-    forecast: undefined,
-    assistPlan: undefined,
-    wallPos: undefined
-  })
+  patch({ ...NO_PREVIEW, mode: "unitSelected", dragging: true, dragHover: { ...bu.pos }, dragValid: true })
   haptic("light")
   return true
 }
@@ -607,41 +443,28 @@ export function dragHover(pos: Pos | null): void {
   const ui = $battleUi.get()
   if (!st || !ui.dragging) return
   const sel = selected(st)
-  if (!sel || !ui.reach) return
+  const reach = ui.reach
+  if (!sel || !reach) return
   if (pos && ui.dragHover && samePos(pos, ui.dragHover) && ui.path) return
-  if (!pos)
-    return patch({ dragHover: undefined, dragValid: false, movedTo: undefined, path: undefined, targetId: undefined })
+  if (!pos) return patch({ ...NO_PREVIEW, dragHover: undefined, dragValid: false })
   const occupant = unitAt(st, pos)
-  const range = weaponRange(st, sel)
-  if (occupant && occupant.side !== sel.side && ui.attackTiles?.has(posKey(pos))) {
-    const from = bestTileForTarget(st, sel, ui.reach, pos, range)
-    if (from)
-      return patch({
-        dragHover: pos,
-        dragValid: true,
-        movedTo: from,
-        path: pathFor(ui.reach, from),
-        targetId: occupant.unitId
-      })
-  }
+  const aim = (from: Pos | null, targetId?: string, wallPos?: Pos): void =>
+    from
+      ? patch({ ...NO_PREVIEW, dragHover: pos, dragValid: true, movedTo: from, path: previewPath(st, sel, reach, from), targetId, wallPos })
+      : patch({ ...NO_PREVIEW, dragHover: pos, dragValid: false })
+  if (occupant && occupant.side !== sel.side && ui.attackTiles?.has(posKey(pos)))
+    return aim(bestTileForTarget(st, sel, reach, pos, weaponRange(st, sel), sel.pos), occupant.unitId)
   if (occupant && occupant.side === sel.side && occupant.unitId !== sel.unitId && ui.assistTiles?.has(posKey(pos))) {
-    const from = bestTileForTarget(st, sel, ui.reach, pos, 1, sel.pos)
-    if (from && planAssist(st, sel.unitId, from, occupant.unitId).valid)
-      return patch({
-        dragHover: pos,
-        dragValid: true,
-        movedTo: from,
-        path: pathFor(ui.reach, from),
-        targetId: occupant.unitId
-      })
+    const from = bestTileForTarget(st, sel, reach, pos, 1, sel.pos)
+    return aim(from && planAssist(st, sel.unitId, from, occupant.unitId).valid ? from : null, occupant.unitId)
   }
-  const node = ui.reach.get(posKey(pos))
-  if (node && node.canStop)
-    return patch({ dragHover: pos, dragValid: true, movedTo: pos, path: pathFor(ui.reach, pos), targetId: undefined })
-  patch({ dragHover: pos, dragValid: false, movedTo: undefined, path: undefined, targetId: undefined })
+  if (!occupant && isBreakableWall(st, pos) && ui.attackTiles?.has(posKey(pos)))
+    return aim(bestTileForTarget(st, sel, reach, pos, weaponRange(st, sel), sel.pos), undefined, pos)
+  const node = reach.get(posKey(pos))
+  aim(node && node.canStop && (!occupant || occupant.unitId === sel.unitId) ? pos : null)
 }
 
-/** Палец отпущен над `pos` (null — вне поля). Возвращает true, если юнит остался на новой клетке. */
+/** Палец отпущен над `pos` (null — вне поля). Возвращает true, если юнит встал на новую клетку или целится. */
 export function endDrag(pos: Pos | null): boolean {
   const st = state()
   const ui = $battleUi.get()
@@ -665,7 +488,16 @@ export function endDrag(pos: Pos | null): boolean {
     }
     if (target && showAssist(st, sel, cur.movedTo, cur.targetId)) return true
   }
-  previewAt(st, sel, cur.movedTo)
+  if (cur.wallPos) {
+    showWall(st, sel, cur.movedTo, cur.wallPos)
+    return true
+  }
+  if (samePos(cur.movedTo, sel.pos)) {
+    selectUnit(st, sel)
+    return false
+  }
+  // Боец уже в руке над клеткой: ставим без пробежки, приземление играет сцена
+  void moveTo(sel.unitId, cur.movedTo, false)
   return true
 }
 
@@ -680,6 +512,32 @@ export function cancelDrag(): void {
 
 /* ---------- Действия ---------- */
 
+/**
+ * Передвинуть бойца, не завершая ход: он остаётся выбранным и готовым действовать.
+ * `animate` — пробежка по клеткам (после тапа); после перетаскивания вид уже над клеткой.
+ */
+async function moveTo(unitId: string, to: Pos, animate: boolean): Promise<void> {
+  const before = state()
+  if (!before) return
+  let result: { state: BattleState, events: BattleEvent[] }
+  try {
+    result = dispatchBattle({ type: "move", unitId, to })
+  }
+  catch (e) {
+    toast((e as Error).message)
+    return
+  }
+  haptic("light")
+  if (animate) {
+    patch({ ...NO_PREVIEW, mode: "busy", busy: true })
+    await playEvents(result.events, before, result.state)
+    patch({ busy: false })
+  }
+  const bu = result.state.units[unitId]
+  if (bu && !result.state.result) selectUnit(result.state, bu)
+  refreshDanger()
+}
+
 export function cancel(): void {
   const st = state()
   const ui = $battleUi.get()
@@ -690,24 +548,19 @@ export function cancel(): void {
     case "forecast":
     case "assistPreview":
     case "wallPreview":
-    case "attackTargeting":
-    case "assistTargeting":
     case "itemSelect":
-      return backFromTargeting(st, sel)
-    case "movedPreview":
-    case "moveTargeting":
       return selectUnit(st, sel)
     default:
       return clearSelection()
   }
 }
 
-/** «Предметы»: открыть список рюкзака для бойца на movedTo (или на месте). */
+/** «Предметы»: открыть рюкзак для выбранного бойца (на клетке, где он стоит). */
 export function chooseItems(): void {
   const st = state()
   const ui = $battleUi.get()
-  if (!st || !ui.selectedId || ui.busy || !ui.actions.items) return
-  patch({ mode: "itemSelect", targetId: undefined, forecast: undefined, assistPlan: undefined, wallPos: undefined })
+  if (!st || !ui.selectedId || ui.busy) return
+  patch({ ...NO_PREVIEW, mode: "itemSelect" })
 }
 
 /** Применить предмет рюкзака к цели (сам боец или сосед); тратит действие. */
@@ -717,18 +570,7 @@ export async function applyItem(itemId: string, targetId: string): Promise<void>
   if (!st || !ui.selectedId || ui.busy) return
   const sel = st.units[ui.selectedId]
   if (!sel) return
-  await commit({ type: "item", unitId: ui.selectedId, to: ui.movedTo ?? sel.pos, targetId, itemId })
-}
-
-/** «Ждать» на movedTo (или на месте). */
-export async function waitHere(): Promise<void> {
-  const st = state()
-  const ui = $battleUi.get()
-  if (!st || !ui.selectedId || ui.busy) return
-  const sel = st.units[ui.selectedId]
-  if (!sel) return
-  const to = ui.movedTo ?? sel.pos
-  await commit({ type: "wait", unitId: ui.selectedId, to })
+  await commit({ type: "item", unitId: ui.selectedId, to: sel.pos, targetId, itemId })
 }
 
 export async function confirm(): Promise<void> {
@@ -832,7 +674,7 @@ export function selectedUnit(): BattleUnit | undefined {
   return st ? selected(st) : undefined
 }
 
-/** Вид выбранного юнита должен стоять на movedTo (предпросмотр), а не на исходной клетке. */
+/** Вид выбранного юнита должен стоять на movedTo (предпросмотр), а не на клетке, где он стоит. */
 export function isDisplaced(ui: BattleUiState): boolean {
   return !!ui.movedTo && !!ui.origin && !samePos(ui.movedTo, ui.origin) && !ui.dragging
 }

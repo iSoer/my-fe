@@ -2,7 +2,7 @@
 import { useEffect } from "react"
 import { App } from "./ui/App"
 import { initRouter } from "./state/router"
-import { $battleUi, confirm, endTurn, tapTile, waitHere } from "./state/battleUi"
+import { $battleUi, confirm, endTurn, tapTile } from "./state/battleUi"
 import { $boardLayout } from "./state/boardLayout"
 import { $save, initSave } from "./state/save"
 import { $villageUi, openNpc, villageControl } from "./state/village"
@@ -26,7 +26,7 @@ export default function GameRoot() {
       ui: $battleUi,
       layout: $boardLayout,
       // Действия игрока в бою — для смоук-тестов и проверки анимаций
-      battle: { tapTile, confirm, waitHere, endTurn },
+      battle: { tapTile, confirm, endTurn },
       // Деревня: телепорт героя (к NPC или в точку), подойти и заговорить, сразу открыть разговор
       village: {
         ui: $villageUi,

@@ -3,7 +3,7 @@ import { decideAction, enemyOrder, nextEnemyAction } from "@game/core/ai"
 import { applyAction } from "@game/core/battle/reducer"
 import { makeBattle } from "./helpers"
 
-const flat = { hp: 20, atk: 10, spd: 5, def: 5, res: 5 }
+const flat = { hp: 20, str: 10, mag: 10, spd: 5, def: 5, res: 5 }
 
 describe("ИИ врага", () => {
   it("hold стоит на месте, пока игрок вне зоны угрозы", () => {
@@ -33,7 +33,7 @@ describe("ИИ врага", () => {
         { classId: "infantry_sword", pos: { x: 1, y: 4 }, baseStats: { ...flat, hp: 50 } },
         { classId: "infantry_sword", pos: { x: 3, y: 4 }, baseStats: { ...flat, hp: 12, def: 0 } }
       ],
-      [{ classId: "infantry_sword", pos: { x: 2, y: 2 }, baseStats: { ...flat, atk: 12 }, stance: "advance" }]
+      [{ classId: "infantry_sword", pos: { x: 2, y: 2 }, baseStats: { ...flat, str: 12, mag: 12 }, stance: "advance" }]
     )
     const s = applyAction(b.state, { type: "endPhase" }).state
     const a = decideAction(s, b.enemies[0]!.id)

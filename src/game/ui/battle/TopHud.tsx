@@ -32,7 +32,7 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
           /
           {players.length}
           {" "}
-          {tr("moved", "ходили")}
+          {tr("acted", "действовали")}
         </span>
       )}
       <span className="bf-grow" />

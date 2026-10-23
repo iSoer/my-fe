@@ -779,7 +779,7 @@ export function healPillar(scene: Phaser.Scene, x: number, y: number, size: numb
 }
 
 /** Цвет стрелки баффа по стату. */
-const STAT_COLOR: Record<string, number> = { hp: 0x80ed99, atk: 0xff6b6b, spd: 0x8ecae6, def: 0xffd166, res: 0xc77dff }
+const STAT_COLOR: Record<string, number> = { hp: 0x80ed99, str: 0xff6b6b, mag: 0xff8fd8, spd: 0x8ecae6, def: 0xffd166, res: 0xc77dff }
 
 /**
  * Бафф/дебафф: вращающееся кольцо рун у ног и стрелки по статам (вверх цвета стата или вниз фиолетовые).
@@ -796,7 +796,7 @@ export function buffRunes(
   if (!sceneAlive(scene)) return
   ensureMotionTextures(scene)
   const feetY = y + size * 0.3
-  const color = up ? (STAT_COLOR[stats[0] ?? "atk"] ?? 0x80ed99) : 0xc77dff
+  const color = up ? (STAT_COLOR[stats[0] ?? "str"] ?? 0x80ed99) : 0xc77dff
   const g = scene.add.graphics().setDepth(9).setBlendMode(Phaser.BlendModes.ADD)
   g.setPosition(x, feetY)
   g.lineStyle(2.5, color, 1)
@@ -818,7 +818,7 @@ export function buffRunes(
   g.setScale(up ? 0.3 : 1.3).setAlpha(0)
   scene.tweens.add({ targets: g, scale: up ? 1.1 : 0.4, alpha: 1, duration: 260 / speed, ease: "Back.easeOut" })
   scene.tweens.add({ targets: g, alpha: 0, duration: 260 / speed, delay: 420 / speed, onComplete: () => g.destroy() })
-  const list = stats.length > 0 ? stats.slice(0, 3) : ["atk"]
+  const list = stats.length > 0 ? stats.slice(0, 3) : ["str"]
   list.forEach((s, i) => {
     const ax = x + (i - (list.length - 1) / 2) * size * 0.28
     const t = scene.add

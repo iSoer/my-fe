@@ -657,7 +657,7 @@ p {
 }
 .grid-stats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
 }
 .stat {
@@ -677,6 +677,11 @@ p {
   font-size: 17px;
   font-weight: 900;
   font-style: italic;
+}
+/* Стат, которым бьёт оружие бойца (Str или Mag) */
+.stat.main .label {
+  color: var(--gold);
+  font-weight: 900;
 }
 .stat.asset .value {
   color: var(--grass);

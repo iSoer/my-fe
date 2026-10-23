@@ -56,6 +56,24 @@ function pickAnchors(points: { x: number, y: number }[], seed: number): { x: num
   return a && b && a !== b ? [a, b] : a ? [a] : []
 }
 
+
+/** Подсвеченная клетка: цвет, прозрачность, задержка появления; своя текстура и глубина пульса — по желанию. */
+/** Клетка-цель для свечения и уголков: цвет цели и тёмная подложка под ним. */
+interface TargetMark {
+  key: string
+  color: number
+  dark: number
+}
+
+interface HighlightTile {
+  key: string
+  color: number
+  alpha: number
+  delay: number
+  texture?: string
+  pulse?: number
+}
+
 export class MapScene extends Phaser.Scene {
   layout: BoardLayout = computeLayout(360, 480)
   readonly units = new Map<string, UnitView>()
@@ -77,15 +95,19 @@ export class MapScene extends Phaser.Scene {
   private hlLayer!: Phaser.GameObjects.Container
   private reachPool: Phaser.GameObjects.Image[] = []
   private targetPool: Phaser.GameObjects.Image[] = []
+  /** Свечение (сложение цветов) вокруг клеток-целей: видно поверх любой местности. */
+  private bloomPool: Phaser.GameObjects.Image[] = []
   private reachSig = ""
   private targetSig = ""
   private pathG!: Phaser.GameObjects.Graphics
+  /** Уголки на клетках-целях (атака, Поддержка и лечение) — поверх фигурок, чтобы цели читались сразу. */
+  private targetG!: Phaser.GameObjects.Graphics
   private ghost: UnitView | null = null
   private ghostKey = ""
   /** Прицел: четыре скобки по углам клетки цели. */
   private marker: Phaser.GameObjects.Container | null = null
   private markerTweens: Phaser.Tweens.Tween[] = []
-  private markerKind: "attack" | "assist" | "wall" | "" = ""
+  private markerKind: "attack" | "assist" | "wall" | "info" | "" = ""
   private lastSelectedId: string | undefined
   /** Трещины на хлипких стенах и их HP по данным последней отрисовки. */
   private cracks = new Map<string, Phaser.GameObjects.Graphics>()
@@ -155,6 +177,7 @@ export class MapScene extends Phaser.Scene {
     this.threatG = this.add.graphics().setDepth(1.85)
     this.hlLayer = this.add.container(0, 0).setDepth(2)
     this.pathG = this.add.graphics().setDepth(3)
+    this.targetG = this.add.graphics().setDepth(11)
     this.dangerLayer = this.add.container(0, 0).setDepth(1.8)
     // Пульс подсветки клеток, бегущая штриховка опасности, следы лап на пути, пена у берега
     this.events.on(Phaser.Scenes.Events.UPDATE, this.tickEnv, this)
@@ -164,6 +187,14 @@ export class MapScene extends Phaser.Scene {
         targets: this.dangerG,
         alpha: 0.55,
         duration: 800,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut"
+      }),
+      this.tweens.add({
+        targets: this.targetG,
+        alpha: 0.6,
+        duration: 520,
         yoyo: true,
         repeat: -1,
         ease: "Sine.easeInOut"
@@ -1202,7 +1233,8 @@ export class MapScene extends Phaser.Scene {
       img.setAlpha(base * (1 - depth + depth * (0.5 + 0.5 * Math.sin(time * speed - wave * 0.7))))
     }
     for (const img of this.reachPool) pulse(img, 0.004, 0.35)
-    for (const img of this.targetPool) pulse(img, 0.009, 0.45)
+    for (const img of this.targetPool) pulse(img, 0.009, (img.getData("pulse") as number | undefined) ?? 0.45)
+    for (const img of this.bloomPool) pulse(img, 0.009, 0.5)
     for (const img of this.threatPool) pulse(img, 0.005, 0.4)
     for (const ts of this.dangerPool) if (ts.visible) ts.tilePositionX = (time * 0.02) % 64
     if (this.pawCount > 0) {
@@ -1239,6 +1271,68 @@ export class MapScene extends Phaser.Scene {
     return img
   }
 
+  /** Толстые уголки по краям клеток-целей: тёмная подложка для контраста, сверху яркий цвет цели. */
+  private drawTargetCorners(targets: TargetMark[]): void {
+    const g = this.targetG
+    g.clear()
+    const t = this.layout.tile
+    // У самого края клетки: не закрывают значки уровня и HP на фигурке
+    const len = t * 0.26
+    const inset = t * 0.03
+    for (const top of [false, true]) {
+      for (const { key, color, dark } of targets) {
+        g.lineStyle(top ? Math.max(3, t * 0.065) : Math.max(5, t * 0.11), top ? color : dark, 1)
+        const pos = this.tileAt(key)
+        if (!pos) continue
+        const o = tileOrigin(this.layout, pos)
+        const l = o.x + inset
+        const r = o.x + t - inset
+        const tp = o.y + inset
+        const b = o.y + t - inset
+        for (const [x, y, dx, dy] of [[l, tp, 1, 1], [r, tp, -1, 1], [r, b, -1, -1], [l, b, 1, -1]] as const) {
+          g.beginPath()
+          g.moveTo(x, y + dy * len)
+          g.lineTo(x, y)
+          g.lineTo(x + dx * len, y)
+          g.strokePath()
+        }
+      }
+    }
+  }
+
+  /** Свечение вокруг клеток-целей: больше клетки, рисуется сложением цветов под фигурками. */
+  private layBloom(targets: TargetMark[], animate: boolean, delay: number): void {
+    const t = this.layout.tile
+    targets.forEach(({ key, color }, i) => {
+      const pos = this.tileAt(key)
+      let img = this.bloomPool[i]
+      if (!img) {
+        img = this.add.image(0, 0, ENV.bloom).setBlendMode(Phaser.BlendModes.ADD)
+        this.hlLayer.addAt(img, 0)
+        this.bloomPool[i] = img
+      }
+      if (!pos) {
+        img.setVisible(false)
+        return
+      }
+      const c = tileCenter(this.layout, pos)
+      this.tweens.killTweensOf(img)
+      img
+        .setPosition(c.x, c.y)
+        .setDisplaySize(t * 1.6, t * 1.6)
+        .setTint(color)
+        .setVisible(true)
+        .setData("baseA", 0.85)
+        .setData("wave", pos.x + pos.y)
+      if (animate) {
+        img.setAlpha(0)
+        this.tweens.add({ targets: img, alpha: 0.85, duration: 200, delay, ease: "Quad.easeOut" })
+      }
+      else img.setAlpha(0.85)
+    })
+    this.hidePool(this.bloomPool, targets.length)
+  }
+
   private hidePool(pool: Phaser.GameObjects.Image[], from = 0): void {
     for (let i = from; i < pool.length; i++) {
       const img = pool[i]
@@ -1251,14 +1345,14 @@ export class MapScene extends Phaser.Scene {
   /** Разложить квадраты пула по клеткам; при animate они появляются волной по delayFn. */
   private layTiles(
     pool: Phaser.GameObjects.Image[],
-    tiles: { key: string, color: number, alpha: number, delay: number }[],
+    tiles: HighlightTile[],
     animate: boolean,
     texture: string = ENV.glowTile
   ): void {
     const t = this.layout.tile
     tiles.forEach((spec, i) => {
       const pos = this.tileAt(spec.key)
-      const img = this.poolTile(pool, i, texture)
+      const img = this.poolTile(pool, i, spec.texture ?? texture)
       if (!pos) {
         img.setVisible(false)
         return
@@ -1272,6 +1366,7 @@ export class MapScene extends Phaser.Scene {
         .setVisible(true)
         .setData("baseA", spec.alpha)
         .setData("wave", pos.x + pos.y)
+        .setData("pulse", spec.pulse)
       if (animate) {
         img.setAlpha(0)
         this.tweens.add({ targets: img, alpha: spec.alpha, duration: 160, delay: spec.delay, ease: "Quad.easeOut" })
@@ -1338,9 +1433,11 @@ export class MapScene extends Phaser.Scene {
       this.targetSig = ""
       this.hidePool(this.reachPool)
       this.hidePool(this.targetPool)
+      this.hidePool(this.bloomPool)
+      this.targetG.clear()
       return
     }
-    const reachTiles: { key: string, color: number, alpha: number, delay: number }[] = []
+    const reachTiles: HighlightTile[] = []
     let maxCost = 0
     for (const node of ui.reach.values()) {
       if (!node.canStop) continue
@@ -1353,22 +1450,31 @@ export class MapScene extends Phaser.Scene {
       this.reachSig = reachSig
       this.layTiles(this.reachPool, reachTiles, fresh)
     }
-    const targetTiles: { key: string, color: number, alpha: number, delay: number }[] = []
+    const targetTiles: HighlightTile[] = []
     const after = maxCost * 45 + 60
+    // Цели атаки — самые заметные: плотная клетка с толстой кромкой, почти не гаснет на пульсе, и свечение вокруг
     if (ui.attackTiles)
-      for (const k of ui.attackTiles) targetTiles.push({ key: k, color: HL.attack, alpha: 0.62, delay: after })
+      for (const k of ui.attackTiles)
+        targetTiles.push({ key: k, color: HL.attack, alpha: 0.95, delay: after, texture: ENV.attackTile, pulse: 0.2 })
     if (ui.assistTiles)
-      for (const k of ui.assistTiles) targetTiles.push({ key: k, color: HL.assist, alpha: 0.6, delay: after + 40 })
+      for (const k of ui.assistTiles)
+        targetTiles.push({ key: k, color: HL.assist, alpha: 0.95, delay: after + 40, texture: ENV.attackTile, pulse: 0.2 })
     const targetSig = `${ui.selectedId}:${ui.mode}:${targetTiles.map(r => r.key + r.color).join("|")}`
     if (targetSig !== this.targetSig) {
       const fresh = !this.targetSig.startsWith(`${ui.selectedId}:`)
       this.targetSig = targetSig
       this.layTiles(this.targetPool, targetTiles, fresh, ENV.targetTile)
+      const marks: TargetMark[] = [
+        ...[...(ui.attackTiles ?? [])].map(key => ({ key, color: HL.attack, dark: 0x2a0008 })),
+        ...[...(ui.assistTiles ?? [])].map(key => ({ key, color: HL.assist, dark: 0x00261c }))
+      ]
+      this.layBloom(marks, fresh, after)
+      this.drawTargetCorners(marks)
     }
   }
 
   /** Прицел из четырёх скобок: дышит и медленно поворачивается. */
-  private drawMarker(pos: Pos | null, kind: "attack" | "assist" | "wall"): void {
+  private drawMarker(pos: Pos | null, kind: "attack" | "assist" | "wall" | "info"): void {
     if (!pos) {
       if (this.marker) {
         for (const t of this.markerTweens) t.stop()
@@ -1380,7 +1486,7 @@ export class MapScene extends Phaser.Scene {
       return
     }
     const c = this.center(pos)
-    const color = kind === "attack" ? HL.attack : kind === "assist" ? HL.assist : 0xffb703
+    const color = kind === "attack" ? HL.attack : kind === "assist" ? HL.assist : kind === "info" ? 0xffffff : 0xffb703
     const t = this.tile
     if (!this.marker) {
       const cont = this.add.container(c.x, c.y).setDepth(12)
@@ -1459,7 +1565,7 @@ export class MapScene extends Phaser.Scene {
 
     // Прицел на цели
     let markerPos: Pos | null = null
-    let kind: "attack" | "assist" | "wall" = "attack"
+    let kind: "attack" | "assist" | "wall" | "info" = "attack"
     if (ui.targetId && st) {
       const t = st.units[ui.targetId]
       const sel = ui.selectedId ? st.units[ui.selectedId] : undefined
@@ -1471,6 +1577,11 @@ export class MapScene extends Phaser.Scene {
     else if (ui.wallPos) {
       markerPos = ui.wallPos
       kind = "wall"
+    }
+    // Справка о клетке: белый прицел на ней
+    if (ui.mode === "tileInfo" && ui.infoPos) {
+      markerPos = ui.infoPos
+      kind = "info"
     }
     this.drawMarker(markerPos, kind)
   }

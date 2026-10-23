@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import { useStore } from "@nanostores/react"
 import type { UnitSkills } from "@game/core/types"
-import { MAX_LEVEL } from "@game/core/types"
+import { MAX_LEVEL, attackStatOf } from "@game/core/types"
+import { isMagicWeapon } from "@game/content/weapons"
 import {
   canRebirth,
   displayName,
@@ -45,7 +46,7 @@ import { GearRow, MasteryGrid, MasterySheet, SkillGrid } from "../components/Uni
 import type { Skill } from "@shared/character/skills"
 import { TalismanSheet, WeaponSheet } from "../components/GearSheet"
 import { ClassPanel } from "../components/ClassInfo"
-import { atkLabel, fmtGains, speciesName } from "../lib/format"
+import { fmtGains, speciesName } from "../lib/format"
 import { useReplay } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
 import { tr } from "@game/i18n"
@@ -219,7 +220,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
 
         <div className="card stack pop-in" style={{ animationDelay: "60ms" }}>
           <b>{tr("Stats", "Характеристики")}</b>
-          <StatsGrid stats={stats} animate atkLabel={atkLabel(unit)} />
+          <StatsGrid stats={stats} animate main={attackStatOf(isMagicWeapon(unit.weaponSkill))} />
         </div>
 
 

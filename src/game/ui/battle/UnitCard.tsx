@@ -6,7 +6,8 @@ import { specialDef } from "@game/content/skills/specials"
 import { WEAPON_COLOR } from "@game/content/weapons"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { classRoleText, moveText } from "../components/ClassInfo"
-import { COLOR_CSS, STAT_LABELS, atkLabel } from "../lib/format"
+import { COLOR_CSS, STAT_LABELS, statChanges } from "../lib/format"
+import { terrainInfo } from "@game/content/terrain"
 import { tr } from "@game/i18n"
 
 /** Компактная карточка бойца в нижней полосе: аватар, имя, HP, статы, спецприём. */
@@ -29,14 +30,10 @@ export function UnitCard({
   const pct = bu.maxHp > 0 ? Math.max(0, Math.min(100, (bu.hp / bu.maxHp) * 100)) : 0
   const hpCls = pct <= 25 ? "crit" : pct <= 50 ? "low" : ""
   // Временные изменения статов: штраф держится до хода бойца, усиление — до начала его фазы
-  const statName = (k: keyof Stats): string => (k === "atk" ? atkLabel(unit) : STAT_LABELS[k])
-  const changes = (m: Partial<Stats>): string =>
-    (Object.entries(m) as [keyof Stats, number][])
-      .filter(([, v]) => v)
-      .map(([k, v]) => `${statName(k)} ${v > 0 ? "+" : "−"}${Math.abs(v)}`)
-      .join(", ")
-  const down = changes(bu.penalties)
-  const up = changes(bu.bonuses)
+  // Бонус клетки, на которой стоит боец (заросли, укрытие)
+  const ground = terrainInfo(state, bu.pos)
+  const down = statChanges(bu.penalties)
+  const up = statChanges(bu.bonuses)
   const stat = (k: Exclude<keyof Stats, "hp">, label: string) => {
     const d = (bu.bonuses[k] ?? 0) + (bu.penalties[k] ?? 0)
     return (
@@ -96,11 +93,21 @@ export function UnitCard({
               <b>{bu.specialCd}</b>
             </span>
           )}
+          {ground.bonus && (
+            <span
+              className="bf-terrain"
+              title={tr(`${ground.name}: bonus while standing here`, `${ground.name}: бонус, пока боец стоит здесь`)}
+              aria-label={`${ground.name}: ${ground.bonus}`}
+            >
+              {`${ground.icon} ${ground.bonus}`}
+            </span>
+          )}
         </div>
         <div className="bf-muted bf-role">{`${classRoleText(unit.classId)} · ${moveText(unit.classId)}`}</div>
         {st && (
           <div className="bf-stats">
-            {stat("atk", atkLabel(unit))}
+            {stat("str", STAT_LABELS.str)}
+            {stat("mag", STAT_LABELS.mag)}
             {stat("spd", "Spd")}
             {stat("def", "Def")}
             {stat("res", "Res")}

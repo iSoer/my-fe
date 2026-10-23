@@ -12,7 +12,8 @@ export type Gender = "m" | "f"
 /** Типы движения — из модели персонажа (`movementOf` класса FW). */
 export type MoveType = Movement
 export type Color = "red" | "blue" | "green" | "colorless"
-export type Stat = "hp" | "atk" | "spd" | "def" | "res"
+/** Боевые статы: у каждого бойца есть и Сила (`str`), и Магия (`mag`); бьёт он тем, чем бьёт его оружие. */
+export type Stat = "hp" | "str" | "mag" | "spd" | "def" | "res"
 export type Stats = Record<Stat, number>
 export type Rarity = 1 | 2 | 3 | 4 | 5
 export type Side = "player" | "enemy"
@@ -28,7 +29,7 @@ export interface Pos {
   y: number
 }
 
-export const STATS: readonly Stat[] = ["hp", "atk", "spd", "def", "res"] as const
+export const STATS: readonly Stat[] = ["hp", "str", "mag", "spd", "def", "res"] as const
 export const MAP_W = 6
 export const MAP_H = 8
 /** Уровни бойцов — уровни модели персонажа (1–80). */
@@ -51,16 +52,25 @@ export function inBounds(p: Pos): boolean {
   return p.x >= 0 && p.y >= 0 && p.x < MAP_W && p.y < MAP_H
 }
 export function emptyStats(): Stats {
-  return { hp: 0, atk: 0, spd: 0, def: 0, res: 0 }
+  return { hp: 0, str: 0, mag: 0, spd: 0, def: 0, res: 0 }
 }
 export function addStats(a: Stats, b: Partial<Stats>): Stats {
   return {
     hp: a.hp + (b.hp ?? 0),
-    atk: a.atk + (b.atk ?? 0),
+    str: a.str + (b.str ?? 0),
+    mag: a.mag + (b.mag ?? 0),
     spd: a.spd + (b.spd ?? 0),
     def: a.def + (b.def ?? 0),
     res: a.res + (b.res ?? 0)
   }
+}
+/** Стат, которым бьёт оружие: Mag у магии и посохов, иначе Str. */
+export function attackStatOf(magical: boolean): "str" | "mag" {
+  return magical ? "mag" : "str"
+}
+/** Бонус «+N к Str и Mag» (навыки, талисманы, Поддержка): действует на атаку любым оружием. */
+export function bothAttacks(n: number): { str: number, mag: number } {
+  return { str: n, mag: n }
 }
 export function clamp(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v
@@ -184,6 +194,11 @@ export interface BattleUnit {
   flags: Record<string, number>
   /** На каком ходу появился (для подкреплений). */
   spawnedTurn: number
+  /**
+   * Клетка, с которой боец начал ход, если он уже передвинулся, но ещё не действовал. Переставлять бойца
+   * можно сколько угодно раз, но дальность хода всегда считается от неё.
+   */
+  turnStart?: Pos
 }
 
 export interface Decal {
@@ -293,6 +308,8 @@ export interface Strike {
 export type BattleAction
   = | { type: "attack", unitId: string, to: Pos, targetId: string, newStance?: Stance }
     | { type: "attackWall", unitId: string, to: Pos, wall: Pos, newStance?: Stance }
+    /** Передвинуться, не завершая ход: боец остаётся готовым к действию. */
+    | { type: "move", unitId: string, to: Pos }
     | { type: "assist", unitId: string, to: Pos, targetId: string, newStance?: Stance }
     | { type: "wait", unitId: string, to: Pos, newStance?: Stance }
     | { type: "item", unitId: string, to: Pos, targetId: string, itemId: string, newStance?: Stance }

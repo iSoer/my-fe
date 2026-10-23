@@ -129,7 +129,8 @@ export interface SpecialDef {
   staffOnly?: boolean
   offense?: {
     ignoreDefPct?: number
-    damagePctOfStat?: { stat: Stat, pct: number, of: "self" | "foe" }
+    /** `atk` — атака бойца: Str или Mag, смотря чем бьёт его оружие. */
+    damagePctOfStat?: { stat: Stat | "atk", pct: number, of: "self" | "foe" }
     damageBonusPct?: number
     healPctOfDamage?: number
   }

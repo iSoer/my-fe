@@ -12,6 +12,8 @@ import { sceneAlive } from "./fx"
 export const ENV = {
   glowTile: "env_glow_tile",
   targetTile: "env_target_tile",
+  attackTile: "env_attack_tile",
+  bloom: "env_bloom",
   hatch: "env_hatch",
   paw: "env_paw",
   cloud: "env_cloud",
@@ -148,6 +150,39 @@ export function ensureEnvTextures(scene: Phaser.Scene): void {
     ctx.arc(32, 32, 4, 0, Math.PI * 2)
     ctx.fillStyle = "rgba(255,255,255,0.9)"
     ctx.fill()
+  })
+  // Клетка-цель (атака, Поддержка, лечение): плотная заливка, толстая кромка и крупные уголки прицела — видна издалека
+  canvasTexture(scene, ENV.attackTile, 64, 64, (ctx) => {
+    const g = ctx.createRadialGradient(32, 32, 4, 32, 32, 42)
+    g.addColorStop(0, "rgba(255,255,255,0.55)")
+    g.addColorStop(1, "rgba(255,255,255,1)")
+    ctx.fillStyle = g
+    roundRect(ctx, 2, 2, 60, 60, 9)
+    ctx.fill()
+    ctx.lineWidth = 5
+    ctx.strokeStyle = "rgba(255,255,255,1)"
+    roundRect(ctx, 4, 4, 56, 56, 8)
+    ctx.stroke()
+    ctx.lineWidth = 6
+    ctx.lineCap = "round"
+    const c = 15
+    const p = 9
+    ctx.beginPath()
+    for (const [x, y, dx, dy] of [[p, p, 1, 1], [64 - p, p, -1, 1], [64 - p, 64 - p, -1, -1], [p, 64 - p, 1, -1]] as const) {
+      ctx.moveTo(x, y + dy * c)
+      ctx.lineTo(x, y)
+      ctx.lineTo(x + dx * c, y)
+    }
+    ctx.stroke()
+  })
+  // Мягкое пятно света (под тинт, рисуется сложением цветов): свечение вокруг целей
+  canvasTexture(scene, ENV.bloom, 64, 64, (ctx) => {
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+    g.addColorStop(0, "rgba(255,255,255,1)")
+    g.addColorStop(0.45, "rgba(255,255,255,0.55)")
+    g.addColorStop(1, "rgba(255,255,255,0)")
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, 64, 64)
   })
   // Диагональная штриховка зоны опасности (бесшовная плитка 32×32 для TileSprite)
   canvasTexture(scene, ENV.hatch, 32, 32, (ctx) => {

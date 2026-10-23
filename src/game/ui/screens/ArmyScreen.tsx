@@ -3,6 +3,7 @@ import { useStore } from "@nanostores/react"
 import type { UnitInstance } from "@game/core/types"
 import { BARRACKS_CAP, SQUAD_SIZE } from "@game/core/types"
 import {
+  attackOf,
   displayName,
   hasClassUpgrade,
   learnableNow,
@@ -91,7 +92,7 @@ function FilledSlot({
         <span>
           {atkLabel(unit)}
           {" "}
-          <b>{st.atk}</b>
+          <b>{attackOf(unit, st)}</b>
         </span>
         <span>
           Spd

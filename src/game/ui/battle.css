@@ -58,12 +58,11 @@
 .bf-overlay .bf-card {
   pointer-events: auto;
 }
-/* Боец зажат или перетаскивается: накладки не перехватывают курсор и меню уходят. */
+/* Боец зажат или перетаскивается: накладки не перехватывают курсор и кнопки уходят. */
 .bf-overlay.is-pressing * {
   pointer-events: none !important;
 }
 .bf-overlay.is-pressing .bf-endturn,
-.bf-overlay.is-pressing .bf-menu,
 .bf-overlay.is-pressing .bf-endprompt {
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -316,101 +315,6 @@
   font-weight: 800;
 }
 
-/* ---------- Контекстное меню на поле ---------- */
-.bf-menu {
-  position: absolute;
-  display: flex;
-  gap: 7px;
-  padding: 6px 8px;
-  pointer-events: auto;
-  z-index: 5;
-  transition:
-    left 0.18s ease,
-    top 0.18s ease;
-}
-.bf-menu-notch {
-  position: absolute;
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 10px solid var(--bf-ink);
-  transform: translateX(-50%);
-  bottom: -3px;
-}
-.bf-menu.below .bf-menu-notch {
-  bottom: auto;
-  top: -3px;
-  border-top: none;
-  border-bottom: 10px solid var(--bf-ink);
-}
-.bf-menu-btn {
-  position: relative;
-  isolation: isolate;
-  width: 64px;
-  min-height: 56px;
-  padding: 4px 2px 5px;
-  border: none;
-  background: transparent;
-  color: var(--bf-text);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  overflow: visible;
-  animation: bf-strip-in 0.22s var(--bf-ease) both;
-  transition: transform 0.1s ease;
-  --slant-bg: var(--bf-paper);
-  --slant-shadow: 3px 3px 0 var(--bf-ink);
-}
-.bf-menu-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--slant-bg);
-  transform: skewX(var(--bf-skew));
-  box-shadow: var(--slant-shadow);
-}
-.bf-menu-btn:active {
-  transform: translate(2px, 2px);
-  --slant-shadow: 1px 1px 0 var(--bf-ink);
-}
-.bf-menu-btn.primary {
-  color: #fff;
-  --slant-bg: var(--bf-red);
-}
-.bf-menu-btn.disabled {
-  color: var(--bf-muted);
-  --slant-bg: #d7d3dd;
-  --slant-shadow: 2px 2px 0 rgba(13, 11, 16, 0.35);
-}
-.bf-menu-ico {
-  font-size: 19px;
-  line-height: 1;
-  filter: drop-shadow(0 1px 0 rgba(13, 11, 16, 0.25));
-}
-.bf-menu-label {
-  font-family: var(--bf-font-display);
-  font-style: italic;
-  font-weight: 900;
-  text-transform: uppercase;
-  font-size: 8.5px;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  white-space: nowrap;
-}
-.bf-menu-label small {
-  font-size: 7.5px;
-  font-weight: 700;
-  text-transform: none;
-  opacity: 0.8;
-}
-
 /* ---------- Нижняя полоса ---------- */
 .bf-bottom {
   position: absolute;
@@ -660,6 +564,15 @@
   background: rgba(255, 255, 255, 0.12);
   transform: skewX(var(--bf-skew));
 }
+/* Бонус клетки под бойцом (заросли, укрытие) — плашкой рядом со спецприёмом, без лишней строки */
+.bf-terrain {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: #1f6f8b;
+  transform: skewX(var(--bf-skew));
+}
 .bf-special b {
   color: var(--bf-on-ink);
 }
@@ -735,6 +648,25 @@
 }
 .bf-status-up {
   background: #2d8a4e;
+}
+.bf-status-terrain {
+  background: #1f6f8b;
+}
+/* Справка о клетке поля */
+.bf-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bf-tile-ico {
+  font-size: 22px;
+  line-height: 1;
+}
+.bf-tile-kind {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 .bf-skills,
 .bf-caption {
@@ -1161,7 +1093,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .bf-card,
-  .bf-menu-btn,
   .bf-phase,
   .bf-phase-name,
   .bf-pill-btn,
@@ -1172,7 +1103,6 @@
   .bf-unit-hp.crit {
     animation: none !important;
   }
-  .bf-menu,
   .bf-bar > div {
     transition: none !important;
   }
@@ -1188,9 +1118,6 @@
   }
   .bf-phase-name {
     font-size: 11.5px;
-  }
-  .bf-menu-btn {
-    width: 58px;
   }
 }
 @media (max-width: 360px) {

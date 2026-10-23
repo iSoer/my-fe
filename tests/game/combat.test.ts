@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest"
 import { simulateCombat, triangleOf } from "@game/core/combat"
 import { weaponDef } from "@game/content/weapons"
 import { makeBattle, plainTiles } from "./helpers"
-import { visibleStats } from "@game/core/units"
+import { attackOf, visibleStats } from "@game/core/units"
 import { applyAction } from "@game/core/battle/reducer"
 
-const flat = { hp: 20, atk: 10, spd: 5, def: 5, res: 5 }
+const flat = { hp: 20, str: 10, mag: 10, spd: 5, def: 5, res: 5 }
 
 describe("треугольник оружия", () => {
   it("коготь > палка > клык > коготь; бесцветные нейтральны", () => {
@@ -27,7 +27,7 @@ describe("simulateCombat", () => {
     const [p] = b.players
     const [e] = b.enemies
     const out = simulateCombat(b.state, p!.id, e!.id, { x: 2, y: 4 })
-    const atk = visibleStats(p!).atk // 10 + Mt 6 (+ видовой сдвиг не трогает atk)
+    const atk = attackOf(p!) // 10 + Mt 6 (+ видовой сдвиг не трогает atk)
     const def = visibleStats(e!).def
     expect(out.strikes.length).toBe(2)
     expect(out.strikes[0]!.damage).toBe(Math.max(0, atk - def))
@@ -45,7 +45,7 @@ describe("simulateCombat", () => {
       ]
     )
     const p = b.players[0]!
-    const atk = visibleStats(p).atk
+    const atk = attackOf(p)
     const def = visibleStats(b.enemies[0]!).def
     const adv = simulateCombat(b.state, p.id, b.enemies[0]!.id, { x: 2, y: 4 })
     const dis = simulateCombat(b.state, p.id, b.enemies[1]!.id, { x: 2, y: 4 })
@@ -99,7 +99,7 @@ describe("simulateCombat", () => {
     )
     const p = b.players[0]!
     const out = simulateCombat(b.state, p.id, b.enemies[0]!.id, { x: 2, y: 5 })
-    const atk = Math.floor(visibleStats(p).atk * 1.5)
+    const atk = Math.floor(attackOf(p) * 1.5)
     expect(out.attackerEffective).toBe(true)
     expect(out.strikes[0]!.damage).toBe(atk - visibleStats(b.enemies[0]!).def)
   })
@@ -112,7 +112,7 @@ describe("simulateCombat", () => {
     )
     const p = b.players[0]!
     const out = simulateCombat(b.state, p.id, b.enemies[0]!.id, { x: 2, y: 5 })
-    const atk = visibleStats(p).atk
+    const atk = attackOf(p)
     let res = visibleStats(b.enemies[0]!).res
     res += Math.floor(res * 0.3)
     expect(out.strikes[0]!.damage).toBe(Math.floor(Math.max(0, atk - res) * 0.5))
@@ -151,7 +151,7 @@ describe("simulateCombat", () => {
     const st = b.state
     st.units[p.id]!.specialCd = 0
     const out = simulateCombat(st, p.id, b.enemies[0]!.id, { x: 2, y: 4 })
-    const base = visibleStats(p).atk - visibleStats(b.enemies[0]!).def
+    const base = attackOf(p) - visibleStats(b.enemies[0]!).def
     expect(out.strikes[0]!.special).toBe("sp_glimmer")
     expect(out.strikes[0]!.damage).toBe(base + Math.floor(base * 0.5))
     // кулдаун сброшен до 2, затем −1 за полученный контрудар и −1 за свою двойную атаку → 0, но второго срабатывания нет
@@ -179,7 +179,7 @@ describe("simulateCombat", () => {
 
   it("смерть прерывает бой, прогноз совпадает с результатом редьюсера", () => {
     const b = makeBattle(
-      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, atk: 40 }, species: "dog" }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, str: 40, mag: 40 }, species: "dog" }],
       [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: { ...flat, hp: 15 }, species: "dog" }]
     )
     const p = b.players[0]!
@@ -233,7 +233,7 @@ describe("simulateCombat", () => {
 
   it("Девять жизней спасает кота с 1 HP", () => {
     const b = makeBattle(
-      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, atk: 50 }, species: "dog" }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, str: 50, mag: 50 }, species: "dog" }],
       [
         {
           classId: "infantry_sword",

@@ -1,7 +1,7 @@
 import type { Rng } from "../rng"
 import { createRng, makeId } from "../rng"
 import type { Appearance, Gender, Rarity, Species, Stats, UnitInstance, UnitSkills } from "../types"
-import { MAX_LEVEL, STATS, addStats, clamp, emptyStats, type Stat } from "../types"
+import { MAX_LEVEL, STATS, addStats, attackStatOf, clamp, emptyStats, type Stat } from "../types"
 import type { ClassDef, PassiveDef, WeaponDef } from "../skills/types"
 import { permanentBonus, unitKit, invalidateKit } from "../skills/engine"
 import {
@@ -38,24 +38,24 @@ const MIN_STAT = 1
 const scaleStat = (v: number): number => Math.max(MIN_STAT, Math.round((v - MODEL_SCALE.statOffset) * MODEL_SCALE.statMul))
 
 /** Из какого стата модели берётся боевой стат (`combatStats`). */
-function combatToModelStat(magical: boolean): Record<Stat, keyof StatValues> {
-  return {
-    hp: "hp",
-    atk: magical ? "specialAttack" : "attack",
-    spd: "speed",
-    def: "defense",
-    res: "specialDefense"
-  }
+const MODEL_STAT_OF: Record<Stat, keyof StatValues> = {
+  hp: "hp",
+  str: "attack",
+  mag: "specialAttack",
+  spd: "speed",
+  def: "defense",
+  res: "specialDefense"
 }
 
 /**
- * Боевые статы FEH из статов модели (`MODEL_SCALE`). Atk — Str (`attack`) для физического оружия
- * и Mag (`specialAttack`) для Black Magic и White Magic; второй атакующий стат в бою не участвует.
+ * Боевые статы из статов модели (`MODEL_SCALE`): у каждого бойца есть и Str (`attack`), и Mag (`specialAttack`).
+ * В бою атака — Str для физического оружия и Mag для Black Magic и White Magic (`attackStatOf`).
  */
-export function combatStats(model: StatValues, magical: boolean): Stats {
+export function combatStats(model: StatValues): Stats {
   return {
     hp: Math.max(MIN_STAT, Math.round(model.hp * MODEL_SCALE.hpMul) + MODEL_SCALE.hpAdd),
-    atk: scaleStat(magical ? model.specialAttack : model.attack),
+    str: scaleStat(model.attack),
+    mag: scaleStat(model.specialAttack),
     spd: scaleStat(model.speed),
     def: scaleStat(model.defense),
     res: scaleStat(model.specialDefense)
@@ -69,7 +69,6 @@ export function modelStatsAt(unit: UnitInstance, level: number): StatValues {
 
 interface StatTable {
   classId: string
-  weaponSkill: UnitInstance["weaponSkill"]
   baseStats: StatValues
   maxStats: StatValues
   /** Боевые статы на уровнях 1…MAX_LEVEL (индекс — уровень − 1). */
@@ -89,13 +88,11 @@ function statTable(unit: UnitInstance): Stats[] {
   if (
     cached
     && cached.classId === unit.classId
-    && cached.weaponSkill === unit.weaponSkill
     && cached.baseStats === unit.baseStats
     && cached.maxStats === unit.maxStats
   )
     return cached.levels
-  const magical = isMagicWeapon(unit.weaponSkill)
-  const natural = Array.from({ length: MAX_LEVEL }, (_, i) => combatStats(modelStatsAt(unit, i + 1), magical))
+  const natural = Array.from({ length: MAX_LEVEL }, (_, i) => combatStats(modelStatsAt(unit, i + 1)))
   const first = natural[0] as Stats
   const last = natural[MAX_LEVEL - 1] as Stats
   const growth = (s: Stat): number => last[s] - first[s]
@@ -126,7 +123,6 @@ function statTable(unit: UnitInstance): Stats[] {
   }
   statTables.set(unit, {
     classId: unit.classId,
-    weaponSkill: unit.weaponSkill,
     baseStats: unit.baseStats,
     maxStats: unit.maxStats,
     levels
@@ -174,23 +170,25 @@ export function weaponMt(unit: UnitInstance): number {
 /** Видимые статы вне боя: уровень и класс + Mt оружия + постоянные бонусы. */
 export function visibleStats(unit: UnitInstance): Stats {
   const base = statsAtLevel(unit, unit.level)
-  const withWeapon = addStats(base, { atk: weaponMt(unit) })
+  // Mt оружия прибавляется к стату, которым оно бьёт
+  const withWeapon = addStats(base, { [attackStatOf(isMagicWeapon(unit.weaponSkill))]: weaponMt(unit) })
   let withBonus = addStats(withWeapon, permanentBonus(unit))
   if (unit.isBoss) {
     const b = COMBAT.bossBonus
-    withBonus = addStats(withBonus, { hp: b, atk: b, spd: b, def: b, res: b })
+    withBonus = addStats(withBonus, { hp: b, str: b, mag: b, spd: b, def: b, res: b })
   }
-  return {
-    hp: Math.max(MIN_STAT, withBonus.hp),
-    atk: Math.max(MIN_STAT, withBonus.atk),
-    spd: Math.max(MIN_STAT, withBonus.spd),
-    def: Math.max(MIN_STAT, withBonus.def),
-    res: Math.max(MIN_STAT, withBonus.res)
-  }
+  const out = emptyStats()
+  for (const s of STATS) out[s] = Math.max(MIN_STAT, withBonus[s])
+  return out
+}
+
+/** Атака бойца вне боя: Str или Mag (с Mt оружия) — смотря чем бьёт его оружие. */
+export function attackOf(unit: UnitInstance, stats: Stats = visibleStats(unit)): number {
+  return stats[attackStatOf(isMagicWeapon(unit.weaponSkill))]
 }
 
 export function statTotal(s: Stats): number {
-  return s.hp + s.atk + s.spd + s.def + s.res
+  return STATS.reduce((sum, k) => sum + s[k], 0)
 }
 
 /* ---------- Отображение ---------- */
@@ -332,13 +330,12 @@ export function rebirthUnit(unit: UnitInstance): UnitInstance {
   // у отстающих статов, чтобы к 80-му уровню ни один стат не стал ниже прежнего
   const before = statsAtLevel(unit, MAX_LEVEL)
   const model = loadCharacterModel()
-  const modelStat = combatToModelStat(isMagicWeapon(unit.weaponSkill))
   for (let guard = 0; guard < 100; guard++) {
     const after = statsAtLevel(next, MAX_LEVEL)
     const short = STATS.filter(s => after[s] < before[s])
     if (short.length === 0) break
     const maxStats = { ...next.maxStats }
-    for (const s of short) maxStats[modelStat[s]] += 5
+    for (const s of short) maxStats[MODEL_STAT_OF[s]] += 5
     next = { ...next, maxStats, baseStats: levelOneStats(maxStats, model.growth, model.rarities[rarity]) }
   }
   return next

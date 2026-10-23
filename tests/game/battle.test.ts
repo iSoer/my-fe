@@ -9,7 +9,7 @@ import { livingUnits } from "@game/core/battle/query"
 import { makeBattle } from "./helpers"
 import { BIOMES } from "@game/content/biomes"
 
-const flat = { hp: 20, atk: 10, spd: 5, def: 5, res: 5 }
+const flat = { hp: 20, str: 10, mag: 10, spd: 5, def: 5, res: 5 }
 
 describe("редьюсер боя", () => {
   it("wait перемещает и помечает юнита; второй раз действовать нельзя", () => {
@@ -23,6 +23,39 @@ describe("редьюсер боя", () => {
     expect(state.units[id]!.acted).toBe(true)
     expect(events.map(e => e.type)).toEqual(["moved", "waited"])
     expect(() => applyAction(state, { type: "wait", unitId: id, to: { x: 2, y: 5 } })).toThrow()
+  })
+
+  it("move переставляет бойца без завершения хода; дальность — от клетки начала хода", () => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 7 }, baseStats: flat }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: flat, stance: "hold" }]
+    )
+    const id = b.players[0]!.id
+    let s = applyAction(b.state, { type: "move", unitId: id, to: { x: 2, y: 5 } }).state
+    expect(s.units[id]!.pos).toEqual({ x: 2, y: 5 })
+    expect(s.units[id]!.acted).toBe(false)
+    expect(s.units[id]!.turnStart).toEqual({ x: 2, y: 7 })
+    // Ход пехоты — 2 клетки от (2,7): к врагу на (2,4) уже не подойти, хоть от (2,5) это одна клетка
+    expect(() => applyAction(s, { type: "move", unitId: id, to: { x: 2, y: 4 } })).toThrow()
+    expect(() =>
+      applyAction(s, { type: "attack", unitId: id, to: { x: 2, y: 4 }, targetId: b.enemies[0]!.id })
+    ).toThrow()
+    // Переставиться ещё раз и вернуться на исходную клетку можно
+    s = applyAction(s, { type: "move", unitId: id, to: { x: 1, y: 6 } }).state
+    const back = applyAction(s, { type: "move", unitId: id, to: { x: 2, y: 7 } })
+    // Путь анимации — от клетки, где боец стоит сейчас
+    const moved = back.events[0]
+    expect(moved?.type === "moved" && moved.path.length).toBe(3)
+    expect(moved?.type === "moved" && moved.path[0]).toEqual({ x: 1, y: 6 })
+    expect(back.state.units[id]!.turnStart).toBeUndefined()
+    // Действие завершает ход и сбрасывает клетку начала хода
+    const waited = applyAction(s, { type: "wait", unitId: id, to: { x: 1, y: 6 } }).state
+    expect(waited.units[id]!.acted).toBe(true)
+    expect(waited.units[id]!.turnStart).toBeUndefined()
+    // Конец фазы: не действовавший боец остаётся на месте, клетка начала хода забыта
+    const ended = applyAction(s, { type: "endPhase" }).state
+    expect(ended.units[id]!.pos).toEqual({ x: 1, y: 6 })
+    expect(ended.units[id]!.turnStart).toBeUndefined()
     // исходное состояние не мутировано
     expect(b.state.units[id]!.pos).toEqual({ x: 2, y: 7 })
   })
@@ -36,7 +69,7 @@ describe("редьюсер боя", () => {
       [{ classId: "infantry_sword", pos: { x: 2, y: 0 }, stance: "hold" }]
     )
     // Вой атаки сработал при старте: сосед получил +4
-    expect(b.state.units[b.players[1]!.id]!.bonuses.atk).toBe(4)
+    expect(b.state.units[b.players[1]!.id]!.bonuses.str).toBe(4)
     const s1 = applyAction(b.state, { type: "endPhase" }).state
     expect(s1.phase).toBe("enemy")
     const s2 = applyAction(s1, { type: "endPhase" }).state
@@ -70,8 +103,8 @@ describe("редьюсер боя", () => {
 
   it("удар без урона даёт 1 опыта, удар с уроном — по разнице уровней", () => {
     const weak = makeBattle(
-      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, level: 10, baseStats: { ...flat, atk: 0 } }],
-      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, level: 10, baseStats: { ...flat, def: 30, atk: 0 } }]
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, level: 10, baseStats: { ...flat, str: 0, mag: 0 } }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, level: 10, baseStats: { ...flat, def: 30, str: 0, mag: 0 } }]
     )
     const id = weak.players[0]!.id
     const r = applyAction(weak.state, { type: "attack", unitId: id, to: { x: 2, y: 4 }, targetId: weak.enemies[0]!.id })
@@ -96,7 +129,7 @@ describe("редьюсер боя", () => {
   it("гибель всех бойцов — поражение; отступление — retreat", () => {
     const b = makeBattle(
       [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, hp: 10, def: 0 } }],
-      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: { ...flat, atk: 50 } }]
+      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: { ...flat, str: 50, mag: 50 } }]
     )
     const { state } = applyAction(b.state, {
       type: "attack",
@@ -111,7 +144,7 @@ describe("редьюсер боя", () => {
 
   it("подкрепления появляются в заданный ход, победа только после них", () => {
     const b = makeBattle(
-      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, atk: 50 } }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, str: 50, mag: 50 } }],
       [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: { ...flat, hp: 5 } }],
       { reinforcements: [{ turn: 2, units: [{ unit: makeBattleUnitForWave(), pos: { x: 0, y: 0 } }] }] }
     )
@@ -166,7 +199,7 @@ describe("редьюсер боя", () => {
 
   it("повышение уровня в бою увеличивает maxHp", () => {
     const b = makeBattle(
-      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, level: 1, baseStats: { ...flat, atk: 50 } }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, level: 1, baseStats: { ...flat, str: 50, mag: 50 } }],
       [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, level: 20, baseStats: { ...flat, hp: 5 } }]
     )
     const id = b.players[0]!.id

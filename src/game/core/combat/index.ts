@@ -1,5 +1,5 @@
 import type { BattleState, BattleUnit, Effect, Pos, Stats, Strike, Triangle, UnitInstance } from "../types"
-import { STATS, addStats, emptyStats, manhattan } from "../types"
+import { STATS, addStats, attackStatOf, emptyStats, manhattan } from "../types"
 import type { CombatCtx, CombatUnitView, StrikeInfo } from "../skills/types"
 import { counterAnyRange, negatesEffective, specialMaxCd, unitKit, wrathfulStaff } from "../skills/engine"
 import { visibleStats } from "../units"
@@ -185,7 +185,7 @@ export function simulateCombat(
     const effective = atk === A ? aEff : dEff
 
     // Атака
-    let atkVal = atk.stats.atk
+    let atkVal = atk.stats[attackStatOf(atk.weapon.magical)]
     if (effective) atkVal = Math.floor(atkVal * COMBAT.effective)
     if (tri === "adv") atkVal += Math.floor(atkVal * COMBAT.triangle)
     else if (tri === "dis") atkVal -= Math.floor(atkVal * COMBAT.triangle)
@@ -204,8 +204,9 @@ export function simulateCombat(
       const o = spAtk.offense as NonNullable<typeof spAtk.offense>
       if (o.ignoreDefPct) defVal -= Math.floor((defVal * o.ignoreDefPct) / 100)
       if (o.damagePctOfStat) {
-        const src = o.damagePctOfStat.of === "self" ? atk.stats : def.stats
-        specialBonus += Math.floor((src[o.damagePctOfStat.stat] * o.damagePctOfStat.pct) / 100)
+        const who = o.damagePctOfStat.of === "self" ? atk : def
+        const stat = o.damagePctOfStat.stat === "atk" ? attackStatOf(who.weapon.magical) : o.damagePctOfStat.stat
+        specialBonus += Math.floor((who.stats[stat] * o.damagePctOfStat.pct) / 100)
       }
       if (o.healPctOfDamage) healPct = o.healPctOfDamage
     }

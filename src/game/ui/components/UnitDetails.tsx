@@ -1,4 +1,6 @@
 import type { UnitInstance } from "@game/core/types"
+import { attackStatOf } from "@game/core/types"
+import { isMagicWeapon } from "@game/content/weapons"
 import { displayName, unitClass, unitClassName, visibleStats } from "@game/core/units"
 import { skillInfo } from "@game/content/index"
 import { breedDef } from "@game/content/breeds"
@@ -6,7 +8,7 @@ import { personalityText } from "@game/content/personalities"
 import { UnitAvatar } from "./UnitAvatar"
 import { MoveBadge, RarityStars, WeaponBadge } from "./Badges"
 import { StatsGrid } from "./Stats"
-import { atkLabel, speciesName } from "../lib/format"
+import { speciesName } from "../lib/format"
 import { aptitudeLine, weaponLine } from "./CharacterPanels"
 import { tr } from "@game/i18n"
 
@@ -42,7 +44,7 @@ export function UnitDetails({ unit, compact = false }: { unit: UnitInstance, com
           </div>
         </div>
       </div>
-      <StatsGrid stats={stats} atkLabel={atkLabel(unit)} />
+      <StatsGrid stats={stats} main={attackStatOf(isMagicWeapon(unit.weaponSkill))} />
       <div className="muted small">
         {weaponLine(unit)}
         {" "}

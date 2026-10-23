@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import fc from "fast-check"
 import {
   allowedSkillIds,
+  attackOf,
   canTakeClassNow,
   combatStats,
   generateRoster,
@@ -56,18 +57,24 @@ describe("generateUnit", () => {
       { numRuns: 300 }
     )
   })
-  it("боевые статы — масштаб статов модели в классе; Atk от Str или Mag по оружию", () => {
+  it("боевые статы — масштаб статов модели в классе; у каждого есть и Str, и Mag", () => {
     const u = generateUnit({ seed: 31337, level: 30 })
     const model = statsInClass(u.baseStats, u.maxStats, u.level, fwClass(u.classId))
-    const physical = combatStats(model, false)
-    const magical = combatStats(model, true)
-    const natural = isMagicWeapon(u.weaponSkill) ? magical : physical
+    const natural = combatStats(model)
     // На 1-м уровне — ровно масштаб модели; дальше — не ниже него (плюс надбавки за «пустые» уровни)
     const model1 = statsInClass(u.baseStats, u.maxStats, 1, fwClass(u.classId))
-    expect(statsAtLevel(u, 1)).toEqual(combatStats(model1, isMagicWeapon(u.weaponSkill)))
+    expect(statsAtLevel(u, 1)).toEqual(combatStats(model1))
     for (const s of STATS) expect(statsAtLevel(u, u.level)[s]).toBeGreaterThanOrEqual(natural[s])
-    expect(physical.def).toBe(magical.def)
-    expect(physical.hp).toBe(Math.round(model.hp * 0.33) + 5)
+    expect(natural.str).toBe(Math.max(1, Math.round((model.attack - 15) * 0.22)))
+    expect(natural.mag).toBe(Math.max(1, Math.round((model.specialAttack - 15) * 0.22)))
+    expect(natural.hp).toBe(Math.round(model.hp * 0.33) + 5)
+    // Mt оружия идёт в стат, которым оно бьёт; второй атакующий стат остаётся своим
+    const vs = visibleStats(u)
+    const own = statsAtLevel(u, u.level)
+    const [hit, other] = isMagicWeapon(u.weaponSkill) ? (["mag", "str"] as const) : (["str", "mag"] as const)
+    expect(vs[hit]).toBe(own[hit] + weaponMt(u))
+    expect(vs[other]).toBe(own[other])
+    expect(attackOf(u)).toBe(vs[hit])
   })
   it("статы не бывают 0, а каждый уровень прибавляет хотя бы 1 (property)", () => {
     fc.assert(
@@ -84,7 +91,7 @@ describe("generateUnit", () => {
   })
   it("стат модели ниже порога шкалы даёт 1, а не 0", () => {
     const low = { hp: 0, attack: 0, defense: 0, specialAttack: 0, specialDefense: 0, speed: 0 }
-    expect(combatStats(low, false)).toEqual({ hp: 5, atk: 1, spd: 1, def: 1, res: 1 })
+    expect(combatStats(low)).toEqual({ hp: 5, str: 1, mag: 1, spd: 1, def: 1, res: 1 })
   })
   it("рост детерминирован и не убывает до 80 уровня", () => {
     const u = generateUnit({ seed: 31337, level: 1 })

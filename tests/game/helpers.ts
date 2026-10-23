@@ -60,8 +60,8 @@ function pinnedModelStats(combat: Stats, cls: CharacterClass): StatValues {
       : modelValue(t, v => Math.max(0, Math.round((v - statOffset) * statMul)), Math.round(statOffset + t / statMul))
   const inClass: StatValues = {
     hp,
-    attack: stat(combat.atk),
-    specialAttack: stat(combat.atk),
+    attack: stat(combat.str),
+    specialAttack: stat(combat.mag),
     speed: stat(combat.spd),
     defense: stat(combat.def),
     specialDefense: stat(combat.res)

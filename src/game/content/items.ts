@@ -1,24 +1,27 @@
 import type { ConsumableDef, TalismanDef } from "@game/core/skills/types"
 import type { Stat } from "@game/core/types"
-import { STATS } from "@game/core/types"
+import { STATS, bothAttacks } from "@game/core/types"
 import { CHARACTER_STAT_LABELS as L } from "@shared/character/leveling"
 import { tr } from "@game/i18n"
 
 // Предметы Лавки: расходники для боя и талисманы с пассивными свойствами. Оружие — `content/weapons.ts`.
 // Цены — в описаниях ниже; медианный бой на «Нормально» отрядом 5-го уровня приносит ~125 🦴.
 
-/** Подписи статов — из модели (атака — «Str/Mag», как в общих местах интерфейса). */
+/** Подписи статов — из модели. */
 const STAT: Record<Stat, string> = {
   hp: L.hp,
-  atk: `${L.attack}/${L.specialAttack}`,
+  str: L.attack,
+  mag: L.specialAttack,
   spd: L.speed,
   def: L.defense,
   res: L.specialDefense
 }
 
+/** «+3 Str/Mag, +2 Spd»: одинаковая прибавка к Str и Mag — одной строкой. */
 function statText(stats: Partial<Record<Stat, number>>): string {
-  return STATS.filter(s => stats[s])
-    .map(s => `+${stats[s]} ${STAT[s]}`)
+  const both = !!stats.str && stats.str === stats.mag
+  return STATS.filter(s => stats[s] && !(both && s === "mag"))
+    .map(s => `+${stats[s]} ${both && s === "str" ? `${L.attack}/${L.specialAttack}` : STAT[s]}`)
     .join(", ")
 }
 
@@ -95,12 +98,12 @@ const statTalisman = (
 
 /** Талисманы: +3 к стату — 140 🦴; особые свойства — 180–240 🦴; сильные — с уровня ростера. */
 export const TALISMANS: readonly TalismanDef[] = [
-  statTalisman("tal_fang", ["Fang on a String", "Клык на шнурке"], "🦷", 140, { atk: 3 }),
+  statTalisman("tal_fang", ["Fang on a String", "Клык на шнурке"], "🦷", 140, { ...bothAttacks(3) }),
   statTalisman("tal_bell", ["Jingle Bell", "Бубенчик"], "🔔", 140, { spd: 3 }),
   statTalisman("tal_collar", ["Spiked Collar", "Шипастый ошейник"], "⛓️", 140, { def: 3 }),
   statTalisman("tal_ribbon", ["Satin Ribbon", "Атласная ленточка"], "🎀", 140, { res: 3 }),
   statTalisman("tal_heart", ["Felt Heart", "Сердечко из фетра"], "❤️", 120, { hp: 6 }),
-  statTalisman("tal_claw", ["Leader's Claw", "Коготь вожака"], "🐾", 320, { atk: 2, spd: 2, def: 2 }, 20),
+  statTalisman("tal_claw", ["Leader's Claw", "Коготь вожака"], "🐾", 320, { ...bothAttacks(2), spd: 2, def: 2 }, 20),
   {
     id: "tal_book",
     get name() { return tr("Tattered Primer", "Потрёпанный букварь") },

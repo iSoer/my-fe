@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useStore } from "@nanostores/react"
 import type { Stance, UnitInstance } from "@game/core/types"
 import { SQUAD_SIZE } from "@game/core/types"
-import { displayName, unitClassName, visibleStats } from "@game/core/units"
+import { attackOf, displayName, unitClassName, visibleStats } from "@game/core/units"
 import { itemCount, totalCount } from "@game/core/items"
 import { ITEMS, difficultyDef } from "@game/content/balance"
 import { CONSUMABLES } from "@game/content/items"
@@ -56,7 +56,7 @@ function FoeCard({ unit, note, index, dim, onOpen }: {
       <UnitAvatar unit={unit} size="md" animated={false} />
       <b className="foe-name">{displayName(unit)}</b>
       <span className="foe-role">{classRoleText(unit.classId)}</span>
-      <span className="foe-stats">{`HP ${st.hp} · ${atkLabel(unit)} ${st.atk}`}</span>
+      <span className="foe-stats">{`HP ${st.hp} · ${atkLabel(unit)} ${attackOf(unit, st)}`}</span>
       {note && <span className="foe-note">{note}</span>}
     </button>
   )
@@ -79,7 +79,7 @@ function SquadSlot({ unit, slot, onOpen }: { unit?: UnitInstance, slot: number, 
       <b className="squad-name">{displayName(unit)}</b>
       <span className="small muted">{`${unitClassName(unit)} · ${tr("Lv.", "Ур.")}${unit.level}`}</span>
       <span className="small">{classRoleText(unit.classId)}</span>
-      <span className="squad-stats">{`HP ${st.hp} · ${atkLabel(unit)} ${st.atk} · Spd ${st.spd}`}</span>
+      <span className="squad-stats">{`HP ${st.hp} · ${atkLabel(unit)} ${attackOf(unit, st)} · Spd ${st.spd}`}</span>
       <span className="squad-swap">{tr("Swap ›", "Заменить ›")}</span>
     </button>
   )

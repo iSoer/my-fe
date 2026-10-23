@@ -12,8 +12,8 @@ export const BLOOD_COLORS = [0xd9122b, 0x9b0f20, 0xff2e4a, 0xb3001b]
 
 export const HL = {
   reach: 0x8fc9ff,
-  attack: 0xff5a68,
-  assist: 0x7ad3c2,
+  attack: 0xff2442,
+  assist: 0x1fe8b0,
   danger: 0xffb86b,
   threat: 0xb79cff,
   path: 0xfff4f7

@@ -7,7 +7,6 @@ import type { BattleGameHandle } from "@game/scene/index"
 import { Toast } from "../components/Toast"
 import { $pauseOpen } from "../lib/pause"
 import { TopHud } from "../battle/TopHud"
-import { ContextMenu } from "../battle/ContextMenu"
 import { ItemMenu } from "../battle/ItemMenu"
 import { BottomBand } from "../battle/BottomBand"
 import { ForecastCard } from "../battle/ForecastCard"
@@ -18,8 +17,7 @@ import "../battle.css"
 import "../village.css"
 import { setBoardInsets } from "@game/state/boardLayout"
 
-/** Высота верхней полосы HUD (для размещения меню над клеткой) и отступы поля под накладки. */
-const TOP_BAND = 76
+/** Отступы поля под накладки HUD и нижней полосы. */
 const BOARD_TOP_INSET = 84
 const BOARD_BOTTOM_INSET = 150
 
@@ -39,7 +37,7 @@ function safeInset(name: "--tg-safe-top" | "--tg-safe-bottom"): number {
 
 /**
  * Экран боя: Phaser-канвас на весь экран, поверх него контекстные DOM-накладки
- * (HUD, меню действий у клетки бойца, карточка бойца, прогноз, «Завершить ход»).
+ * (HUD, карточка бойца, прогноз, «Завершить ход»).
  */
 export function BattleScreen() {
   const battle = useStore($battle)
@@ -97,7 +95,6 @@ export function BattleScreen() {
 
   if (!battle) return <div className="bf-root" />
 
-  const safeTop = safeInset("--tg-safe-top")
   const pressing = !!ui.pressedId || ui.dragging
 
   return (
@@ -108,7 +105,6 @@ export function BattleScreen() {
           <TopHud battle={battle} ui={ui} />
           {ui.mode === "forecast" && ui.forecast && <ForecastCard state={battle} forecast={ui.forecast} />}
         </div>
-        <ContextMenu ui={ui} topBand={TOP_BAND + safeTop} />
         <ItemMenu battle={battle} ui={ui} />
         <EndTurnButton battle={battle} ui={ui} />
         <EndTurnPrompt battle={battle} ui={ui} />

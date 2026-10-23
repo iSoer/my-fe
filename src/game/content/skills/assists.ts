@@ -1,4 +1,5 @@
 import type { AssistDef } from "@game/core/skills/types"
+import { bothAttacks } from "@game/core/types"
 import { tr } from "@game/i18n"
 
 export const ASSISTS: readonly AssistDef[] = [
@@ -9,7 +10,7 @@ export const ASSISTS: readonly AssistDef[] = [
     kind: "rally",
     spCost: 150,
     stage: "mvp",
-    stats: { atk: 4 }
+    stats: { ...bothAttacks(4) }
   },
   {
     id: "as_rally_spd",
