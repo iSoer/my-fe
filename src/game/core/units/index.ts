@@ -1,7 +1,7 @@
 import type { Rng } from "../rng"
 import { createRng, makeId } from "../rng"
 import type { Appearance, Gender, Rarity, Species, Stats, UnitInstance, UnitSkills } from "../types"
-import { MAX_LEVEL, STATS, addStats, clamp } from "../types"
+import { MAX_LEVEL, STATS, addStats, clamp, emptyStats, type Stat } from "../types"
 import type { ClassDef, PassiveDef, WeaponDef } from "../skills/types"
 import { permanentBonus, unitKit, invalidateKit } from "../skills/engine"
 import {
@@ -32,7 +32,21 @@ import { rankAtLevel, rankIndex, ranksAtLevel, type Rank, type WeaponGrade, type
 
 const RARITY_SKILL_POOL: Record<Rarity, number> = { 1: 3, 2: 3, 3: 4, 4: 4, 5: 5 }
 
-const scaleStat = (v: number): number => Math.max(0, Math.round((v - MODEL_SCALE.statOffset) * MODEL_SCALE.statMul))
+/** Любой стат бойца — не меньше 1. */
+const MIN_STAT = 1
+
+const scaleStat = (v: number): number => Math.max(MIN_STAT, Math.round((v - MODEL_SCALE.statOffset) * MODEL_SCALE.statMul))
+
+/** Из какого стата модели берётся боевой стат (`combatStats`). */
+function combatToModelStat(magical: boolean): Record<Stat, keyof StatValues> {
+  return {
+    hp: "hp",
+    atk: magical ? "specialAttack" : "attack",
+    spd: "speed",
+    def: "defense",
+    res: "specialDefense"
+  }
+}
 
 /**
  * Боевые статы FEH из статов модели (`MODEL_SCALE`). Atk — Str (`attack`) для физического оружия
@@ -40,7 +54,7 @@ const scaleStat = (v: number): number => Math.max(0, Math.round((v - MODEL_SCALE
  */
 export function combatStats(model: StatValues, magical: boolean): Stats {
   return {
-    hp: Math.max(1, Math.round(model.hp * MODEL_SCALE.hpMul) + MODEL_SCALE.hpAdd),
+    hp: Math.max(MIN_STAT, Math.round(model.hp * MODEL_SCALE.hpMul) + MODEL_SCALE.hpAdd),
     atk: scaleStat(magical ? model.specialAttack : model.attack),
     spd: scaleStat(model.speed),
     def: scaleStat(model.defense),
@@ -53,9 +67,76 @@ export function modelStatsAt(unit: UnitInstance, level: number): StatValues {
   return statsInClass(unit.baseStats, unit.maxStats, clamp(level, 1, MAX_LEVEL), fwClass(unit.classId))
 }
 
-/** Боевые статы уровня `level` без оружия и навыков. */
+interface StatTable {
+  classId: string
+  weaponSkill: UnitInstance["weaponSkill"]
+  baseStats: StatValues
+  maxStats: StatValues
+  /** Боевые статы на уровнях 1…MAX_LEVEL (индекс — уровень − 1). */
+  levels: Stats[]
+}
+
+const statTables = new WeakMap<UnitInstance, StatTable>()
+
+/**
+ * Боевые статы бойца на всех уровнях в текущем классе. Рост модели при переводе в боевую шкалу дробится, и многие
+ * уровни сами по себе не дают ничего; такой уровень даёт +1 к одному стату — так каждый уровень что-то прибавляет.
+ * Надбавки делятся между статами пропорционально их собственному росту с 1-го по 80-й уровень (метод Уэбстера):
+ * получает тот, кто сильнее всех отстал от своей доли, при равенстве — тот, кто растёт быстрее.
+ */
+function statTable(unit: UnitInstance): Stats[] {
+  const cached = statTables.get(unit)
+  if (
+    cached
+    && cached.classId === unit.classId
+    && cached.weaponSkill === unit.weaponSkill
+    && cached.baseStats === unit.baseStats
+    && cached.maxStats === unit.maxStats
+  )
+    return cached.levels
+  const magical = isMagicWeapon(unit.weaponSkill)
+  const natural = Array.from({ length: MAX_LEVEL }, (_, i) => combatStats(modelStatsAt(unit, i + 1), magical))
+  const first = natural[0] as Stats
+  const last = natural[MAX_LEVEL - 1] as Stats
+  const growth = (s: Stat): number => last[s] - first[s]
+  const totalGrowth = STATS.reduce((sum, s) => sum + growth(s), 0)
+  // Бойцу без собственного роста надбавки достаются поровну
+  const weight = (s: Stat): number => (totalGrowth > 0 ? growth(s) / totalGrowth : 1 / STATS.length)
+  const bonus = emptyStats()
+  let given = 0
+  const levels: Stats[] = [first]
+  for (let i = 1; i < MAX_LEVEL; i++) {
+    const prev = levels[i - 1] as Stats
+    let cur = addStats(natural[i] as Stats, bonus)
+    if (STATS.every(s => cur[s] <= prev[s])) {
+      given++
+      let pick: Stat = STATS[0] as Stat
+      let best = -Infinity
+      for (const s of STATS) {
+        const lag = weight(s) * given - bonus[s]
+        if (lag > best || (lag === best && weight(s) > weight(pick))) {
+          best = lag
+          pick = s
+        }
+      }
+      bonus[pick] += 1
+      cur = addStats(natural[i] as Stats, bonus)
+    }
+    levels.push(cur)
+  }
+  statTables.set(unit, {
+    classId: unit.classId,
+    weaponSkill: unit.weaponSkill,
+    baseStats: unit.baseStats,
+    maxStats: unit.maxStats,
+    levels
+  })
+  return levels
+}
+
+/** Боевые статы уровня `level` без оружия и навыков: каждый не меньше 1, каждый уровень прибавляет хотя бы 1. */
 export function statsAtLevel(unit: UnitInstance, level: number): Stats {
-  return combatStats(modelStatsAt(unit, level), isMagicWeapon(unit.weaponSkill))
+  return statTable(unit)[clamp(Math.trunc(level), 1, MAX_LEVEL) - 1] as Stats
 }
 
 /** Прирост боевых статов между уровнями. */
@@ -100,11 +181,11 @@ export function visibleStats(unit: UnitInstance): Stats {
     withBonus = addStats(withBonus, { hp: b, atk: b, spd: b, def: b, res: b })
   }
   return {
-    hp: Math.max(1, withBonus.hp),
-    atk: Math.max(0, withBonus.atk),
-    spd: Math.max(0, withBonus.spd),
-    def: Math.max(0, withBonus.def),
-    res: Math.max(0, withBonus.res)
+    hp: Math.max(MIN_STAT, withBonus.hp),
+    atk: Math.max(MIN_STAT, withBonus.atk),
+    spd: Math.max(MIN_STAT, withBonus.spd),
+    def: Math.max(MIN_STAT, withBonus.def),
+    res: Math.max(MIN_STAT, withBonus.res)
   }
 }
 
@@ -246,7 +327,21 @@ export function rebirthUnit(unit: UnitInstance): UnitInstance {
     learnable = [...learnable, ...cands.slice(0, extra)]
   }
   invalidateKit(unit)
-  return { ...unit, ...rescaleRarity(unit.maxStats, unit.rarity, rarity), rarity, level: 1, xp: 0, learnable }
+  let next: UnitInstance = { ...unit, ...rescaleRarity(unit.maxStats, unit.rarity, rarity), rarity, level: 1, xp: 0, learnable }
+  // Надбавки за «пустые» уровни зависят от роста, и с новой звездой их бывает меньше: подтягиваем максимум модели
+  // у отстающих статов, чтобы к 80-му уровню ни один стат не стал ниже прежнего
+  const before = statsAtLevel(unit, MAX_LEVEL)
+  const model = loadCharacterModel()
+  const modelStat = combatToModelStat(isMagicWeapon(unit.weaponSkill))
+  for (let guard = 0; guard < 100; guard++) {
+    const after = statsAtLevel(next, MAX_LEVEL)
+    const short = STATS.filter(s => after[s] < before[s])
+    if (short.length === 0) break
+    const maxStats = { ...next.maxStats }
+    for (const s of short) maxStats[modelStat[s]] += 5
+    next = { ...next, maxStats, baseStats: levelOneStats(maxStats, model.growth, model.rarities[rarity]) }
+  }
+  return next
 }
 
 /* ---------- Пулы навыков ---------- */

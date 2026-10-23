@@ -97,10 +97,19 @@ export function makeUnit(spec: TestUnitSpec, isEnemy: boolean): UnitInstance {
   u.aptitudes = aptitudesOf([])
   if (spec.baseStats) {
     const combat = { ...statsAtLevel(u, u.level), ...spec.baseStats }
-    for (const s of STATS) combat[s] = Math.max(s === "hp" ? 5 : 0, combat[s])
-    const own = pinnedModelStats(combat, fwClass(u.classId))
-    u.baseStats = own
-    u.maxStats = { ...own }
+    for (const s of STATS) combat[s] = Math.max(s === "hp" ? 5 : 1, combat[s])
+    const pin = (target: Stats): void => {
+      const own = pinnedModelStats(target, fwClass(u.classId))
+      u.baseStats = own
+      u.maxStats = { ...own }
+    }
+    pin(combat)
+    // Без собственного роста каждый уровень даёт +1 поровну: вычитаем эти надбавки, чтобы на уровне бойца
+    // статы были ровно заданными (насколько позволяет минимум 1)
+    const got = statsAtLevel(u, u.level)
+    const target = { ...combat }
+    for (const s of STATS) target[s] = Math.max(s === "hp" ? 5 : 1, combat[s] - (got[s] - combat[s]))
+    pin(target)
   }
   if (spec.skills) u.skills = { ...u.skills, ...spec.skills }
   if (spec.weaponTier !== undefined) u.weaponTier = spec.weaponTier

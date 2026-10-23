@@ -46,8 +46,7 @@ describe("generateUnit", () => {
         expect(canTakeClassNow(u, u.classId)).toBe(true)
         expect(classWeapons(u.classId)).toContain(u.weaponSkill)
         const vs = visibleStats(u)
-        expect(vs.hp).toBeGreaterThan(0)
-        for (const s of STATS) expect(vs[s]).toBeGreaterThanOrEqual(0)
+        for (const s of STATS) expect(vs[s]).toBeGreaterThanOrEqual(1)
         expect(u.learnable.length).toBeGreaterThan(0)
         // Каждый новый боец начинает с простым деревянным оружием своего навыка
         expect(u.skills.weapon).toBe(`${u.weaponSkill}_wood`)
@@ -62,11 +61,30 @@ describe("generateUnit", () => {
     const model = statsInClass(u.baseStats, u.maxStats, u.level, fwClass(u.classId))
     const physical = combatStats(model, false)
     const magical = combatStats(model, true)
-    expect(statsAtLevel(u, u.level)).toEqual(
-      isMagicWeapon(u.weaponSkill) ? magical : physical
-    )
+    const natural = isMagicWeapon(u.weaponSkill) ? magical : physical
+    // На 1-м уровне — ровно масштаб модели; дальше — не ниже него (плюс надбавки за «пустые» уровни)
+    const model1 = statsInClass(u.baseStats, u.maxStats, 1, fwClass(u.classId))
+    expect(statsAtLevel(u, 1)).toEqual(combatStats(model1, isMagicWeapon(u.weaponSkill)))
+    for (const s of STATS) expect(statsAtLevel(u, u.level)[s]).toBeGreaterThanOrEqual(natural[s])
     expect(physical.def).toBe(magical.def)
     expect(physical.hp).toBe(Math.round(model.hp * 0.33) + 5)
+  })
+  it("статы не бывают 0, а каждый уровень прибавляет хотя бы 1 (property)", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 0x7fffffff }), (seed) => {
+        const u = generateUnit({ seed, level: 1 })
+        for (const s of STATS) expect(statsAtLevel(u, 1)[s]).toBeGreaterThanOrEqual(1)
+        for (let l = 1; l < MAX_LEVEL; l++) {
+          const gains = levelGains(u, l, l + 1)
+          expect(Object.values(gains).some(g => (g ?? 0) >= 1), `level ${l}`).toBe(true)
+        }
+      }),
+      { numRuns: 100 }
+    )
+  })
+  it("стат модели ниже порога шкалы даёт 1, а не 0", () => {
+    const low = { hp: 0, attack: 0, defense: 0, specialAttack: 0, specialDefense: 0, speed: 0 }
+    expect(combatStats(low, false)).toEqual({ hp: 5, atk: 1, spd: 1, def: 1, res: 1 })
   })
   it("рост детерминирован и не убывает до 80 уровня", () => {
     const u = generateUnit({ seed: 31337, level: 1 })
