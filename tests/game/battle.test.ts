@@ -8,7 +8,8 @@ import type { BattleState, Difficulty } from "@game/core/types"
 import { livingUnits } from "@game/core/battle/query"
 import { makeBattle } from "./helpers"
 import { planAssist } from "@game/core/battle/assist"
-import { healLevelBonus } from "@game/content/balance"
+import { COMBAT } from "@game/content/balance"
+import { healPower, weaponMt } from "@game/core/units"
 import { BIOMES } from "@game/content/biomes"
 
 const flat = { hp: 20, str: 10, mag: 10, spd: 5, def: 5, res: 5 }
@@ -83,45 +84,43 @@ describe("редьюсер боя", () => {
   it("лечение Бинтом восстанавливает HP и даёт XP", () => {
     const b = makeBattle(
       [
-        { classId: "infantry_whiteMagic", pos: { x: 2, y: 7 }, baseStats: flat },
-        { classId: "infantry_sword", pos: { x: 3, y: 7 }, baseStats: flat }
+        { classId: "infantry_whiteMagic", pos: { x: 2, y: 7 }, baseStats: { ...flat, mag: 2 } },
+        { classId: "infantry_sword", pos: { x: 3, y: 7 }, baseStats: { ...flat, hp: 40 } }
       ],
       [{ classId: "infantry_sword", pos: { x: 2, y: 0 } }]
     )
     const healer = b.players[0]!.id
     const ally = b.players[1]!.id
     b.state.units[ally]!.hp = 5
+    const heal = 5 + healPower(b.players[0]!)
     const { state, events } = applyAction(b.state, {
       type: "assist",
       unitId: healer,
       to: { x: 2, y: 7 },
       targetId: ally
     })
-    expect(state.units[ally]!.hp).toBe(10)
-    expect(events.some(e => e.type === "assist" && e.heal === 5)).toBe(true)
+    expect(state.units[ally]!.hp).toBe(5 + heal)
+    expect(events.some(e => e.type === "assist" && e.heal === heal)).toBe(true)
     // опыт за лечение — по вылеченному HP
-    expect(events.find(e => e.type === "xp" && e.unitId === healer)).toMatchObject({ amount: xpForHeal(5) })
+    expect(events.find(e => e.type === "xp" && e.unitId === healer)).toMatchObject({ amount: xpForHeal(heal) })
   })
 
-  it("лечение растёт с уровнем лекаря: +5 HP за каждые 5 уровней", () => {
-    const heal = (level: number): number => {
+  it("лечение = база умения + Mag лекаря + Mt посоха (заточка лечит сильнее)", () => {
+    const heal = (mag: number, weaponTier: 0 | 1 = 0): number => {
       const b = makeBattle(
         [
-          { classId: "infantry_whiteMagic", pos: { x: 2, y: 7 }, baseStats: { ...flat, hp: 60 }, level },
-          { classId: "infantry_sword", pos: { x: 3, y: 7 }, baseStats: { ...flat, hp: 60 } }
+          { classId: "infantry_whiteMagic", pos: { x: 2, y: 7 }, baseStats: { ...flat, mag }, weaponTier },
+          { classId: "infantry_sword", pos: { x: 3, y: 7 }, baseStats: { ...flat, hp: 90 } }
         ],
         [{ classId: "infantry_sword", pos: { x: 2, y: 0 } }]
       )
       b.state.units[b.players[1]!.id]!.hp = 1
-      const plan = planAssist(b.state, b.players[0]!.id, { x: 2, y: 7 }, b.players[1]!.id)
-      return plan.heal
+      return planAssist(b.state, b.players[0]!.id, { x: 2, y: 7 }, b.players[1]!.id).heal
     }
-    expect(heal(1)).toBe(5)
-    expect(heal(4)).toBe(5)
-    expect(heal(5)).toBe(10)
-    expect(heal(14)).toBe(15)
-    expect(heal(20)).toBe(25)
-    expect(healLevelBonus(80)).toBe(80)
+    const mt = weaponMt(makeBattle([{ classId: "infantry_whiteMagic", pos: { x: 2, y: 7 }, baseStats: flat }], []).players[0]!)
+    expect(heal(10)).toBe(5 + 10 + mt)
+    expect(heal(20) - heal(10)).toBe(10)
+    expect(heal(10, 1) - heal(10)).toBe(COMBAT.weaponTierMt)
   })
 
   it("удар без урона даёт 1 опыта, удар с уроном — по разнице уровней", () => {

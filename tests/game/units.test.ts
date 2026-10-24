@@ -7,6 +7,7 @@ import {
   combatStats,
   generateRoster,
   generateUnit,
+  growthRates,
   learnableNow,
   levelGains,
   loadoutsAt,
@@ -18,12 +19,12 @@ import {
   weaponMt
 } from "@game/core/units"
 import { MAX_LEVEL, STATS, type Rarity } from "@game/core/types"
-import { CLASS_IDS, DANCER_CLASS, classDef, classWeapons, fwClass, unitClass } from "@game/content/classes"
+import { CLASS_IDS, DANCER_CLASS, classDef, classWeapons, unitClass } from "@game/content/classes"
+import { classStatMods } from "@game/content/classStats"
 import { isMagicWeapon } from "@game/content/weapons"
 import { ROSTER } from "@game/content/balance"
 import { budgetRangeOf, loadCharacterModel } from "@/server/character-model/model"
 import { levelOneStats, totalOfStats } from "@shared/character/leveling"
-import { statsInClass } from "@shared/character/classes"
 import { aptitudesOf } from "@shared/character/skills"
 
 describe("generateUnit", () => {
@@ -57,24 +58,45 @@ describe("generateUnit", () => {
       { numRuns: 300 }
     )
   })
-  it("боевые статы — масштаб статов модели в классе; у каждого есть и Str, и Mag", () => {
+  it("статы 1-го уровня — масштаб модели с множителем класса; у каждого есть и Str, и Mag", () => {
     const u = generateUnit({ seed: 31337, level: 30 })
-    const model = statsInClass(u.baseStats, u.maxStats, u.level, fwClass(u.classId))
-    const natural = combatStats(model)
-    // На 1-м уровне — ровно масштаб модели; дальше — не ниже него (плюс надбавки за «пустые» уровни)
-    const model1 = statsInClass(u.baseStats, u.maxStats, 1, fwClass(u.classId))
-    expect(statsAtLevel(u, 1)).toEqual(combatStats(model1))
-    for (const s of STATS) expect(statsAtLevel(u, u.level)[s]).toBeGreaterThanOrEqual(natural[s])
-    expect(natural.str).toBe(Math.max(1, Math.round((model.attack - 15) * 0.22)))
-    expect(natural.mag).toBe(Math.max(1, Math.round((model.specialAttack - 15) * 0.22)))
-    expect(natural.hp).toBe(Math.round(model.hp * 0.33) + 5)
+    const own = combatStats(u.baseStats)
+    const mods = classStatMods(u.classId)
+    const first = statsAtLevel(u, 1)
+    for (const s of STATS) expect(first[s], s).toBe(Math.max(1, Math.round(own[s] * (1 + mods[s] / 100))))
+    expect(own.str).toBe(Math.max(1, Math.round((u.baseStats.attack - 15) * 0.22)))
+    expect(own.mag).toBe(Math.max(1, Math.round((u.baseStats.specialAttack - 15) * 0.22)))
+    expect(own.hp).toBe(Math.round(u.baseStats.hp * 0.33) + 5)
     // Mt оружия идёт в стат, которым оно бьёт; второй атакующий стат остаётся своим
     const vs = visibleStats(u)
-    const own = statsAtLevel(u, u.level)
+    const lv = statsAtLevel(u, u.level)
     const [hit, other] = isMagicWeapon(u.weaponSkill) ? (["mag", "str"] as const) : (["str", "mag"] as const)
-    expect(vs[hit]).toBe(own[hit] + weaponMt(u))
-    expect(vs[other]).toBe(own[other])
+    expect(vs[hit]).toBe(lv[hit] + weaponMt(u))
+    expect(vs[other]).toBe(lv[other])
     expect(attackOf(u)).toBe(vs[hit])
+  })
+  it("рост в духе FEH: к 80-му уровню каждый стат вырастает на свой процент роста, уровни разные", () => {
+    const u = generateUnit({ seed: 4242, level: 1 })
+    const rates = growthRates(u)
+    const first = statsAtLevel(u, 1)
+    const last = statsAtLevel(u, MAX_LEVEL)
+    const total = STATS.reduce((sum, s) => sum + (last[s] - first[s]), 0)
+    // Гарантия «минимум два стата» может добавить прибавок, но не отнять
+    expect(total).toBeGreaterThanOrEqual(STATS.reduce((sum, s) => sum + Math.round((rates[s] * (MAX_LEVEL - 1)) / 100), 0))
+    // Уровни различаются: встречаются уровни и с двумя, и с тремя и более статами
+    const sizes = new Set<number>()
+    for (let l = 1; l < MAX_LEVEL; l++) sizes.add(Object.values(levelGains(u, l, l + 1)).filter(g => (g ?? 0) > 0).length)
+    expect(sizes.has(2)).toBe(true)
+    expect([...sizes].some(k => k >= 3)).toBe(true)
+  })
+  it("класс меняет и статы, и их рост: у латника Def выше, Res ниже, чем у того же бойца-солдата без множителей", () => {
+    const u = generateUnit({ seed: 99, level: 40 })
+    const knight = { ...u, classId: "armored-knight" }
+    const plain = { ...u, classId: "__none__" }
+    expect(growthRates(knight).def).toBeGreaterThan(growthRates(plain).def)
+    expect(growthRates(knight).res).toBeLessThan(growthRates(plain).res)
+    expect(statsAtLevel(knight, 40).def).toBeGreaterThan(statsAtLevel(plain, 40).def)
+    expect(statsAtLevel(knight, 40).res).toBeLessThan(statsAtLevel(plain, 40).res)
   })
   it("статы не бывают 0, а каждый уровень растит хотя бы два разных стата (property)", () => {
     fc.assert(

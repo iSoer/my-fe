@@ -53,7 +53,7 @@ export function ClassFacts({ classId, unit }: { classId: string, unit?: UnitInst
               <span className="bonus-chips">
                 {info.bonus.map(b => (
                   <span key={b.label} className={`bonus-chip ${b.value > 0 ? "up" : "down"}`}>
-                    {`${b.label} ${b.value > 0 ? "+" : "−"}${Math.abs(b.value)}`}
+                    {`${b.label} ${b.value > 0 ? "+" : "−"}${Math.abs(b.value)}%`}
                   </span>
                 ))}
               </span>
@@ -166,19 +166,19 @@ export function ClassPanel({ unit, openCount, upgrade, nextTierLevel, onChange }
       </div>
 
       <div className="class-section">
-        <span className="class-section-title">{tr("Class bonus to stats", "Бонус класса к статам")}</span>
+        <span className="class-section-title">{tr("Class stat multipliers", "Множители класса к статам")}</span>
         {info.bonus.length === 0
           ? <span className="muted small">{tr("none", "нет")}</span>
           : (
               <span className="bonus-chips">
                 {info.bonus.map(b => (
                   <span key={b.label} className={`bonus-chip big ${b.value > 0 ? "up" : "down"}`}>
-                    {`${b.label} ${b.value > 0 ? "+" : "−"}${Math.abs(b.value)}`}
+                    {`${b.label} ${b.value > 0 ? "+" : "−"}${Math.abs(b.value)}%`}
                   </span>
                 ))}
               </span>
             )}
-        <span className="muted small">{tr("Already included in the stats above; works while the fighter is in this class.", "Уже учтён в статах выше; действует, пока боец в этом классе.")}</span>
+        <span className="muted small">{tr("Scale both the stats and their growth per level; already included in the stats above, works while the fighter is in this class.", "Меняют и статы, и их рост за уровень; уже учтены в статах выше и действуют, пока боец в этом классе.")}</span>
       </div>
 
       <div className="class-section">

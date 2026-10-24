@@ -6,7 +6,6 @@ import {
   MOVEMENT_LABELS,
   TIER_LABELS,
   TIER_LEVELS,
-  classBonusOf,
   classById,
   isUniqueClass,
   mountOf,
@@ -16,9 +15,10 @@ import {
 } from "@shared/character/classes"
 import { CHARACTER_STAT_LABELS } from "@shared/character/leveling"
 import { SKILL_LABELS, type Rank, type Skill } from "@shared/character/skills"
-import type { Stat as ModelStat } from "@shared/api/schema/pokemon/generated"
+import type { Stat } from "@game/core/types"
+import { STATS } from "@game/core/types"
 import { isMagicWeapon, weaponRange } from "./weapons"
-import { MODEL_SCALE } from "./balance"
+import { classStatMods } from "./classStats"
 import { tr } from "@game/i18n"
 
 // Классы, их тип движения и оружие — модель персонажа (`src/shared/character/classes.ts`); здесь только поиск
@@ -91,16 +91,16 @@ export { isMagicWeapon }
 /** Правила передвижения (как в `moveCost` и `content/weapons.ts`): дальность, местность, чем уязвим. */
 const MOVE_NOTES: Record<MoveType, string> = {
   get infantry() {
-    return tr("forest costs 2 move points; water and mountains are impassable", "лес отнимает 2 очка хода, вода и горы непроходимы")
+    return tr("water and mountains are impassable", "вода и горы непроходимы")
   },
   get armored() {
-    return tr("slow, but forest doesn't slow it down; Armorslayer hits ×1.5", "медленный, зато лес не замедляет; Armorslayer бьёт ×1.5")
+    return tr("slow; Armorslayer hits ×1.5", "медленный; Armorslayer бьёт ×1.5")
   },
   get cavalry() {
-    return tr("fast, but can't enter forest; Horseslayer hits ×1.5", "быстрый, но в лес не заходит; Horseslayer бьёт ×1.5")
+    return tr("fast; Horseslayer hits ×1.5", "быстрый; Horseslayer бьёт ×1.5")
   },
   get flier() {
-    return tr("flies over water, mountains and forest; Bow hits ×1.5", "перелетает воду, горы и лес; Bow бьёт ×1.5")
+    return tr("flies over water and mountains; Bow hits ×1.5", "перелетает воду и горы; Bow бьёт ×1.5")
   }
 }
 
@@ -119,7 +119,7 @@ export interface ClassInfo extends ClassRole {
   moveLabel: string
   moveRange: number
   moveNote: string
-  /** Бонус класса к статам в боевой шкале (подписи модели: HP, Str, Mag, Spd, Def, Res), без нулей. */
+  /** Множители класса к статам, в процентах (подписи модели: HP, Str, Mag, Spd, Def, Res), без нулей. */
   bonus: { label: string, value: number }[]
   weapons: readonly WeaponSkill[]
   /** Требования к рангам: «Sword C», «Axe C или Sword C». */
@@ -127,15 +127,19 @@ export interface ClassInfo extends ClassRole {
   unique: boolean
 }
 
-const MODEL_STAT_ORDER: readonly ModelStat[] = ["hp", "attack", "specialAttack", "speed", "defense", "specialDefense"]
+const STAT_LABEL: Record<Stat, string> = {
+  hp: CHARACTER_STAT_LABELS.hp,
+  str: CHARACTER_STAT_LABELS.attack,
+  mag: CHARACTER_STAT_LABELS.specialAttack,
+  spd: CHARACTER_STAT_LABELS.speed,
+  def: CHARACTER_STAT_LABELS.defense,
+  res: CHARACTER_STAT_LABELS.specialDefense
+}
 
-/** Бонус класса, переведённый из шкалы модели в боевые статы (`MODEL_SCALE`), — то, что видно в бою. */
-export function classCombatBonus(classId: string): { stat: ModelStat, label: string, value: number }[] {
-  const bonus = classBonusOf(fwClass(classId))
-  return MODEL_STAT_ORDER.map((stat) => {
-    const mul = stat === "hp" ? MODEL_SCALE.hpMul : MODEL_SCALE.statMul
-    return { stat, label: CHARACTER_STAT_LABELS[stat], value: Math.round(bonus[stat] * mul) }
-  }).filter(b => b.value !== 0)
+/** Множители класса к статам в процентах (`content/classStats.ts`), без нулей: «Def +15 %», «Res −15 %». */
+export function classCombatBonus(classId: string): { stat: Stat, label: string, value: number }[] {
+  const mods = classStatMods(classId)
+  return STATS.map(stat => ({ stat, label: STAT_LABEL[stat], value: mods[stat] })).filter(b => b.value !== 0)
 }
 
 /** Роль класса по оружию, передвижению и бонусу: лекарь, маг, танк, летун, всадник, стрелок, дуэлянт… */
@@ -154,16 +158,16 @@ export function classRole(classId: string): ClassRole {
       ? { icon: "🔮", role: tr("Mage-Healer", "Маг-целитель"), summary: tr("Magic from 2 tiles against Res; with White Magic it heals too.", "Магия с 2 клеток по Res; с White Magic ещё и лечит.") }
       : { icon: "✨", role: tr("Mage", "Маг"), summary: tr("Hits with magic from 2 tiles against Res — great vs armored foes.", "Бьёт магией с 2 клеток по Res — хорош против латников.") }
   if (move === "armored")
-    return { icon: "🛡️", role: tr("Tank", "Танк"), summary: tr("Soaks hits and blocks passages, but moves only 1 tile.", "Держит удар и закрывает проходы, но ходит всего на 1 клетку.") }
+    return { icon: "🛡️", role: tr("Tank", "Танк"), summary: tr("Soaks hits and blocks passages, but moves only 2 tiles.", "Держит удар и закрывает проходы, но ходит всего на 2 клетки.") }
   if (move === "flier")
     return { icon: "🪽", role: tr("Flier", "Летун"), summary: tr("Flies over obstacles and hits the flanks; keep away from archers.", "Перелетает препятствия и заходит с фланга; берегите от стрелков.") }
   if (move === "cavalry")
     return { icon: "🐎", role: tr("Rider", "Всадник"), summary: tr("Moves farthest of all — finishes foes fast and pulls the wounded out.", "Ходит дальше всех — быстро добивает и уводит раненых.") }
   if (weapons.every(w => weaponRange(w) === 2))
     return { icon: "🏹", role: tr("Archer", "Стрелок"), summary: tr("Hits from 2 tiles, melee foes can't strike back; Bow downs fliers.", "Бьёт с 2 клеток, ближние не могут ответить; Bow сбивает летунов.") }
-  if (top === "speed")
+  if (top === "spd")
     return { icon: "⚡", role: tr("Duelist", "Дуэлянт"), summary: tr("Fast melee fighter: strikes twice more often and gets hit twice less.", "Быстрый боец ближнего боя: чаще бьёт дважды и реже получает второй удар.") }
-  if (top === "defense" || top === "specialDefense")
+  if (top === "def" || top === "res")
     return { icon: "🧱", role: tr("Guardian", "Страж"), summary: tr("Sturdy melee fighter who holds the front line.", "Крепкий боец ближнего боя, стоит на передовой.") }
   return { icon: "⚔️", role: tr("Fighter", "Боец"), summary: tr("Hard-hitting melee fighter — the backbone of the squad.", "Сильный удар в ближнем бою — основа отряда.") }
 }

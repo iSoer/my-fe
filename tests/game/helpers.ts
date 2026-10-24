@@ -15,8 +15,6 @@ import { MAP_H, MAP_W, STATS } from "@game/core/types"
 import { generateUnit, statsAtLevel } from "@game/core/units"
 import { createBattle } from "@game/core/battle/reducer"
 import { MODEL_SCALE } from "@game/content/balance"
-import { fwClass } from "@game/content/classes"
-import { classBonusOf, type CharacterClass } from "@shared/character/classes"
 import { aptitudesOf } from "@shared/character/skills"
 import type { StatValues } from "@shared/character/leveling"
 
@@ -50,15 +48,15 @@ function modelValue(target: number, toCombat: (v: number) => number, guess: numb
   throw new Error(`no model value for combat stat ${target}`)
 }
 
-/** Статы модели (без бонуса класса), при которых боевые статы равны `combat` на любом уровне (кроме совсем малых). */
-function pinnedModelStats(combat: Stats, cls: CharacterClass): StatValues {
+/** Статы модели, которые после `MODEL_SCALE` дают ровно `combat` (без множителей класса и роста). */
+function pinnedModelStats(combat: Stats): StatValues {
   const { hpMul, hpAdd, statMul, statOffset } = MODEL_SCALE
   const hp = modelValue(combat.hp, v => Math.round(v * hpMul) + hpAdd, Math.round((combat.hp - hpAdd) / hpMul))
   const stat = (t: number): number =>
     t <= 0
       ? statOffset
       : modelValue(t, v => Math.max(0, Math.round((v - statOffset) * statMul)), Math.round(statOffset + t / statMul))
-  const inClass: StatValues = {
+  return {
     hp,
     attack: stat(combat.str),
     specialAttack: stat(combat.mag),
@@ -66,13 +64,6 @@ function pinnedModelStats(combat: Stats, cls: CharacterClass): StatValues {
     defense: stat(combat.def),
     specialDefense: stat(combat.res)
   }
-  const bonus = classBonusOf(cls)
-  const own = { ...inClass }
-  for (const k of Object.keys(own) as (keyof StatValues)[]) {
-    // У стартовых классов бонус не нулевой: стат ниже бонуса класса поднимается до минимума (1 у модели)
-    own[k] = Math.max(1, inClass[k] - bonus[k])
-  }
-  return own
 }
 
 let counter = 1
@@ -99,17 +90,20 @@ export function makeUnit(spec: TestUnitSpec, isEnemy: boolean): UnitInstance {
     const combat = { ...statsAtLevel(u, u.level), ...spec.baseStats }
     for (const s of STATS) combat[s] = Math.max(s === "hp" ? 5 : 1, combat[s])
     const pin = (target: Stats): void => {
-      const own = pinnedModelStats(target, fwClass(u.classId))
+      const own = pinnedModelStats(target)
       u.baseStats = own
       u.maxStats = { ...own }
     }
-    pin(combat)
-    // Без собственного роста каждый уровень даёт +1 поровну: вычитаем эти надбавки, чтобы на уровне бойца
-    // статы были ровно заданными (насколько позволяет минимум 1)
-    const got = statsAtLevel(u, u.level)
+    // Без собственного роста (base = max) статы бойца — это статы модели с множителем класса плюс гарантированные
+    // прибавки за уровни: подбираем статы модели так, чтобы на уровне бойца вышло ровно заданное
+    // (насколько позволяет минимум 1)
     const target = { ...combat }
-    for (const s of STATS) target[s] = Math.max(s === "hp" ? 5 : 1, combat[s] - (got[s] - combat[s]))
-    pin(target)
+    for (let k = 0; k < 8; k++) {
+      pin(target)
+      const got = statsAtLevel(u, u.level)
+      if (STATS.every(s => got[s] === combat[s])) break
+      for (const s of STATS) target[s] = Math.max(s === "hp" ? 5 : 1, target[s] + combat[s] - got[s])
+    }
   }
   if (spec.skills) u.skills = { ...u.skills, ...spec.skills }
   if (spec.weaponTier !== undefined) u.weaponTier = spec.weaponTier

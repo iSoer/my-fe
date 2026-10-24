@@ -20,12 +20,13 @@ import { BOSS_TITLES, EPITHETS, NAMES } from "@game/content/names"
 import { BREEDS } from "@game/content/breeds"
 import { PERSONALITIES } from "@game/content/personalities"
 import { ACCESSORIES, EYES, EYE_COLORS, FUR_PALETTES, PATTERNS } from "@game/content/appearance"
-import { COMBAT, LEVEL_UP, MODEL_SCALE, ROSTER, recruitRarityWeights } from "@game/content/balance"
+import { COMBAT, HEALING, LEVEL_UP, MODEL_SCALE, ROSTER, recruitRarityWeights } from "@game/content/balance"
+import { classStatMods } from "@game/content/classStats"
 import { factionDef } from "@game/content/factions"
 import { generateCharacter, validateCharacterRequest } from "@/server/character-model/generate"
 import { loadCharacterModel } from "@/server/character-model/model"
 import { levelOneStats, type StatValues } from "@shared/character/leveling"
-import { CHARACTER_CLASSES, CLASS_TIERS, availableClasses, canTakeClass, isUniqueClass, statsInClass } from "@shared/character/classes"
+import { CHARACTER_CLASSES, CLASS_TIERS, availableClasses, canTakeClass, isUniqueClass } from "@shared/character/classes"
 import { rankAtLevel, rankIndex, ranksAtLevel, type Rank, type WeaponGrade, type WeaponSkill } from "@shared/character/skills"
 
 /* ---------- Статы: модель персонажа → бой ---------- */
@@ -62,13 +63,11 @@ export function combatStats(model: StatValues): Stats {
   }
 }
 
-/** Статы модели на уровне в текущем классе: собственный рост + бонус класса (шкала модели). */
-export function modelStatsAt(unit: UnitInstance, level: number): StatValues {
-  return statsInClass(unit.baseStats, unit.maxStats, clamp(level, 1, MAX_LEVEL), fwClass(unit.classId))
-}
-
 interface StatTable {
   classId: string
+  weaponSkill: WeaponSkill
+  rarity: Rarity
+  seed: number
   baseStats: StatValues
   maxStats: StatValues
   /** Боевые статы на уровнях 1…MAX_LEVEL (индекс — уровень − 1). */
@@ -78,56 +77,94 @@ interface StatTable {
 const statTables = new WeakMap<UnitInstance, StatTable>()
 
 /**
- * Боевые статы бойца на всех уровнях в текущем классе. Рост модели при переводе в боевую шкалу дробится, и многие
- * уровни сами по себе дают мало; каждый уровень растит хотя бы `LEVEL_UP.minStats` разных статов — недостающие
- * получают +1. Надбавки делятся между статами пропорционально их собственному росту с 1-го по 80-й уровень
- * (метод Уэбстера): получает тот, кто сильнее всех отстал от своей доли, при равенстве — тот, кто растёт быстрее.
+ * Проценты роста бойца в текущем классе, по стату: сумма — по звезде (`LEVEL_UP.growthTotal`), пропорции — собственный
+ * рост его модели с 1-го по 80-й уровень в боевой шкале, стат его оружия — с весом `LEVEL_UP.attackWeight`;
+ * затем множитель класса и потолок `LEVEL_UP.maxRate`.
+ */
+export function growthRates(unit: UnitInstance): Stats {
+  const mods = classStatMods(unit.classId)
+  const hit = attackStatOf(isMagicWeapon(unit.weaponSkill))
+  const weight = (s: Stat): number => {
+    const k = MODEL_STAT_OF[s]
+    const own = Math.max(0, (unit.maxStats[k] - unit.baseStats[k]) * (s === "hp" ? MODEL_SCALE.hpMul : MODEL_SCALE.statMul))
+    return s === hit ? own * LEVEL_UP.attackWeight : own
+  }
+  const sum = STATS.reduce((acc, s) => acc + weight(s), 0)
+  const total = LEVEL_UP.growthTotal.base + LEVEL_UP.growthTotal.perStar * unit.rarity
+  const out = emptyStats()
+  for (const s of STATS) {
+    const own = sum > 0 ? (total * weight(s)) / sum : 0
+    out[s] = clamp(own * (1 + mods[s] / 100), 0, LEVEL_UP.maxRate)
+  }
+  return out
+}
+
+/**
+ * Боевые статы бойца на всех уровнях в текущем классе — в духе FEH. Статы 1-го уровня — из модели персонажа
+ * с множителем класса; к 80-му уровню каждый стат вырастает на round(процент роста × 79 %), а уровни, на которых
+ * он растёт, перемешаны по зерну бойца — поэтому уровни разные: где-то +1 к двум статам, где-то ко всем шести.
+ * Каждый уровень растит хотя бы `LEVEL_UP.minStats` разных статов: прибавка переносится с другого уровня, где её в избытке.
  */
 function statTable(unit: UnitInstance): Stats[] {
   const cached = statTables.get(unit)
   if (
     cached
     && cached.classId === unit.classId
+    && cached.weaponSkill === unit.weaponSkill
+    && cached.rarity === unit.rarity
+    && cached.seed === unit.seed
     && cached.baseStats === unit.baseStats
     && cached.maxStats === unit.maxStats
   )
     return cached.levels
-  const natural = Array.from({ length: MAX_LEVEL }, (_, i) => combatStats(modelStatsAt(unit, i + 1)))
-  const first = natural[0] as Stats
-  const last = natural[MAX_LEVEL - 1] as Stats
-  const growth = (s: Stat): number => last[s] - first[s]
-  const totalGrowth = STATS.reduce((sum, s) => sum + growth(s), 0)
-  // Бойцу без собственного роста надбавки достаются поровну
-  const weight = (s: Stat): number => (totalGrowth > 0 ? growth(s) / totalGrowth : 1 / STATS.length)
-  const bonus = emptyStats()
-  let given = 0
-  const levels: Stats[] = [first]
-  for (let i = 1; i < MAX_LEVEL; i++) {
-    const prev = levels[i - 1] as Stats
-    let cur = addStats(natural[i] as Stats, bonus)
-    // Каждый уровень растит хотя бы LEVEL_UP.minStats разных статов: недостающие добирают надбавками
-    const grown = new Set(STATS.filter(s => cur[s] > prev[s]))
-    while (grown.size < LEVEL_UP.minStats) {
-      given++
-      let pick: Stat | undefined
-      let best = -Infinity
-      for (const s of STATS) {
-        if (grown.has(s)) continue
-        const lag = weight(s) * given - bonus[s]
-        if (lag > best || (pick && lag === best && weight(s) > weight(pick))) {
-          best = lag
-          pick = s
-        }
+  const steps = MAX_LEVEL - 1
+  const mods = classStatMods(unit.classId)
+  const own = combatStats(unit.baseStats)
+  const rates = growthRates(unit)
+  const first = emptyStats()
+  for (const s of STATS) first[s] = Math.max(MIN_STAT, Math.round(own[s] * (1 + mods[s] / 100)))
+
+  // На каких уровнях растёт каждый стат: свои уровни на стат, перемешанные по зерну бойца (индекс i — уровень i + 2)
+  const rng = createRng(unit.seed).fork("growth")
+  const at: Set<Stat>[] = Array.from({ length: steps }, () => new Set<Stat>())
+  const levelsIdx = Array.from({ length: steps }, (_, i) => i)
+  for (const s of STATS) {
+    const count = Math.round((rates[s] * steps) / 100)
+    const order = rng.fork(s).shuffle(levelsIdx)
+    for (let k = 0; k < count; k++) at[order[k] as number]?.add(s)
+  }
+  // Гарантия: на каждом уровне хотя бы minStats разных статов — переносим прибавку с наименее щедрого из уровней,
+  // где есть лишнее (редкие «идеальные» уровни остаются), а если переносить неоткуда — добавляем стату с самым высоким ростом
+  const byRate = [...STATS].sort((a, b) => rates[b] - rates[a])
+  for (let i = 0; i < steps; i++) {
+    const here = at[i] as Set<Stat>
+    while (here.size < LEVEL_UP.minStats) {
+      let donor = -1
+      for (let j = 0; j < steps; j++) {
+        const there = at[j] as Set<Stat>
+        if (there.size <= LEVEL_UP.minStats || ![...there].some(s => !here.has(s))) continue
+        if (donor < 0 || there.size < (at[donor] as Set<Stat>).size) donor = j
       }
-      if (!pick) break
-      bonus[pick] += 1
-      grown.add(pick)
-      cur = addStats(natural[i] as Stats, bonus)
+      if (donor >= 0) {
+        const there = at[donor] as Set<Stat>
+        const s = byRate.find(x => there.has(x) && !here.has(x)) as Stat
+        there.delete(s)
+        here.add(s)
+      }
+      else here.add(byRate.find(x => !here.has(x)) as Stat)
     }
-    levels.push(cur)
+  }
+  const levels: Stats[] = [first]
+  for (let i = 0; i < steps; i++) {
+    const next = { ...(levels[i] as Stats) }
+    for (const s of at[i] as Set<Stat>) next[s] += 1
+    levels.push(next)
   }
   statTables.set(unit, {
     classId: unit.classId,
+    weaponSkill: unit.weaponSkill,
+    rarity: unit.rarity,
+    seed: unit.seed,
     baseStats: unit.baseStats,
     maxStats: unit.maxStats,
     levels
@@ -135,7 +172,7 @@ function statTable(unit: UnitInstance): Stats[] {
   return levels
 }
 
-/** Боевые статы уровня `level` без оружия и навыков: каждый не меньше 1, каждый уровень прибавляет хотя бы 1. */
+/** Боевые статы уровня `level` без оружия и навыков: каждый не меньше 1, каждый уровень растит хотя бы два стата. */
 export function statsAtLevel(unit: UnitInstance, level: number): Stats {
   return statTable(unit)[clamp(Math.trunc(level), 1, MAX_LEVEL) - 1] as Stats
 }
@@ -185,6 +222,16 @@ export function visibleStats(unit: UnitInstance): Stats {
   const out = emptyStats()
   for (const s of STATS) out[s] = Math.max(MIN_STAT, withBonus[s])
   return out
+}
+
+/**
+ * Сила лечения Поддержкой сверх базы умения: Mag лекаря × `HEALING.magShare` (с бонусами навыков и талисмана)
+ * плюс Mt посоха в лапах — заточка и ранг оружия лечат сильнее.
+ */
+export function healPower(unit: UnitInstance): number {
+  const mt = weaponMt(unit)
+  const ownMag = visibleStats(unit).mag - (isMagicWeapon(unit.weaponSkill) ? mt : 0)
+  return Math.floor(Math.max(0, ownMag) * HEALING.magShare) + mt
 }
 
 /** Атака бойца вне боя: Str или Mag (с Mt оружия) — смотря чем бьёт его оружие. */

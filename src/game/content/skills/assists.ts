@@ -90,7 +90,7 @@ export const ASSISTS: readonly AssistDef[] = [
   {
     id: "as_heal",
     get name() { return tr("Bandage", "Перевязать") },
-    get desc() { return tr("Heal an ally for 5 HP, +5 for every 5 levels of the healer.", "Вылечить союзника на 5 HP, +5 за каждые 5 уровней лекаря.") },
+    get desc() { return tr("Heal an ally for 5 HP + Mag + staff Mt.", "Вылечить союзника на 5 HP + Mag + Mt посоха.") },
     kind: "heal",
     spCost: 0,
     stage: "mvp",
@@ -100,7 +100,7 @@ export const ASSISTS: readonly AssistDef[] = [
   {
     id: "as_mend",
     get name() { return tr("Lick Wounds", "Зализать") },
-    get desc() { return tr("Heal an ally for 7 HP, +5 for every 5 levels of the healer.", "Вылечить союзника на 7 HP, +5 за каждые 5 уровней лекаря.") },
+    get desc() { return tr("Heal an ally for 7 HP + Mag + staff Mt.", "Вылечить союзника на 7 HP + Mag + Mt посоха.") },
     kind: "heal",
     spCost: 150,
     stage: "v1",
@@ -110,7 +110,7 @@ export const ASSISTS: readonly AssistDef[] = [
   {
     id: "as_recover",
     get name() { return tr("Patch Up", "Залатать") },
-    get desc() { return tr("Heal an ally for 15 HP, +5 for every 5 levels of the healer.", "Вылечить союзника на 15 HP, +5 за каждые 5 уровней лекаря.") },
+    get desc() { return tr("Heal an ally for 15 HP + Mag + staff Mt.", "Вылечить союзника на 15 HP + Mag + Mt посоха.") },
     kind: "heal",
     spCost: 300,
     stage: "v1",

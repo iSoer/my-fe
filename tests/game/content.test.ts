@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { CLASS_IDS, MOVE_RANGE, classInfo, classWeapons } from "@game/content/classes"
+import { CLASS_STAT_MODS } from "@game/content/classStats"
 import { SKILL_LABELS, WEAPON_GRADE_LABELS, aptitudesOf, type Skill } from "@shared/character/skills"
 import { CHARACTER_CLASSES, TIER_LEVELS, earliestLevelOf } from "@shared/character/classes"
 import { WEAPONS } from "@game/content/weapons"
@@ -61,15 +62,24 @@ describe("контент", () => {
 })
 
 describe("пояснения классов", () => {
-  it("у каждого класса есть роль, пояснение, ход и оружие; бонус — в боевой шкале", () => {
+  it("у каждого класса есть роль, пояснение, ход, оружие и множители статов в разумных пределах", () => {
     for (const id of CLASS_IDS) {
       const info = classInfo(id)
       expect(info.role.length).toBeGreaterThan(0)
       expect(info.summary.length).toBeGreaterThan(10)
       expect(info.moveRange).toBe(MOVE_RANGE[info.moveType])
       expect(info.weapons.length).toBeGreaterThan(0)
-      for (const b of info.bonus) expect(Math.abs(b.value)).toBeLessThan(20)
+      expect(CLASS_STAT_MODS[id], id).toBeDefined()
+      // У класса есть и сильная, и слабая сторона (или хотя бы сильная у высоких ярусов), множители — до ±50 %
+      expect(info.bonus.some(b => b.value > 0), id).toBe(true)
+      for (const b of info.bonus) expect(Math.abs(b.value), id).toBeLessThanOrEqual(50)
     }
+  })
+  it("множители класса: латник крепок, но слаб против магии; маг — наоборот", () => {
+    expect(CLASS_STAT_MODS["armored-knight"]?.def).toBeGreaterThan(0)
+    expect(CLASS_STAT_MODS["armored-knight"]?.res).toBeLessThan(0)
+    expect(CLASS_STAT_MODS["mage"]?.mag).toBeGreaterThan(0)
+    expect(CLASS_STAT_MODS["mage"]?.str).toBeLessThan(0)
   })
   it("роли совпадают с механикой: Dancer танцует, Priest и Healer лечат, Mage колдует, латы — танк", () => {
     expect(classInfo("dancer").role).toBe("Dancer")
