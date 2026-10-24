@@ -7,6 +7,8 @@ import { generateRoster } from "@game/core/units"
 import type { BattleState, Difficulty } from "@game/core/types"
 import { livingUnits } from "@game/core/battle/query"
 import { makeBattle } from "./helpers"
+import { planAssist } from "@game/core/battle/assist"
+import { healLevelBonus } from "@game/content/balance"
 import { BIOMES } from "@game/content/biomes"
 
 const flat = { hp: 20, str: 10, mag: 10, spd: 5, def: 5, res: 5 }
@@ -28,17 +30,17 @@ describe("редьюсер боя", () => {
   it("move переставляет бойца без завершения хода; дальность — от клетки начала хода", () => {
     const b = makeBattle(
       [{ classId: "infantry_sword", pos: { x: 2, y: 7 }, baseStats: flat }],
-      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: flat, stance: "hold" }]
+      [{ classId: "infantry_sword", pos: { x: 2, y: 2 }, baseStats: flat, stance: "hold" }]
     )
     const id = b.players[0]!.id
-    let s = applyAction(b.state, { type: "move", unitId: id, to: { x: 2, y: 5 } }).state
-    expect(s.units[id]!.pos).toEqual({ x: 2, y: 5 })
+    let s = applyAction(b.state, { type: "move", unitId: id, to: { x: 2, y: 4 } }).state
+    expect(s.units[id]!.pos).toEqual({ x: 2, y: 4 })
     expect(s.units[id]!.acted).toBe(false)
     expect(s.units[id]!.turnStart).toEqual({ x: 2, y: 7 })
-    // Ход пехоты — 2 клетки от (2,7): к врагу на (2,4) уже не подойти, хоть от (2,5) это одна клетка
-    expect(() => applyAction(s, { type: "move", unitId: id, to: { x: 2, y: 4 } })).toThrow()
+    // Ход пехоты — 3 клетки от (2,7): к врагу на (2,3) уже не подойти, хоть от (2,4) это одна клетка
+    expect(() => applyAction(s, { type: "move", unitId: id, to: { x: 2, y: 3 } })).toThrow()
     expect(() =>
-      applyAction(s, { type: "attack", unitId: id, to: { x: 2, y: 4 }, targetId: b.enemies[0]!.id })
+      applyAction(s, { type: "attack", unitId: id, to: { x: 2, y: 3 }, targetId: b.enemies[0]!.id })
     ).toThrow()
     // Переставиться ещё раз и вернуться на исходную клетку можно
     s = applyAction(s, { type: "move", unitId: id, to: { x: 1, y: 6 } }).state
@@ -99,6 +101,27 @@ describe("редьюсер боя", () => {
     expect(events.some(e => e.type === "assist" && e.heal === 5)).toBe(true)
     // опыт за лечение — по вылеченному HP
     expect(events.find(e => e.type === "xp" && e.unitId === healer)).toMatchObject({ amount: xpForHeal(5) })
+  })
+
+  it("лечение растёт с уровнем лекаря: +5 HP за каждые 5 уровней", () => {
+    const heal = (level: number): number => {
+      const b = makeBattle(
+        [
+          { classId: "infantry_whiteMagic", pos: { x: 2, y: 7 }, baseStats: { ...flat, hp: 60 }, level },
+          { classId: "infantry_sword", pos: { x: 3, y: 7 }, baseStats: { ...flat, hp: 60 } }
+        ],
+        [{ classId: "infantry_sword", pos: { x: 2, y: 0 } }]
+      )
+      b.state.units[b.players[1]!.id]!.hp = 1
+      const plan = planAssist(b.state, b.players[0]!.id, { x: 2, y: 7 }, b.players[1]!.id)
+      return plan.heal
+    }
+    expect(heal(1)).toBe(5)
+    expect(heal(4)).toBe(5)
+    expect(heal(5)).toBe(10)
+    expect(heal(14)).toBe(15)
+    expect(heal(20)).toBe(25)
+    expect(healLevelBonus(80)).toBe(80)
   })
 
   it("удар без урона даёт 1 опыта, удар с уроном — по разнице уровней", () => {

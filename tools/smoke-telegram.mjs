@@ -132,6 +132,7 @@ await step('кнопка «Назад»: из деревни — в меню, в
     .click();
   await page.evaluate(() => window.__pf.village.talk('sorties'));
   await page.getByRole('button', { name: /Plan a sortie/ }).click();
+  await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();
   await page.getByRole('button', { name: /Start battle/ }).click();
   await page.locator('#battle-canvas canvas').waitFor({ timeout: 30000 });

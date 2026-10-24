@@ -25,7 +25,7 @@ import { tr } from "@game/i18n"
 // и боевой класс для ядра. Названия — `CharacterClass.name`, ярусы — `TIER_LABELS`, навыки — `SKILL_LABELS`.
 
 /** Клеток хода по типу движения модели (правило игры, как в FEH). */
-export const MOVE_RANGE: Record<MoveType, number> = { infantry: 2, armored: 1, cavalry: 3, flier: 2 }
+export const MOVE_RANGE: Record<MoveType, number> = { infantry: 3, armored: 2, cavalry: 4, flier: 3 }
 
 /** Класс Dancer: танцует (Поддержка «освежить» союзника) вместо обычной Поддержки. */
 export const DANCER_CLASS = "dancer"

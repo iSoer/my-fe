@@ -146,7 +146,11 @@ export function SquadScreen() {
 
   return (
     <div className="screen">
-      <TopBar title={tr("Sortie · 2/2", "Вылазка · 2/2")} right={<ResourceBar />} onBack={() => navigate("/battle/setup", true)} />
+      <TopBar
+        title={tr("Sortie · 3/3", "Вылазка · 3/3")}
+        right={<ResourceBar />}
+        onBack={() => navigate(pending ? `/battle/enemy/${pending.difficulty}` : "/battle/setup", true)}
+      />
       <div className="screen-body">
         <div className="row wrap" style={{ gap: 6 }}>
           <span className="chip">{`${DIFF_STYLE[pending.difficulty].icon} ${diff.name}`}</span>

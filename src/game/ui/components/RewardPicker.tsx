@@ -60,7 +60,7 @@ export function RewardPicker({
           </div>
         )
       })}
-      <Button ghost block onClick={() => skipRewardAction()}>
+      <Button danger block onClick={() => skipRewardAction()}>
         {tr("Decline", "Отказаться")}
       </Button>
     </div>

@@ -142,7 +142,7 @@ function bfsReach(g: Grid, from: Pos, moveType: MoveType): Set<string> {
 function validate(g: Grid, playerSpawns: Pos[], enemySpawns: Pos[]): boolean {
   const all = cells()
   const passable = all.filter(p => isPassable(get(g, p), "infantry"))
-  if (passable.length / all.length < 0.65) return false
+  if (all.length - passable.length > TERRAIN_SHARE.maxBlocked) return false
   for (let y = 0; y < MAP_H; y++) if ((g[y] ?? []).filter(t => isPassable(t, "infantry")).length < 2) return false
   const first = playerSpawns[0]
   if (!first) return false
@@ -251,8 +251,9 @@ function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boo
       const horizontal = rng.chance(0.65)
       if (horizontal) {
         const y = rng.int(3, 4)
+        // Три брода: река делит поле, но не запирает его
         const first = rng.int(0, MAP_W - 1)
-        const fords = new Set([first, (first + rng.int(2, MAP_W - 2)) % MAP_W])
+        const fords = new Set([first, (first + 2) % MAP_W, (first + 4) % MAP_W])
         for (let x = 0; x < MAP_W; x++) {
           const p = { x, y }
           if (!allowed(p)) continue
@@ -261,7 +262,7 @@ function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boo
       }
       else {
         const x = rng.int(2, 3)
-        const fords = new Set([rng.int(1, MAP_H - 2), rng.int(1, MAP_H - 2)])
+        const fords = new Set([rng.int(1, 2), rng.int(3, 4), rng.int(5, MAP_H - 2)])
         for (let y = 1; y < MAP_H - 1; y++) {
           const p = { x, y }
           if (!allowed(p)) continue
@@ -286,19 +287,19 @@ function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boo
       break
     }
     case "islands": {
-      for (let i = 0; i < rng.int(2, 3); i++)
+      for (let i = 0; i < rng.int(1, 2); i++)
         growBlob(g, rng, waterLike, 2, p => allowed(p) && p.y > 1 && p.y < MAP_H - 2)
       break
     }
     case "fort": {
-      // Вражеская зона огорожена стеной с 1–2 «воротами» из хлипкой стены
+      // Вражеская зона огорожена стеной: открытый проход и «ворота» из хлипкой стены через клетку
       const y = 3
-      const gates = new Set([rng.int(1, MAP_W - 2)])
-      if (rng.chance(0.5)) gates.add(rng.int(1, MAP_W - 2))
+      const open = rng.int(0, MAP_W - 1)
       for (let x = 0; x < MAP_W; x++) {
         const p = { x, y }
         if (!allowed(p)) continue
-        set(g, p, gates.has(x) ? "wall_breakable" : "wall")
+        const d = Math.abs(x - open)
+        set(g, p, d === 0 || d === 3 ? "plain" : d % 2 === 0 ? "wall_breakable" : "wall")
       }
       // внутри крепости — укрытия
       for (let i = 0; i < 2; i++) {
@@ -311,7 +312,7 @@ function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boo
       // Разбросанные обломки стен и укрытия
       for (let i = 0; i < rng.int(3, 5); i++) {
         const p = { x: rng.int(0, MAP_W - 1), y: rng.int(1, MAP_H - 2) }
-        if (allowed(p) && get(g, p) === "plain") set(g, p, rng.chance(0.5) ? "wall_breakable" : "cover")
+        if (allowed(p) && get(g, p) === "plain") set(g, p, rng.chance(0.3) ? "wall_breakable" : "cover")
       }
       break
     }
@@ -346,15 +347,15 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
     )
     const wallShare = clamp(
       rng.next() * (TERRAIN_SHARE.walls[1] - TERRAIN_SHARE.walls[0]) + TERRAIN_SHARE.walls[0] + biome.bias.walls,
-      0.02,
-      0.12
+      0,
+      0.08
     )
     const impShare = clamp(
       rng.next() * (TERRAIN_SHARE.impassable[1] - TERRAIN_SHARE.impassable[0])
       + TERRAIN_SHARE.impassable[0]
       + biome.bias.impassable,
       0,
-      0.1
+      0.06
     )
 
     const forestCells = Math.round(total * forestShare)

@@ -4,7 +4,7 @@ import { generateMap } from "@game/core/map/generate"
 import { isPassable } from "@game/core/map/pathing"
 import type { Difficulty, Pos, TerrainId } from "@game/core/types"
 import { MAP_H, MAP_W, MAX_LEVEL, posKey } from "@game/core/types"
-import { ENEMY_TEAMS, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
+import { ENEMY_TEAMS, TERRAIN_SHARE, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
 import { BIOMES } from "@game/content/biomes"
 import { unitClass } from "@game/content/classes"
 import { generateUnit } from "@game/core/units"
@@ -160,5 +160,19 @@ describe("случайный биом", () => {
     for (let seed = 0; seed < 400 && seen.size < ALL_BIOMES.length; seed++)
       seen.add(generateMap({ seed, biomeId: "random", difficulty: "easy", team: 0, squadSize: 4 }).biomeId)
     expect([...seen].sort()).toEqual([...ALL_BIOMES].sort())
+  })
+})
+
+describe("препятствия", () => {
+  it("непроходимых клеток немного: не больше TERRAIN_SHARE.maxBlocked на любой карте (property)", () => {
+    const diffs: Difficulty[] = ["easy", "normal", "hard", "nightmare"]
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 0x7fffffff }), fc.integer({ min: 0, max: 3 }), (seed, d) => {
+        const map = generateMap({ seed, biomeId: "random", difficulty: diffs[d]!, team: seed % ENEMY_TEAMS, squadSize: 4 })
+        const blocked = map.tiles.flat().filter(t => !isPassable(t, "infantry")).length
+        expect(blocked).toBeLessThanOrEqual(TERRAIN_SHARE.maxBlocked)
+      }),
+      { numRuns: 200 }
+    )
   })
 })

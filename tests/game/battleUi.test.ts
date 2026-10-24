@@ -65,18 +65,18 @@ describe("контроллер боя: управление в духе FEH", ()
     const b = setup({ x: 2, y: 0 })
     const id = b.players[0]!.id
     tapTile({ x: 2, y: 7 })
-    tapTile({ x: 2, y: 5 })
+    tapTile({ x: 2, y: 4 })
     await flush()
     let bu = $save.get().battle!.units[id]!
-    expect(bu.pos).toEqual({ x: 2, y: 5 })
+    expect(bu.pos).toEqual({ x: 2, y: 4 })
     expect(bu.acted).toBe(false)
     expect(bu.turnStart).toEqual({ x: 2, y: 7 })
     let ui = $battleUi.get()
     expect(ui.mode).toBe("unitSelected")
     expect(ui.selectedId).toBe(id)
-    expect(ui.origin).toEqual({ x: 2, y: 5 })
-    // Дальность — от клетки начала хода: дальше (2,5) не уйти, но можно вернуться назад
-    expect(ui.reach?.has("2,4")).toBe(false)
+    expect(ui.origin).toEqual({ x: 2, y: 4 })
+    // Дальность — от клетки начала хода (3 клетки пехоты): дальше (2,4) не уйти, но можно вернуться назад
+    expect(ui.reach?.has("2,3")).toBe(false)
     expect(ui.reach?.get("2,7")?.canStop).toBe(true)
     tapTile({ x: 1, y: 6 })
     await flush()
@@ -234,5 +234,45 @@ describe("контроллер боя: справка о клетке", () => {
     const ui = $battleUi.get()
     expect(ui.mode).toBe("tileInfo")
     expect(ui.selectedId).toBeUndefined()
+  })
+})
+
+describe("контроллер боя: выбор союзника", () => {
+  it("тап по не ходившему союзнику выбирает его, даже если у выбранного есть Поддержка", () => {
+    const b = makeBattle(
+      [
+        { classId: "infantry_sword", pos: { x: 2, y: 7 }, baseStats: flat, skills: { assist: "as_swap" } },
+        { classId: "infantry_sword", pos: { x: 3, y: 7 }, baseStats: flat }
+      ],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 0 }, baseStats: flat, stance: "hold" }]
+    )
+    const save = createEmptySave(1)
+    save.battle = b.state
+    $save.set(save)
+    enterBattleScreen()
+    tapTile({ x: 2, y: 7 })
+    expect($battleUi.get().assistTiles?.has("3,7")).toBe(true)
+    tapTile({ x: 3, y: 7 })
+    expect($battleUi.get().mode).toBe("unitSelected")
+    expect($battleUi.get().selectedId).toBe(b.players[1]!.id)
+    // Поддержку без лечения дают перетаскиванием на союзника
+    beginDrag(b.players[1]!.id)
+    endDrag({ x: 2, y: 7 })
+    expect($battleUi.get().mode).toBe("unitSelected")
+    tapTile({ x: 2, y: 7 })
+    beginDrag(b.players[0]!.id)
+    endDrag({ x: 3, y: 7 })
+    expect($battleUi.get().mode).toBe("assistPreview")
+  })
+
+  it("лекарь по тапу на раненого союзника открывает лечение", () => {
+    const b = setup({ x: 2, y: 0 })
+    const save = $save.get()
+    const ally = save.battle!.units[b.players[0]!.id]!
+    ally.hp = Math.max(1, ally.hp - 5)
+    $save.set({ ...save })
+    tapTile({ x: 3, y: 7 })
+    tapTile({ x: 2, y: 7 })
+    expect($battleUi.get().mode).toBe("assistPreview")
   })
 })

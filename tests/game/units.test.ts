@@ -76,14 +76,14 @@ describe("generateUnit", () => {
     expect(vs[other]).toBe(own[other])
     expect(attackOf(u)).toBe(vs[hit])
   })
-  it("статы не бывают 0, а каждый уровень прибавляет хотя бы 1 (property)", () => {
+  it("статы не бывают 0, а каждый уровень растит хотя бы два разных стата (property)", () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 0x7fffffff }), (seed) => {
         const u = generateUnit({ seed, level: 1 })
         for (const s of STATS) expect(statsAtLevel(u, 1)[s]).toBeGreaterThanOrEqual(1)
         for (let l = 1; l < MAX_LEVEL; l++) {
           const gains = levelGains(u, l, l + 1)
-          expect(Object.values(gains).some(g => (g ?? 0) >= 1), `level ${l}`).toBe(true)
+          expect(Object.values(gains).filter(g => (g ?? 0) >= 1).length, `level ${l}`).toBeGreaterThanOrEqual(2)
         }
       }),
       { numRuns: 100 }

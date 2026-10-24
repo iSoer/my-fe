@@ -78,7 +78,7 @@ describe("пояснения классов", () => {
     expect(classInfo("healer").role).toBe("Healer")
     expect(classInfo("mage").role).toBe("Mage")
     expect(classInfo("soldier").tierLevel).toBe(1)
-    expect(classInfo("light-cavalry").moveRange).toBe(3)
+    expect(classInfo("light-cavalry").moveRange).toBe(4)
     expect(classInfo("wing-soldier").moveLabel).toBe("Pegasus")
   })
 })

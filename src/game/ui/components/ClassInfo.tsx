@@ -109,7 +109,7 @@ export function MovePanel({ classId }: { classId: string }) {
         <span className="grow">
           <b>{info.moveLabel}</b>
           <span className="class-move-range" aria-label={tr(`Move ${info.moveRange}`, `Ход ${info.moveRange}`)}>
-            {[1, 2, 3].map(i => <i key={i} className={i <= info.moveRange ? "on" : ""} />)}
+            {[1, 2, 3, 4].map(i => <i key={i} className={i <= info.moveRange ? "on" : ""} />)}
             <span className="small">{`${info.moveRange} ${plural(info.moveRange, ["tile", "tiles"], ["клетка", "клетки", "клеток"])}`}</span>
           </span>
         </span>

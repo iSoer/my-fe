@@ -108,12 +108,9 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
   )
 }
 
-/** Вылазка, шаг 1 из 2: сложность и вражеская команда (биом у каждой случайный). «Далее» разведывает бой и ведёт к выбору отряда. */
+/** Вылазка, шаг 1 из 3: сложность. Тап по открытой сложности ведёт к выбору вражеской армии. */
 export function BattleSetupScreen() {
   const save = useStore($save)
-  const pending = save.pendingBattle
-  const [difficulty, setDifficulty] = useState<Difficulty>(pending?.difficulty ?? "easy")
-  const [team, setTeam] = useState<number | null>(pending?.team ?? null)
   const [toastEl, toast] = useToast()
 
   useEffect(() => {
@@ -121,21 +118,9 @@ export function BattleSetupScreen() {
     ensureSortieSeed()
   }, [])
 
-  // Команды появляются, когда есть зерно вылазки (создаётся при входе на экран)
-  const offers = save.sortieSeed !== undefined && save.army ? enemyTeams(difficulty) : []
-  const armyLevel = rosterLevel(save.army)
-  const picked = team ?? closestTeam(offers, armyLevel)
-
-  const onNext = () => {
-    const r = scoutBattle(difficulty, picked)
-    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
-    haptic("medium")
-    navigate("/battle/squad")
-  }
-
   return (
     <div className="screen">
-      <TopBar title={tr("Sortie · 1/2", "Вылазка · 1/2")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
+      <TopBar title={tr("Sortie · 1/3", "Вылазка · 1/3")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
       <div className="screen-body">
         <div className="section-title">{tr("Difficulty", "Сложность")}</div>
         <div className="stack">
@@ -153,16 +138,24 @@ export function BattleSetupScreen() {
             const unlockText = d.unlock
               ? tr(`after ${unlockWins} ${winsWord} on “${unlockName}”`, `после ${unlockWins} ${winsWord} на «${unlockName}»`)
               : ""
+            const pick = () => {
+              if (!unlocked) return toast(`${tr("Unlocks", "Откроется")} ${unlockText}`)
+              haptic("select")
+              navigate(`/battle/enemy/${d.id}`)
+            }
             return (
               <div
                 key={d.id}
-                className={`card clickable diff-card pop-in ${difficulty === d.id ? "selected" : ""} ${unlocked ? "" : "locked"}`}
+                role="button"
+                tabIndex={0}
+                aria-label={d.name}
+                className={`card clickable diff-card pop-in ${unlocked ? "" : "locked"}`}
                 style={{ ...stagger(i, 60), "--diff-color": st.color, "--diff-rgb": st.rgb } as Record<string, string>}
-                onClick={() => {
-                  if (!unlocked) return toast(`${tr("Unlocks", "Откроется")} ${unlockText}`)
-                  haptic("select")
-                  setDifficulty(d.id)
-                  setTeam(null)
+                onClick={pick}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" && e.key !== " ") return
+                  e.preventDefault()
+                  pick()
                 }}
               >
                 <span className="diff-ico" aria-hidden="true">
@@ -184,13 +177,57 @@ export function BattleSetupScreen() {
                     ))}
                   </div>
                 </div>
+                {unlocked && <span className="diff-go" aria-hidden="true">›</span>}
               </div>
             )
           })}
         </div>
+      </div>
+      {toastEl}
+    </div>
+  )
+}
 
+/**
+ * Вылазка, шаг 2 из 3: вражеская армия на выбранной сложности (биом у каждой случайный).
+ * По умолчанию выбрана ближайшая к уровню армии игрока; «Далее» разведывает бой и ведёт к выбору отряда.
+ */
+export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
+  const save = useStore($save)
+  const pending = save.pendingBattle
+  const [team, setTeam] = useState<number | null>(pending?.difficulty === difficulty ? pending.team : null)
+  const [toastEl, toast] = useToast()
+  const unlocked = difficultyUnlocked(save, difficulty)
+
+  useEffect(() => {
+    ensureRoster()
+    ensureSortieSeed()
+  }, [])
+  // Закрытая сложность по прямой ссылке — назад к выбору сложности
+  useEffect(() => {
+    if (!unlocked) navigate("/battle/setup", true)
+  }, [unlocked])
+
+  // Команды появляются, когда есть зерно вылазки (создаётся при входе на экран)
+  const offers = unlocked && save.sortieSeed !== undefined && save.army ? enemyTeams(difficulty) : []
+  const armyLevel = rosterLevel(save.army)
+  const picked = team ?? closestTeam(offers, armyLevel)
+  const diff = DIFFICULTIES.find(d => d.id === difficulty)
+  const st = DIFF_STYLE[difficulty]
+
+  const onNext = () => {
+    const r = scoutBattle(difficulty, picked)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
+    haptic("medium")
+    navigate("/battle/squad")
+  }
+
+  return (
+    <div className="screen">
+      <TopBar title={tr("Sortie · 2/3", "Вылазка · 2/3")} right={<ResourceBar />} onBack={() => navigate("/battle/setup", true)} />
+      <div className="screen-body">
         <div className="row between">
-          <div className="section-title">{tr("Enemy army", "Армия врага")}</div>
+          <div className="section-title">{`${st.icon} ${diff?.name ?? ""} · ${tr("enemy army", "армия врага")}`}</div>
           <span className="muted small">{tr(`your army: Lv. ${armyLevel}`, `ваша армия: ур. ${armyLevel}`)}</span>
         </div>
         <div className="stack">

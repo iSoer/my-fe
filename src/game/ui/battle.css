@@ -19,7 +19,6 @@
   --bf-purple: #b79cff;
   --bf-purple-text: #7a5cd6;
   --bf-blood: #e63946;
-  --bf-blood-text: #d62839;
   --bf-skew: -12deg;
   --bf-ease: cubic-bezier(0.2, 0.9, 0.3, 1.2);
   --bf-top-band: 76px;
@@ -62,9 +61,8 @@
 .bf-overlay.is-pressing * {
   pointer-events: none !important;
 }
-.bf-overlay.is-pressing .bf-endturn,
-.bf-overlay.is-pressing .bf-endprompt {
-  opacity: 0;
+.bf-overlay.is-pressing .bf-bar-bottom {
+  opacity: 0.4;
   transition: opacity 0.12s ease;
 }
 
@@ -215,13 +213,9 @@
   left: 0;
   right: 0;
   top: 0;
-  padding: calc(8px + var(--tg-safe-top)) 10px 34px;
-  background: linear-gradient(
-    180deg,
-    rgba(13, 11, 16, 0.55) 0%,
-    rgba(13, 11, 16, 0.25) 55%,
-    rgba(13, 11, 16, 0) 100%
-  );
+  height: calc(60px + var(--tg-safe-top));
+  padding: calc(8px + var(--tg-safe-top)) 10px 8px;
+  background: linear-gradient(180deg, rgba(13, 11, 16, 0.6) 0%, rgba(13, 11, 16, 0.3) 100%);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -315,62 +309,183 @@
   font-weight: 800;
 }
 
-/* ---------- Нижняя полоса ---------- */
-.bf-bottom {
+/* ---------- Панель сведений над полем ---------- */
+/* Высоту задаёт экран: от шапки до верхнего края поля, лишнее прокручивается — клетки никогда не закрыты. */
+.bf-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  padding: 4px 12px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: none;
+}
+.bf-info::-webkit-scrollbar {
+  display: none;
+}
+.bf-info > * {
+  flex: none;
+}
+/* Ряд кнопок панели («Предметы») прилипает к её низу и всегда виден */
+.bf-info > .bf-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: auto;
+  padding: 4px 0 2px;
+}
+/* Низкая панель (маленький телефон): прогноз плотнее — HP и урон в одну строку, кнопки ниже */
+.bf-info.compact .bf-forecast {
+  padding: 6px 10px;
+  gap: 6px;
+}
+.bf-info.compact .bf-fc-side {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
+}
+.bf-info.compact .bf-fc-side.enemy {
+  justify-content: flex-end;
+}
+.bf-info.compact .bf-fc-top,
+.bf-info.compact .bf-bar-fc,
+.bf-info.compact .bf-fc-tags {
+  flex-basis: 100%;
+}
+.bf-info.compact .bf-fc-side.enemy .bf-fc-top {
+  justify-content: flex-start;
+}
+.bf-info.compact .bf-fc-top .critter-svg {
+  width: 24px;
+  height: 28px;
+}
+.bf-info.compact .bf-fc-names b {
+  font-size: 11px;
+}
+.bf-info.compact .bf-fc-hp {
+  gap: 3px;
+  font-size: 18px;
+}
+.bf-info.compact .bf-fc-hp .before {
+  font-size: 12px;
+}
+.bf-info.compact .bf-fc-hp .arrow {
+  font-size: 11px;
+}
+/* Полоска HP дублирует числа «было → стало» — в компактном режиме её нет */
+.bf-info.compact .bf-bar-fc {
+  display: none;
+}
+.bf-info.compact .bf-fc-dmg {
+  padding: 1px 6px;
+  font-size: 13px;
+}
+.bf-info.compact .bf-pill-btn {
+  min-height: 36px;
+}
+.bf-info.compact > .bf-actions {
+  padding-top: 2px;
+}
+/* Рюкзак — внутри панели, а не всплывающим окном поверх поля */
+.bf-info .bf-items {
+  position: static;
+  transform: none;
+  width: 100%;
+  max-height: none;
+  bottom: auto;
+  left: auto;
+}
+
+/* ---------- Панель кнопок под полем ---------- */
+.bf-bar-bottom {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 28px 12px calc(12px + var(--tg-safe-bottom));
-  background: linear-gradient(
-    0deg,
-    rgba(13, 11, 16, 0.6) 0%,
-    rgba(13, 11, 16, 0.28) 60%,
-    rgba(13, 11, 16, 0) 100%
-  );
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: stretch;
+  height: calc(66px + var(--tg-safe-bottom));
+  padding: 8px 10px calc(8px + var(--tg-safe-bottom));
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 8px;
+  background: var(--bf-ink);
+  box-shadow: 0 -3px 0 var(--bf-red);
+  pointer-events: auto;
+  z-index: 5;
 }
-.bf-hint {
-  align-self: center;
+.bf-bar-btn {
   position: relative;
   isolation: isolate;
-  padding: 7px 18px;
-  color: var(--bf-text);
-  font-size: 13px;
-  font-weight: 800;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--bf-on-ink);
+  font-family: var(--bf-font-display);
   font-style: italic;
-  text-align: center;
-  animation: bf-strip-in 0.2s var(--bf-ease) both;
-  pointer-events: none;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: transform 0.1s ease;
 }
-.bf-hint::before {
+.bf-bar-btn::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: var(--bf-paper);
+  background: var(--bf-ink-2);
+  border: 2px solid rgba(255, 255, 255, 0.35);
   transform: skewX(var(--bf-skew));
-  box-shadow: 3px 3px 0 var(--bf-ink);
 }
-.bf-hint.thin {
-  font-size: 12px;
-  padding: 5px 14px;
-  font-weight: 700;
+.bf-bar-btn:active {
+  transform: translate(1px, 2px);
 }
-.bf-hint.accent::before {
-  box-shadow:
-    3px 3px 0 var(--bf-ink),
-    inset 0 0 0 2px var(--bf-red);
+.bf-bar-ico {
+  font-size: 18px;
+  line-height: 1;
 }
-.bf-hint.danger {
-  color: #fff;
-  animation: bf-shake 0.3s ease;
+.bf-bar-label {
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
-.bf-hint.danger::before {
+/* Зона опасности включена */
+.bf-bar-btn.on::before {
   background: var(--bf-red);
+  border-color: var(--bf-paper);
+}
+/* «Завершить ход» — главная кнопка */
+.bf-bar-end {
+  flex-direction: row;
+  gap: 8px;
+}
+.bf-bar-end .bf-bar-label {
+  font-size: 14px;
+}
+.bf-bar-end::before {
+  background: var(--bf-red);
+  border-color: var(--bf-paper);
+  box-shadow: 3px 3px 0 rgba(255, 255, 255, 0.2);
+}
+.bf-bar-end.pulse::before {
+  animation: bf-hard-pulse 1.2s ease-in-out infinite;
+}
+.bf-bar-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .bf-actions {
   display: flex;
@@ -409,19 +524,6 @@
 .bf-pill-btn:active {
   transform: translate(2px, 2px);
   --slant-shadow: 2px 2px 0 var(--bf-ink);
-}
-.bf-pill-btn.primary {
-  color: #fff;
-  --slant-bg: var(--bf-red);
-}
-.bf-pill-btn.big {
-  flex: 1;
-  max-width: 260px;
-  min-height: 52px;
-  font-size: 18px;
-}
-.bf-pill-btn.danger {
-  color: var(--bf-blood-text);
 }
 
 /* ---------- Карточка бойца (чернильная панель с красным клином) ---------- */
@@ -950,52 +1052,6 @@
   color: var(--bf-teal-text);
 }
 
-/* ---------- Завершить ход ---------- */
-.bf-endturn {
-  position: absolute;
-  right: 16px;
-  bottom: calc(68px + var(--tg-safe-bottom));
-  pointer-events: auto;
-  isolation: isolate;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 0 22px 0 16px;
-  border: none;
-  background: transparent;
-  color: #fff;
-  font-family: var(--bf-font-display);
-  font-style: italic;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 15px;
-  animation: bf-strip-in 0.24s var(--bf-ease) both;
-  transition: transform 0.1s ease;
-  z-index: 4;
-  --slant-shadow: 5px 5px 0 var(--bf-ink);
-}
-.bf-endturn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--bf-red);
-  transform: skewX(var(--bf-skew));
-  box-shadow: var(--slant-shadow);
-}
-.bf-endturn:active {
-  transform: translate(2px, 2px);
-  --slant-shadow: 3px 3px 0 var(--bf-ink);
-}
-.bf-endturn.pulse::before {
-  animation: bf-hard-pulse 1.2s ease-in-out infinite;
-}
-.bf-endturn-ico {
-  font-size: 16px;
-}
-
 /* ---------- Пауза ---------- */
 .bf-pause {
   display: flex;
@@ -1110,26 +1166,12 @@
       0 0 0 5px rgba(255, 255, 255, 0.9);
   }
 }
-@keyframes bf-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-4px);
-  }
-  75% {
-    transform: translateX(4px);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .bf-card,
   .bf-phase,
   .bf-phase-name,
   .bf-pill-btn,
-  .bf-endturn,
-  .bf-endturn::before,
-  .bf-hint,
+  .bf-bar-end::before,
   .bf-tag.death,
   .bf-unit-hp.crit {
     animation: none !important;
@@ -1158,71 +1200,4 @@
   .bf-phase {
     padding-left: 8px;
   }
-}
-
-/* ---------- Предложение завершить ход ---------- */
-.bf-endprompt {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(14px + var(--tg-safe-bottom));
-  z-index: 6;
-  pointer-events: auto;
-  padding: 18px 14px 12px;
-  background: var(--bf-paper);
-  border: none;
-  box-shadow: none;
-  color: var(--bf-text);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: bf-slide-up 0.26s var(--bf-ease) both;
-}
-.bf-endprompt::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-  background: var(--bf-red);
-}
-.bf-endprompt-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.bf-endprompt-ico {
-  font-size: 22px;
-  line-height: 1;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bf-ink);
-  transform: skewX(var(--bf-skew));
-}
-.bf-endprompt-title {
-  font-family: var(--bf-font-display);
-  font-style: italic;
-  font-weight: 900;
-  text-transform: uppercase;
-  font-size: 16px;
-  letter-spacing: 0.02em;
-}
-.bf-endprompt-sub {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--bf-muted);
-}
-.bf-endprompt-actions {
-  display: flex;
-  gap: 12px;
-}
-.bf-endprompt-actions .bf-pill-btn {
-  flex: 1;
-  min-height: 46px;
-  font-size: 13.5px;
-  padding: 0 12px;
 }

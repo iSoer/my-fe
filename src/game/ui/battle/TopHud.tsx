@@ -2,12 +2,11 @@ import { lootShare } from "@game/core/progression"
 import type { BattleState } from "@game/core/types"
 import { livingUnits } from "@game/core/battle/query"
 import { biomeDef } from "@game/content/biomes"
-import { $pauseOpen } from "../lib/pause"
 import { haptic } from "@game/platform/haptics"
-import { setFastForward, toggleDanger, type BattleUiState } from "@game/state/battleUi"
+import { setFastForward, type BattleUiState } from "@game/state/battleUi"
 import { tr } from "@game/i18n"
 
-/** Верхняя полоса HUD поверх поля: фаза, счётчик походивших, биом и кнопки. */
+/** Верхняя полоса HUD над полем: фаза, счётчик действовавших, добыча, биом и ускорение хода врага. */
 export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState }) {
   const isPlayer = battle.phase === "player"
   const players = livingUnits(battle, "player")
@@ -67,29 +66,6 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
           ⏩
         </button>
       )}
-      <button
-        type="button"
-        className={`bf-icon ${ui.dangerOn ? "active warn" : ""}`}
-        aria-label={tr("Danger zone", "Зона опасности")}
-        title={tr("Show danger zone", "Показать зону опасности")}
-        onClick={() => {
-          haptic("select")
-          toggleDanger()
-        }}
-      >
-        ⚠
-      </button>
-      <button
-        type="button"
-        className="bf-icon"
-        aria-label={tr("Pause", "Пауза")}
-        onClick={() => {
-          haptic("select")
-          $pauseOpen.set(true)
-        }}
-      >
-        ≡
-      </button>
     </div>
   )
 }

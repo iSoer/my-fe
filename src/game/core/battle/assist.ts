@@ -6,6 +6,7 @@ import { assistDef } from "@game/content/skills/assists"
 import { specialDef } from "@game/content/skills/specials"
 import { DANCER_CLASS, unitClass } from "@game/content/classes"
 import type { AssistDef } from "../skills/types"
+import { healLevelBonus } from "@game/content/balance"
 import { tr } from "@game/i18n"
 
 export interface AssistPlan {
@@ -105,7 +106,8 @@ export function planAssist(state: BattleState, unitId: string, from: Pos, target
     }
     case "heal": {
       if (target.hp >= target.maxHp) return invalid(tr("ally is at full HP", "союзник здоров"))
-      let amount = assist.heal ?? 5
+      // Лечение растёт с уровнем лекаря (`HEAL_SCALING`)
+      let amount = (assist.heal ?? 5) + healLevelBonus(unit.level)
       const spId = unit.skills.special
       if (spId) {
         const sp = specialDef(spId)

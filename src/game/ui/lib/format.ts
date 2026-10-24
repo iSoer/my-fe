@@ -71,15 +71,6 @@ export function difficultyName(d: Difficulty): string {
   return difficultyDef(d).name
 }
 
-export function fmtGains(gains: Partial<Stats>): string {
-  const parts: string[] = []
-  for (const s of STATS) {
-    const v = gains[s]
-    if (v) parts.push(`${STAT_LABELS[s]} ${v > 0 ? "+" : ""}${v}`)
-  }
-  return parts.length ? parts.join(", ") : tr("no change", "без изменений")
-}
-
 export function g(gender: Gender, m: string, f: string): string {
   return gender === "m" ? m : f
 }

@@ -1,5 +1,6 @@
 import { atom } from "nanostores"
-import type { BattleAction, BattleEvent, BattleState, BattleUnit, Pos } from "@game/core/types"
+import type { BattleAction, BattleEvent, BattleState, BattleUnit, Pos, UnitInstance } from "@game/core/types"
+import { unitKit } from "@game/core/skills/engine"
 import { MAP_H, MAP_W, manhattan, posKey, samePos } from "@game/core/types"
 import {
   attackOptions,
@@ -353,6 +354,12 @@ function tapWithSelection(st: BattleState, sel: BattleUnit, reach: ReachMap, pos
     return
   }
   if (occupant) {
+    // Не ходивший союзник — выбрать его, чтобы переставить: иначе Поддержка, годная для любого союзника
+    // (Rally, Swap…), перехватывала бы тап, а повторный тап её применял. Такую Поддержку дают перетаскиванием
+    // бойца на союзника; лечение — и тапом, раненых лечат именно так.
+    const assist = st.roster[sel.unitId] ? unitKit(st.roster[sel.unitId] as UnitInstance).assist : undefined
+    const healing = assist?.kind === "heal" || assist?.kind === "sacrifice"
+    if (!occupant.acted && !healing) return selectUnit(st, occupant)
     if (tryAssist(st, sel, reach, occupant)) return
     if (!occupant.acted) return selectUnit(st, occupant)
     return clearSelection()

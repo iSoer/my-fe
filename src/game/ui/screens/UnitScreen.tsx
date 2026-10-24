@@ -13,8 +13,7 @@ import {
   slotOf,
   unitClass,
   unitClassName,
-  visibleStats,
-  levelGains
+  visibleStats
 } from "@game/core/units"
 import { XP } from "@game/content/balance"
 import { CLASS_TIERS, TIER_LEVELS } from "@shared/character/classes"
@@ -46,7 +45,8 @@ import { GearRow, MasteryGrid, MasterySheet, SkillGrid } from "../components/Uni
 import type { Skill } from "@shared/character/skills"
 import { TalismanSheet, WeaponSheet } from "../components/GearSheet"
 import { ClassPanel } from "../components/ClassInfo"
-import { fmtGains, speciesName } from "../lib/format"
+import { speciesName } from "../lib/format"
+import { LevelUpModal, type LevelUpView } from "../components/LevelUpModal"
 import { useReplay } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
 import { tr } from "@game/i18n"
@@ -78,6 +78,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   const [mastery, setMastery] = useState<Skill | null>(null)
   const [classOpen, setClassOpen] = useState(false)
   const [gear, setGear] = useState<"weapon" | "talisman" | null>(null)
+  const [levelUp, setLevelUp] = useState<LevelUpView | null>(null)
   const [toastEl, toast] = useToast()
   const [bounceKey, replayBounce] = useReplay()
   const [happy, setHappy] = useState(false)
@@ -106,12 +107,13 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   }
 
   const onTrain = () => {
-    const gains = levelGains(unit, unit.level, unit.level + 1)
+    const from = unit.level
     const r = trainUnitAction(unit.id)
     if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("success")
     celebrate()
-    toast(tr(`Level ${unit.level + 1}! ${fmtGains(gains)}`, `Уровень ${unit.level + 1}! ${fmtGains(gains)}`))
+    const trained = $save.get().army?.units.find(u => u.id === unit.id)
+    if (trained) setLevelUp({ unit: trained, from, to: trained.level })
   }
   const onReclass = (classId: string) => {
     const r = reclassAction(unit.id, classId)
@@ -417,6 +419,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         onConfirm={onRelease}
         onClose={() => setRelease(0)}
       />
+      <LevelUpModal view={levelUp} onClose={() => setLevelUp(null)} />
       {toastEl}
     </div>
   )

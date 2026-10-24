@@ -340,6 +340,22 @@ export const TERRAIN_BONUS: Partial<Record<TerrainId, Partial<Stats>>> = {
   forest: { def: 1, res: 1 }
 }
 
+/** Прокачка: каждый уровень растит хотя бы столько разных статов (+1 каждому). */
+export const LEVEL_UP = {
+  minStats: 2
+}
+
+/** Лечение Поддержкой растёт с уровнем лекаря: +bonus HP за каждые `every` уровней. */
+export const HEAL_SCALING = {
+  every: 5,
+  bonus: 5
+}
+
+/** Прибавка к лечению от уровня лекаря: 0 до 4-го, +5 с 5-го, +10 с 10-го… */
+export function healLevelBonus(level: number): number {
+  return Math.floor(level / HEAL_SCALING.every) * HEAL_SCALING.bonus
+}
+
 export const COMBAT = {
   triangle: 0.2,
   effective: 1.5,
@@ -367,10 +383,16 @@ export const MODEL_SCALE = {
   statOffset: 15
 }
 
+/**
+ * Доли местности на поле 6×8. Заросли и укрытия проходимы (дают бонус); стены, вода, горы и хлипкие препятствия
+ * мешают идти — их немного, чтобы бойцам было где развернуться (генератор держит непроходимых ≤ `maxBlocked`).
+ */
 export const TERRAIN_SHARE = {
   forest: [0.15, 0.25] as const,
-  walls: [0.02, 0.05] as const,
-  impassable: [0.0, 0.06] as const,
+  walls: [0, 0.02] as const,
+  impassable: [0.0, 0.03] as const,
   covers: [2, 4] as const,
-  breakable: [0, 2] as const
+  breakable: [0, 1] as const,
+  /** Непроходимых клеток на карте не больше. */
+  maxBlocked: 6
 }

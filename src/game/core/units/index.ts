@@ -20,7 +20,7 @@ import { BOSS_TITLES, EPITHETS, NAMES } from "@game/content/names"
 import { BREEDS } from "@game/content/breeds"
 import { PERSONALITIES } from "@game/content/personalities"
 import { ACCESSORIES, EYES, EYE_COLORS, FUR_PALETTES, PATTERNS } from "@game/content/appearance"
-import { COMBAT, MODEL_SCALE, ROSTER, recruitRarityWeights } from "@game/content/balance"
+import { COMBAT, LEVEL_UP, MODEL_SCALE, ROSTER, recruitRarityWeights } from "@game/content/balance"
 import { factionDef } from "@game/content/factions"
 import { generateCharacter, validateCharacterRequest } from "@/server/character-model/generate"
 import { loadCharacterModel } from "@/server/character-model/model"
@@ -79,9 +79,9 @@ const statTables = new WeakMap<UnitInstance, StatTable>()
 
 /**
  * Боевые статы бойца на всех уровнях в текущем классе. Рост модели при переводе в боевую шкалу дробится, и многие
- * уровни сами по себе не дают ничего; такой уровень даёт +1 к одному стату — так каждый уровень что-то прибавляет.
- * Надбавки делятся между статами пропорционально их собственному росту с 1-го по 80-й уровень (метод Уэбстера):
- * получает тот, кто сильнее всех отстал от своей доли, при равенстве — тот, кто растёт быстрее.
+ * уровни сами по себе дают мало; каждый уровень растит хотя бы `LEVEL_UP.minStats` разных статов — недостающие
+ * получают +1. Надбавки делятся между статами пропорционально их собственному росту с 1-го по 80-й уровень
+ * (метод Уэбстера): получает тот, кто сильнее всех отстал от своей доли, при равенстве — тот, кто растёт быстрее.
  */
 function statTable(unit: UnitInstance): Stats[] {
   const cached = statTables.get(unit)
@@ -105,18 +105,23 @@ function statTable(unit: UnitInstance): Stats[] {
   for (let i = 1; i < MAX_LEVEL; i++) {
     const prev = levels[i - 1] as Stats
     let cur = addStats(natural[i] as Stats, bonus)
-    if (STATS.every(s => cur[s] <= prev[s])) {
+    // Каждый уровень растит хотя бы LEVEL_UP.minStats разных статов: недостающие добирают надбавками
+    const grown = new Set(STATS.filter(s => cur[s] > prev[s]))
+    while (grown.size < LEVEL_UP.minStats) {
       given++
-      let pick: Stat = STATS[0] as Stat
+      let pick: Stat | undefined
       let best = -Infinity
       for (const s of STATS) {
+        if (grown.has(s)) continue
         const lag = weight(s) * given - bonus[s]
-        if (lag > best || (lag === best && weight(s) > weight(pick))) {
+        if (lag > best || (pick && lag === best && weight(s) > weight(pick))) {
           best = lag
           pick = s
         }
       }
+      if (!pick) break
       bonus[pick] += 1
+      grown.add(pick)
       cur = addStats(natural[i] as Stats, bonus)
     }
     levels.push(cur)

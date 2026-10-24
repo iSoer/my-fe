@@ -2067,6 +2067,16 @@ p {
   transform: skewX(-10deg) scale(1.1) rotate(-6deg);
   background: var(--paper);
 }
+/* Стрелка «дальше»: тап по сложности ведёт к выбору вражеской армии */
+.diff-card .diff-go {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--diff-color);
+}
 .diff-card .diff-body {
   flex: 1;
   min-width: 0;
@@ -2334,67 +2344,16 @@ p {
     opacity: 0;
   }
 }
-.reward-chips {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.reward-chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px 6px 18px;
-  border-radius: 0;
-  background: var(--ink);
-  color: #fff;
-  border: none;
-  font-weight: 900;
-  font-style: italic;
-  font-size: 17px;
-  font-variant-numeric: tabular-nums;
-  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
-}
-.reward-chip::before {
-  /* дырочка бирки */
-  content: '';
-  position: absolute;
-  left: 9px;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  margin-top: -2.5px;
-  border-radius: 50%;
-  background: var(--paper);
-}
-.reward-chip .ico {
-  font-size: 14px;
-  font-style: normal;
-}
-.reward-chip.gold {
-  background: var(--gold);
-  color: var(--ink);
-}
-.gain-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.gain-chip {
-  padding: 1px 8px;
-  border-radius: 0;
-  background: var(--paper);
-  color: var(--ink);
-  border: none;
-  font-size: 11px;
-  font-weight: 900;
-  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
-  animation: pop-in 0.4s var(--ease-back) both;
-}
 .lvl-arrow {
+  padding: 0 0 1px;
+  border: none;
+  border-bottom: 2px dashed currentColor;
+  background: none;
+  font: inherit;
   color: var(--gold);
   font-weight: 900;
   font-style: italic;
+  cursor: pointer;
   animation: pop-in 0.4s var(--ease-back) both;
 }
 .fallen-card {
@@ -2441,41 +2400,6 @@ p {
   color: var(--ok-text);
   font-weight: 800;
 }
-.xp-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.xp-row .info {
-  flex: 1;
-  min-width: 0;
-}
-.xp-row .name {
-  font-weight: 900;
-  font-style: italic;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  overflow: hidden;
-}
-.xp-row .xp-line {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 12px;
-  color: var(--muted-ink);
-}
-.xp-row .xp-line .bar {
-  flex: 1;
-  height: 6px;
-}
-.card.ink .xp-row .xp-line .bar {
-  background: rgba(255, 255, 255, 0.16);
-}
-.card.ink .xp-row .xp-line .bar > div {
-  background: var(--paper);
-}
-
 /* ---------- Карточка бойца ---------- */
 .unit-hero {
   overflow: hidden;
@@ -2659,7 +2583,7 @@ p {
   .shake,
   .pulse-once,
   .chip.pop,
-  .gain-chip,
+  .res-gain,
   .lvl-arrow,
   .result-banner .stamp,
   .result-banner::before,
@@ -3199,3 +3123,345 @@ p {
   }
 }
 
+
+/* ---------- Экран нового уровня ---------- */
+.lvlup {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+}
+.lvlup-banner {
+  align-self: flex-start;
+  margin: -4px 0 0 -4px;
+  padding: 4px 14px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-head);
+  font-style: italic;
+  font-size: 20px;
+  text-transform: uppercase;
+  transform: skewX(-8deg);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.lvlup-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lvlup-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lvlup-who > b {
+  font-family: var(--font-head);
+  font-style: italic;
+  text-transform: uppercase;
+  font-size: 16px;
+}
+.lvlup-level {
+  font-weight: 900;
+  font-size: 15px;
+}
+.lvlup-level b {
+  color: var(--red);
+  font-size: 20px;
+}
+.lvlup-arrow {
+  margin: 0 6px;
+  color: var(--muted-paper);
+}
+.lvlup-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lvlup-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 20px 1fr 48px;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--paper-2);
+  font-weight: 800;
+  font-size: 16px;
+}
+.lvlup-row.up {
+  background: #eaf7e1;
+}
+.lvlup-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-paper);
+}
+.lvlup-row.main .lvlup-label {
+  color: var(--gold-text);
+}
+.lvlup-old {
+  text-align: right;
+  color: var(--muted-paper);
+}
+.lvlup-to {
+  text-align: center;
+  color: var(--muted-paper);
+}
+.lvlup-new {
+  font-family: var(--font-head);
+  font-style: italic;
+  font-size: 18px;
+}
+.lvlup-row.up .lvlup-new {
+  color: var(--ok-text);
+}
+.lvlup-gain {
+  justify-self: end;
+  color: var(--muted-paper);
+}
+.lvlup-row.up .lvlup-gain {
+  padding: 1px 6px;
+  background: var(--ok-text);
+  color: #fff;
+  animation: pop-in 0.3s var(--ease-back) both;
+}
+.lvlup-total {
+  text-align: right;
+  font-weight: 800;
+}
+
+/* ---------- Итоги боя: шаги ---------- */
+.result-steps {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.result-step {
+  padding: 3px 10px;
+  background: var(--ink-3);
+  color: var(--muted-ink);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transform: skewX(-8deg);
+}
+.result-step.done {
+  color: var(--text-ink);
+}
+.result-step.on {
+  background: var(--red);
+  color: #fff;
+}
+
+/* ---------- Итоги боя: крупные блоки ---------- */
+/* Кнопка шага всегда внизу экрана: на коротком шаге прижата к низу, на длинном прилипает при прокрутке */
+.result-screen .res-cta {
+  margin-top: auto;
+}
+.res-big {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.res-big-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px 10px;
+  background: var(--ink);
+  color: #fff;
+  transform: skewX(-6deg);
+  box-shadow: 4px 4px 0 var(--red);
+}
+.res-big-item > * {
+  transform: skewX(6deg);
+}
+.res-big-item.gold {
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.res-big-ico {
+  font-size: 22px;
+  line-height: 1;
+}
+.res-big-item b {
+  font-family: var(--font-head);
+  font-style: italic;
+  font-size: 40px;
+  line-height: 1.05;
+}
+.res-big-label {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.res-big-total {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+.res-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.res-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--paper-2);
+  font-size: 14px;
+  font-weight: 700;
+}
+.res-row b {
+  font-weight: 900;
+}
+.res-row.danger b {
+  color: var(--red-deep);
+}
+.res-row.ok b {
+  color: var(--ok-text);
+}
+.res-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.res-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 10px 4px 8px;
+  background: var(--ink-2);
+  border: 2px solid var(--ink-3);
+  color: var(--text-ink);
+}
+.res-tile-ico {
+  font-size: 16px;
+  line-height: 1;
+}
+.res-tile b {
+  font-family: var(--font-head);
+  font-style: italic;
+  font-size: 22px;
+}
+.res-tile-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-ink);
+}
+.res-mvp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.res-mvp-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 900;
+  transform: skewX(-8deg);
+}
+.res-mvp-name {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-head);
+  font-style: italic;
+  text-transform: uppercase;
+  font-size: 17px;
+}
+.res-fighter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.res-fighter.leveled {
+  box-shadow: 5px 5px 0 var(--gold);
+}
+.res-fighter-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.res-fighter-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-style: italic;
+  font-size: 16px;
+}
+.res-fighter-lv {
+  font-weight: 900;
+  font-style: italic;
+  color: var(--muted-ink);
+}
+.res-fighter-xp {
+  font-family: var(--font-head);
+  font-style: italic;
+  font-size: 20px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.res-fighter .xp-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted-ink);
+}
+.res-fighter .xp-line .bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.res-fighter .xp-line .bar > div {
+  background: var(--gold);
+}
+.res-gains {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.res-gain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px;
+  background: rgba(255, 255, 255, 0.08);
+  animation: pop-in 0.4s var(--ease-back) both;
+}
+.res-gain small {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--muted-ink);
+}
+.res-gain.main small {
+  color: var(--gold);
+}
+.res-gain b {
+  font-family: var(--font-head);
+  font-style: italic;
+  font-size: 17px;
+}
+.res-gain em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--grass);
+}
+.res-gain.up {
+  background: rgba(154, 214, 107, 0.18);
+}

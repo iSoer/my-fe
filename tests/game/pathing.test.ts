@@ -16,7 +16,7 @@ describe("moveCost", () => {
 })
 
 describe("reachableTiles", () => {
-  it("пехота ходит на 2, кавалерия на 3, броня на 1", () => {
+  it("пехота ходит на 3, кавалерия на 4, броня на 2", () => {
     const b = makeBattle(
       [
         { classId: "infantry_sword", pos: { x: 0, y: 7 } },
@@ -28,11 +28,12 @@ describe("reachableTiles", () => {
     const inf = reachableTiles(b.state, b.state.units[b.players[0]!.id]!)
     const cav = reachableTiles(b.state, b.state.units[b.players[1]!.id]!)
     const arm = reachableTiles(b.state, b.state.units[b.players[2]!.id]!)
-    expect(inf.has(posKey({ x: 0, y: 5 }))).toBe(true)
-    expect(inf.has(posKey({ x: 0, y: 4 }))).toBe(false)
-    expect(cav.has(posKey({ x: 5, y: 4 }))).toBe(true)
-    expect(arm.has(posKey({ x: 2, y: 6 }))).toBe(true)
-    expect(arm.has(posKey({ x: 2, y: 5 }))).toBe(false)
+    expect(inf.has(posKey({ x: 0, y: 4 }))).toBe(true)
+    expect(inf.has(posKey({ x: 0, y: 3 }))).toBe(false)
+    expect(cav.has(posKey({ x: 5, y: 3 }))).toBe(true)
+    expect(cav.has(posKey({ x: 5, y: 2 }))).toBe(false)
+    expect(arm.has(posKey({ x: 2, y: 5 }))).toBe(true)
+    expect(arm.has(posKey({ x: 2, y: 4 }))).toBe(false)
   })
   it("проходит сквозь союзников, но не сквозь врагов и не останавливается на занятых", () => {
     const b = makeBattle(

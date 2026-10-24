@@ -1,4 +1,5 @@
 import { atom } from "nanostores"
+import type { Difficulty } from "@game/core/types"
 
 export type Route
   = | { name: "menu" }
@@ -9,12 +10,16 @@ export type Route
     | { name: "recruit" }
     | { name: "unit", unitId: string }
     | { name: "battleSetup" }
+    /** Шаг 2 вылазки: вражеская армия на выбранной сложности. */
+    | { name: "battleEnemy", difficulty: Difficulty }
     | { name: "battleSquad" }
     | { name: "battle" }
     | { name: "battleResult" }
     | { name: "memorial" }
     | { name: "settings" }
     | { name: "notFound", path: string }
+
+const DIFFICULTY_IDS: readonly Difficulty[] = ["easy", "normal", "hard", "nightmare"]
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#/, "").replace(/^\/+/, "").replace(/\/+$/, "")
@@ -30,6 +35,8 @@ export function parseRoute(hash: string): Route {
   if (a === "battle") {
     if (!b) return { name: "battle" }
     if (b === "setup") return { name: "battleSetup" }
+    if (b === "enemy" && parts[2] && (DIFFICULTY_IDS as readonly string[]).includes(parts[2]))
+      return { name: "battleEnemy", difficulty: parts[2] as Difficulty }
     if (b === "squad") return { name: "battleSquad" }
     if (b === "result") return { name: "battleResult" }
   }
@@ -58,6 +65,8 @@ export function routePath(r: Route): string {
       return `/army/${r.unitId}`
     case "battleSetup":
       return "/battle/setup"
+    case "battleEnemy":
+      return `/battle/enemy/${r.difficulty}`
     case "battleSquad":
       return "/battle/squad"
     case "battle":
@@ -113,6 +122,8 @@ export function parentRoute(r: Route): Route {
     case "armyCreate":
     case "recruit":
       return { name: "army" }
+    case "battleEnemy":
+      return { name: "battleSetup" }
     case "battleSetup":
     case "battleResult":
     case "army":

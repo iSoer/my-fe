@@ -61,6 +61,7 @@ await step('Лавка: покупка пластырей', async () => {
 await step('ворота → вылазка 1/2 и 2/2', async () => {
   await pf(() => window.__pf.village.talk('sorties'));
   await page.getByRole('button', { name: /Plan a sortie/ }).click();
+  await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();
   await page.locator('.foe-card').first().waitFor();
   await page.locator('.pack-row button', { hasText: '+' }).first().click();
@@ -85,7 +86,14 @@ await step('сдача → итоги → деревня', async () => {
   });
   await page.getByRole('button', { name: /Surrender/ }).click();
   await page.getByRole('button', { name: 'Surrender' }).last().click();
-  await page.getByRole('button', { name: /To the village/ }).click({ timeout: 15000 });
+  // Итоги по шагам: «Далее», пока не появится «В деревню»
+  const village = page.getByRole('button', { name: /To the village/ });
+  await page.getByRole('button', { name: /^(➜ )?Next$|To the village/ }).first().waitFor({ timeout: 15000 });
+  for (let i = 0; i < 4 && !(await village.count()); i++) {
+    await page.getByRole('button', { name: /Next/ }).first().click();
+    await page.waitForTimeout(300);
+  }
+  await village.click({ timeout: 15000 });
   await page.locator('.vl-canvas canvas').waitFor();
 });
 await step('перезагрузка → «Продолжить»', async () => {

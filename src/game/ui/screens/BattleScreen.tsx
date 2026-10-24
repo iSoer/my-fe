@@ -10,16 +10,22 @@ import { TopHud } from "../battle/TopHud"
 import { ItemMenu } from "../battle/ItemMenu"
 import { BottomBand } from "../battle/BottomBand"
 import { ForecastCard } from "../battle/ForecastCard"
-import { EndTurnButton } from "../battle/EndTurnButton"
-import { EndTurnPrompt } from "../battle/EndTurnPrompt"
+import { BattleBar } from "../battle/BattleBar"
 import { PauseModal } from "../battle/PauseModal"
 import "../battle.css"
 import "../village.css"
-import { setBoardInsets } from "@game/state/boardLayout"
+import { $boardLayout, setBoardInsets } from "@game/state/boardLayout"
 
-/** Отступы поля под накладки HUD и нижней полосы. */
-const BOARD_TOP_INSET = 84
-const BOARD_BOTTOM_INSET = 150
+/**
+ * Раскладка как в Fire Emblem Heroes: сверху шапка (HUD_H) и информационная панель (не меньше INFO_MIN),
+ * под полем — панель кнопок (BAR_H). Поле прижато к панели кнопок, всё свободное место по высоте уходит панели
+ * сведений, и она заканчивается ровно над полем — ничего не закрывает клетки.
+ */
+const HUD_H = 60
+const INFO_MIN = 130
+/** Ниже этой высоты панель сведений компактная: прогноз в две строки, кнопки ниже. */
+const INFO_COMPACT = 200
+const BAR_H = 66
 
 /**
  * Отступ безопасной зоны в пикселях. Значение переменной не читаем строкой: env() внутри пользовательской
@@ -36,20 +42,22 @@ function safeInset(name: "--tg-safe-top" | "--tg-safe-bottom"): number {
 }
 
 /**
- * Экран боя: Phaser-канвас на весь экран, поверх него контекстные DOM-накладки
- * (HUD, карточка бойца, прогноз, «Завершить ход»).
+ * Экран боя: Phaser-канвас на весь экран и DOM-накладки вокруг поля: шапка, панель сведений над полем
+ * (боец, прогноз, клетка, подсказки) и панель кнопок под ним (меню, зона опасности, «Завершить ход»).
  */
 export function BattleScreen() {
   const battle = useStore($battle)
   const ui = useStore($battleUi)
+  const layout = useStore($boardLayout)
   const canvasRef = useRef<HTMLDivElement>(null)
 
   // Поле должно помещаться между HUD и нижней карточкой: публикуем отступы (с учётом safe-area).
   useEffect(() => {
     const publish = () =>
       setBoardInsets({
-        top: BOARD_TOP_INSET + safeInset("--tg-safe-top"),
-        bottom: BOARD_BOTTOM_INSET + safeInset("--tg-safe-bottom")
+        top: HUD_H + INFO_MIN + safeInset("--tg-safe-top"),
+        // +4: красная кромка панели кнопок не ложится на нижний ряд клеток
+        bottom: BAR_H + 4 + safeInset("--tg-safe-bottom")
       })
     publish()
     window.addEventListener("resize", publish)
@@ -96,6 +104,9 @@ export function BattleScreen() {
   if (!battle) return <div className="bf-root" />
 
   const pressing = !!ui.pressedId || ui.dragging
+  // Панель сведений — от шапки до верхнего края поля (поле публикует MapScene)
+  const infoTop = HUD_H + safeInset("--tg-safe-top")
+  const infoHeight = layout ? Math.max(INFO_MIN * 0.6, layout.oy - infoTop - 6) : INFO_MIN
 
   return (
     <div className="bf-root">
@@ -103,14 +114,13 @@ export function BattleScreen() {
       <div className={`bf-overlay${pressing ? " is-pressing" : ""}`}>
         <div className="bf-top">
           <TopHud battle={battle} ui={ui} />
-          {ui.mode === "forecast" && ui.forecast && <ForecastCard state={battle} forecast={ui.forecast} />}
         </div>
-        <ItemMenu battle={battle} ui={ui} />
-        <EndTurnButton battle={battle} ui={ui} />
-        <EndTurnPrompt battle={battle} ui={ui} />
-        <div className="bf-bottom">
+        <div className={`bf-info${infoHeight < INFO_COMPACT ? " compact" : ""}`} style={{ top: `${infoTop}px`, height: `${infoHeight}px` }}>
+          {ui.mode === "forecast" && ui.forecast && <ForecastCard state={battle} forecast={ui.forecast} />}
+          <ItemMenu battle={battle} ui={ui} />
           <BottomBand battle={battle} ui={ui} />
         </div>
+        <BattleBar battle={battle} ui={ui} />
       </div>
       <Toast message={ui.toast} at={ui.toastAt} error />
       <PauseModal battle={battle} />
