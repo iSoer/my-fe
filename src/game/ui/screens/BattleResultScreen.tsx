@@ -6,7 +6,7 @@ import { MAX_LEVEL, attackStatOf } from "@game/core/types"
 import { isMagicWeapon } from "@game/content/weapons"
 import { displayName, unitClassName, visibleStats } from "@game/core/units"
 import { biomeDef } from "@game/content/biomes"
-import { XP } from "@game/content/balance"
+import { BATTLE, XP } from "@game/content/balance"
 import { $save } from "@game/state/save"
 import { navigate } from "@game/state/router"
 import { Button } from "../components/Button"
@@ -133,7 +133,9 @@ export function BattleResultScreen() {
 
   const title = lb.result === "victory"
     ? tr("VICTORY", "ПОБЕДА")
-    : lb.result === "defeat" ? tr("DEFEAT", "ПОРАЖЕНИЕ") : tr("RETREAT", "ОТСТУПЛЕНИЕ")
+    : lb.result === "defeat"
+      ? tr("DEFEAT", "ПОРАЖЕНИЕ")
+      : lb.timeUp ? tr("TIME'S UP", "ВРЕМЯ ВЫШЛО") : tr("RETREAT", "ОТСТУПЛЕНИЕ")
   const mvp = lb.mvpId ? lb.survivors.find(u => u.id === lb.mvpId) : undefined
   const stepTitle: Record<ResultStep, string> = {
     rewards: tr("Rewards", "Награда"),
@@ -257,6 +259,18 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
           {lb.result === "victory" ? ` · ${tr("wins here", "побед на сложности")}: ${profile.wins[lb.difficulty] ?? 0}` : ""}
         </div>
       </div>
+
+      {lb.timeUp && (
+        <div className="card warning-box stack pop-in">
+          <div>{tr(`${BATTLE.turnLimit} TURNS ARE OVER`, `ПРОШЛО ${BATTLE.turnLimit} ХОДОВ`)}</div>
+          <div className="small" style={{ fontWeight: 400 }}>
+            {tr(
+              "The squad retreated: surviving fighters are back, the loot is partly lost.",
+              "Отряд отступил: выжившие бойцы вернулись, часть добычи потеряна."
+            )}
+          </div>
+        </div>
+      )}
 
       {lb.armyFell && (
         <div className="card warning-box stack pop-in" style={{ animationDelay: `${fellDelay}ms` }}>

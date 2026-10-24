@@ -244,7 +244,10 @@ export function simulateCombat(
       const r = h.damageReduction?.(ctxDef, info) ?? 0
       if (r > 0) dmg = Math.floor(dmg * (1 - r))
     }
-    dmg = Math.max(0, dmg)
+    // Любой удар ранит хотя бы на COMBAT.minDamage — бойцы, не пробивающие друг друга, не затягивают бой навсегда;
+    // обнулить урон может только неуязвимость (пассивки)
+    dmg = Math.max(COMBAT.minDamage, dmg)
+    if (hooksDef.some(h => h.damageImmune?.(ctxDef, info, dmg))) dmg = 0
 
     // Применение
     let miracle = false

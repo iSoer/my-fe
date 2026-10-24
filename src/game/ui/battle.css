@@ -264,6 +264,16 @@
   text-transform: uppercase;
   margin-right: 10px;
 }
+/* Последние ходы перед лимитом — счётчик горит */
+.bf-phase-turn.late {
+  color: var(--bf-gold);
+  animation: bf-turn-late 1.2s ease-in-out infinite;
+}
+@keyframes bf-turn-late {
+  50% {
+    opacity: 0.45;
+  }
+}
 .bf-phase-name {
   position: relative;
   isolation: isolate;
@@ -332,14 +342,6 @@
 .bf-info > * {
   flex: none;
 }
-/* Ряд кнопок панели («Предметы») прилипает к её низу и всегда виден */
-.bf-info > .bf-actions {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  margin-top: auto;
-  padding: 4px 0 2px;
-}
 /* Низкая панель (маленький телефон): прогноз плотнее — HP и урон в одну строку, кнопки ниже */
 .bf-info.compact .bf-forecast {
   padding: 6px 10px;
@@ -386,21 +388,6 @@
 .bf-info.compact .bf-fc-dmg {
   padding: 1px 6px;
   font-size: 13px;
-}
-.bf-info.compact .bf-pill-btn {
-  min-height: 36px;
-}
-.bf-info.compact > .bf-actions {
-  padding-top: 2px;
-}
-/* Рюкзак — внутри панели, а не всплывающим окном поверх поля */
-.bf-info .bf-items {
-  position: static;
-  transform: none;
-  width: 100%;
-  max-height: none;
-  bottom: auto;
-  left: auto;
 }
 
 /* ---------- Панель кнопок под полем ---------- */
@@ -486,44 +473,6 @@
 .bf-bar-btn:disabled {
   opacity: 0.45;
   cursor: default;
-}
-.bf-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-.bf-pill-btn {
-  pointer-events: auto;
-  position: relative;
-  isolation: isolate;
-  min-height: 46px;
-  padding: 0 22px;
-  border: none;
-  background: transparent;
-  color: var(--bf-text);
-  font-family: var(--bf-font-display);
-  font-style: italic;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 15px;
-  animation: bf-strip-in 0.2s var(--bf-ease) both;
-  transition: transform 0.1s ease;
-  --slant-bg: var(--bf-paper);
-  --slant-shadow: 4px 4px 0 var(--bf-ink);
-}
-.bf-pill-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--slant-bg);
-  transform: skewX(var(--bf-skew));
-  box-shadow: var(--slant-shadow);
-}
-.bf-pill-btn:active {
-  transform: translate(2px, 2px);
-  --slant-shadow: 2px 2px 0 var(--bf-ink);
 }
 
 /* ---------- Карточка бойца (чернильная панель с красным клином) ---------- */
@@ -1119,16 +1068,6 @@
     opacity: 1;
   }
 }
-@keyframes bf-strip-in {
-  from {
-    transform: translateX(26px) rotate(-3deg);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0) rotate(0deg);
-    opacity: 1;
-  }
-}
 @keyframes bf-fade {
   from {
     opacity: 0;
@@ -1168,9 +1107,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .bf-card,
+  .bf-phase-turn.late,
   .bf-phase,
   .bf-phase-name,
-  .bf-pill-btn,
   .bf-bar-end::before,
   .bf-tag.death,
   .bf-unit-hp.crit {

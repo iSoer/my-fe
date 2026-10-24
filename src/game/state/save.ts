@@ -2,7 +2,6 @@ import { atom, computed } from "nanostores"
 import type {
   Army,
   Facing,
-  Inventory,
   MapDef,
   Pos,
   Rarity,
@@ -41,10 +40,9 @@ import {
   itemCount,
   itemPrice,
   removeItem,
-  totalCount,
   unitGear
 } from "@game/core/items"
-import { isConsumableId, isTalismanId } from "@game/content/items"
+import { isTalismanId } from "@game/content/items"
 import { ENEMY_TEAMS, ITEMS, REWARDS } from "@game/content/balance"
 import { HERO_RETURN } from "@game/content/village"
 import { generateMap } from "@game/core/map/generate"
@@ -447,22 +445,6 @@ export function equipTalismanAction(unitId: string, talismanId: string | undefin
   return { ok: true }
 }
 
-/** Рюкзак вылазки: расходники из инвентаря, всего не больше `ITEMS.packSize`. Списываются при старте боя. */
-export function setPackAction(pack: Inventory): { ok: boolean, error?: string } {
-  const s = $save.get()
-  if (!s.pendingBattle) return { ok: false, error: tr("Scout a battle first", "Сначала разведайте бой") }
-  const clean: Inventory = {}
-  for (const [id, n] of Object.entries(pack)) {
-    if (n <= 0) continue
-    if (!isConsumableId(id)) return { ok: false, error: tr("Only consumables go in the pack", "В рюкзак — только расходники") }
-    if (itemCount(s.inventory, id) < n) return { ok: false, error: tr("Not that many in inventory", "Столько нет в инвентаре") }
-    clean[id] = n
-  }
-  if (totalCount(clean) > ITEMS.packSize) return { ok: false, error: tr(`The pack holds ${ITEMS.packSize}`, `В рюкзак влезает ${ITEMS.packSize}`) }
-  updateSave(st => (st.pendingBattle ? { ...st, pendingBattle: { ...st.pendingBattle, pack: clean } } : st))
-  return { ok: true }
-}
-
 /* ---------- Деревня ---------- */
 
 /** Запомнить, где стоит герой (сцена зовёт это при остановке и уходе, а не каждый кадр). */
@@ -577,7 +559,7 @@ export function enemyTeams(difficulty: Difficulty): EnemyTeamOffer[] {
 
 /**
  * Разведка: выбранная вражеская команда на сложности становится боем; отряд выбирается на следующем шаге.
- * Карта та же, что в предложении команды (тот же seed и случайный биом), рюкзак сохраняется.
+ * Карта та же, что в предложении команды (тот же seed и случайный биом).
  */
 export function scoutBattle(difficulty: Difficulty, team = 0): { ok: boolean, error?: string } {
   const s = $save.get()
@@ -587,8 +569,7 @@ export function scoutBattle(difficulty: Difficulty, team = 0): { ok: boolean, er
   if (pb && pb.difficulty === difficulty && pb.team === team) return { ok: true }
   const offer = enemyTeams(difficulty)[team]
   if (!offer) return { ok: false, error: tr("No such enemy army", "Нет такой армии врагов") }
-  const pack = pb?.pack
-  updateSave(st => ({ ...st, pendingBattle: { seed: offer.seed, difficulty, biomeId: offer.map.biomeId, team, map: offer.map, ...(pack ? { pack } : {}) } }))
+  updateSave(st => ({ ...st, pendingBattle: { seed: offer.seed, difficulty, biomeId: offer.map.biomeId, team, map: offer.map } }))
   return { ok: true }
 }
 
@@ -602,25 +583,15 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
   const squad = squadIds.map(id => s.army?.units.find(u => u.id === id)).filter((u): u is UnitInstance => !!u)
   if (squad.length === 0) return { ok: false, error: tr("Squad is empty", "Пустой отряд") }
   if (squad.length > SQUAD_SIZE) return { ok: false, error: tr(`Squad holds at most ${SQUAD_SIZE}`, `В отряде не больше ${SQUAD_SIZE}`) }
-  // Рюкзак списывается из инвентаря (то, чего уже нет, не берётся); остаток вернётся после боя
-  const pack: Inventory = {}
-  for (const [id, n] of Object.entries(pb.pack ?? {})) {
-    const take = Math.min(n, itemCount(s.inventory, id))
-    if (take > 0) pack[id] = take
-  }
   const { state, events } = createBattle({
     map: pb.map,
     squad,
     seed: createRng(pb.seed).fork("battle").seed,
-    now: Date.now(),
-    pack
+    now: Date.now()
   })
   updateSave((st) => {
-    let inventory = st.inventory
-    for (const [id, n] of Object.entries(pack)) inventory = removeItem(inventory, id, n)
     const next: SaveGame = {
       ...st,
-      inventory,
       battle: state,
       army: st.army ? { ...st.army, squadIds: squad.map(u => u.id) } : st.army
     }

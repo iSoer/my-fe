@@ -1,4 +1,5 @@
 import { lootShare } from "@game/core/progression"
+import { BATTLE } from "@game/content/balance"
 import type { BattleState } from "@game/core/types"
 import { livingUnits } from "@game/core/battle/query"
 import { biomeDef } from "@game/content/biomes"
@@ -16,9 +17,12 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
   return (
     <div className="bf-hud-row">
       <div key={`${battle.turn}-${battle.phase}`} className={`bf-phase ${isPlayer ? "player" : "enemy"}`}>
-        <span className="bf-phase-turn">
+        <span
+          className={`bf-phase-turn ${BATTLE.turnLimit - battle.turn < 3 ? "late" : ""}`}
+          title={tr(`The battle lasts at most ${BATTLE.turnLimit} turns, then your squad retreats`, `Бой длится не больше ${BATTLE.turnLimit} ходов, затем отряд отступает`)}
+        >
           {tr("Turn", "Ход")}
-          {battle.turn}
+          {`${battle.turn}/${BATTLE.turnLimit}`}
         </span>
         <span className="bf-phase-name">{isPlayer ? tr("YOUR PHASE", "ВАША ФАЗА") : tr("ENEMY PHASE", "ФАЗА ВРАГА")}</span>
       </div>

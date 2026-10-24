@@ -1,4 +1,4 @@
-// Headless smoke test игрового цикла: главный экран → новая игра → деревня → Лавка → вылазка (2 шага) → бой с предметом →
+// Headless smoke test игрового цикла: главный экран → новая игра → деревня → Лавка → вылазка (2 шага) → бой →
 // сдача → итоги → деревня → «Продолжить» после перезагрузки. Нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`.
 //   node tools/smoke.mjs [url] [путь к Chromium]
 import { chromium } from 'playwright-core';
@@ -43,18 +43,17 @@ await step('новая игра → деревня', async () => {
   await page.locator('.vl-canvas canvas').waitFor({ timeout: 30000 });
   await page.waitForTimeout(1500);
 });
-await step('Лавка: покупка пластырей', async () => {
+await step('Лавка: покупка талисмана', async () => {
   await pf(() => {
     const s = window.__pf.save.get();
     window.__pf.save.set({ ...s, profile: { ...s.profile, treats: 500 } });
   });
   await pf(() => window.__pf.village.walkTo('store'));
   await page.getByRole('button', { name: /Shop: weapons/ }).click({ timeout: 15000 });
-  await page.getByRole('tab', { name: 'Healing' }).click();
-  await page.locator('.store-item button').first().click();
+  await page.getByRole('tab', { name: 'Talismans' }).click();
   await page.locator('.store-item button').first().click();
   const inv = await pf(() => window.__pf.save.get().inventory);
-  if (!inv.itm_bandage) throw new Error(`инвентарь: ${JSON.stringify(inv)}`);
+  if (!Object.keys(inv).some((id) => id.startsWith('tal_'))) throw new Error(`инвентарь: ${JSON.stringify(inv)}`);
   await page.getByRole('button', { name: 'Back' }).click();
   await page.locator('.vl-canvas canvas').waitFor();
 });
@@ -64,21 +63,9 @@ await step('ворота → вылазка 1/2 и 2/2', async () => {
   await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();
   await page.locator('.foe-card').first().waitFor();
-  await page.locator('.pack-row button', { hasText: '+' }).first().click();
   await page.getByRole('button', { name: /Start battle/ }).click();
   await page.locator('#battle-canvas canvas').waitFor({ timeout: 30000 });
   await page.waitForTimeout(2500);
-});
-await step('бой: предмет из рюкзака', async () => {
-  const pos = await pf(
-    () => Object.values(window.__pf.save.get().battle.units).find((u) => u.side === 'player').pos,
-  );
-  await pf((p) => window.__pf.battle.tapTile(p), pos);
-  await page.getByRole('button', { name: 'Items' }).click();
-  await page.locator('.bf-item-target').first().click();
-  await page.waitForTimeout(1200);
-  const pack = await pf(() => window.__pf.save.get().battle.pack);
-  if (Object.keys(pack).length !== 0) throw new Error(`рюкзак не потрачен: ${JSON.stringify(pack)}`);
 });
 await step('сдача → итоги → деревня', async () => {
   await pf(() => {

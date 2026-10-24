@@ -3,7 +3,6 @@ import { useStore } from "@nanostores/react"
 import type { ItemCategory, UnitInstance } from "@game/core/types"
 import { itemCount, itemInfo, storeOffers } from "@game/core/items"
 import { weaponDef } from "@game/content/weapons"
-import { ITEMS } from "@game/content/balance"
 import { SKILL_LABELS, rankAtLevel, rankIndex } from "@shared/character/skills"
 import { $save, buyItemAction, ensureRoster, markStoreSeen } from "@game/state/save"
 import { navigate } from "@game/state/router"
@@ -23,16 +22,6 @@ const TABS: { id: ItemCategory, readonly label: string, readonly hint: string }[
     id: "weapon",
     get label() { return tr("Weapons", "Оружие") },
     get hint() { return tr("Any fighter can use any weapon; skill rank decides how well.", "Любой боец сражается любым оружием; ранг навыка решает, насколько хорошо.") }
-  },
-  {
-    id: "consumable",
-    get label() { return tr("Healing", "Лечение") },
-    get hint() {
-      return tr(
-        `Packed for a sortie (up to ${ITEMS.packSize}); using one costs the fighter’s action.`,
-        `Берутся в рюкзак вылазки (до ${ITEMS.packSize}) и тратят действие бойца.`
-      )
-    }
   },
   {
     id: "talisman",

@@ -8,7 +8,8 @@ import type { BattleState, Difficulty } from "@game/core/types"
 import { livingUnits } from "@game/core/battle/query"
 import { makeBattle } from "./helpers"
 import { planAssist } from "@game/core/battle/assist"
-import { COMBAT } from "@game/content/balance"
+import { BATTLE, COMBAT } from "@game/content/balance"
+import { simulateCombat } from "@game/core/combat"
 import { healPower, weaponMt } from "@game/core/units"
 import { BIOMES } from "@game/content/biomes"
 
@@ -123,14 +124,32 @@ describe("редьюсер боя", () => {
     expect(heal(10, 1) - heal(10)).toBe(COMBAT.weaponTierMt)
   })
 
-  it("удар без урона даёт 1 опыта, удар с уроном — по разнице уровней", () => {
+  it("удар, не пробивающий защиту, всё равно ранит на 1 (минимальный урон) и даёт опыт за попадание", () => {
     const weak = makeBattle(
-      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, level: 10, baseStats: { ...flat, str: 0, mag: 0 } }],
-      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, level: 10, baseStats: { ...flat, def: 30, str: 0, mag: 0 } }]
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, level: 10, baseStats: { ...flat, str: 1, mag: 1 } }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, level: 10, baseStats: { ...flat, hp: 40, def: 60, str: 1, mag: 1 } }]
     )
     const id = weak.players[0]!.id
+    const out = simulateCombat(weak.state, id, weak.enemies[0]!.id, { x: 2, y: 4 })
+    expect(out.strikes[0]!.damage).toBe(COMBAT.minDamage)
     const r = applyAction(weak.state, { type: "attack", unitId: id, to: { x: 2, y: 4 }, targetId: weak.enemies[0]!.id })
-    expect(r.events.find(e => e.type === "xp" && e.unitId === id)).toMatchObject({ amount: 1 })
+    expect(r.events.find(e => e.type === "xp" && e.unitId === id)).toMatchObject({ amount: xpForCombat(10, 10, "hit") })
+  })
+
+  it("по лимиту ходов отряд отступает: живые бойцы целы, исход — отступление", () => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 7 }, baseStats: flat }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 0 }, baseStats: flat, stance: "hold" }]
+    )
+    let s = b.state
+    s.turn = BATTLE.turnLimit
+    s = applyAction(s, { type: "endPhase" }).state // фаза врага последнего хода
+    expect(s.result).toBeUndefined()
+    const end = applyAction(s, { type: "endPhase" })
+    expect(end.state.result).toBe("retreat")
+    expect(end.state.timeUp).toBe(true)
+    expect(end.events.some(e => e.type === "battleEnded" && e.result === "retreat")).toBe(true)
+    expect(end.state.units[b.players[0]!.id]!.alive).toBe(true)
   })
 
   it("Поменяться меняет позиции", () => {
@@ -324,11 +343,9 @@ describe("опыт как в Fire Emblem", () => {
     expect(xpForCombat(40, 5, "kill")).toBe(1)
     for (let gap = 0; gap < 40; gap++) expect(xpForCombat(10 + gap, 10, "kill")).toBeGreaterThanOrEqual(1)
   })
-  it("лечение: больше вылечил — больше опыта; предметом — вдвое меньше", () => {
+  it("лечение: больше вылечил — больше опыта", () => {
     expect(xpForHeal(10)).toBe(15)
     expect(xpForHeal(20)).toBeGreaterThan(xpForHeal(10))
     expect(xpForHeal(200)).toBe(25)
-    expect(xpForHeal(10, true)).toBe(8)
-    expect(xpForHeal(1, true)).toBeGreaterThanOrEqual(3)
   })
 })

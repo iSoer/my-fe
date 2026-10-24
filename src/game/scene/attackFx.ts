@@ -17,14 +17,43 @@ import {
   shakeMul,
   shockRing,
   slashTrail,
+  speedLines,
   thrustLine
 } from "./motionFx"
+import { finisherBurst, fireball, holyPillar, lightningStrike, specialAura } from "./epicFx"
 import { tr } from "@game/i18n"
 
 /** Цвет тёмной (Black Magic) и светлой (White Magic) магии. */
 const DARK_MAGIC = 0xb15cff
 const DARK_CORE = 0x2a0a3d
 const LIGHT_MAGIC = 0xffe8a3
+const FIRE_MAGIC = 0xff7a1a
+const THUNDER_MAGIC = 0x4cc9f0
+
+/** Стихия тёмной магии бойца: тьма, огонь или молния — закреплена за ним (по «почерку»), чтобы маги различались. */
+export type MagicElement = "dark" | "fire" | "thunder"
+export function magicElement(flavor: number | undefined): MagicElement {
+  return (["dark", "fire", "thunder"] as const)[Math.abs(Math.trunc(flavor ?? 0)) % 3] as MagicElement
+}
+
+/** Случайный приём из `n` для разнообразия ударов (только презентация). */
+function roll(n: number): number {
+  return Math.floor(Math.random() * n)
+}
+
+/** Цвет ауры и финального взрыва спецприёма: по виду оружия и стихии. */
+function specialColor(ctx: AttackFxCtx): number {
+  switch (ctx.kind) {
+    case "blackMagic": {
+      const el = magicElement(ctx.flavor)
+      return el === "fire" ? FIRE_MAGIC : el === "thunder" ? THUNDER_MAGIC : DARK_MAGIC
+    }
+    case "whiteMagic":
+      return LIGHT_MAGIC
+    default:
+      return 0xffd166
+  }
+}
 
 /**
  * Персональные анимации атак по виду оружия: замах/бросок атакующего, фирменный эффект на защищающемся,
@@ -64,6 +93,8 @@ export interface AttackFxCtx {
   groundY?: number
   /** Сцена в режиме пропуска — декорации можно сократить. */
   skipped?: boolean
+  /** «Почерк» атакующего (его зерно): стихия тёмной магии закреплена за бойцом. */
+  flavor?: number
 }
 
 export interface AttackFxResult {
@@ -961,6 +992,9 @@ function choreo(ctx: AttackFxCtx, body: (hit: () => void) => Promise<void>): Mot
   const impact = new Promise<void>(r => (resolveImpact = r))
   const settle = (async () => {
     try {
+      // Спецприём: аура под ногами и вспышка перед ударом
+      if (ctx.special && !ctx.skipped && ctx.scene.tweens.timeScale < 10)
+        await specialAura(ctx.scene, home.x, ctx.atkPos.y + ctx.size * 0.45, ctx.size, specialColor(ctx), ctx.speed)
       await body(resolveImpact)
     }
     finally {
@@ -1005,8 +1039,52 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
   const by = attacker.scaleY
   let motion: Motion
 
+  // Разнообразие: у каждого оружия несколько приёмов, выбор — на каждый удар (при пропуске — базовый)
+  const move = deco ? roll(3) : 0
+
   switch (kind) {
     case "sword": {
+      if (move === 1) {
+        // Иай: присед → рывок насквозь за спину цели → пауза → разрез крест-накрест догоняет
+        motion = choreo(ctx, async (hit) => {
+          await tweenP(scene, { targets: attacker, x: home.x - dir * size * 0.04, scaleY: by * 0.94, angle: -6 * dir, duration: 120 / speed, ease: "Quad.easeOut" })
+          if (m.glint !== null) glint(scene, attacker.x + dir * size * 0.2, atkPos.y - size * 0.1, size, m.glint, speed, m.power)
+          speedLines(scene, (atkPos.x + defPos.x) / 2, atkPos.y, Math.abs(defPos.x - atkPos.x) + size, size * 0.7, dir, speed, 14, 26)
+          afterImages(scene, attacker, 4, 18, m.trail, speed)
+          await tweenP(scene, { targets: attacker, x: defPos.x + dir * size * 0.6, scaleY: by, angle: 0, duration: 90 / speed, ease: "Expo.easeIn" })
+          await wait(scene, 170 / speed)
+          slashTrail(scene, defPos.x, defPos.y, size * 1.05, dir, m.trail, speed, true)
+          slashTrail(scene, defPos.x, defPos.y, size * 0.95, dir, m.trail, speed, false, true)
+          if (ctx.damage > 0) slashMarks(scene, defPos.x, defPos.y, size, dir, speed, 1.2, bloodTints(ctx))
+          weaponHit(ctx, defPos.x, defPos.y, 12)
+          squash(scene, defender, 0.82, 200 / speed)
+          hit()
+          await wait(scene, 140 / speed)
+          await recover(ctx, 260, bx, by)
+        })
+        break
+      }
+      if (move === 2) {
+        // Вихрь клинка: рывок и три быстрых взмаха с разных сторон, порезы — на последнем
+        motion = choreo(ctx, async (hit) => {
+          afterImages(scene, attacker, 3, 22, m.trail, speed)
+          await tweenP(scene, { targets: attacker, x: home.x + dir * reach(ctx, 0.6), angle: 8 * dir, duration: 110 / speed, ease: "Cubic.easeIn" })
+          for (let i = 0; i < 3; i++) {
+            await tweenP(scene, { targets: attacker, angle: (i % 2 ? -14 : 16) * dir, duration: 55 / speed, ease: "Quad.easeIn" })
+            const dy = (i - 1) * size * 0.12
+            slashTrail(scene, defPos.x + dir * size * 0.04 * i, defPos.y + dy, size * 0.72, dir, m.trail, speed, i === 2, i % 2 === 1)
+            weaponHit(ctx, defPos.x - dir * size * 0.08, defPos.y + dy, 4)
+            jitter(scene, defender, 2.5, 80 / speed)
+            if (i === 2) {
+              if (ctx.damage > 0) slashMarks(scene, defPos.x, defPos.y, size, dir, speed, 1, bloodTints(ctx))
+              hit()
+            }
+          }
+          await wait(scene, 60 / speed)
+          await recover(ctx, 200, bx, by)
+        })
+        break
+      }
       // Замах с бликом клинка → рывок → рубящая дуга, порезы, искры. Brave — второй взмах крест-накрест.
       motion = choreo(ctx, async (hit) => {
         await tweenP(scene, {
@@ -1048,6 +1126,30 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
       break
     }
     case "spear": {
+      if (move === 1) {
+        // Град уколов: выпад и три стремительных укола на разной высоте, последний — насквозь
+        motion = choreo(ctx, async (hit) => {
+          afterImages(scene, attacker, 3, 22, m.trail, speed)
+          await tweenP(scene, { targets: attacker, x: home.x + dir * reach(ctx, 0.7), angle: 4 * dir, duration: 100 / speed, ease: "Expo.easeIn" })
+          const base = attacker.x
+          for (let i = 0; i < 3; i++) {
+            const dy = [-0.12, 0.1, 0][i]! * size
+            await tweenP(scene, { targets: attacker, x: base + dir * size * 0.08, duration: 40 / speed, ease: "Quad.easeIn" })
+            thrustLine(scene, { x: attacker.x + dir * size * 0.1, y: defPos.y + dy }, { x: defPos.x + dir * size * (i === 2 ? 0.6 : 0.3), y: defPos.y + dy }, size * (i === 2 ? 1.1 : 0.8), m.trail, speed)
+            weaponHit(ctx, defPos.x - dir * size * 0.12, defPos.y + dy, 4)
+            jitter(scene, defender, 2.5, 70 / speed)
+            if (i === 2) {
+              if (ctx.damage > 0) pierceExit(ctx, defPos.x + dir * size * 0.22, defPos.y + dy, 1.2)
+              squash(scene, defender, 0.8, 200 / speed)
+              hit()
+            }
+            await tweenP(scene, { targets: attacker, x: base, duration: 40 / speed, ease: "Quad.easeOut" })
+          }
+          await wait(scene, 90 / speed)
+          await recover(ctx, 200, bx, by)
+        })
+        break
+      }
       // Отвод назад → рывок-выпад → прямой след укола насквозь, брызги за спиной цели.
       motion = choreo(ctx, async (hit) => {
         await tweenP(scene, {
@@ -1098,6 +1200,26 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
       break
     }
     case "axe": {
+      if (move === 1) {
+        // Смерч: боец раскручивается, врываясь в цель, — два кольцевых взмаха, ударная волна по земле, отброс
+        motion = choreo(ctx, async (hit) => {
+          afterImages(scene, attacker, 4, 30, m.trail, speed)
+          await tweenP(scene, { targets: attacker, x: home.x + dir * reach(ctx, 0.5), angle: 360 * dir, duration: 280 / speed, ease: "Quad.easeIn" })
+          attacker.setAngle(0)
+          swingArc(scene, attacker.x, atkPos.y, size * 0.7, dir, speed, m.trail)
+          swingArc(scene, attacker.x, atkPos.y + size * 0.1, size * 0.6, -dir, speed, m.trail)
+          slashTrail(scene, defPos.x, defPos.y, size * 0.9, dir, m.trail, speed, true)
+          shockRing(scene, attacker.x, groundY, size * 1.2, speed, m.sparks[0] ?? 0xffd166)
+          debrisBurst(scene, defPos.x, groundY, size, 10, speed)
+          weaponHit(ctx, defPos.x, defPos.y, 10)
+          knockback(scene, defender, dir * size * 0.3, 280 / speed)
+          shakeCam(scene, 180 / speed, 9)
+          hit()
+          await wait(scene, 110 / speed)
+          await recover(ctx, 240, bx, by)
+        })
+        break
+      }
       // Подъём над головой → пауза-«вес» с бликом → рубящий удар вниз, трещина в земле, обломки, тряска.
       motion = choreo(ctx, async (hit) => {
         await tweenP(scene, {
@@ -1150,9 +1272,55 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
       break
     }
     case "bow": {
+      const hand = { x: atkPos.x + dir * size * 0.22, y: atkPos.y - size * 0.02 }
+      if (move === 1) {
+        // Заряженный выстрел: долгое натяжение, стрела горит светом и прошивает цель насквозь
+        motion = choreo(ctx, async (hit) => {
+          drawCharge(scene, hand.x, hand.y, size, 380 / speed, 0xfff3b0)
+          glow(scene, hand.x, hand.y, size * 0.05, size * 0.6, 0xffe8a3, 420 / speed, 0.9)
+          await tweenP(scene, { targets: attacker, x: home.x - dir * size * 0.07, scaleX: bx * 0.9, angle: -5 * dir, duration: 380 / speed, ease: "Sine.easeOut" })
+          scene.tweens.add({ targets: attacker, x: home.x - dir * size * 0.14, scaleX: bx * 1.05, duration: 80 / speed, ease: "Back.easeOut" })
+          popRing(scene, hand.x, hand.y, size * 0.9, speed, 0xffe8a3)
+          thrustLine(scene, hand, { x: defPos.x + dir * size * 0.8, y: defPos.y }, size * 1.3, 0xfff3b0, speed)
+          await arrowShot(scene, hand, { x: defPos.x - dir * size * 0.05, y: defPos.y }, size * 0.8, speed, { tip: 0xffffff, trail: 0xfff3b0 })
+          if (ctx.damage > 0) pierceExit(ctx, defPos.x + dir * size * 0.2, defPos.y, 1.3)
+          shockRing(scene, defPos.x, defPos.y, size * 0.9, speed, 0xffe8a3)
+          squash(scene, defender, 0.82, 200 / speed)
+          hit()
+          await wait(scene, 80 / speed)
+          await recover(ctx, 200, bx, by)
+        })
+        break
+      }
+      if (move === 2) {
+        // Ливень стрел: выстрел в небо — и град стрел обрушивается на цель
+        motion = choreo(ctx, async (hit) => {
+          await tweenP(scene, { targets: attacker, angle: -28 * dir, scaleX: bx * 0.94, duration: 200 / speed, ease: "Sine.easeOut" })
+          popRing(scene, hand.x, hand.y - size * 0.1, size * 0.6, speed, 0xffffff)
+          thrustLine(scene, hand, { x: hand.x + dir * size * 0.3, y: hand.y - size * 2 }, size * 0.6, m.trail, speed)
+          await wait(scene, 160 / speed)
+          const n = 5
+          const shots: Promise<void>[] = []
+          for (let k = 0; k < n; k++) {
+            const to = { x: defPos.x + (k - 2) * size * 0.13, y: defPos.y + (Math.random() - 0.3) * size * 0.25 }
+            const from = { x: to.x - dir * size * 0.5, y: defPos.y - size * 2.4 }
+            shots.push(wait(scene, (k * 55) / speed).then(() =>
+              arrowShot(scene, from, to, size * 0.7, speed * 1.3, { tip: m.edge, trail: m.trail }).then(() => {
+                stuckArrow(ctx, to.x, to.y, 0.7)
+                jitter(scene, defender, 2, 70 / speed)
+              })
+            ))
+          }
+          await shots[2]
+          if (ctx.damage > 0) pierceExit(ctx, defPos.x, defPos.y, 0.8)
+          hit()
+          await Promise.all(shots)
+          await recover(ctx, 200, bx, by)
+        })
+        break
+      }
       // Натяжение (штрихи сходятся к руке) → выстрел с отдачей → стрела по дуге → втыкается и дрожит.
       motion = choreo(ctx, async (hit) => {
-        const hand = { x: atkPos.x + dir * size * 0.22, y: atkPos.y - size * 0.02 }
         if (deco) drawCharge(scene, hand.x, hand.y, size, 220 / speed, m.trail)
         await tweenP(scene, {
           targets: attacker,
@@ -1197,6 +1365,42 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
       break
     }
     case "blackMagic": {
+      const element = magicElement(ctx.flavor)
+      if (deco && element === "fire") {
+        // Огонь: круг рун цвета пламени, заклинатель вскидывает лапы — огненный шар по дуге и взрыв
+        motion = choreo(ctx, async (hit) => {
+          const hand = { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.1 }
+          runeCircle(scene, home.x, home.y, size * m.power, speed, FIRE_MAGIC, 720 / speed)
+          glow(scene, hand.x, hand.y, size * 0.05, size * 0.5, FIRE_MAGIC, 300 / speed)
+          await tweenP(scene, { targets: attacker, y: home.y - size * 0.05, scaleX: bx * 1.05, scaleY: by * 1.05, angle: -6 * dir, duration: 220 / speed, ease: "Sine.easeOut" })
+          scene.tweens.add({ targets: attacker, x: home.x + dir * size * 0.06, angle: 6 * dir, duration: 90 / speed, ease: "Back.easeOut" })
+          await fireball(scene, hand, defPos, size * m.power, speed)
+          tintFor(scene, defender, 0xff9f1c, 30 / speed, 320 / speed)
+          jitter(scene, defender, 4, 240 / speed)
+          hit()
+          await wait(scene, 100 / speed)
+          await recover(ctx, 220, bx, by)
+        })
+        break
+      }
+      if (deco && element === "thunder") {
+        // Молния: заклинатель поднимает лапу к небу, искры в ладони — разряд бьёт в цель с неба
+        motion = choreo(ctx, async (hit) => {
+          const hand = { x: atkPos.x + dir * size * 0.15, y: atkPos.y - size * 0.35 }
+          runeCircle(scene, home.x, home.y, size * m.power, speed, THUNDER_MAGIC, 700 / speed)
+          await tweenP(scene, { targets: attacker, y: home.y - size * 0.06, angle: -10 * dir, scaleY: by * 1.06, duration: 220 / speed, ease: "Sine.easeOut" })
+          glow(scene, hand.x, hand.y, size * 0.05, size * 0.45, THUNDER_MAGIC, 260 / speed)
+          popRing(scene, hand.x, hand.y, size * 0.5, speed, 0x9be7ff)
+          await wait(scene, 120 / speed)
+          await lightningStrike(scene, defPos.x, defPos.y, size * m.power, speed)
+          tintFor(scene, defender, 0x9be7ff, 20 / speed, 260 / speed)
+          jitter(scene, defender, 5, 260 / speed)
+          hit()
+          await wait(scene, 120 / speed)
+          await recover(ctx, 220, bx, by)
+        })
+        break
+      }
       // Круг рун под кастером, клочья тьмы → тёмный снаряд → столб тьмы из-под цели и взрыв.
       motion = choreo(ctx, async (hit) => {
         const hand = { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.06 }
@@ -1232,6 +1436,23 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
       break
     }
     case "whiteMagic": {
+      if (move === 1) {
+        // Святой свет: посох к небу — на цель обрушивается столб света с нимбом и перьями
+        motion = choreo(ctx, async (hit) => {
+          const tip = { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.4 }
+          glow(scene, tip.x, tip.y, size * 0.05, size * 0.5 * m.power, LIGHT_MAGIC, 320 / speed, 0.95)
+          lightStars(scene, tip.x, tip.y, size * 0.5, speed, 5)
+          await tweenP(scene, { targets: attacker, y: home.y - size * 0.05, angle: -12 * dir, duration: 220 / speed, ease: "Sine.easeOut" })
+          await holyPillar(scene, defPos.x, groundY, size * m.power, speed)
+          lightStars(scene, defPos.x, defPos.y, size * m.power, speed, 8)
+          tintFor(scene, defender, 0xfff3b0, 20 / speed, 260 / speed)
+          squash(scene, defender, 0.9, 200 / speed)
+          hit()
+          await wait(scene, 160 / speed)
+          await recover(ctx, 200, bx, by)
+        })
+        break
+      }
       // Посох вверх, свет собирается в навершии → короткий тычок светом, звёздочки на цели.
       motion = choreo(ctx, async (hit) => {
         const tip = { x: atkPos.x + dir * size * 0.24, y: atkPos.y - size * 0.3 }
@@ -1271,6 +1492,23 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
     }
     case "gauntlet":
     default: {
+      if (move === 1) {
+        // Апперкот: рывок, присед — и удар снизу, цель подлетает; звезда удара и вертикальная волна
+        motion = choreo(ctx, async (hit) => {
+          afterImages(scene, attacker, 3, 22, m.trail, speed)
+          await tweenP(scene, { targets: attacker, x: home.x + dir * reach(ctx, 0.8), scaleY: by * 0.88, angle: 4 * dir, duration: 110 / speed, ease: "Quad.easeIn" })
+          await tweenP(scene, { targets: attacker, y: home.y - size * 0.12, scaleY: by * 1.1, angle: -14 * dir, duration: 70 / speed, ease: "Back.easeOut" })
+          impactStar(scene, defPos.x - dir * size * 0.08, defPos.y + size * 0.05, size * 1.2, 0xffd166, speed)
+          shockRing(scene, defPos.x, defPos.y, size * 0.9, speed, m.sparks[0] ?? 0xffd166)
+          const dy = defender.y
+          scene.tweens.add({ targets: defender, y: dy - size * 0.22, duration: 140 / speed, ease: "Quad.easeOut", yoyo: true, onComplete: () => defender.setY(dy) })
+          floatText(scene, defPos.x, defPos.y - size * 0.55, tr("POW", "БАЦ"), "#ffd166", speed, { size: size * 0.16, rise: size * 0.3, stroke: 5, shake: true })
+          hit()
+          await wait(scene, 200 / speed)
+          await recover(ctx, 220, bx, by)
+        })
+        break
+      }
       // Рывок вплотную → серия толчков (3, Brave — 4) с ударными кольцами → последний — с ударной волной.
       motion = choreo(ctx, async (hit) => {
         if (deco) afterImages(scene, attacker, 2, 25, m.trail, speed)
@@ -1317,6 +1555,8 @@ export function playAttackFx(ctx: AttackFxCtx): AttackFxResult {
   }
   const impactAt = motion.impact.then(() => {
     if (deco) impactAccents(ctx, false)
+    // Спецприём: финальный взрыв на цели
+    if (deco && ctx.special) finisherBurst(scene, defPos.x, defPos.y, size, specialColor(ctx), speed)
   })
   return { impactAt, done: motion.settle }
 }
@@ -1335,9 +1575,31 @@ export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
   const m = materialOf(ctx)
   const brave = ctx.variant === "brave"
   const groundY = ctx.groundY ?? defPos.y + size * 0.4
+  const move = roll(3)
   let impactAt: Promise<void>
   switch (kind) {
     case "sword":
+      if (move === 1) {
+        // Крест-накрест: два разреза, второй догоняет
+        slashTrail(scene, defPos.x, defPos.y, size * 1.05, dir, m.trail, speed, true)
+        later(scene, 70 / speed, () => slashTrail(scene, defPos.x, defPos.y, size, dir, m.trail, speed, false, true))
+        if (ctx.damage > 0) slashMarks(scene, defPos.x, defPos.y, size, dir, speed, s, bloodTints(ctx))
+        weaponHit(ctx, defPos.x, defPos.y, 8)
+        impactAt = wait(scene, 70 / speed)
+        break
+      }
+      if (move === 2) {
+        // Вихрь клинка: три быстрых разреза на разной высоте
+        for (let i = 0; i < 3; i++) {
+          later(scene, (i * 60) / speed, () => {
+            slashTrail(scene, defPos.x, defPos.y + (i - 1) * size * 0.12, size * 0.75, dir, m.trail, speed, i === 2, i % 2 === 1)
+            jitter(scene, defender, 2, 70 / speed)
+          })
+        }
+        if (ctx.damage > 0) later(scene, 120 / speed, () => slashMarks(scene, defPos.x, defPos.y, size, dir, speed, s * 0.85, bloodTints(ctx)))
+        impactAt = wait(scene, 120 / speed)
+        break
+      }
       slashTrail(scene, defPos.x, defPos.y, size, dir, m.trail, speed, ctx.special)
       if (ctx.damage > 0) slashMarks(scene, defPos.x, defPos.y, size, dir, speed, s * 0.85, bloodTints(ctx))
       weaponHit(ctx, defPos.x - dir * size * 0.1, defPos.y, 6)
@@ -1345,6 +1607,20 @@ export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
       impactAt = Promise.resolve()
       break
     case "spear": {
+      if (move === 1) {
+        // Град уколов: три укола на разной высоте, последний — насквозь
+        for (let i = 0; i < 3; i++) {
+          const dy = [-0.12, 0.1, 0][i]! * size
+          later(scene, (i * 55) / speed, () => {
+            thrustLine(scene, { x: atkPos.x, y: atkPos.y + dy }, { x: defPos.x + dir * size * (i === 2 ? 0.45 : 0.25), y: defPos.y + dy }, size * 0.85, m.trail, speed)
+            jitter(scene, defender, 2, 60 / speed)
+          })
+        }
+        impactAt = wait(scene, 110 / speed).then(() => {
+          if (ctx.damage > 0) pierceExit(ctx, defPos.x + dir * size * 0.2, defPos.y, 0.8)
+        })
+        break
+      }
       const thrust = (dy: number): void => {
         thrustLine(scene, { x: atkPos.x, y: atkPos.y + dy }, { x: defPos.x + dir * size * 0.45, y: defPos.y + dy }, size, m.trail, speed)
         if (ctx.damage > 0) pierceExit(ctx, defPos.x + dir * size * 0.2, defPos.y + dy, 0.6)
@@ -1356,6 +1632,16 @@ export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
       break
     }
     case "axe":
+      if (move === 1) {
+        // Смерч: два кольцевых взмаха и ударная волна по земле
+        swingArc(scene, atkPos.x + dir * size * 0.2, atkPos.y, size * 0.6, dir, speed, m.trail)
+        swingArc(scene, atkPos.x + dir * size * 0.2, atkPos.y + size * 0.1, size * 0.5, -dir, speed, m.trail)
+        shockRing(scene, defPos.x, groundY, size * 1.1, speed, m.sparks[0] ?? 0xffd166)
+        debrisBurst(scene, defPos.x, groundY, size, 8, speed)
+        knockback(scene, defender, dir * size * 0.16, 220 / speed)
+        impactAt = Promise.resolve()
+        break
+      }
       slashTrail(scene, defPos.x, defPos.y, size, dir, m.trail, speed, true)
       swingArc(scene, atkPos.x + dir * size * 0.2, atkPos.y, size * 0.5, dir, speed, m.trail)
       impactStar(scene, defPos.x, defPos.y, size, 0xffd166, speed)
@@ -1364,7 +1650,18 @@ export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
       if (brave) later(scene, 90 / speed, () => impactStar(scene, defPos.x, defPos.y + size * 0.1, size * 0.8, 0xffd166, speed))
       impactAt = Promise.resolve()
       break
-    case "blackMagic":
+    case "blackMagic": {
+      const element = magicElement(ctx.flavor)
+      if (element === "fire") {
+        runeCircle(scene, atkPos.x, atkPos.y + size * 0.38, size * 0.8 * m.power, speed, FIRE_MAGIC, 520 / speed)
+        impactAt = fireball(scene, { x: atkPos.x + dir * size * 0.25, y: atkPos.y }, defPos, size * 0.75 * m.power, speed)
+        break
+      }
+      if (element === "thunder") {
+        runeCircle(scene, atkPos.x, atkPos.y + size * 0.38, size * 0.8 * m.power, speed, THUNDER_MAGIC, 520 / speed)
+        impactAt = wait(scene, 140 / speed).then(() => lightningStrike(scene, defPos.x, defPos.y, size * 0.8 * m.power, speed))
+        break
+      }
       runeCircle(scene, atkPos.x, atkPos.y + size * 0.38, size * 0.8 * m.power, speed, DARK_MAGIC, 520 / speed)
       impactAt = magicBolt(
         scene,
@@ -1379,6 +1676,7 @@ export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
         darkBlast(scene, defPos.x, defPos.y, size * 0.7, speed)
       })
       break
+    }
     case "bow": {
       const look = { tip: m.edge, trail: m.trail }
       const from = { x: atkPos.x + dir * size * 0.25, y: atkPos.y }
@@ -1387,11 +1685,29 @@ export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
           stuckArrow(ctx, defPos.x - dir * size * 0.05, defPos.y + dy, 0.8)
           impactStar(scene, defPos.x, defPos.y + dy, size * 0.8, 0xffd166, speed)
         })
+      if (move === 2) {
+        // Ливень стрел: стрелы падают на цель сверху одна за другой
+        const rain: Promise<void>[] = []
+        for (let k = 0; k < 4; k++) {
+          const to = { x: defPos.x + (k - 1.5) * size * 0.14, y: defPos.y + (Math.random() - 0.3) * size * 0.2 }
+          rain.push(wait(scene, (k * 50) / speed).then(() =>
+            arrowShot(scene, { x: to.x - dir * size * 0.4, y: defPos.y - size * 2 }, to, size * 0.8, speed * 1.3, look).then(() =>
+              stuckArrow(ctx, to.x, to.y, 0.6)
+            )
+          ))
+        }
+        impactAt = rain[1] ?? Promise.resolve()
+        break
+      }
       impactAt = shot(0)
       if (brave) later(scene, 90 / speed, () => void shot(size * 0.12))
       break
     }
     case "whiteMagic":
+      if (move === 1) {
+        impactAt = holyPillar(scene, defPos.x, groundY, size * 0.85, speed).then(() => lightStars(scene, defPos.x, defPos.y, size * 0.7, speed, 6))
+        break
+      }
       impactAt = lightBeam(scene, { x: atkPos.x + dir * size * 0.2, y: atkPos.y - size * 0.2 }, defPos, size * 0.8, speed).then(() =>
         lightStars(scene, defPos.x, defPos.y, size * 0.7, speed, 5)
       )
@@ -1410,7 +1726,11 @@ export function playQuickAttackFx(ctx: AttackFxCtx): AttackFxResult {
       break
     }
   }
-  impactAt = impactAt.then(() => impactAccents(ctx, true))
+  impactAt = impactAt.then(() => {
+    impactAccents(ctx, true)
+    // Спецприём: финальный взрыв на цели
+    if (ctx.special) finisherBurst(scene, defPos.x, defPos.y, size * 0.85, specialColor(ctx), speed)
+  })
   const done = impactAt.then(() => {
     zoomPunch(scene, 1.04, 140 / speed)
   })

@@ -2,7 +2,7 @@ import { createRng } from "../rng"
 import type { Army, Inventory, ItemCategory, StoreStock, UnitInstance } from "../types"
 import { rosterLevel } from "../progression"
 import { ITEMS } from "@game/content/balance"
-import { CONSUMABLES, TALISMANS, consumableDef, isConsumableId, isTalismanId, talismanDef } from "@game/content/items"
+import { TALISMANS, isTalismanId, talismanDef } from "@game/content/items"
 import { WEAPONS, gradeWeaponId, isWeaponId, weaponDef } from "@game/content/weapons"
 import { WEAPON_SKILLS, type WeaponGrade } from "@shared/character/skills"
 
@@ -10,13 +10,12 @@ import { WEAPON_SKILLS, type WeaponGrade } from "@shared/character/skills"
 
 export function itemCategory(id: string): ItemCategory {
   if (isWeaponId(id)) return "weapon"
-  if (isConsumableId(id)) return "consumable"
   if (isTalismanId(id)) return "talisman"
   throw new Error(`unknown item ${id}`)
 }
 
 export function isItemId(id: string): boolean {
-  return isWeaponId(id) || isConsumableId(id) || isTalismanId(id)
+  return isWeaponId(id) || isTalismanId(id)
 }
 
 export interface ItemInfo {
@@ -36,7 +35,7 @@ export function itemInfo(id: string): ItemInfo {
     const w = weaponDef(id)
     return { id, category, name: w.name, icon: WEAPON_ICON, desc: w.desc, price: w.price }
   }
-  const d = category === "consumable" ? consumableDef(id) : talismanDef(id)
+  const d = talismanDef(id)
   return { id, category, name: d.name, icon: d.icon, desc: d.desc, price: d.price }
 }
 
@@ -108,23 +107,22 @@ export function generateStore(seed: number, army: Army | undefined, glory: numbe
   if (level >= ITEMS.silverFromLevel) weapons.push(...grade("silver", ITEMS.silverOffers))
   const variants = rng.shuffle(WEAPONS.filter(w => w.variant !== "basic").map(w => w.id))
   weapons.push(...variants.slice(0, ITEMS.variantOffers + extra))
-  const consumables = CONSUMABLES.filter(c => available(c, level, glory)).map(c => c.id)
   const talismans = rng
     .shuffle(TALISMANS.filter(t => available(t, level, glory)).map(t => t.id))
     .slice(0, ITEMS.talismanOffers + extra)
-  return { seed, weapons, consumables, talismans, fresh: true }
+  return { seed, weapons, talismans, fresh: true }
 }
 
 export function storeOffers(store: StoreStock, category: ItemCategory): string[] {
-  return category === "weapon" ? store.weapons : category === "consumable" ? store.consumables : store.talismans
+  return category === "weapon" ? store.weapons : store.talismans
 }
 
 export function inStore(store: StoreStock, id: string): boolean {
-  return [...store.weapons, ...store.consumables, ...store.talismans].includes(id)
+  return [...store.weapons, ...store.talismans].includes(id)
 }
 
 /** Пустая Лавка до первой генерации (новый сейв). */
-export const EMPTY_STORE: StoreStock = { seed: 0, weapons: [], consumables: [], talismans: [], fresh: false }
+export const EMPTY_STORE: StoreStock = { seed: 0, weapons: [], talismans: [], fresh: false }
 
 /* ---------- Враги ---------- */
 

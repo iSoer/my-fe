@@ -198,10 +198,8 @@ export const WEAPON_PRICES = {
   variant: { brave: 320, killer: 220, armorslayer: 200, cavslayer: 200 }
 } as const
 
-/** Лавка и рюкзак вылазки. */
+/** Лавка. */
 export const ITEMS = {
-  /** Сколько расходников всего можно взять в одну вылазку. */
-  packSize: 5,
   /** Больше этого количества одного предмета в инвентаре не купить. */
   stackCap: 99,
   /** Разновидностей оружия на витрине (Славы ≥ 150 — на одну больше). */
@@ -220,7 +218,7 @@ export const ITEMS = {
  * Схватка: нанёс урон — `combatBase` + `combatPerLevelDiff` × (уровень врага − свой), в пределах [combatMin, combatMax];
  * не нанёс (не дотянулся, ноль урона) — `noDamage`; добил — ещё `killBonus` + `killPerLevelDiff` × разница,
  * вожак — ещё `bossBonus`. Боец выше врага — всё это −`overlevelPenalty` за уровень, но не меньше `combatMin`.
- * Лечение: `heal` + `healPerHp` × вылеченное HP (до `healMax`), предметом — вдвое меньше (не меньше `itemMin`).
+ * Лечение: `heal` + `healPerHp` × вылеченное HP (до `healMax`).
  */
 export const XP = {
   /** 80 уровней модели персонажа: уровень вдвое дешевле, чем при прежних 40. */
@@ -241,7 +239,6 @@ export const XP = {
   heal: 10,
   healPerHp: 0.5,
   healMax: 25,
-  itemMin: 3,
   /** Танец (вернуть союзнику ход). */
   dance: 10,
   /** Прочие Поддержки: перемещения, удар по стене и т. п. */
@@ -364,7 +361,14 @@ export const HEALING = {
   magShare: 1
 }
 
+/** Бой длится не дольше `turnLimit` ходов: после фазы врага последнего хода отряд отступает (живые бойцы целы, часть добычи). */
+export const BATTLE = {
+  turnLimit: 20
+}
+
 export const COMBAT = {
+  /** Любой удар наносит хотя бы столько урона (если цель не неуязвима). */
+  minDamage: 1,
   triangle: 0.2,
   effective: 1.5,
   coverBonus: 0.3,

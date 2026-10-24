@@ -1,27 +1,9 @@
 import type { BattleState } from "@game/core/types"
 import { displayName } from "@game/core/units"
-import { packItems } from "@game/core/battle/items"
 import { terrainInfo } from "@game/content/terrain"
-import { chooseItems, type BattleUiState } from "@game/state/battleUi"
-import { haptic } from "@game/platform/haptics"
+import type { BattleUiState } from "@game/state/battleUi"
 import { UnitCard } from "./UnitCard"
 import { tr } from "@game/i18n"
-
-function Pill({ label, onClick }: { label: string, onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className="bf-pill-btn"
-      onClick={() => {
-        haptic("light")
-        onClick()
-      }}
-    >
-      {label}
-    </button>
-  )
-}
 
 function AssistSummary({ state, ui }: { state: BattleState, ui: BattleUiState }) {
   const plan = ui.assistPlan
@@ -115,11 +97,6 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
       return (
         <>
           {card}
-          {packItems(battle).length > 0 && (
-            <div className="bf-actions">
-              <Pill label={tr("Items", "Предметы")} onClick={chooseItems} />
-            </div>
-          )}
         </>
       )
     case "assistPreview":

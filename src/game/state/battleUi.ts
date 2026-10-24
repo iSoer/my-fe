@@ -38,7 +38,6 @@ export type UiMode
     | "forecast"
     | "assistPreview"
     | "wallPreview"
-    | "itemSelect"
     | "enemyInfo"
     | "tileInfo"
     | "busy"
@@ -555,29 +554,10 @@ export function cancel(): void {
     case "forecast":
     case "assistPreview":
     case "wallPreview":
-    case "itemSelect":
       return selectUnit(st, sel)
     default:
       return clearSelection()
   }
-}
-
-/** «Предметы»: открыть рюкзак для выбранного бойца (на клетке, где он стоит). */
-export function chooseItems(): void {
-  const st = state()
-  const ui = $battleUi.get()
-  if (!st || !ui.selectedId || ui.busy) return
-  patch({ ...NO_PREVIEW, mode: "itemSelect" })
-}
-
-/** Применить предмет рюкзака к цели (сам боец или сосед); тратит действие. */
-export async function applyItem(itemId: string, targetId: string): Promise<void> {
-  const st = state()
-  const ui = $battleUi.get()
-  if (!st || !ui.selectedId || ui.busy) return
-  const sel = st.units[ui.selectedId]
-  if (!sel) return
-  await commit({ type: "item", unitId: ui.selectedId, to: sel.pos, targetId, itemId })
 }
 
 export async function confirm(): Promise<void> {

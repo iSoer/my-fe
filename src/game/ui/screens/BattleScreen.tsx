@@ -7,7 +7,6 @@ import type { BattleGameHandle } from "@game/scene/index"
 import { Toast } from "../components/Toast"
 import { $pauseOpen } from "../lib/pause"
 import { TopHud } from "../battle/TopHud"
-import { ItemMenu } from "../battle/ItemMenu"
 import { BottomBand } from "../battle/BottomBand"
 import { ForecastCard } from "../battle/ForecastCard"
 import { BattleBar } from "../battle/BattleBar"
@@ -117,7 +116,6 @@ export function BattleScreen() {
         </div>
         <div className={`bf-info${infoHeight < INFO_COMPACT ? " compact" : ""}`} style={{ top: `${infoTop}px`, height: `${infoHeight}px` }}>
           {ui.mode === "forecast" && ui.forecast && <ForecastCard state={battle} forecast={ui.forecast} />}
-          <ItemMenu battle={battle} ui={ui} />
           <BottomBand battle={battle} ui={ui} />
         </div>
         <BattleBar battle={battle} ui={ui} />

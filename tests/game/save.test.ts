@@ -46,8 +46,24 @@ describe("save", () => {
     const r = parseSave(JSON.stringify(raw))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.save.version).toBe(7)
+    expect(r.save.version).toBe(8)
     expect(r.save.army!.units.map(u => u.classId)).toEqual(["soldier", "healer", "mage", "gladiator"])
     expect(r.save.shelter.candidates[0]!.classId).toBe("hunter")
+  })
+
+  it("v7 → v8: предметы лечения пропадают из инвентаря, рюкзака и Лавки; оружие и талисманы остаются", () => {
+    const s = createEmptySave(1)
+    const raw = {
+      ...JSON.parse(serializeSave(s)),
+      version: 7,
+      inventory: { itm_bandage: 3, itm_elixir: 1, sword_steel: 1, tal_fang: 2 },
+      store: { seed: 1, weapons: ["sword_iron"], consumables: ["itm_bandage"], talismans: ["tal_fang"], fresh: false }
+    }
+    const r = parseSave(JSON.stringify(raw))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.save.version).toBe(8)
+    expect(r.save.inventory).toEqual({ sword_steel: 1, tal_fang: 2 })
+    expect(r.save.store).toEqual({ seed: 1, weapons: ["sword_iron"], talismans: ["tal_fang"], fresh: false })
   })
 })

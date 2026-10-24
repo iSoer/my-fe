@@ -115,7 +115,7 @@ export const PLACES: readonly PlaceDef[] = [
     id: "store",
     icon: "🛒",
     get name() { return tr("Shop", "Лавка") },
-    get hint() { return tr("Weapons · healing", "Оружие · лечение") },
+    get hint() { return tr("Weapons · talismans", "Оружие · талисманы") },
     rect: houseRect(HOUSES[1] as HouseDef)
   },
   {
@@ -158,7 +158,7 @@ export const NPCS: readonly NpcDef[] = [
     species: "mouse",
     pos: { x: 9.2, y: 4.6 },
     facing: "down",
-    get greeting() { return tr("Come on in, dearie! Weapons, band-aids, talismans — all at honest prices.", "Заходи, милок! Оружие, пластыри, талисманы — всё по честной цене.") },
+    get greeting() { return tr("Come on in, dearie! Weapons and talismans — all at honest prices.", "Заходи, милок! Оружие и талисманы — всё по честной цене.") },
     fur: 1,
     eyes: 0,
     accessory: 6

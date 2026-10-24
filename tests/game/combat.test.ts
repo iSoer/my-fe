@@ -251,3 +251,37 @@ describe("simulateCombat", () => {
     expect(out.defender.hpAfter).toBe(1)
   })
 })
+
+describe("защитные пассивки: неуязвимость на время", () => {
+  const duel = (defender: Partial<{ classId: string, a: string, b: string }>, turn = 1) => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, str: 30 } }],
+      [{ classId: defender.classId ?? "infantry_sword", pos: { x: 2, y: 3 }, baseStats: { ...flat, hp: 90 }, skills: { b: defender.b } }]
+    )
+    b.state.turn = turn
+    return { b, out: simulateCombat(b.state, b.players[0]!.id, b.enemies[0]!.id, { x: 2, y: 4 }) }
+  }
+  it("Железная шкура: латник не получает урона в 1–2-й ход, с 3-го — получает", () => {
+    expect(duel({ classId: "armored_sword", b: "b_iron_hide" }, 1).out.strikes[0]!.damage).toBe(0)
+    expect(duel({ classId: "armored_sword", b: "b_iron_hide" }, 2).out.strikes[0]!.damage).toBe(0)
+    expect(duel({ classId: "armored_sword", b: "b_iron_hide" }, 3).out.strikes[0]!.damage).toBeGreaterThan(0)
+  })
+  it("Барьер гасит только первый ранящий удар за бой и запоминает это", () => {
+    const { b, out } = duel({ b: "b_barrier" })
+    expect(out.strikes[0]!.damage).toBe(0)
+    expect(out.defender.flags["barrier_used"]).toBe(1)
+    const r = applyAction(b.state, { type: "attack", unitId: b.players[0]!.id, to: { x: 2, y: 4 }, targetId: b.enemies[0]!.id })
+    const again = simulateCombat(r.state, b.players[0]!.id, b.enemies[0]!.id, { x: 2, y: 4 })
+    expect(again.strikes[0]!.damage).toBeGreaterThan(0)
+  })
+  it("Неуловимость: каждый третий ход без урона", () => {
+    expect(duel({ b: "b_evasion" }, 3).out.strikes[0]!.damage).toBe(0)
+    expect(duel({ b: "b_evasion" }, 4).out.strikes[0]!.damage).toBeGreaterThan(0)
+  })
+  it("Стойкость: первый удар атакующего по всаднику не ранит, следующие — ранят", () => {
+    const { out } = duel({ classId: "cavalry_sword", b: "b_stand_firm" })
+    expect(out.strikes[0]!.damage).toBe(0)
+    const later = out.strikes.filter(s => !s.isCounter).slice(1)
+    for (const s of later) expect(s.damage).toBeGreaterThan(0)
+  })
+})

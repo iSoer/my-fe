@@ -271,13 +271,13 @@ export interface BattleState {
   walls: Record<string, number>
   decals: Decal[]
   result?: BattleResult
+  /** Бой закончился по лимиту ходов (`BATTLE.turnLimit`): исход — отступление. */
+  timeUp?: boolean
   stats: BattleStats
   spawnedWaves: number[]
   /** Порядок хода врагов в текущей фазе (null = не рассчитан). */
   enemyQueue: string[] | null
   startedAt: number
-  /** Рюкзак вылазки: расходники, взятые из инвентаря; остаток возвращается после боя. */
-  pack: Inventory
 }
 
 export type Effect
@@ -312,7 +312,6 @@ export type BattleAction
     | { type: "move", unitId: string, to: Pos }
     | { type: "assist", unitId: string, to: Pos, targetId: string, newStance?: Stance }
     | { type: "wait", unitId: string, to: Pos, newStance?: Stance }
-    | { type: "item", unitId: string, to: Pos, targetId: string, itemId: string, newStance?: Stance }
     | { type: "endPhase" }
     | { type: "retreat" }
 
@@ -340,15 +339,6 @@ export type BattleEvent
       heal: number
       targetHpAfter?: number
       unitHpAfter?: number
-    }
-    | {
-      type: "item"
-      unitId: string
-      targetId: string
-      itemId: string
-      /** Кого и на сколько вылечил предмет (у «котелка» — несколько союзников). */
-      heals: { unitId: string, amount: number, hpAfter: number }[]
-      cleansed: string[]
     }
     | { type: "effect", effect: Effect, hpAfter?: number }
     | { type: "died", unitId: string, killerId?: string, pos: Pos, side: Side }
@@ -384,7 +374,7 @@ export interface Shelter {
   seed: number
 }
 
-/** Разведанный бой: карта и враги уже известны, игрок собирает под них отряд и рюкзак. */
+/** Разведанный бой: карта и враги уже известны, игрок собирает под них отряд. */
 export interface PendingBattle {
   seed: number
   difficulty: Difficulty
@@ -392,20 +382,17 @@ export interface PendingBattle {
   /** Выбранная вражеская команда 0…ENEMY_TEAMS−1. */
   team: number
   map: MapDef
-  /** Выбранные в рюкзак расходники (ещё в инвентаре, списываются при старте боя). */
-  pack?: Inventory
 }
 
-/** Инвентарь армии: id предмета (оружие, расходник, талисман) → количество. */
+/** Инвентарь армии: id предмета (оружие, талисман) → количество. */
 export type Inventory = Record<string, number>
 
-export type ItemCategory = "weapon" | "consumable" | "talisman"
+export type ItemCategory = "weapon" | "talisman"
 
 /** Ассортимент Лавки: обновляется после каждого боя, товаров не убывает. */
 export interface StoreStock {
   seed: number
   weapons: string[]
-  consumables: string[]
   talismans: string[]
   /** Ассортимент обновился, а игрок ещё не заглядывал в Лавку («!» над торговцем). */
   fresh: boolean
@@ -452,6 +439,8 @@ export interface BattleSummary {
   mvpId?: string
   survivors: UnitInstance[]
   armyFell: boolean
+  /** Отступление по лимиту ходов, а не по решению игрока. */
+  timeUp?: boolean
 }
 
 export interface SaveGame {

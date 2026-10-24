@@ -212,6 +212,67 @@ export const PASSIVES: readonly PassiveDef[] = [
       onTurnStart: (state, self) => (state.turn % 2 === 1 ? [{ type: "heal", unitId: self.unitId, amount: 10 }] : [])
     }
   },
+  // Неуязвимость на время: пару ходов, раз за бой или по расписанию — переживают удар, но бой не затягивают навсегда
+  {
+    id: "b_iron_hide",
+    get name() { return tr("Iron Hide", "Железная шкура") },
+    get desc() { return tr("Takes no damage on turns 1–2 of the battle. Armored only.", "В 1-й и 2-й ход боя не получает урона. Только латники.") },
+    slot: "b",
+    tier: 2,
+    spCost: 200,
+    stage: "v1",
+    allow: { moveTypes: ["armored"] },
+    hooks: { damageImmune: ctx => ctx.state.turn <= 2 }
+  },
+  {
+    id: "b_barrier",
+    get name() { return tr("Barrier", "Барьер") },
+    get desc() { return tr("Once per battle, fully blocks a hit that would deal damage.", "Раз за бой полностью гасит удар, который ранил бы.") },
+    slot: "b",
+    tier: 2,
+    spCost: 200,
+    stage: "v1",
+    hooks: {
+      damageImmune: (ctx, _strike, damage) => {
+        if (damage <= 0 || (ctx.self.bu.flags["barrier_used"] ?? 0) > 0) return false
+        ctx.self.bu.flags["barrier_used"] = 1
+        return true
+      }
+    }
+  },
+  {
+    id: "b_evasion",
+    get name() { return tr("Evasion", "Неуловимость") },
+    get desc() { return tr("Takes no damage on every third turn (3, 6, 9…). Infantry and fliers.", "Каждый третий ход (3-й, 6-й, 9-й…) не получает урона. Пехота и летуны.") },
+    slot: "b",
+    tier: 3,
+    spCost: 300,
+    stage: "v1",
+    allow: { moveTypes: ["infantry", "flier"] },
+    hooks: { damageImmune: ctx => ctx.state.turn % 3 === 0 }
+  },
+  {
+    id: "b_stand_firm",
+    get name() { return tr("Stand Firm", "Стойкость") },
+    get desc() { return tr("When attacked, the foe's first hit deals no damage. Cavalry only.", "Когда атакуют его, первый удар врага не ранит. Только всадники.") },
+    slot: "b",
+    tier: 3,
+    spCost: 300,
+    stage: "v1",
+    allow: { moveTypes: ["cavalry"] },
+    hooks: { damageImmune: (ctx, strike) => !ctx.self.isInitiator && !strike.isCounter && strike.isFirstStrike }
+  },
+  {
+    id: "b_spell_ward",
+    get name() { return tr("Spell Ward", "Чародейский щит") },
+    get desc() { return tr("On turns 1–3, takes half damage from magic. Magic users only.", "В 1–3-й ход вдвое меньше урона от магии. Только маги и лекари.") },
+    slot: "b",
+    tier: 1,
+    spCost: 120,
+    stage: "v1",
+    allow: { weaponSkills: ["blackMagic", "whiteMagic"] },
+    hooks: { damageReduction: ctx => (ctx.state.turn <= 3 && ctx.foe.weapon.magical ? 0.5 : 0) }
+  },
 
   /* ---------- C ---------- */
   {

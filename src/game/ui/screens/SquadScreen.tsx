@@ -3,11 +3,9 @@ import { useStore } from "@nanostores/react"
 import type { Stance, UnitInstance } from "@game/core/types"
 import { SQUAD_SIZE } from "@game/core/types"
 import { attackOf, displayName, unitClassName, visibleStats } from "@game/core/units"
-import { itemCount, totalCount } from "@game/core/items"
-import { ITEMS, difficultyDef } from "@game/content/balance"
-import { CONSUMABLES } from "@game/content/items"
+import { difficultyDef } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
-import { $save, assignSquadSlot, setPackAction, startBattle } from "@game/state/save"
+import { $save, assignSquadSlot, startBattle } from "@game/state/save"
 import { navigate } from "@game/state/router"
 import { haptic } from "@game/platform/haptics"
 import { Button } from "../components/Button"
@@ -85,7 +83,7 @@ function SquadSlot({ unit, slot, onOpen }: { unit?: UnitInstance, slot: number, 
   )
 }
 
-/** Вылазка, шаг 2 из 2: враги, которые ждут (по 3 в ряд), отряд из 4 слотов с заменой из ростера, рюкзак и старт. */
+/** Вылазка, шаг 2 из 2: враги, которые ждут (по 3 в ряд), отряд из 4 слотов с заменой из ростера и старт. */
 export function SquadScreen() {
   const save = useStore($save)
   const army = save.army
@@ -118,9 +116,6 @@ export function SquadScreen() {
   const ratioClass = ratio >= 1.0 ? "ok" : ratio >= 0.75 ? "warn" : "danger"
   const barClass = ratio >= 1.0 ? "good" : ratio >= 0.75 ? "mid" : "bad"
   const diff = difficultyDef(pending.difficulty)
-  const pack = pending.pack ?? {}
-  const packed = totalCount(pack)
-  const owned = CONSUMABLES.filter(c => itemCount(save.inventory, c.id) > 0)
   const slotUnit = slot !== null ? squad[slot] : undefined
   const roster = [...army.units].sort((a, b) => b.level - a.level)
 
@@ -130,11 +125,6 @@ export function SquadScreen() {
     if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
     setSlot(null)
-  }
-  const onPack = (id: string, delta: number) => {
-    const r = setPackAction({ ...pack, [id]: Math.max(0, (pack[id] ?? 0) + delta) })
-    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
-    haptic("select")
   }
   const onStart = () => {
     if (squad.length === 0) return toast(tr("Pick fighters for the squad", "Выберите бойцов в отряд"), true)
@@ -194,32 +184,6 @@ export function SquadScreen() {
             <div className={barClass} style={{ width: `${Math.min(100, ratio * 50)}%` }} />
           </div>
         </div>
-
-        <div className="section-title">{tr(`Pack ${packed}/${ITEMS.packSize}`, `Рюкзак ${packed}/${ITEMS.packSize}`)}</div>
-        {owned.length === 0
-          ? <p className="muted small">{tr("No consumables — Auntie Brie sells bandages and medkits at the Shop.", "Расходников нет — пластыри и аптечки продаёт Тётушка Сырница в Лавке.")}</p>
-          : (
-              <div className="stack">
-                {owned.map(c => (
-                  <div key={c.id} className="card pack-row">
-                    <span className="store-ico" aria-hidden="true">{c.icon}</span>
-                    <div className="grow" style={{ minWidth: 0 }}>
-                      <b>{c.name}</b>
-                      <div className="muted small">{`${c.desc} ${tr("In inventory:", "В инвентаре:")} ${itemCount(save.inventory, c.id)}`}</div>
-                    </div>
-                    <Button sm ghost disabled={!pack[c.id]} onClick={() => onPack(c.id, -1)}>−</Button>
-                    <b className="pack-count">{pack[c.id] ?? 0}</b>
-                    <Button
-                      sm
-                      disabled={packed >= ITEMS.packSize || (pack[c.id] ?? 0) >= itemCount(save.inventory, c.id)}
-                      onClick={() => onPack(c.id, 1)}
-                    >
-                      +
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
 
         <div className="warning-box">{tr("☠️ The fallen don’t come back — and neither does their gear. Defeat — half the loot.", "☠️ Павшие не возвращаются вместе со снаряжением. Поражение — половина добычи.")}</div>
         <div className="sticky-cta">

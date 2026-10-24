@@ -1,5 +1,4 @@
 import type {
-  Inventory,
   BattleAction,
   BattleEvent,
   BattleState,
@@ -15,13 +14,12 @@ import type {
 import { MAP_H, MAP_W, STATS, manhattan, posKey, samePos } from "../types"
 import { livingUnits, otherSide, unitAt } from "./query"
 import { planAssist } from "./assist"
-import { itemTargetsFrom, planItem } from "./items"
 import { moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
 import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
 import { lootFor } from "../progression"
-import { difficultyDef, SP, XP } from "@game/content/balance"
+import { BATTLE, difficultyDef, SP, XP } from "@game/content/balance"
 import { MAX_LEVEL } from "../types"
 import { tr } from "@game/i18n"
 
@@ -30,8 +28,6 @@ export interface CreateBattleOptions {
   squad: UnitInstance[]
   seed: number
   now: number
-  /** Рюкзак вылазки (уже списан из инвентаря). */
-  pack?: Inventory
 }
 
 function makeBattleUnit(
@@ -74,8 +70,7 @@ export function createBattle(opts: CreateBattleOptions): ReduceResult {
     stats: { kills: 0, damage: 0, turns: 0, deaths: [], xpGained: {}, loot: 0 },
     spawnedWaves: [],
     enemyQueue: null,
-    startedAt: opts.now,
-    pack: { ...(opts.pack ?? {}) }
+    startedAt: opts.now
   }
   opts.map.tiles.forEach((row, y) =>
     row.forEach((t, x) => {
@@ -212,10 +207,9 @@ export function xpForCombat(selfLevel: number, foeLevel: number, result: CombatX
   return Math.max(XP.combatMin, Math.round(raw * mult))
 }
 
-/** Опыт за лечение: больше вылечил — больше опыта; предметом — вдвое меньше. */
-export function xpForHeal(healed: number, byItem = false): number {
-  const staff = Math.min(XP.healMax, XP.heal + Math.round(healed * XP.healPerHp))
-  return byItem ? Math.max(XP.itemMin, Math.round(staff / 2)) : staff
+/** Опыт за лечение: больше вылечил — больше опыта. */
+export function xpForHeal(healed: number): number {
+  return Math.min(XP.healMax, XP.heal + Math.round(healed * XP.healPerHp))
 }
 
 function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"]): void {
@@ -305,6 +299,12 @@ function endPhase(state: BattleState, events: BattleEvent[]): void {
     delete u.turnStart
   }
   if (side === "player") startPhase(state, "enemy", events)
+  else if (state.turn >= BATTLE.turnLimit) {
+    // Лимит ходов: отряд отступает — живые бойцы возвращаются, добыча — как при отступлении
+    state.result = "retreat"
+    state.timeUp = true
+    events.push({ type: "battleEnded", result: "retreat" })
+  }
   else {
     state.turn++
     state.stats.turns = state.turn
@@ -367,41 +367,6 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       moveUnit(state, bu, action.to, events)
       finishAction(state, bu, action.newStance)
       events.push({ type: "waited", unitId: bu.unitId })
-      break
-    }
-    case "item": {
-      const bu = validateActor(state, action.unitId)
-      if (bu.side !== "player") throw new Error(tr("only the squad can use items", "предметы только у отряда"))
-      if ((state.pack[action.itemId] ?? 0) <= 0) throw new Error(tr("item not in the pack", "предмета нет в рюкзаке"))
-      moveUnit(state, bu, action.to, events)
-      if (!itemTargetsFrom(state, bu, bu.pos, action.itemId).some(u => u.unitId === action.targetId))
-        throw new Error(tr("target out of reach", "цель вне досягаемости"))
-      const plan = planItem(state, bu, bu.pos, action.targetId, action.itemId)
-      let healed = 0
-      for (const h of plan.heals) {
-        const u = state.units[h.unitId]
-        if (!u) continue
-        healed += Math.max(0, h.hpAfter - u.hp)
-        u.hp = h.hpAfter
-      }
-      for (const id of plan.cleansed) {
-        const u = state.units[id]
-        if (u) u.penalties = {}
-      }
-      const left = (state.pack[action.itemId] ?? 0) - 1
-      if (left > 0) state.pack[action.itemId] = left
-      else delete state.pack[action.itemId]
-      events.push({
-        type: "item",
-        unitId: bu.unitId,
-        targetId: action.targetId,
-        itemId: action.itemId,
-        heals: plan.heals,
-        cleansed: plan.cleansed
-      })
-      finishAction(state, bu, action.newStance)
-      // Лечение предметом — тоже опыт (вдвое меньше посоха)
-      if (healed > 0) grantXp(state, bu.unitId, xpForHeal(healed, true), 0, events)
       break
     }
     case "attackWall": {

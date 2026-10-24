@@ -88,7 +88,7 @@ function NpcDialog({ id }: { id: NpcId }) {
       : tr("Stock refreshes after the next battle.", "Ассортимент обновится после следующего боя.")]
     actions = (
       <Button big primary block icon="🛒" onClick={() => go("/store")}>
-        {tr("Shop: weapons, healing, talismans", "Лавка: оружие, лечение, талисманы")}
+        {tr("Shop: weapons, talismans", "Лавка: оружие, талисманы")}
       </Button>
     )
   }

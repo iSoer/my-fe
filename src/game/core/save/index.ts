@@ -11,9 +11,10 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
 
 /**
  * v6: деревня-хаб (позиция героя), признак начатой игры, инвентарь армии, Лавка, талисман бойца, рюкзак вылазки;
- * оружие — предмет, а не навык за SP (v5 и v4 мигрируют).
+ * оружие — предмет, а не навык за SP (v5 и v4 мигрируют). v7: без классов Commoner / Noble / Diviner.
+ * v8: без предметов лечения и рюкзака вылазки.
  */
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -144,6 +145,7 @@ const battleSchema = z.object({
   walls: z.record(z.string(), z.number()),
   decals: z.array(z.object({ pos, kind: z.enum(["splat", "pool"]) })),
   result: z.enum(["victory", "defeat", "retreat"]).optional(),
+  timeUp: z.boolean().optional(),
   stats: z.object({
     kills: z.number(),
     damage: z.number(),
@@ -155,8 +157,7 @@ const battleSchema = z.object({
   }),
   spawnedWaves: z.array(z.number()),
   enemyQueue: z.array(z.string()).nullable(),
-  startedAt: z.number(),
-  pack: z.record(z.string(), z.number())
+  startedAt: z.number()
 })
 
 const memorialSchema = z.object({
@@ -199,7 +200,8 @@ const summarySchema = z.object({
   rewards: z.object({ treats: z.number(), loot: z.number(), lost: z.number(), glory: z.number(), flawless: z.boolean() }),
   mvpId: z.string().optional(),
   survivors: z.array(unitSchema),
-  armyFell: z.boolean()
+  armyFell: z.boolean(),
+  timeUp: z.boolean().optional()
 })
 
 export const saveSchema = z.object({
@@ -221,7 +223,6 @@ export const saveSchema = z.object({
   store: z.object({
     seed: z.number(),
     weapons: z.array(z.string()),
-    consumables: z.array(z.string()),
     talismans: z.array(z.string()),
     fresh: z.boolean()
   }),
@@ -243,8 +244,7 @@ export const saveSchema = z.object({
       biomeId: z.string(),
       // Разведки до выбора команды — самая слабая команда
       team: z.number().int().min(0).default(0),
-      map: mapSchema,
-      pack: z.record(z.string(), z.number()).optional()
+      map: mapSchema
     })
     .optional(),
   sortieSeed: z.number().optional(),
@@ -359,6 +359,29 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
       return out
     }
     return { ...(walk(old) as Record<string, unknown>), version: 7 }
+  },
+  // v7 → v8: предметы лечения (расходники) убраны из игры — пропадают из инвентаря, из рюкзака разведанного
+  // и идущего боя и с витрины Лавки.
+  7: (old) => {
+    const data = { ...old }
+    const inventory = (data["inventory"] ?? {}) as Record<string, number>
+    data["inventory"] = Object.fromEntries(Object.entries(inventory).filter(([id]) => !id.startsWith("itm_")))
+    for (const key of ["battle", "pendingBattle"]) {
+      const v = data[key] as Record<string, unknown> | undefined
+      if (v) {
+        const next = { ...v }
+        delete next["pack"]
+        data[key] = next
+      }
+    }
+    const store = data["store"] as Record<string, unknown> | undefined
+    if (store) {
+      const next = { ...store }
+      delete next["consumables"]
+      data["store"] = next
+    }
+    data["version"] = 8
+    return data
   }
 }
 

@@ -9,15 +9,11 @@ import {
   newGame,
   reclassAction,
   releaseUnit,
-  scoutBattle,
-  setPackAction,
-  startBattle,
   updateSettings
 } from "@game/state/save"
 import { SAVE_VERSION, createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { generateStore, itemPrice } from "@game/core/items"
 import { lootShare, resolveBattle } from "@game/core/progression"
-import { applyAction } from "@game/core/battle/reducer"
 import { simulateCombat } from "@game/core/combat"
 import { attackOf, openClasses, weaponMt, weaponShortfall } from "@game/core/units"
 import { ITEMS, REWARDS } from "@game/content/balance"
@@ -49,12 +45,11 @@ describe("Лавка", () => {
     expect(high.weapons.some(id => weaponDef(id).grade === "steel")).toBe(true)
     expect(high.weapons.some(id => weaponDef(id).grade === "silver")).toBe(true)
     expect(high.talismans.length).toBe(ITEMS.talismanOffers + 1)
-    expect(high.consumables.length).toBeGreaterThan(low.consumables.length)
   })
 
   it("покупка списывает цену и кладёт в инвентарь; без денег и не из ассортимента — отказ", () => {
     const store = $save.get().store
-    const id = store.consumables[0]!
+    const id = store.talismans[0]!
     const before = $save.get().profile.treats
     expect(buyItemAction(id).ok).toBe(true)
     expect($save.get().inventory[id]).toBe(1)
@@ -146,66 +141,6 @@ describe("снаряжение", () => {
   })
 })
 
-describe("предметы в бою", () => {
-  it("лечение: на себя и соседа, тратит действие и предмет; дальше соседа — нельзя", () => {
-    const b = makeBattle(
-      [
-        { classId: "infantry_sword", pos: { x: 2, y: 5 }, baseStats: { hp: 40 } },
-        { classId: "infantry_axe", pos: { x: 3, y: 5 }, baseStats: { hp: 40 } },
-        { classId: "infantry_spear", pos: { x: 5, y: 7 }, baseStats: { hp: 40 } }
-      ],
-      [{ classId: "infantry_sword", pos: { x: 0, y: 0 } }]
-    )
-    const st = structuredClone(b.state)
-    st.pack = { itm_bandage: 2 }
-    const [a, n, far] = b.players.map(u => u.id) as [string, string, string]
-    st.units[n]!.hp = 20
-    st.units[far]!.hp = 20
-    expect(() => applyAction(st, { type: "item", unitId: a, to: { x: 2, y: 5 }, targetId: far, itemId: "itm_bandage" })).toThrow()
-    const { state, events } = applyAction(st, { type: "item", unitId: a, to: { x: 2, y: 5 }, targetId: n, itemId: "itm_bandage" })
-    expect(state.units[n]!.hp).toBe(30)
-    expect(state.units[a]!.acted).toBe(true)
-    expect(state.pack.itm_bandage).toBe(1)
-    expect(events.some(e => e.type === "item")).toBe(true)
-    const again = { type: "item", unitId: a, to: { x: 2, y: 5 }, targetId: a, itemId: "itm_bandage" } as const
-    expect(() => applyAction(state, again)).toThrow()
-  })
-
-  it("котелок лечит всех вокруг, валерьянка снимает штрафы, пустой рюкзак — отказ", () => {
-    const b = makeBattle(
-      [
-        { classId: "infantry_sword", pos: { x: 2, y: 5 }, baseStats: { hp: 40 } },
-        { classId: "infantry_axe", pos: { x: 2, y: 7 }, baseStats: { hp: 40 } }
-      ],
-      [{ classId: "infantry_sword", pos: { x: 0, y: 0 } }]
-    )
-    const [a, n] = b.players.map(u => u.id) as [string, string]
-    const st = structuredClone(b.state)
-    st.pack = { itm_stew: 1, itm_valerian: 1 }
-    st.units[a]!.hp = 10
-    st.units[n]!.hp = 10
-    const r = applyAction(st, { type: "item", unitId: a, to: { x: 2, y: 5 }, targetId: a, itemId: "itm_stew" })
-    expect(r.state.units[a]!.hp).toBe(18)
-    expect(r.state.units[n]!.hp).toBe(18)
-    r.state.units[n]!.penalties = { str: -4, mag: -4 }
-    const v = applyAction(r.state, { type: "item", unitId: n, to: { x: 2, y: 6 }, targetId: n, itemId: "itm_valerian" })
-    expect(v.state.units[n]!.penalties).toEqual({})
-    expect(v.state.pack).toEqual({})
-    expect(() => applyAction(b.state, { type: "item", unitId: a, to: { x: 2, y: 5 }, targetId: a, itemId: "itm_kit" })).toThrow()
-  })
-
-  it("рюкзак: не больше packSize, списывается при старте боя, остаток возвращается после", () => {
-    freshGame()
-    $save.set({ ...$save.get(), inventory: { itm_bandage: 10 } })
-    expect(scoutBattle("easy").ok).toBe(true)
-    expect(setPackAction({ itm_bandage: ITEMS.packSize + 1 }).ok).toBe(false)
-    expect(setPackAction({ itm_bandage: 3 }).ok).toBe(true)
-    expect(startBattle($save.get().army!.squadIds).ok).toBe(true)
-    expect($save.get().inventory.itm_bandage).toBe(7)
-    expect($save.get().battle!.pack).toEqual({ itm_bandage: 3 })
-  })
-})
-
 describe("награды за исход", () => {
   function resolved(result: "victory" | "defeat" | "retreat") {
     const b = makeBattle(
@@ -215,7 +150,6 @@ describe("награды за исход", () => {
     const st = structuredClone(b.state)
     st.result = result
     st.stats.loot = 100
-    st.pack = { itm_bandage: 2 }
     const save: SaveGame = {
       ...createEmptySave(1),
       army: { id: "a", units: b.players, squadIds: b.players.map(u => u.id), createdAt: 1, battles: 0, wins: 0 }
@@ -233,8 +167,7 @@ describe("награды за исход", () => {
     expect(lose.summary.rewards.lost).toBe(100 - lose.summary.rewards.treats)
     expect(flee.summary.rewards.treats).toBe(Math.round(100 * REWARDS.retreatLootShare))
     expect(lootShare("defeat")).toBeLessThan(lootShare("retreat"))
-    // остаток рюкзака возвращается, Лавка обновлена
-    expect(lose.inventory.itm_bandage).toBe(2)
+    // Лавка обновлена
     expect(lose.store.fresh).toBe(true)
   })
 })

@@ -455,7 +455,8 @@ export class CinematicScene extends Phaser.Scene {
       damage: strike.damage,
       size: atk.height,
       color: atk.weaponColor,
-      skipped: this.skipped
+      skipped: this.skipped,
+      flavor: atk.unit.seed
     })
     await fx.impactAt
     // Контакт: хит-стоп, зум-удар, тряска по силе удара
@@ -497,7 +498,7 @@ export class CinematicScene extends Phaser.Scene {
     haptic(strike.special ? "heavy" : "medium")
     const dmgColor
       = strike.damage === 0 ? "#bbbbbb" : strike.special ? "#ffd166" : strike.effective ? "#ff6b6b" : "#ffffff"
-    const dmgText = strike.damage === 0 ? tr("Bonk!", "Хлоп!") : String(strike.damage)
+    const dmgText = strike.damage === 0 ? tr("Blocked!", "Блок!") : String(strike.damage)
     const big = strike.damage >= def.maxHp * 0.5
     bigNumber(this, def.sprite.x, defBodyY - 30, dmgText, dmgColor, big || lethal ? 58 : strike.special ? 50 : 42, sp, {
       crit: big || !!strike.special,

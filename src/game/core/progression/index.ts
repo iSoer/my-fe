@@ -18,7 +18,7 @@ import type {
 import { BARRACKS_CAP, MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
 import { generateUnit, levelGains, unitClassName } from "../units"
 import { treatsMultiplier } from "../skills/engine"
-import { addAll, generateStore } from "../items"
+import { generateStore } from "../items"
 import { LOOT, PRICES, REWARDS, SHOP, XP, recruitRarityWeights } from "@game/content/balance"
 import { EPITAPHS } from "@game/content/epitaphs"
 import { personalityText } from "@game/content/personalities"
@@ -122,7 +122,7 @@ export interface BattleResolution {
   profile: Profile
   memorial: MemorialEntry[]
   shelter: Shelter
-  /** Инвентарь с вернувшимся остатком рюкзака (снаряжение павших потеряно вместе с ними). */
+  /** Инвентарь армии (снаряжение павших потеряно вместе с ними). */
   inventory: Inventory
   store: StoreStock
   rewardChoice?: UnitInstance[]
@@ -237,13 +237,14 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
     survivors,
     armyFell
   }
+  if (state.timeUp) summary.timeUp = true
   const mvp = Object.entries(xpGained).sort((a, b) => b[1] - a[1])[0]
   if (mvp) summary.mvpId = mvp[0]
 
   // Витрина Казармы и Лавка обновляются после каждого боя; бесплатная награда — если ростер ещё жив
   const shelter: Shelter = generateShop(rng.int(0, 0x7fffffff), nextArmy, profile, now)
   const store = generateStore(rng.int(0, 0x7fffffff), nextArmy, profile.glory)
-  const inventory = addAll(save.inventory, state.pack ?? {})
+  const inventory = save.inventory
   const rewardChoice = nextArmy
     ? generateRewardChoice(rng.int(0, 0x7fffffff), nextArmy, profile, result === "victory", now)
     : undefined

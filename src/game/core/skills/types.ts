@@ -99,6 +99,11 @@ export interface SkillHooks {
   desperation?: (ctx: CombatCtx) => boolean
   vantage?: (ctx: CombatCtx) => boolean
   damageReduction?: (ctx: CombatCtx, strike: StrikeInfo) => number
+  /**
+   * Удар не наносит урона (неуязвимость): проверяется последним, после минимального урона; `damage` — сколько
+   * удар нанёс бы. Может менять флаги бойца (например, «раз за бой»).
+   */
+  damageImmune?: (ctx: CombatCtx, strike: StrikeInfo, damage: number) => boolean
   flatDamage?: (ctx: CombatCtx, strike: StrikeInfo) => number
   damageMultiplier?: (ctx: CombatCtx) => number
   passThrough?: boolean
@@ -184,25 +189,6 @@ export interface PassiveDef {
   hooks: SkillHooks
   /** Ограничения по классам. */
   allow?: { moveTypes?: MoveType[], weaponSkills?: WeaponSkill[] }
-}
-
-/** Расходник Лавки: используется в бою командой «Предмет» на себя или соседнего союзника. */
-export interface ConsumableDef {
-  id: string
-  name: string
-  icon: string
-  desc: string
-  price: number
-  /** Лечение: фиксированное и/или доля maxHp (берётся большее). */
-  heal?: number
-  healPct?: number
-  /** Снимает штрафы (`penalties`). */
-  cleanse?: boolean
-  /** Действует на применившего и всех союзников в радиусе (цель — сам боец). */
-  area?: number
-  /** В ассортименте с уровня ростера / Славы. */
-  minRosterLevel?: number
-  minGlory?: number
 }
 
 /** Талисман: аксессуар в единственном слоте бойца, пассивные свойства — хуки навыков (попадают в прогноз боя). */
