@@ -22,6 +22,7 @@ import { nextEnemyAction } from "@game/core/ai"
 import { terrainAt, unitAt } from "@game/core/battle/query"
 import { $save, dispatchBattle } from "./save"
 import { haptic } from "@game/platform/haptics"
+import { sfx } from "@game/platform/audio"
 
 /**
  * Управление в духе Fire Emblem Heroes, без меню действий и «Ждать»:
@@ -254,6 +255,7 @@ function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiStat
     ...extra
   })
   haptic("select")
+  sfx("select")
 }
 
 function showForecast(st: BattleState, bu: BattleUnit, from: Pos, targetId: string): void {
@@ -271,6 +273,7 @@ function showForecast(st: BattleState, bu: BattleUnit, from: Pos, targetId: stri
     dragValid: false
   })
   haptic("select")
+  sfx("aim")
   if (!$save.get().settings.confirmAttack) void confirm()
 }
 

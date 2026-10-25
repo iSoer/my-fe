@@ -1,4 +1,5 @@
 import type { ComponentType } from "react"
+import type { HapticKind } from "./haptics"
 
 /**
  * Хост игры — то, во что она встроена (страница /game в Next, Telegram Mini App и PWA в my-fe).
@@ -9,6 +10,8 @@ export interface GameHost {
   Overlay?: ComponentType
   /** Секция в начале Настроек (установка приложения, хранилище). */
   SettingsSection?: ComponentType
+  /** Тактильный отклик платформы; true — обработан, иначе игра вибрирует сама через Vibration API. */
+  haptic?: (kind: HapticKind) => boolean
 }
 
 let host: GameHost = {}

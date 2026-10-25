@@ -23,6 +23,7 @@ import type { BattleResult } from "@game/core/types"
 import { UnitView } from "./UnitView"
 import { actorFlash, bloodBurst, bloodDecal, confettiRain, debrisBurst, sceneAlive, tween } from "./fx"
 import { haptic } from "@game/platform/haptics"
+import { sfx } from "@game/platform/audio"
 import {
   ensureUnitTextures,
   hasTexture,
@@ -464,6 +465,7 @@ export class MapScene extends Phaser.Scene {
     if (!view.scene) return
     view.setPosition(c.x, c.y)
     haptic("light")
+    sfx("land")
     await view.playLanding()
     if (view.scene) view.setDepth(10 + pos.y * 0.01)
   }

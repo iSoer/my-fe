@@ -7,7 +7,7 @@ import { $route, back, navigate } from '@game/state/router';
 import { $battle, flushPersist } from '@game/state/save';
 import { $pauseOpen } from '@game/ui/lib/pause';
 import '@game/ui/styles.css';
-import { initTelegram, setBackButton, setClosingConfirmation, userNamespace } from '@host/telegram';
+import { initTelegram, setBackButton, setClosingConfirmation, tgHaptic, userNamespace } from '@host/telegram';
 import { initPwa } from '@host/pwa';
 import { chooseCloud, reconcileCloudSave, startCloudMirror } from '@host/sync';
 import { PwaBanners } from '@host/PwaBanners';
@@ -68,7 +68,7 @@ async function boot(): Promise<void> {
   // Сейвы разных пользователей Telegram на одном устройстве не смешиваются
   setStorageNamespace(userNamespace());
   if (import.meta.env.PROD) initPwa({ getSerwist, beforeReload: flushPersist });
-  setGameHost({ Overlay: PwaBanners, SettingsSection: AppCard });
+  setGameHost({ Overlay: PwaBanners, SettingsSection: AppCard, haptic: tgHaptic });
 
   const el = document.getElementById('app');
   if (!el) throw new Error('#app не найден');

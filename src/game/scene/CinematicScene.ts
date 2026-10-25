@@ -6,7 +6,8 @@ import { unitClass } from "@game/content/classes"
 import { WEAPON_COLOR } from "@game/content/weapons"
 import { specialDef } from "@game/content/skills/specials"
 import { displayName, unitClassName } from "@game/core/units"
-import { haptic } from "@game/platform/haptics"
+import { haptic, strikeHaptic } from "@game/platform/haptics"
+import { sfx, strikeSfx, swingSfx } from "@game/platform/audio"
 import type { CritterPart, Pose } from "@game/art/index"
 import { deathSeed, pickDeathVariant, playDeathCine, preloadDeathParts, type DeathCtx } from "./deathFx"
 import { ensureTextures, TEX } from "./textures"
@@ -436,6 +437,7 @@ export class CinematicScene extends Phaser.Scene {
         })
       this.tweens.add({ targets: cam, zoom: 1.06, duration: 160 / sp, yoyo: true, ease: "Sine.easeInOut" })
     }
+    swingSfx(look.kind)
     const fx = playAttackFx({
       scene: this,
       kind: look.kind,
@@ -459,6 +461,14 @@ export class CinematicScene extends Phaser.Scene {
       flavor: atk.unit.seed
     })
     await fx.impactAt
+    strikeSfx({
+      weapon: look.kind,
+      damage: strike.damage,
+      frac: strike.damage / Math.max(1, def.maxHp),
+      special: !!strike.special,
+      lethal,
+      effective: strike.effective
+    })
     // Контакт: хит-стоп, зум-удар, тряска по силе удара
     impactFeel(this, {
       special: !!strike.special,
@@ -495,7 +505,7 @@ export class CinematicScene extends Phaser.Scene {
       })
     }
     this.hurt(def, 200 / sp)
-    haptic(strike.special ? "heavy" : "medium")
+    haptic(strikeHaptic(strike.damage, strike.damage / Math.max(1, def.maxHp), !!strike.special, lethal))
     const dmgColor
       = strike.damage === 0 ? "#bbbbbb" : strike.special ? "#ffd166" : strike.effective ? "#ff6b6b" : "#ffffff"
     const dmgText = strike.damage === 0 ? tr("Blocked!", "Блок!") : String(strike.damage)
@@ -639,6 +649,7 @@ export class CinematicScene extends Phaser.Scene {
       .setAlpha(0.6)
     portrait.setX(band.x + (atk.onLeft ? -w * 0.36 : w * 0.36))
     haptic("heavy")
+    sfx("special")
     speedLines(this, w / 2, h * 0.42, w, h * 0.3, atk.onLeft ? 1 : -1, sp, 14, 41)
     this.tweens.add({ targets: overlay, fillAlpha: 0.55, duration: 120 / sp })
     await tween(this, { targets: [band, label], x: w / 2, duration: 160 / sp, ease: "Cubic.easeOut" })

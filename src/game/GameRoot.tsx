@@ -5,6 +5,7 @@ import { initRouter } from "./state/router"
 import { $battleUi, confirm, endTurn, tapTile } from "./state/battleUi"
 import { $boardLayout } from "./state/boardLayout"
 import { $save, initSave } from "./state/save"
+import { initSound } from "./state/sound"
 import { $villageUi, openNpc, villageControl } from "./state/village"
 import { NPCS, type NpcId } from "./content/village"
 import { spotNear } from "./core/village"
@@ -20,6 +21,7 @@ export default function GameRoot() {
   useEffect(() => {
     initRouter()
     initSave()
+    initSound()
     // Отладочный хук для консоли и смоук-тестов (игра одиночная, секретов нет)
     ;(window as unknown as { __pf?: unknown }).__pf = {
       save: $save,

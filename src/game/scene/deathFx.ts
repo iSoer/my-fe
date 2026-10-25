@@ -21,6 +21,7 @@ import { reducedMotion } from "@game/ui/lib/animate"
 import { UnitView } from "./UnitView"
 import { ensureUnitPartTextures, hasTexture, withTimeout, type UnitTexSize } from "./svgTextures"
 import { tr } from "@game/i18n"
+import { deathSfx, sfx } from "@game/platform/audio"
 
 import { deathHash as hash, type DeathVariant } from "./deathVariants"
 export { DEATH_VARIANTS, deathSeed, pickDeathVariant, type DeathVariant } from "./deathVariants"
@@ -520,6 +521,7 @@ async function killMoment(ctx: DeathCtx, b: Body): Promise<void> {
     if (sceneAlive(b.scene) && tw.timeScale === slow) tw.timeScale = base
   }
   if (!alive(b)) return
+  deathSfx("killHit", sp)
   shake(b, 240 / sp, b.mode === "cine" ? 0.018 : 0.01)
   gush(ctx, b, ctx.x, ctx.y - b.h * 0.5, 1, KILL_GORE[ctx.killerKind ?? "sword"], -0.3)
   // Враги — зомби: к крови добавляется зеленоватая сукровица
@@ -555,6 +557,7 @@ const fall: VariantFn = async (ctx, b) => {
   bloodBurst(b.scene, ctx.x, ctx.y - b.h * 0.45, b.mode === "cine" ? 55 : 50, null, b.mode === "cine" ? 1.8 : 1.1, sp)
   // Шатается, из раны бьёт струя, затем валится набок с отскоком
   bloodSquirt(b.scene, ctx.x, ctx.y - b.h * 0.55, fxSize(ctx, b), ctx.dir > 0 ? -60 : -120, 420 / sp, 24, ctx.y)
+  deathSfx("squirt", sp)
   await tween(b.scene, { targets: b.t, angle: -ctx.dir * 8, duration: 120 / sp, yoyo: true, ease: "Sine.easeInOut" })
   if (!alive(b)) return
   ctx.onPool?.()
@@ -567,6 +570,7 @@ const fall: VariantFn = async (ctx, b) => {
     ease: "Bounce.easeOut"
   })
   if (!alive(b)) return
+  deathSfx("bodyFall", sp)
   gush(ctx, b, ctx.x + ctx.dir * b.w * 0.3, ctx.y - b.h * 0.1, 0.6, "blunt", -1)
   dustPuff(b.scene, ctx.x, ctx.y, b.h * 0.5, 8)
   await twitch(b, sp)
@@ -581,6 +585,7 @@ const gibs: VariantFn = async (ctx, b, rng) => {
   if (!alive(b)) return
   shake(b, 220 / sp, b.mode === "cine" ? 0.025 : 0.014)
   hideBody(b)
+  deathSfx("gibsBurst", sp)
   const s = b.h
   const g = s * 3.2
   const dir = ctx.dir
@@ -633,7 +638,10 @@ const gibs: VariantFn = async (ctx, b, rng) => {
         2,
         (x, y, n) => {
           splatAt(b, x, ctx.y + 2, s * (n === 0 ? 0.3 : 0.18), partSeed * 3 + n)
-          if (n === 0) gush(ctx, b, x, y, 0.45, "blunt", -1)
+          if (n === 0) {
+            gush(ctx, b, x, y, 0.45, "blunt", -1)
+            deathSfx("splatSmall", sp)
+          }
         },
         dripper(ctx, b)
       )
@@ -651,6 +659,7 @@ const explode: VariantFn = async (ctx, b) => {
   const s = b.h
   // Дрожь и раздувание с покраснением
   const shakeTw = b.scene.tweens.add({ targets: b.t, x: b.x0 + 3, duration: 45 / sp, yoyo: true, repeat: 5 })
+  deathSfx("fuse", sp)
   await Promise.all([scaleFromFeet(b, 1.35, 1.35, 240 / sp, "Quad.easeIn"), tintRamp(b, 0xff3b3b, 240 / sp)])
   shakeTw.stop()
   if (!alive(b)) return
@@ -659,6 +668,7 @@ const explode: VariantFn = async (ctx, b) => {
   await wait(b.scene, 60 / sp)
   if (!alive(b)) return
   hideBody(b)
+  deathSfx("explosion", sp)
   const cx = ctx.x
   const cy = ctx.y - s * 0.5
   shake(b, 260 / sp, b.mode === "cine" ? 0.03 : 0.016)
@@ -713,11 +723,13 @@ const flatten: VariantFn = async (ctx, b) => {
   const sp = ctx.speed
   const s = b.h
   // Предчувствие: чуть вытянуться вверх
+  deathSfx("stretch", sp)
   await scaleFromFeet(b, 0.94, 1.08, 90 / sp, "Quad.easeOut")
   if (!alive(b)) return
   await scaleFromFeet(b, 1.7, 0.08, 120 / sp, "Quad.easeIn")
   if (!alive(b)) return
   shake(b, 180 / sp, b.mode === "cine" ? 0.028 : 0.015)
+  deathSfx("squash", sp)
   punchText(b.scene, ctx.x, ctx.y - s * 0.5, tr("SPLAT!", "ШМЯК!"), "#ffd166", b.mode === "cine" ? 40 : ctx.size * 0.42, sp)
   bloodBurst(
     b.scene,
@@ -767,6 +779,7 @@ const launch: VariantFn = async (ctx, b) => {
   const s = b.h
   flash(b, 60 / sp)
   shake(b, 160 / sp, b.mode === "cine" ? 0.02 : 0.012)
+  deathSfx("launch", sp)
   bloodBurst(
     b.scene,
     ctx.x,
@@ -818,6 +831,7 @@ const launch: VariantFn = async (ctx, b) => {
   const ex = pt ? pt.tx : b.t.x
   const ey = pt ? pt.ty - s * 0.3 : b.t.y - s * 0.3
   hideBody(b)
+  deathSfx("twinkle", sp)
   // Блик «✦» на выходе
   const star = b.scene.add
     .text(ex, ey, "✦", textStyle(b.mode === "cine" ? 36 : ctx.size * 0.5, "#fff6d0", true, 3))
@@ -841,6 +855,7 @@ const dissolve: VariantFn = async (ctx, b) => {
   const s = b.h
   await tintRamp(b, 0xff5a5a, 220 / sp)
   if (!alive(b)) return
+  deathSfx("dissolve", sp)
   const cx = b.left + b.w / 2
   const cy = b.top + b.h * 0.5
   const fur = b.furColor
@@ -864,6 +879,7 @@ const dissolve: VariantFn = async (ctx, b) => {
     b.scene.time.delayedCall((i * 90) / sp, () => {
       if (!alive(b)) return
       bloodDrip(b.scene, b.left + b.w * (0.2 + 0.6 * ((i * 37) % 10) / 10), b.top + b.h * 0.7, ctx.y + 2, fxSize(ctx, b), sp)
+      if (i % 2 === 0) deathSfx("drip", sp)
     })
   }
   gush(ctx, b, cx, cy, 0.7, "magic", -1)
@@ -898,6 +914,7 @@ const drill: VariantFn = async (ctx, b) => {
     callback: () => dustPuff(b.scene, ctx.x, ctx.y, s * 0.4, 6)
   })
   bloodBurst(b.scene, ctx.x, ctx.y - s * 0.4, b.mode === "cine" ? 20 : 12, { min: 220, max: 320 }, 1, sp)
+  deathSfx("drill", sp)
   // Кровь разлетается спиралью, пока ввинчивается в землю
   let turn = 0
   const spiral = b.scene.time.addEvent({
@@ -917,6 +934,7 @@ const drill: VariantFn = async (ctx, b) => {
   spiral.remove(false)
   if (!alive(b)) return
   hideBody(b)
+  deathSfx("drillEnd", sp)
   gush(ctx, b, ctx.x, ctx.y, 0.8, "blunt", -1)
   const hole = b.scene.add
     .image(ctx.x, ctx.y, TEX.disc)
@@ -936,6 +954,7 @@ const crumble: VariantFn = async (ctx, b, rng) => {
   // Добит светом (посох) — рассыпается светлым кристаллом, иначе камнем
   const frozen = ctx.killerKind === "whiteMagic"
   const stone = frozen ? 0xa8dcff : 0x9e9e9e
+  deathSfx(frozen ? "freeze" : "petrify", sp)
   await tintRamp(b, stone, 220 / sp)
   if (!alive(b)) return
   if (b.img?.scene) b.img.setTintFill(stone)
@@ -958,6 +977,7 @@ const crumble: VariantFn = async (ctx, b, rng) => {
     g.strokePath()
   }
   b.temps.push(g)
+  deathSfx(frozen ? "iceCrack" : "crackStone", sp)
   await tween(b.scene, { targets: g, alpha: 1, duration: 260 / sp })
   if (!alive(b)) return
   shake(b, 120 / sp, 0.01)
@@ -965,6 +985,7 @@ const crumble: VariantFn = async (ctx, b, rng) => {
   if (!alive(b)) return
   hideBody(b)
   g.destroy()
+  deathSfx(frozen ? "shatterIce" : "shatterStone", sp)
   // Осколки
   const groundY = ctx.y
   const flights: Promise<void>[] = []
@@ -1034,6 +1055,7 @@ const electro: VariantFn = async (ctx, b, rng) => {
     }
     if (on) {
       drawBolts()
+      deathSfx("zap", sp)
       puff(b.scene, cx, topY + b.h * 0.5, TEX.star, [0xffd166, 0xfff3b0, 0xffffff], {
         count: 6,
         speed: [s * 0.4, s * 1.1],
@@ -1064,6 +1086,7 @@ const electro: VariantFn = async (ctx, b, rng) => {
   bloodBurst(b.scene, ctx.x, ctx.y - s * 0.45, b.mode === "cine" ? 18 : 10, null, 0.9, sp)
   gush(ctx, b, ctx.x, ctx.y - s * 0.5, 0.8, "magic", -1)
   ctx.onPool?.()
+  b.scene.time.delayedCall(160 / sp, () => deathSfx("bodyFall", sp))
   await tween(b.scene, {
     targets: b.t,
     angle: ctx.dir > 0 ? -95 : 95,
@@ -1111,6 +1134,7 @@ const ragdoll: VariantFn = async (ctx, b) => {
     const pt = b.mode === "map" ? (b.t as Phaser.GameObjects.Container).getWorldTransformMatrix() : null
     const wx = pt ? pt.tx : b.t.x
     splatAt(b, wx, ctx.y + 2, s * (0.36 - seed * 0.06), 5 + seed)
+    deathSfx(seed === 0 ? "bodyFall" : "bodyFallLight", sp)
     bloodBurst(b.scene, wx, ctx.y, 8, { min: 220, max: 320 }, 0.7, sp)
     gush(ctx, b, wx, ctx.y - s * 0.15, 0.7 - seed * 0.15, "blunt", -1)
     dustPuff(b.scene, wx, ctx.y, s * 0.35, 5)
@@ -1133,6 +1157,7 @@ const sink: VariantFn = async (ctx, b) => {
   const sp = ctx.speed
   const s = b.h
   fountain(ctx, b, ctx.x, ctx.y - s * 0.4, 380)
+  deathSfx("sink", sp)
   ctx.onPool?.()
   ensureGoreTextures(b.scene)
   const pool = b.scene.add
@@ -1183,6 +1208,7 @@ const sink: VariantFn = async (ctx, b) => {
   ])
   if (!alive(b)) return
   hideBody(b)
+  deathSfx("plop", sp)
   if (tailImg?.scene) {
     tailImg.setDepth(b.mode === "cine" ? 7 : 1.6)
     await tween(b.scene, {
@@ -1470,6 +1496,7 @@ const behead: VariantFn = async (ctx, b, rng) => {
     if (part === "legFront") leg = img
   }
   const neck = { x: an.x, y: an.neckY }
+  deathSfx("slice", sp)
   slashLine(b, neck.x - d * b.w * 0.55, neck.y - s * 0.07, neck.x + d * b.w * 0.55, neck.y + s * 0.03, Math.max(2, s * 0.02), sp)
   shake(b, 200 / sp, b.mode === "cine" ? 0.022 : 0.012)
   gush(ctx, b, neck.x, neck.y, 1, "slash", -1)
@@ -1487,6 +1514,7 @@ const behead: VariantFn = async (ctx, b, rng) => {
     2,
     (x, y, n) => {
       splatAt(b, x, ctx.y + 2, s * (n === 0 ? 0.34 : 0.2), 21 + n)
+      deathSfx(n === 0 ? "headBonk" : "splatSmall", sp)
       if (n === 0) {
         gush(ctx, b, x, y, 0.5, "blunt", -1)
         dustPuff(b.scene, x, ctx.y, s * 0.3, 5)
@@ -1496,6 +1524,7 @@ const behead: VariantFn = async (ctx, b, rng) => {
   )
   // Фонтан из шеи и пульсирующая струйка
   fountain(ctx, b, neck.x, neck.y, 900)
+  deathSfx("fountain", sp)
   bloodSquirt(b.scene, neck.x, neck.y, fxSize(ctx, b), d > 0 ? -65 : -115, 520 / sp, 24, ctx.y)
   // Тело ещё стоит, пошатываясь…
   await tween(b.scene, { targets: torso, angle: -d * 6, duration: 150 / sp, yoyo: true, repeat: 1, ease: "Sine.easeInOut" })
@@ -1504,6 +1533,7 @@ const behead: VariantFn = async (ctx, b, rng) => {
   // …подгибает лапы и валится вперёд
   await tween(b.scene, { targets: torso, scaleY: 0.86, duration: 110 / sp, ease: "Quad.easeOut" })
   if (!torso.scene) return
+  b.scene.time.delayedCall(160 / sp, () => deathSfx("bodyFall", sp))
   await tween(b.scene, { targets: torso, angle: -d * 90, scaleY: 1, duration: 420 / sp, ease: "Bounce.easeOut" })
   if (!torso.scene) return
   gush(ctx, b, ctx.x - d * s * 0.55, ctx.y - s * 0.08, 0.6, "blunt", -1)
@@ -1582,6 +1612,7 @@ const halve: VariantFn = async (ctx, b, rng) => {
     mLow.sync()
     wLow.sync()
   }
+  deathSfx("slice", sp)
   slashLine(b, cx - d * w * 0.75, lineY(cx - d * w * 0.75), cx + d * w * 0.75, lineY(cx + d * w * 0.75), Math.max(2, s * 0.022), sp)
   shake(b, 180 / sp, b.mode === "cine" ? 0.02 : 0.011)
   b.scene.tweens.add({ targets: [wTop.g, wLow.g], alpha: 1, duration: 120 / sp })
@@ -1593,6 +1624,7 @@ const halve: VariantFn = async (ctx, b, rng) => {
   const x0 = top.x
   const y0 = top.y
   bloodSquirt(b.scene, cx, cy, fxSize(ctx, b), d > 0 ? -50 : -130, 420 / sp, 24, ctx.y)
+  deathSfx("slideWet", sp)
   await tween(b.scene, {
     targets: top,
     x: x0 + d * slide,
@@ -1605,6 +1637,7 @@ const halve: VariantFn = async (ctx, b, rng) => {
   if (!top.scene) return
   // …и падает за край
   fountain(ctx, b, cx, cy, 650)
+  deathSfx("fountain", sp)
   if (ctx.unit.isEnemy) ichorSplash(b.scene, cx, cy, fxSize(ctx, b), d, sp, 1)
   ctx.onPool?.()
   const landX = x0 + d * w * (b.mode === "cine" ? 0.6 : 0.85)
@@ -1618,6 +1651,7 @@ const halve: VariantFn = async (ctx, b, rng) => {
     onUpdate: syncTop
   }).then(() => {
     if (!top.scene) return
+    deathSfx("bodyFall", sp)
     splatAt(b, landX, ctx.y + 2, s * 0.42, 41)
     gush(ctx, b, landX, ctx.y - s * 0.15, 0.6, "blunt", -1)
     dustPuff(b.scene, landX, ctx.y, s * 0.35, 6)
@@ -1635,6 +1669,7 @@ const halve: VariantFn = async (ctx, b, rng) => {
   await Promise.all([fallTop, fallLow])
   if (!low.scene) return
   syncLow()
+  deathSfx("bodyFallLight", sp)
   gush(ctx, b, ctx.x - d * s * 0.45, ctx.y - s * 0.1, 0.6, "blunt", -1)
   splatAt(b, ctx.x - d * s * 0.5, ctx.y + 2, s * 0.36, 43)
   await wait(b.scene, 160 / sp)
@@ -1675,6 +1710,7 @@ const impale: VariantFn = async (ctx, b) => {
   await tween(b.scene, { targets: spear, x: tipEnd.x, y: tipEnd.y, duration: 110 / sp, ease: "Quad.easeIn" })
   if (!alive(b)) return
   tip.setAlpha(1)
+  deathSfx("stab", sp)
   shake(b, 160 / sp, b.mode === "cine" ? 0.02 : 0.011)
   const exitA = Phaser.Math.RadToDeg(ang)
   bloodBurst(b.scene, chest.x + ux * s * 0.18, chest.y + uy * s * 0.18, b.mode === "cine" ? 26 : 14, { min: exitA - 25, max: exitA + 25 }, b.mode === "cine" ? 1.5 : 0.9, sp)
@@ -1689,6 +1725,7 @@ const impale: VariantFn = async (ctx, b) => {
   if (!alive(b)) return
   // Висит: лапы болтаются, кровь стекает по древку
   bloodSquirt(b.scene, chest.x + ux * s * 0.2, chest.y - lift + uy * s * 0.2, fxSize(ctx, b), exitA, 380 / sp, 24, ctx.y)
+  deathSfx("squirt", sp)
   const base = { x: tipEnd.x - ux * len, y: tipEnd.y - lift - uy * len }
   const from = { x: chest.x, y: chest.y - lift }
   for (let i = 0; i < 5; i++) {
@@ -1716,6 +1753,7 @@ const impale: VariantFn = async (ctx, b) => {
   await tween(b.scene, { targets: b.t, angle: d * 16, duration: 140 / sp, yoyo: true, repeat: 1, ease: "Sine.easeInOut" })
   if (!alive(b)) return
   // Сползает по древку…
+  deathSfx("slideWet", sp)
   const slide = s * 0.3
   await tween(b.scene, {
     targets: b.t,
@@ -1727,6 +1765,7 @@ const impale: VariantFn = async (ctx, b) => {
   })
   if (!alive(b)) return
   // …и шлёпается на землю, копьё выдёргивают
+  deathSfx("pull", sp)
   b.scene.tweens.add({
     targets: spear,
     x: `-=${ux * s * 0.9}`,
@@ -1739,6 +1778,7 @@ const impale: VariantFn = async (ctx, b) => {
   await tween(b.scene, { targets: b.t, y: lyingY(ctx, b), angle: d * 90, duration: 320 / sp, ease: "Bounce.easeOut" })
   if (!alive(b)) return
   const gx = ctx.x - ux * slide + d * s * 0.3
+  deathSfx("bodyFall", sp)
   gush(ctx, b, gx, ctx.y - s * 0.1, 0.7, "blunt", -1)
   splatAt(b, gx, ctx.y + 2, s * 0.4, 51)
   dustPuff(b.scene, gx, ctx.y, s * 0.4, 6)
@@ -1770,6 +1810,7 @@ const pincushion: VariantFn = async (ctx, b, rng) => {
     b.temps.push(arrow)
     await tween(b.scene, { targets: arrow, x: tx, y: ty, duration: 80 / sp, ease: "Linear" })
     if (!alive(b) || !arrow.scene) return
+    deathSfx("arrow", sp)
     glue(b, arrow)
     const a = Phaser.Math.RadToDeg(rot)
     bloodBurst(b.scene, tx, ty, b.mode === "cine" ? 10 : 6, { min: a - 160, max: a - 110 }, b.mode === "cine" ? 1 : 0.6, sp)
@@ -1787,6 +1828,7 @@ const pincushion: VariantFn = async (ctx, b, rng) => {
   // …и валится навзничь
   await tween(b.scene, { targets: b.t, angle: d * 92, y: lyingY(ctx, b), duration: 420 / sp, ease: "Bounce.easeOut" })
   if (!alive(b)) return
+  deathSfx("bodyFall", sp)
   gush(ctx, b, ctx.x + d * s * 0.4, ctx.y - s * 0.1, 0.7, "arrow", -1)
   splatAt(b, ctx.x + d * s * 0.45, ctx.y + 2, s * 0.42, 61)
   dustPuff(b.scene, ctx.x + d * s * 0.3, ctx.y, s * 0.45, 8)
@@ -1818,6 +1860,7 @@ const ash: VariantFn = async (ctx, b) => {
     }
   })
   b.cleanup.push(() => flames.remove(false))
+  deathSfx("ignite", sp)
   gush(ctx, b, an.x, an.chestY, 0.7, "magic", -1)
   await tintRamp(b, 0xff8a3d, 200 / sp)
   if (!alive(b)) return
@@ -1835,6 +1878,7 @@ const ash: VariantFn = async (ctx, b) => {
     return e
   })
   await tween(b.scene, { targets: eyes, alpha: 1, duration: 120 / sp })
+  deathSfx("blink", sp)
   await tween(b.scene, { targets: eyes, scaleY: eyes[0]!.scaleY * 0.1, duration: 70 / sp, yoyo: true, hold: 30 / sp })
   await wait(b.scene, 140 / sp)
   if (!alive(b)) return
@@ -1876,6 +1920,7 @@ const ash: VariantFn = async (ctx, b) => {
   const proxy = { k: 0 }
   let last = 0
   ctx.onPool?.()
+  deathSfx("windAsh", sp)
   await tween(b.scene, {
     targets: proxy,
     k: 1,
@@ -1963,6 +2008,7 @@ const freeze: VariantFn = async (ctx, b, rng) => {
     life: [400, 700],
     area: { w: bw, h: s * 0.1 }
   })
+  deathSfx("freeze", sp)
   await Promise.all([
     tween(b.scene, { targets: block, scaleY: 1, duration: 380 / sp, ease: "Back.easeOut" }),
     tintRamp(b, 0x9fd8ff, 380 / sp)
@@ -1975,6 +2021,7 @@ const freeze: VariantFn = async (ctx, b, rng) => {
     .setDepth(b.depth + 0.6)
     .setScale(0)
   b.temps.push(glint)
+  deathSfx("glint", sp)
   b.scene.tweens.add({ targets: glint, scale: (s * 0.16) / 16, angle: 90, duration: 200 / sp, yoyo: true, onComplete: () => glint.destroy() })
   await wait(b.scene, 300 / sp)
   if (!alive(b)) return
@@ -2000,6 +2047,7 @@ const freeze: VariantFn = async (ctx, b, rng) => {
       cracks.strokePath()
     }
     shake(b, 70 / sp, 0.005)
+    deathSfx("iceCrack", sp)
     await wait(b.scene, 170 / sp)
     if (!alive(b)) return
   }
@@ -2007,6 +2055,7 @@ const freeze: VariantFn = async (ctx, b, rng) => {
   hideBody(b)
   block.destroy()
   cracks.destroy()
+  deathSfx("shatterIce", sp)
   shake(b, 200 / sp, b.mode === "cine" ? 0.022 : 0.012)
   shockRing(b.scene, an.x, ctx.y - bh * 0.5, s, 0xdff3ff, 360 / sp)
   const flights: Promise<void>[] = []
@@ -2066,6 +2115,7 @@ const ascend: VariantFn = async (ctx, b) => {
   ])
   if (!alive(b)) return
   dustPuff(b.scene, ctx.x + d * s * 0.3, ctx.y, s * 0.3, 5)
+  deathSfx("bodyFallLight", sp)
   bloodDrip(b.scene, ctx.x + d * s * 0.4, ctx.y - s * 0.1, ctx.y + 2, fxSize(ctx, b), sp)
   const soul = bodyCopy(b)
   if (!soul) {
@@ -2104,6 +2154,7 @@ const ascend: VariantFn = async (ctx, b) => {
     area: { w: w * 0.5, h: s * 0.4 }
   })
   const wingW = wings[0]!.scaleY
+  deathSfx("ascend", sp)
   const proxy = { k: 0 }
   await tween(b.scene, {
     targets: proxy,
@@ -2146,8 +2197,9 @@ const balloon: VariantFn = async (ctx, b, rng) => {
   const d = ctx.dir
   const tint = tintRamp(b, 0xffb8cf, 520 / sp)
   const steps: [number, number][] = [[1.14, 1.1], [1.3, 1.24], [1.5, 1.44]]
-  for (const [sx, sy] of steps) {
+  for (const [i, [sx, sy]] of steps.entries()) {
     if (!alive(b)) return
+    deathSfx("inflate", sp, i)
     await scaleFromFeet(b, sx, sy, 110 / sp, "Back.easeOut")
     await wait(b.scene, 70 / sp)
   }
@@ -2171,6 +2223,7 @@ const balloon: VariantFn = async (ctx, b, rng) => {
   await wait(b.scene, 40 / sp)
   if (!alive(b)) return
   hideBody(b)
+  deathSfx("pop", sp)
   shake(b, 200 / sp, b.mode === "cine" ? 0.024 : 0.012)
   punchText(b.scene, cx, cy - s * 0.2, tr("POP!", "ПУФ!"), "#ff8fc7", b.mode === "cine" ? 40 : ctx.size * 0.42, sp)
   puff(b.scene, cx, cy, TEX.square, [0xff6b9d, 0xffd166, 0x6ee7b7, 0x60a5fa, 0xc084fc], {
@@ -2194,6 +2247,7 @@ const balloon: VariantFn = async (ctx, b, rng) => {
     skin.setDisplaySize(b.w * 0.5, b.h * 0.42)
     let x = cx
     let y = cy
+    deathSfx("deflate", sp)
     for (let i = 0; i < 4; i++) {
       if (!skin.scene) break
       x = cx + (rng() - 0.5) * s * 1.1
@@ -2213,7 +2267,9 @@ const balloon: VariantFn = async (ctx, b, rng) => {
     if (skin.scene) {
       bits.push(
         fly(b.scene, skin, d * s * 0.2, 0, s * 4, ctx.y - s * 0.04, d * 300, sp, 1, (lx, _y, k) => {
-          if (k === 0) splatAt(b, lx, ctx.y + 2, s * 0.3, 81)
+          if (k !== 0) return
+          splatAt(b, lx, ctx.y + 2, s * 0.3, 81)
+          deathSfx("splatSmall", sp)
         })
       )
     }
@@ -2236,6 +2292,7 @@ const knockout: VariantFn = async (ctx, b) => {
   tooth.setDisplaySize(s * 0.045, s * 0.06)
   b.temps.push(tooth)
   bloodBurst(b.scene, tooth.x, tooth.y, b.mode === "cine" ? 12 : 6, d > 0 ? { min: -60, max: 0 } : { min: 180, max: 240 }, 0.8, sp)
+  deathSfx("tooth", sp)
   const toothFlight = fly(b.scene, tooth, d * s * 0.75, -s * 1.3, s * 4, ctx.y - s * 0.02, d * 900, sp, 1, (x, _y, k) => {
     if (k === 0) splatAt(b, x, ctx.y + 2, s * 0.14, 91)
   }, dripper(ctx, b))
@@ -2270,6 +2327,7 @@ const knockout: VariantFn = async (ctx, b) => {
     })
   })
   // Шатается…
+  deathSfx("dizzy", sp)
   await tween(b.scene, { targets: b.t, angle: -d * 9, duration: 150 / sp, ease: "Sine.easeInOut" })
   if (!alive(b)) return
   await tween(b.scene, { targets: b.t, angle: d * 9, duration: 300 / sp, yoyo: true, repeat: 0, ease: "Sine.easeInOut" })
@@ -2278,6 +2336,8 @@ const knockout: VariantFn = async (ctx, b) => {
   await tween(b.scene, { targets: b.t, angle: d * 90, y: lyingY(ctx, b), duration: 300 / sp, ease: "Quad.easeIn" })
   if (!alive(b)) return
   shake(b, 200 / sp, b.mode === "cine" ? 0.022 : 0.012)
+  deathSfx("slam", sp)
+  deathSfx("koBell", sp)
   punchText(b.scene, ctx.x + d * s * 0.3, ctx.y - s * 0.55, "K.O.!", "#ffd166", b.mode === "cine" ? 42 : ctx.size * 0.42, sp)
   dustPuff(b.scene, ctx.x + d * s * 0.3, ctx.y, s * 0.5, 10)
   const px = b.mode === "cine" ? ctx.x + d * s * 0.42 : ctx.x
@@ -2305,11 +2365,13 @@ const zombieMelt: VariantFn = async (ctx, b, rng) => {
   ensureDeathTextures(b.scene)
   ensureGoreTextures(b.scene)
   // Оседает…
+  deathSfx("zombieSettle", sp)
   await scaleFromFeet(b, 1.1, 0.8, 150 / sp, "Quad.easeOut")
   if (!alive(b)) return
   // …и рывками пытается встать снова
   for (let i = 0; i < 3; i++) {
     if (!alive(b)) return
+    deathSfx("boneCreak", sp)
     await Promise.all([
       tween(b.scene, { targets: b.t, angle: (i % 2 ? -1 : 1) * d * 11, duration: 70 / sp, ease: "Quad.easeOut" }),
       scaleFromFeet(b, 1.06 - i * 0.05, 0.84 + i * 0.09, 90 / sp, "Back.easeOut")
@@ -2322,10 +2384,12 @@ const zombieMelt: VariantFn = async (ctx, b, rng) => {
     scaleFromFeet(b, 0.92, 1.12, 140 / sp, "Back.easeOut")
   ])
   if (!alive(b)) return
+  deathSfx("grr", sp)
   punchText(b.scene, ctx.x, ctx.y - s * 1.05, tr("Grr…?", "Ррр…?"), "#b5e655", b.mode === "cine" ? 28 : ctx.size * 0.3, sp)
   await wait(b.scene, 200 / sp)
   if (!alive(b)) return
   // Не вышло: стекает в лужу
+  deathSfx("melt", sp)
   // Зелёная лужа поверх обычной кровавой (её кладёт onPool), внутри — немного красного
   growPool(b, ctx.x, ctx.y + 2, TEX.pool, 0x6fa12a, s * 1.6, s * 0.48, 820 / sp, 0.1)
   growPool(b, ctx.x + d * s * 0.15, ctx.y + 3, GORE_TEX.pool(1), null, s * 0.6, s * 0.18, 700 / sp, 0.15)
@@ -2344,6 +2408,7 @@ const zombieMelt: VariantFn = async (ctx, b, rng) => {
   ])
   if (!alive(b)) return
   hideBody(b)
+  deathSfx("bones", sp)
   // Кости и черепок всплывают в луже
   const depth = b.mode === "cine" ? 6.3 : 1.6
   const relics: [string, number, number, number, number][] = [
@@ -2421,6 +2486,9 @@ const VARIANTS: Record<DeathVariant, VariantFn> = {
 
 /* ---------- Входные точки ---------- */
 
+/** Варианты без предсмертного крика: мгновенные (крик не успеет) или со своим «голосом» (шарик, зомби). */
+const SILENT_VARIANTS = new Set<DeathVariant>(["gibs", "explode", "flatten", "behead", "balloon", "zombieMelt"])
+
 async function playDeath(ctx: DeathCtx, mode: Mode): Promise<void> {
   if (!sceneAlive(ctx.scene)) return
   const b = makeBody(ctx, mode)
@@ -2430,6 +2498,7 @@ async function playDeath(ctx: DeathCtx, mode: Mode): Promise<void> {
   const rng = makeRng(hash(`${ctx.unit.id}:${variant}:${ctx.unit.seed}`))
   try {
     await killMoment(ctx, b)
+    if (!SILENT_VARIANTS.has(variant)) sfx(ctx.side === "player" ? "deathPlayer" : "deathEnemy")
     if (alive(b)) await VARIANTS[variant](ctx, b, rng)
   }
   catch (e) {

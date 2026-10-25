@@ -2,7 +2,8 @@ import type Phaser from "phaser"
 import type { BattleEvent, BattleState, Pos } from "@game/core/types"
 import { $save } from "@game/state/save"
 import { $battleUi, type Presenter } from "@game/state/battleUi"
-import { haptic } from "@game/platform/haptics"
+import { haptic, strikeHaptic } from "@game/platform/haptics"
+import { sfx, stopMusic, strikeSfx, swingSfx } from "@game/platform/audio"
 import { MAP_SCENE_KEY, MapScene } from "./MapScene"
 import { CINEMATIC_SCENE_KEY, type CinematicData, type CombatEvent } from "./CinematicScene"
 import { banner, floatText, ghostRise, stamp, tween, wait } from "./fx"
@@ -121,6 +122,7 @@ export class GamePresenter implements Presenter {
       case "loot": {
         // Выбитые Вкусняшки всплывают над местом гибели врага
         const c = map.center(ev.pos)
+        sfx("loot")
         floatText(map, c.x, c.y - map.tile * 0.2, `+${ev.amount} 🦴`, "#ffd166", sp, {
           size: map.tile * 0.3,
           rise: 34,
@@ -134,6 +136,7 @@ export class GamePresenter implements Presenter {
         return this.assist(ev, after, map, sp)
       case "wallHit": {
         map.shakeTile(ev.pos)
+        sfx("wall")
         map.setWallHp(ev.pos, ev.hpAfter, sp)
         map.cameras.main.shake(80 / sp, 0.004)
         const c = map.center(ev.pos)
@@ -156,6 +159,7 @@ export class GamePresenter implements Presenter {
         return wait(map, 150 / sp)
       }
       case "phaseChanged":
+        sfx(ev.phase === "player" ? "phasePlayer" : "phaseEnemy")
         return banner(
           map,
           ev.phase === "player"
@@ -177,6 +181,7 @@ export class GamePresenter implements Presenter {
           if (!bu) return
           await wait(map, (i * 110) / sp)
           const c = map.center(bu.pos)
+          sfx("portal")
           await portalSpawn(map, c.x, c.y, map.tile, sp)
           const view = map.ensureUnitView(id, after)
           if (!view) return
@@ -191,6 +196,7 @@ export class GamePresenter implements Presenter {
         if (view) {
           view.hop()
           haptic("success")
+          sfx("levelUp")
           await levelUpFx(map, view.x, view.y - map.tile * 0.1, map.tile, sp)
           return wait(map, 200 / sp)
         }
@@ -202,6 +208,8 @@ export class GamePresenter implements Presenter {
         return wait(map, 60 / sp)
       case "battleEnded": {
         haptic(ev.result === "victory" ? "success" : ev.result === "defeat" ? "error" : "warning")
+        stopMusic(0.5)
+        sfx(ev.result)
         // Победа: выжившие подпрыгивают от радости; поражение — кровь на экране
         if (ev.result === "victory") {
           for (const v of map.units.values()) if (v.side === "player") v.hop()
@@ -250,7 +258,10 @@ export class GamePresenter implements Presenter {
         onLand: () => {
           if (!map.sys.isActive()) return
           const feet = view.feetWorld()
-          if (view.gait !== "flier") stepFx(map, feet.x, feet.y, map.tile, terrain, state.map.biomeId, heavyStep)
+          if (view.gait !== "flier") {
+            stepFx(map, feet.x, feet.y, map.tile, terrain, state.map.biomeId, heavyStep)
+            sfx(heavyStep ? "stepHeavy" : "step")
+          }
           if (view.gait === "armored") shakeCam(map, 50 / sp, 1.5)
           // Раненый оставляет кровавый след
           if (view.hpFrac() < 0.5) bloodTrail(map, feet.x, feet.y, map.tile, sp, 2)
@@ -359,11 +370,11 @@ export class GamePresenter implements Presenter {
       floatText(map, atk.x, atk.y - tile * 0.85, tr("COUNTER", "КОНТРА"), "#8ecae6", sp, { size: tile * 0.2, rise: tile * 0.25 })
     if (strike.special) {
       haptic("heavy")
+      sfx("special")
       const portrait = atkUnit ? unitTexKey(atkUnit, "happy", "map") : undefined
       await specialCutIn(map, specialDef(strike.special).name, trailColor, atk.side === "player", sp, portrait)
       if (!atk.scene || !def.scene) return
     }
-    else haptic("medium")
     // Замах (anticipation): назад и присесть
     atk.setPose("run")
     const rig = atk.bodyRig()
@@ -382,6 +393,7 @@ export class GamePresenter implements Presenter {
     const ranged = skill === "bow" || skill === "blackMagic" || skill === "whiteMagic"
     const reach = ranged ? 0.1 : def.side === atk.side ? 0.2 : 0.38
     afterImages(map, atk, ranged ? 1 : 3, 28, trailColor, sp)
+    swingSfx(skill)
     map.tweens.add({ targets: rig, scaleX: 0.92, scaleY: 1.1, duration: 90 / sp, ease: "Quad.easeIn" })
     await tween(map, {
       targets: atk,
@@ -421,6 +433,8 @@ export class GamePresenter implements Presenter {
     // Контакт: хит-стоп, отдача, тряска
     const frac = strike.damage / Math.max(1, defMax)
     const lethal = strike.defenderHpAfter <= 0
+    strikeSfx({ weapon: skill, damage: strike.damage, frac, special: !!strike.special, lethal, effective: strike.effective })
+    haptic(strikeHaptic(strike.damage, frac, !!strike.special, lethal))
     hitStop(map, strike.damage > 0 ? (strike.special || lethal ? 110 : 75) : 45)
     def.takeHit(ux, uy, frac * 2.2 + (strike.special ? 0.5 : 0), sp)
     shakeCam(map, 110 / sp, shakePx(!!strike.special, strike.effective) * (lethal ? 1.6 : 0.9))
@@ -459,6 +473,7 @@ export class GamePresenter implements Presenter {
       floatText(map, def.x + tile * 0.3, def.y - tile * 0.85, "×1.5", slayer ? "#57e389" : "#ff6b6b", sp, { size: tile * 0.22 })
     }
     if (strike.healed > 0) {
+      sfx("heal")
       floatText(map, atk.x, atk.y - tile * 0.5, `+${strike.healed}`, "#80ed99", sp, { size: tile * 0.3 })
       healPillar(map, ox, oy, tile, sp)
     }
@@ -584,6 +599,7 @@ export class GamePresenter implements Presenter {
     if (!view) return
     switch (ev.effect.type) {
       case "heal":
+        sfx("heal")
         healPillar(map, view.x, view.y, map.tile, sp)
         floatText(map, view.x, view.y - map.tile * 0.5, `+${ev.effect.amount}`, "#80ed99", sp, {
           size: map.tile * 0.34
@@ -592,6 +608,8 @@ export class GamePresenter implements Presenter {
           view.setHp(ev.hpAfter, view.getHp() > ev.hpAfter ? view.getHp() : Math.max(ev.hpAfter, view.getHp()))
         break
       case "damage":
+        sfx("hurt")
+        haptic("light")
         bigNumber(map, view.x, view.y - map.tile * 0.5, `−${ev.effect.amount}`, "#ffffff", map.tile * 0.34, sp)
         view.takeHit(0, -1, 0.6, sp)
         hitGore(map, {
@@ -610,9 +628,11 @@ export class GamePresenter implements Presenter {
         })
         break
       case "buff":
+        sfx("buff")
         buffRunes(map, view.x, view.y, map.tile, Object.keys(ev.effect.stats), true, sp)
         break
       case "debuff":
+        sfx("debuff")
         buffRunes(map, view.x, view.y, map.tile, Object.keys(ev.effect.stats), false, sp)
         break
       case "flag":
@@ -649,6 +669,7 @@ export class GamePresenter implements Presenter {
       }).then(() => {
         if (!view.scene) return
         view.setPosition(c.x, c.y)
+        sfx("land")
         const feet = view.feetWorld()
         stepFx(map, feet.x, feet.y, map.tile, after.map.tiles[m.to.y]?.[m.to.x], after.map.biomeId, true)
       })
@@ -657,6 +678,7 @@ export class GamePresenter implements Presenter {
     const target = map.units.get(ev.targetId)
     const actor = map.units.get(ev.unitId)
     if (target && ev.heal > 0) {
+      sfx("heal")
       healPillar(map, target.x, target.y, map.tile, sp)
       bigNumber(map, target.x, target.y - map.tile * 0.55, `+${ev.heal}`, "#80ed99", map.tile * 0.4, sp)
       const tb = after.units[ev.targetId]
@@ -668,6 +690,7 @@ export class GamePresenter implements Presenter {
       if (ab) actor.setHp(ev.unitHpAfter, ab.maxHp)
     }
     if (target && ev.assistId === "as_dance") {
+      sfx("buff")
       if (actor) danceFx(map, actor.x, actor.y, map.tile, sp, actor.bodyRig())
       danceFx(map, target.x, target.y, map.tile, sp, target.bodyRig())
       floatText(map, target.x, target.y - map.tile * 0.7, tr("↻ again!", "↻ ещё раз!"), "#ffd166", sp, { size: map.tile * 0.3 })
@@ -677,6 +700,7 @@ export class GamePresenter implements Presenter {
     if (target && ev.assistId.startsWith("as_rally")) {
       const stat = ev.assistId.replace("as_rally_", "")
       buffRunes(map, target.x, target.y, map.tile, [stat], true, sp)
+      sfx("buff")
       actor?.hop()
     }
     return wait(map, 200 / sp)

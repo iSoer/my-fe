@@ -1,5 +1,7 @@
 /** Тонкий типизированный адаптер над window.Telegram.WebApp с фолбэком для браузера. */
 
+import type { HapticKind } from '@game/platform/haptics';
+
 export interface TgSafeArea {
   top: number;
   bottom: number;
@@ -157,4 +159,47 @@ export function shareText(text: string, url: string): void {
   const link = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
   if (tg) tg.openTelegramLink(link);
   else window.open(link, '_blank');
+}
+
+/**
+ * Тактильный отклик через Telegram (работает и на iOS, где нет Vibration API).
+ * Серии ударов — несколькими импульсами подряд. false — не в Telegram или клиент слишком старый.
+ */
+export function tgHaptic(kind: HapticKind): boolean {
+  if (!tg || !isTelegram || !tg.isVersionAtLeast('6.1')) return false;
+  const h = tg.HapticFeedback;
+  const pulses = (styles: ('light' | 'medium' | 'heavy' | 'rigid' | 'soft')[], gap: number): void =>
+    styles.forEach((s, i) => (i ? setTimeout(() => h.impactOccurred(s), i * gap) : h.impactOccurred(s)));
+  try {
+    switch (kind) {
+      case 'select':
+        h.selectionChanged();
+        break;
+      case 'light':
+      case 'medium':
+      case 'heavy':
+        h.impactOccurred(kind);
+        break;
+      case 'error':
+      case 'success':
+      case 'warning':
+        h.notificationOccurred(kind);
+        break;
+      case 'block':
+        pulses(['rigid', 'light'], 60);
+        break;
+      case 'hit':
+        h.impactOccurred('heavy');
+        break;
+      case 'crit':
+        pulses(['heavy', 'rigid', 'heavy'], 70);
+        break;
+      case 'kill':
+        pulses(['heavy', 'heavy', 'rigid', 'heavy'], 80);
+        break;
+    }
+  } catch {
+    return false;
+  }
+  return true;
 }
