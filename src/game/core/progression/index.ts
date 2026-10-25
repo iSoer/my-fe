@@ -3,7 +3,6 @@ import type {
   Army,
   BattleResult,
   Inventory,
-  StoreStock,
   BattleState,
   BattleSummary,
   LevelUpSummary,
@@ -11,14 +10,15 @@ import type {
   Profile,
   SaveGame,
   Rarity,
+  Settlement,
   Shelter,
   Stats,
   UnitInstance
 } from "../types"
-import { BARRACKS_CAP, MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
+import { MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
 import { generateUnit, levelGains, unitClassName } from "../units"
 import { treatsMultiplier } from "../skills/engine"
-import { generateStore } from "../items"
+import { refillHospital, returnFromBattle, rosterCap, trainingBattleXp } from "../settlement"
 import { LOOT, PRICES, REWARDS, SHOP, XP, recruitRarityWeights } from "@game/content/balance"
 import { EPITAPHS } from "@game/content/epitaphs"
 import { personalityText } from "@game/content/personalities"
@@ -124,7 +124,8 @@ export interface BattleResolution {
   shelter: Shelter
   /** Инвентарь армии (снаряжение павших потеряно вместе с ними). */
   inventory: Inventory
-  store: StoreStock
+  /** Поселение после боя: опыт бойцам полигона, заряды Больницы восстановлены. */
+  settlement: Settlement
   rewardChoice?: UnitInstance[]
 }
 
@@ -153,10 +154,11 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
       nextUnits.push(u)
       continue
     }
-    let merged: UnitInstance = {
+    // Из боя боец возвращается уставшим, блюдо Столовой съедено
+    let merged: UnitInstance = returnFromBattle({
       ...roster,
       history: { ...roster.history, battles: roster.history.battles + 1 }
-    }
+    })
     const short = XP.victoryMin - (xpGained[u.id] ?? 0)
     if (bu.alive && result === "victory" && short > 0) {
       merged = gainXp(merged, short).unit
@@ -241,15 +243,15 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
   const mvp = Object.entries(xpGained).sort((a, b) => b[1] - a[1])[0]
   if (mvp) summary.mvpId = mvp[0]
 
-  // Витрина Казармы и Лавка обновляются после каждого боя; бесплатная награда — если ростер ещё жив
+  // Витрина Казармы обновляется после каждого боя (Торговая площадка — по часам); бесплатная награда — если ростер ещё жив
   const shelter: Shelter = generateShop(rng.int(0, 0x7fffffff), nextArmy, profile, now)
-  const store = generateStore(rng.int(0, 0x7fffffff), nextArmy, profile.glory)
   const inventory = save.inventory
+  const settlement = refillHospital(trainingBattleXp(save.settlement, nextArmy))
   const rewardChoice = nextArmy
     ? generateRewardChoice(rng.int(0, 0x7fffffff), nextArmy, profile, result === "victory", now)
     : undefined
 
-  return { summary, army: nextArmy, profile, memorial: [...save.memorial, ...fallen], shelter, inventory, store, rewardChoice }
+  return { summary, army: nextArmy, profile, memorial: [...save.memorial, ...fallen], shelter, inventory, settlement, rewardChoice }
 }
 
 function statDiff(a: UnitInstance, b: UnitInstance): Partial<Stats> {
@@ -306,8 +308,8 @@ export function generateRewardChoice(
   return candidates(seed, "reward", REWARDS.rewardChoices, rosterLevel(army), weights, now)
 }
 
-export function canRecruit(army: Army | undefined): boolean {
-  return !!army && army.units.length < BARRACKS_CAP
+export function canRecruit(save: Pick<SaveGame, "army" | "settlement">): boolean {
+  return !!save.army && save.army.units.length < rosterCap(save)
 }
 
 export function biomeName(id: string): string {

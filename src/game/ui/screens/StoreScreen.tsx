@@ -4,7 +4,9 @@ import type { ItemCategory, UnitInstance } from "@game/core/types"
 import { itemCount, itemInfo, storeOffers } from "@game/core/items"
 import { weaponDef } from "@game/content/weapons"
 import { SKILL_LABELS, rankAtLevel, rankIndex } from "@shared/character/skills"
-import { $save, buyItemAction, ensureRoster, markStoreSeen } from "@game/state/save"
+import { $save, buyItemAction, ensureRoster, ensureStore, markStoreSeen } from "@game/state/save"
+import { buildingLevel, msToMarketRefresh } from "@game/core/settlement"
+import { MAX_BUILDING_LEVEL } from "@game/content/buildings"
 import { navigate } from "@game/state/router"
 import { haptic } from "@game/platform/haptics"
 import { Button } from "../components/Button"
@@ -36,15 +38,31 @@ function wielders(units: UnitInstance[], weaponId: string): number {
   return units.filter(u => rankIndex(rankAtLevel(u.aptitudes[w.kind], u.level)) >= rankIndex(w.requiredRank)).length
 }
 
-/** Лавка Тётушки Сырницы: вкладки оружия, расходников и талисманов; ассортимент обновляется после боя. */
+/** Минуты и секунды до обновления витрины. */
+function countdown(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
+}
+
+/** Торговая площадка (Лавка Тётушки Сырницы): вкладки оружия и талисманов; витрина обновляется каждый час. */
 export function StoreScreen() {
   const save = useStore($save)
   const [tab, setTab] = useState<ItemCategory>("weapon")
+  const [now, setNow] = useState(() => Date.now())
   const [toastEl, toast] = useToast()
   useEffect(() => {
     ensureRoster()
+    ensureStore()
     markStoreSeen()
+    const t = window.setInterval(() => {
+      setNow(Date.now())
+      // Граница часа — новая витрина прямо на экране
+      ensureStore()
+      markStoreSeen()
+    }, 1000)
+    return () => window.clearInterval(t)
   }, [])
+  const marketLevel = Math.max(1, buildingLevel(save, "market"))
 
   const units = save.army?.units ?? []
   const offers = storeOffers(save.store, tab)
@@ -57,7 +75,7 @@ export function StoreScreen() {
 
   return (
     <div className="screen">
-      <TopBar title={tr("Shop", "Лавка")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
+      <TopBar title={tr("Market", "Лавка")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
       <div className="tabs" role="tablist">
         {TABS.map(t => (
           <button key={t.id} type="button" role="tab" className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)}>
@@ -66,6 +84,10 @@ export function StoreScreen() {
         ))}
       </div>
       <div className="screen-body">
+        <div className="row between small">
+          <span className="chip">{`🛒 ${tr("Market Lv.", "Площадка ур.")} ${marketLevel}/${MAX_BUILDING_LEVEL}`}</span>
+          <span className="muted">{`⏳ ${tr("new stock in", "новый товар через")} ${countdown(msToMarketRefresh(now))}`}</span>
+        </div>
         <p className="muted small">{TABS.find(t => t.id === tab)?.hint}</p>
         <div className="stack">
           {offers.map((id, i) => {
@@ -95,9 +117,14 @@ export function StoreScreen() {
               </div>
             )
           })}
-          {offers.length === 0 && <p className="muted">{tr("Empty — check back after the next sortie.", "Пусто — загляните после следующей вылазки.")}</p>}
+          {offers.length === 0 && <p className="muted">{tr("Empty — check back next hour.", "Пусто — загляните в следующем часу.")}</p>}
         </div>
-        <p className="muted small hint-line">{tr("Stock refreshes after every battle. Purchases go to the army’s inventory.", "Ассортимент обновляется после каждого боя. Купленное лежит в инвентаре армии.")}</p>
+        <p className="muted small hint-line">
+          {tr(
+            "Stock refreshes every real hour. Upgrade the Market in the Settlement for more goods and upgraded weapons. Purchases go to the army’s inventory.",
+            "Товар обновляется каждый реальный час. Улучшайте площадку в Поселении — товаров больше, чаще усиленное оружие. Купленное лежит в инвентаре армии."
+          )}
+        </p>
       </div>
       {toastEl}
     </div>

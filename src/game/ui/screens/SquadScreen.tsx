@@ -5,7 +5,10 @@ import { SQUAD_SIZE } from "@game/core/types"
 import { attackOf, displayName, unitClassName, visibleStats } from "@game/core/units"
 import { difficultyDef } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
-import { $save, assignSquadSlot, startBattle } from "@game/state/save"
+import { $save, assignSquadSlot, setMealAction, startBattle } from "@game/state/save"
+import { DISHES, dishDef } from "@game/content/buildings"
+import { buildingLevel, isTraining, mealSlots, mealsFood } from "@game/core/settlement"
+import { UnitStatusChips } from "../components/UnitStatus"
 import { navigate } from "@game/state/router"
 import { haptic } from "@game/platform/haptics"
 import { Button } from "../components/Button"
@@ -78,6 +81,10 @@ function SquadSlot({ unit, slot, onOpen }: { unit?: UnitInstance, slot: number, 
       <span className="small muted">{`${unitClassName(unit)} · ${tr("Lv.", "Ур.")}${unit.level}`}</span>
       <span className="small">{classRoleText(unit.classId)}</span>
       <span className="squad-stats">{`HP ${st.hp} · ${atkLabel(unit)} ${attackOf(unit, st)} · Spd ${st.spd}`}</span>
+      <span className="row wrap" style={{ gap: 4, justifyContent: "center" }}>
+        <UnitStatusChips unit={unit} />
+        {unit.meal && <span className="chip gold">{dishDef(unit.meal)?.icon}</span>}
+      </span>
       <span className="squad-swap">{tr("Swap ›", "Заменить ›")}</span>
     </button>
   )
@@ -99,9 +106,16 @@ export function SquadScreen() {
   if (!army || !pending) return <div className="screen" />
 
   const map = pending.map
+  const meals = pending.meals ?? {}
+  // Бойцы отряда с выбранными блюдами: статы и сила отряда — уже с баффом Столовой
   const squad = army.squadIds
     .map(id => army.units.find(u => u.id === id))
     .filter((u): u is UnitInstance => !!u)
+    .map(u => (meals[u.id] ? { ...u, meal: meals[u.id] } : u))
+  const canteen = buildingLevel(save, "canteen")
+  const fedCap = mealSlots(save)
+  const fed = squad.filter(u => u.meal).length
+  const foodNeed = mealsFood(Object.fromEntries(squad.filter(u => u.meal).map(u => [u.id, u.meal as string])))
   const enemies = map.enemies
   const waves = map.reinforcements
   const enemyPower = power([...enemies.map(e => e.unit), ...waves.flatMap(w => w.units.map(x => x.unit))])
@@ -125,6 +139,11 @@ export function SquadScreen() {
     if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("select")
     setSlot(null)
+  }
+  const onMeal = (unitId: string, dishId: string | undefined) => {
+    const r = setMealAction(unitId, dishId)
+    if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
+    haptic("select")
   }
   const onStart = () => {
     if (squad.length === 0) return toast(tr("Pick fighters for the squad", "Выберите бойцов в отряд"), true)
@@ -174,6 +193,38 @@ export function SquadScreen() {
           ))}
         </div>
 
+        {canteen > 0 && squad.length > 0 && (
+          <>
+            <div className="section-title">{tr(`Canteen ${fed}/${fedCap} · 🌾 ${foodNeed}/${save.profile.food}`, `Столовая ${fed}/${fedCap} · 🌾 ${foodNeed}/${save.profile.food}`)}</div>
+            <p className="muted small">{tr("A meal buffs a fighter for this battle; Food is spent when the battle starts.", "Блюдо усиливает бойца на этот бой; Еда тратится при старте боя.")}</p>
+            <div className="stack">
+              {squad.map(u => (
+                <div key={u.id} className="card stack" style={{ gap: 6 }}>
+                  <div className="row" style={{ gap: 8 }}>
+                    <UnitAvatar unit={u} size="sm" friendly animated={false} />
+                    <b className="grow">{displayName(u)}</b>
+                    {u.meal && <span className="muted small">{dishDef(u.meal)?.desc}</span>}
+                  </div>
+                  <div className="meal-row">
+                    {DISHES.filter(d => d.minLevel <= canteen).map(d => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        className={`meal-btn${u.meal === d.id ? " on" : ""}`}
+                        disabled={u.meal !== d.id && !u.meal && fed >= fedCap}
+                        title={d.desc}
+                        onClick={() => onMeal(u.id, u.meal === d.id ? undefined : d.id)}
+                      >
+                        {`${d.icon} ${d.name} · 🌾${d.food}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         <div className="card power-card">
           <div className="row between">
             <span>{tr("Squad power", "Сила отряда")}</span>
@@ -212,7 +263,9 @@ export function SquadScreen() {
                 index={i}
                 animated={false}
                 selected={here}
+                dim={isTraining(save, u.id)}
                 onClick={() => pick(u.id)}
+                tags={<UnitStatusChips unit={u} training={isTraining(save, u.id)} />}
                 right={
                   here
                     ? <span className="chip squad">{tr("Here", "Здесь")}</span>

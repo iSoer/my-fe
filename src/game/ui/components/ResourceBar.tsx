@@ -1,5 +1,6 @@
 import { useStore } from "@nanostores/react"
-import { $profile } from "@game/state/save"
+import { $save } from "@game/state/save"
+import { buildingLevel } from "@game/core/settlement"
 import { useCountUp } from "../lib/animate"
 import { tr } from "@game/i18n"
 
@@ -18,11 +19,15 @@ function Res({ icon, value, title }: { icon: string, value: number, title: strin
 }
 
 export function ResourceBar() {
-  const p = useStore($profile)
+  const save = useStore($save)
+  const p = save.profile
+  // Еда видна, когда она есть или растёт на Полях
+  const food = p.food > 0 || buildingLevel(save, "fields") > 0
   return (
     <div className="resources">
       <Res icon="✦" value={p.glory} title={tr("Glory", "Слава")} />
       <Res icon="🦴" value={p.treats} title={tr("Treats", "Вкусняшки")} />
+      {food && <Res icon="🌾" value={p.food} title={tr("Food", "Еда")} />}
     </div>
   )
 }

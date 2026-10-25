@@ -5,6 +5,7 @@ export type Route
   = | { name: "menu" }
     | { name: "village" }
     | { name: "store" }
+    | { name: "settlement" }
     | { name: "army" }
     | { name: "armyCreate" }
     | { name: "recruit" }
@@ -42,6 +43,7 @@ export function parseRoute(hash: string): Route {
   }
   if (a === "village") return { name: "village" }
   if (a === "store") return { name: "store" }
+  if (a === "settlement") return { name: "settlement" }
   if (a === "memorial") return { name: "memorial" }
   if (a === "settings") return { name: "settings" }
   return { name: "notFound", path }
@@ -55,6 +57,8 @@ export function routePath(r: Route): string {
       return "/village"
     case "store":
       return "/store"
+    case "settlement":
+      return "/settlement"
     case "army":
       return "/army"
     case "armyCreate":
@@ -87,6 +91,13 @@ const currentHash = (): string => (typeof location !== "undefined" ? location.ha
 export const $route = atom<Route>(parseRoute(currentHash()))
 
 let depth = 0
+
+/** Счётчик перемонтирования: экран текущего маршрута создаётся заново (debug-правки боя поверх идущей сцены). */
+export const $routeNonce = atom(0)
+
+export function remountRoute(): void {
+  $routeNonce.set($routeNonce.get() + 1)
+}
 
 export function navigate(path: string, replace = false): void {
   const target = `#${path.startsWith("/") ? path : `/${path}`}`

@@ -1,5 +1,5 @@
-// Headless smoke test игрового цикла: главный экран → новая игра → деревня → Лавка → вылазка (2 шага) → бой →
-// сдача → итоги → деревня → «Продолжить» после перезагрузки. Нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`.
+// Headless smoke test игрового цикла: главный экран → новая игра → лагерь → Лавка → стройка в лагере → вылазка (2 шага) → бой →
+// сдача → итоги → лагерь → «Продолжить» после перезагрузки. Нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`.
 //   node tools/smoke.mjs [url] [путь к Chromium]
 import { chromium } from 'playwright-core';
 
@@ -48,7 +48,7 @@ await step('Лавка: покупка талисмана', async () => {
     const s = window.__pf.save.get();
     window.__pf.save.set({ ...s, profile: { ...s.profile, treats: 500 } });
   });
-  await pf(() => window.__pf.village.walkTo('store'));
+  await pf(() => window.__pf.village.walkTo('market'));
   await page.getByRole('button', { name: /Shop: weapons/ }).click({ timeout: 15000 });
   await page.getByRole('tab', { name: 'Talismans' }).click();
   await page.locator('.store-item button').first().click();
@@ -56,6 +56,36 @@ await step('Лавка: покупка талисмана', async () => {
   if (!Object.keys(inv).some((id) => id.startsWith('tal_'))) throw new Error(`инвентарь: ${JSON.stringify(inv)}`);
   await page.getByRole('button', { name: 'Back' }).click();
   await page.locator('.vl-canvas canvas').waitFor();
+});
+// Лист закрывается тапом по затемнению над ним
+const closeSheet = () => page.locator('.overlay').click({ position: { x: 10, y: 10 } });
+await step('Лагерь: постройка Полей на карте, улучшение площадки у входа', async () => {
+  await pf(() => {
+    const s = window.__pf.save.get();
+    window.__pf.save.set({ ...s, profile: { ...s.profile, treats: s.profile.treats + 2000 } });
+  });
+  await pf(() => window.__pf.village.walkTo('settlement'));
+  await page.locator('.sheet').getByRole('button', { name: /All buildings/ }).click({ timeout: 15000 });
+  // «Построить» на экране Поселения уводит в лагерь: призрак здания на свободном месте, подтверждение в панели стройки
+  await page.locator('.bld-card', { hasText: 'Fields' }).getByRole('button', { name: /Build/ }).click();
+  await page.locator('.vl-buildbar').getByRole('button', { name: /Build/ }).click({ timeout: 30000 });
+  const s = await pf(() => window.__pf.save.get().settlement);
+  if (s.buildings.fields !== 1 || !s.layout.buildings.fields) throw new Error(`Поля: ${JSON.stringify(s.layout)}`);
+  await page.locator('.vl-buildbar').waitFor({ state: 'detached' });
+  // Каталог стройки из нижней панели
+  await page.locator('.vl-dock').getByRole('button', { name: /Build/ }).click();
+  await page.locator('.cat-decor').first().waitFor();
+  await closeSheet();
+  await page.locator('.cat-decor').first().waitFor({ state: 'detached' });
+  // Улучшение — у входа в здание
+  await pf(() => window.__pf.village.walkTo('market'));
+  await page.locator('.sheet .bld-info').getByRole('button', { name: /Upgrade/ }).click({ timeout: 15000 });
+  const b = await pf(() => window.__pf.save.get().settlement.buildings);
+  if (b.market !== 2) throw new Error(`здания: ${JSON.stringify(b)}`);
+  await closeSheet();
+  await pf(() => window.__pf.village.walkTo('fields'));
+  await page.locator('.sheet').getByRole('button', { name: /Harvest|Nothing grown/ }).waitFor({ timeout: 20000 });
+  await closeSheet();
 });
 await step('ворота → вылазка 1/2 и 2/2', async () => {
   await pf(() => window.__pf.village.talk('sorties'));

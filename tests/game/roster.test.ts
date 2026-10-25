@@ -18,7 +18,8 @@ import {
 } from "@game/state/save"
 import { SAVE_VERSION, createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { lootFor, rosterLevel, unitPrice } from "@game/core/progression"
-import { BARRACKS_CAP, SQUAD_SIZE } from "@game/core/types"
+import { SQUAD_SIZE } from "@game/core/types"
+import { rosterCap } from "@game/core/settlement"
 import { ROSTER, SHOP } from "@game/content/balance"
 
 function freshGame(treats = 1000): void {
@@ -86,7 +87,7 @@ describe("ростер", () => {
     expect(buyAction(0).ok).toBe(false)
     freshGame(100000)
     const s = $save.get()
-    const filler = Array.from({ length: BARRACKS_CAP - s.army!.units.length }, (_, i) => ({ ...s.army!.units[0]!, id: `f${i}` }))
+    const filler = Array.from({ length: rosterCap(s) - s.army!.units.length }, (_, i) => ({ ...s.army!.units[0]!, id: `f${i}` }))
     $save.set({ ...s, army: { ...s.army!, units: [...s.army!.units, ...filler] } })
     expect(freeSlots($save.get())).toBe(0)
     expect(buyAction(0).ok).toBe(false)

@@ -1138,6 +1138,13 @@ p {
 .resources .res > * {
   transform: skewX(12deg);
 }
+/* Три ресурса (с Едой) — плотнее, чтобы заголовок экрана поместился */
+.resources:has(.res:nth-child(3)) {
+  gap: 6px;
+}
+.resources:has(.res:nth-child(3)) .res {
+  padding: 4px 8px 4px 7px;
+}
 .resources .res-ico {
   font-size: 13px;
   font-style: normal;

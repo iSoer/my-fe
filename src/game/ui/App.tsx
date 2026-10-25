@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { Suspense, lazy, useState } from "react"
 import { useStore } from "@nanostores/react"
-import { $route, type Route } from "@game/state/router"
+import { $route, $routeNonce, type Route } from "@game/state/router"
+import { DEBUG } from "@game/state/debugFlag"
 import { $saveError, $saveStatus } from "@game/state/save"
 import { MenuScreen } from "./screens/MenuScreen"
 import { ArmyScreen } from "./screens/ArmyScreen"
@@ -13,6 +14,7 @@ import { MemorialScreen } from "./screens/MemorialScreen"
 import { SettingsScreen } from "./screens/SettingsScreen"
 import { VillageScreen } from "./screens/VillageScreen"
 import { StoreScreen } from "./screens/StoreScreen"
+import { SettlementScreen } from "./screens/SettlementScreen"
 import { critterSvg, furArt } from "@game/art/index"
 import { gameHost } from "@game/platform/host"
 import { $lang, tr } from "@game/i18n"
@@ -84,6 +86,8 @@ function Screen({ route }: { route: Route }) {
       return <VillageScreen />
     case "store":
       return <StoreScreen />
+    case "settlement":
+      return <SettlementScreen />
     case "army":
       return <ArmyScreen />
     case "armyCreate":
@@ -110,12 +114,16 @@ function Screen({ route }: { route: Route }) {
   }
 }
 
+/** Debug-панель — отдельный чанк; без `DEBUG` (обычная сборка) его нет вовсе. */
+const DebugPanel = DEBUG ? lazy(() => import("./debug/DebugPanel")) : null
+
 function Router() {
   const route = useStore($route)
   const lang = useStore($lang)
+  const nonce = useStore($routeNonce)
   // key пересоздаёт контейнер при смене маршрута — проигрывается CSS-переход route-in; смена языка перерисовывает экран
   return (
-    <div className="route" key={`${lang}:${routeKey(route)}`}>
+    <div className="route" key={`${lang}:${routeKey(route)}:${nonce}`}>
       <Screen route={route} />
     </div>
   )
@@ -145,6 +153,11 @@ export function App() {
     <>
       <Router />
       {Overlay && <Overlay />}
+      {DebugPanel && (
+        <Suspense fallback={null}>
+          <DebugPanel />
+        </Suspense>
+      )}
     </>
   )
 }

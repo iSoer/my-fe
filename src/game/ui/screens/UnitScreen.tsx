@@ -18,6 +18,8 @@ import {
 import { XP } from "@game/content/balance"
 import { CLASS_TIERS, TIER_LEVELS } from "@shared/character/classes"
 import { sharpenCost, trainCost } from "@game/core/progression"
+import { fatigueOf, isTraining } from "@game/core/settlement"
+import { UnitStatusChips, fatigueHint } from "../components/UnitStatus"
 import { skillInfo } from "@game/content/index"
 import { breedDef } from "@game/content/breeds"
 import { personalityText } from "@game/content/personalities"
@@ -205,7 +207,9 @@ export function UnitScreen({ unitId }: { unitId: string }) {
             <div className="row wrap">
               <MoveBadge classId={cls.id} />
               <WeaponBadge skill={cls.weaponSkill} />
+              <UnitStatusChips unit={unit} training={isTraining(save, unit.id)} />
             </div>
+            {fatigueOf(unit) > 0 && <div className="muted small">{fatigueHint(unit)}</div>}
             <StatBar value={unit.xp} max={XP.perLevel} kind="xp" animate />
             <div className="row between small muted">
               <span>

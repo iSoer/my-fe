@@ -15,7 +15,7 @@ import type {
   UnitInstance,
   UnitSkills
 } from "@game/core/types"
-import { BARRACKS_CAP, MAX_LEVEL, SQUAD_SIZE } from "@game/core/types"
+import { MAX_LEVEL, SQUAD_SIZE } from "@game/core/types"
 import { createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { createRng, randomSeed } from "@game/core/rng"
 import {
@@ -33,7 +33,6 @@ import {
 import {
   addAll,
   addItem,
-  generateStore,
   inStore,
   isWoodWeapon,
   itemCategory,
@@ -44,7 +43,7 @@ import {
 } from "@game/core/items"
 import { isTalismanId } from "@game/content/items"
 import { ENEMY_TEAMS, ITEMS, REWARDS } from "@game/content/balance"
-import { HERO_RETURN } from "@game/content/village"
+import { HERO_RETURN, type DecorId } from "@game/content/village"
 import { generateMap } from "@game/core/map/generate"
 import { applyAction, createBattle } from "@game/core/battle/reducer"
 import {
@@ -59,6 +58,27 @@ import {
   trainUnit
 } from "@game/core/progression"
 import { difficultyDef } from "@game/content/balance"
+import type { BuildingId } from "@game/content/buildings"
+import {
+  canUpgrade,
+  collectFood,
+  collectTraining,
+  cureFatigue,
+  isTraining,
+  mealsFood,
+  moveBuilding,
+  placeDecor,
+  refreshMarket,
+  removeDecor,
+  rosterCap,
+  sellFood,
+  setMeal,
+  setTraining,
+  tickSettlement,
+  upgradeBuilding,
+  type Result,
+  type TrainingLevelUp
+} from "@game/core/settlement"
 import { invalidateKit } from "@game/core/skills/engine"
 import { clearLocal, loadLocal, saveLocal } from "@game/platform/storage"
 import { setHapticsEnabled } from "@game/platform/haptics"
@@ -185,10 +205,18 @@ export function ensureRoster(): void {
   })
 }
 
-/** Сгенерировать ассортимент Лавки, если его ещё нет (новый сейв или миграция с v5). */
+/** Витрина Торговой площадки на текущий час: пустая или прошлого часа собирается заново. */
 export function ensureStore(): void {
-  if ($save.get().store.weapons.length > 0) return
-  updateSave(st => ({ ...st, store: generateStore(randomSeed(), st.army, st.profile.glory) }))
+  const s = $save.get()
+  const next = refreshMarket(s, Date.now())
+  if (next !== s) updateSave(() => next)
+}
+
+/** Шаг поселения: опыт полигона за прошедшее время и витрина площадки (при входе в деревню и на экранах зданий). */
+export function tickSettlementNow(): void {
+  const s = $save.get()
+  const next = tickSettlement(s, Date.now())
+  if (next !== s) updateSave(() => next)
 }
 
 /**
@@ -203,9 +231,14 @@ export function newGame(): void {
   ensureRoster()
 }
 
-/** Свободные места в ростере (из 20). */
+/** Свободные места в ростере (вместимость — по уровню Казарм). */
 export function freeSlots(save: SaveGame): number {
-  return Math.max(0, BARRACKS_CAP - (save.army?.units.length ?? 0))
+  return Math.max(0, rosterCap(save) - (save.army?.units.length ?? 0))
+}
+
+function rosterFullError(save: SaveGame): string {
+  const cap = rosterCap(save)
+  return tr(`Roster full (${cap}) — upgrade the Barracks or release someone`, `Ростер полон (${cap}) — улучшите Казармы или отпустите кого-нибудь`)
 }
 
 function joinRoster(st: SaveGame, cand: UnitInstance): Army {
@@ -221,7 +254,7 @@ function joinRoster(st: SaveGame, cand: UnitInstance): Army {
 export function buyAction(index: number): { ok: boolean, error?: string, unit?: UnitInstance } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
-  if (freeSlots(s) === 0) return { ok: false, error: tr(`Roster full (${BARRACKS_CAP})`, `Ростер полон (${BARRACKS_CAP})`) }
+  if (freeSlots(s) === 0) return { ok: false, error: rosterFullError(s) }
   const cand = s.shelter.candidates[index]
   if (!cand) return { ok: false, error: tr("No recruit", "нет кандидата") }
   const cost = unitPrice(cand)
@@ -240,7 +273,7 @@ export function claimRewardAction(index: number): { ok: boolean, error?: string,
   const s = $save.get()
   const cand = s.rewardChoice?.[index]
   if (!s.army || !cand) return { ok: false, error: tr("No reward", "нет награды") }
-  if (freeSlots(s) === 0) return { ok: false, error: tr(`Roster full (${BARRACKS_CAP}) — release someone`, `Ростер полон (${BARRACKS_CAP}) — отпустите кого-нибудь`) }
+  if (freeSlots(s) === 0) return { ok: false, error: rosterFullError(s) }
   updateSave((st) => {
     const next: SaveGame = { ...st, army: joinRoster(st, cand) }
     delete next.rewardChoice
@@ -281,6 +314,7 @@ export function assignSquadSlot(slot: number, unitId: string | null): { ok: bool
     return { ok: true }
   }
   if (!s.army.units.some(u => u.id === unitId)) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (isTraining(s, unitId)) return { ok: false, error: trainingError() }
   const cur = ids.indexOf(unitId)
   if (slot >= ids.length) {
     if (cur >= 0) return { ok: true }
@@ -296,9 +330,14 @@ export function toggleSquad(unitId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
   const inSquad = s.army.squadIds.includes(unitId)
+  if (!inSquad && isTraining(s, unitId)) return { ok: false, error: trainingError() }
   if (!inSquad && s.army.squadIds.length >= SQUAD_SIZE) return { ok: false, error: tr("Squad is full", "Отряд полон") }
   setSquad(inSquad ? s.army.squadIds.filter(id => id !== unitId) : [...s.army.squadIds, unitId])
   return { ok: true }
+}
+
+function trainingError(): string {
+  return tr("This fighter is at the Training Ground", "Боец на тренировочном полигоне")
 }
 
 export function trainUnitAction(unitId: string): { ok: boolean, error?: string } {
@@ -476,8 +515,12 @@ export function releaseUnit(unitId: string): { ok: boolean, armyFell?: boolean }
   const now = Date.now()
   const remaining = s.army.units.filter(u => u.id !== unitId)
   updateSave((st) => {
+    const training = st.settlement.training
+    const bank = { ...training.bank }
+    delete bank[unitId]
     const next: SaveGame = {
       ...st,
+      settlement: { ...st.settlement, training: { ...training, unitIds: training.unitIds.filter(id => id !== unitId), bank } },
       memorial: [...st.memorial, memorialEntry(unit, "released", now)],
       // Отпущенный оставляет купленное оружие и талисман
       inventory: addAll(st.inventory, unitGear(unit))
@@ -583,9 +626,15 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
   const squad = squadIds.map(id => s.army?.units.find(u => u.id === id)).filter((u): u is UnitInstance => !!u)
   if (squad.length === 0) return { ok: false, error: tr("Squad is empty", "Пустой отряд") }
   if (squad.length > SQUAD_SIZE) return { ok: false, error: tr(`Squad holds at most ${SQUAD_SIZE}`, `В отряде не больше ${SQUAD_SIZE}`) }
+  if (squad.some(u => isTraining(s, u.id))) return { ok: false, error: trainingError() }
+  // Блюда Столовой — только бойцам этого отряда; Еда списывается сейчас, бафф живёт в копии бойца внутри боя
+  const meals = Object.fromEntries(Object.entries(pb.meals ?? {}).filter(([id]) => squad.some(u => u.id === id)))
+  const food = mealsFood(meals)
+  if (food > s.profile.food) return { ok: false, error: tr("Not enough Food for the meals", "Не хватает Еды на блюда") }
+  const fed = squad.map(u => (meals[u.id] ? { ...u, meal: meals[u.id] as string } : u))
   const { state, events } = createBattle({
     map: pb.map,
-    squad,
+    squad: fed,
     seed: createRng(pb.seed).fork("battle").seed,
     now: Date.now()
   })
@@ -593,6 +642,7 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
     const next: SaveGame = {
       ...st,
       battle: state,
+      profile: { ...st.profile, food: st.profile.food - food },
       army: st.army ? { ...st.army, squadIds: squad.map(u => u.id) } : st.army
     }
     delete next.pendingBattle
@@ -631,7 +681,7 @@ export function finishBattle(): BattleSummary | null {
       memorial: res.memorial,
       shelter: res.shelter,
       inventory: res.inventory,
-      store: res.store,
+      settlement: res.settlement,
       // После боя герой возвращается в деревню через ворота
       village: { pos: { ...HERO_RETURN }, facing: "down" },
       lastBattle: res.summary,
@@ -654,6 +704,75 @@ export function finishBattle(): BattleSummary | null {
     return next
   })
   return res.summary
+}
+
+/* ---------- Поселение ---------- */
+
+function applyResult(r: Result<SaveGame>): { ok: boolean, error?: string } {
+  if (!r.ok) return { ok: false, error: r.error }
+  updateSave(() => r.value)
+  return { ok: true }
+}
+
+/** Построить (на выбранном месте лагеря или ближайшем свободном) или улучшить здание. */
+export function upgradeBuildingAction(id: BuildingId, at?: Pos): { ok: boolean, error?: string } {
+  const s = $save.get()
+  const check = canUpgrade(s, id)
+  if (!check.ok) return { ok: false, error: check.error }
+  return applyResult(upgradeBuilding(s, id, Date.now(), at))
+}
+
+/** Перенести здание на новое место лагеря. */
+export function moveBuildingAction(id: BuildingId, at: Pos): { ok: boolean, error?: string } {
+  return applyResult(moveBuilding($save.get(), id, at))
+}
+
+/** Купить и поставить декор. */
+export function placeDecorAction(id: DecorId, at: Pos): { ok: boolean, error?: string } {
+  return applyResult(placeDecor($save.get(), id, at))
+}
+
+/** Убрать декор с клетки (половина цены возвращается). */
+export function removeDecorAction(at: Pos): { ok: boolean, error?: string, refund?: number, id?: DecorId } {
+  const r = removeDecor($save.get(), at)
+  if (!r.ok) return { ok: false, error: r.error }
+  updateSave(() => r.value.save)
+  return { ok: true, refund: r.value.refund, id: r.value.id }
+}
+
+/** Собрать урожай с Полей. */
+export function collectFoodAction(): { ok: boolean, amount: number } {
+  const r = collectFood($save.get(), Date.now())
+  if (r.amount > 0) updateSave(() => r.save)
+  return { ok: r.amount > 0, amount: r.amount }
+}
+
+export function sellFoodAction(amount: number): { ok: boolean, error?: string } {
+  return applyResult(sellFood($save.get(), amount))
+}
+
+/** Поставить бойца на полигон или снять (снятый забирает накопленный опыт). */
+export function setTrainingAction(unitId: string, on: boolean): { ok: boolean, error?: string, levelUps?: TrainingLevelUp[] } {
+  const r = setTraining($save.get(), unitId, on, Date.now())
+  if (!r.ok) return { ok: false, error: r.error }
+  updateSave(() => r.value.save)
+  return { ok: true, levelUps: r.value.levelUps }
+}
+
+/** Забрать опыт полигона всем бойцам (до предела «сильнейший − 1»). */
+export function collectTrainingAction(): { xp: number, levelUps: TrainingLevelUp[] } {
+  const r = collectTraining(tickSettlement($save.get(), Date.now()))
+  updateSave(() => r.save)
+  return { xp: r.xp, levelUps: r.levelUps }
+}
+
+export function cureFatigueAction(unitId: string): { ok: boolean, error?: string } {
+  return applyResult(cureFatigue($save.get(), unitId))
+}
+
+/** Блюдо Столовой бойцу разведанной вылазки (`undefined` — убрать). */
+export function setMealAction(unitId: string, dishId: string | undefined): { ok: boolean, error?: string } {
+  return applyResult(setMeal($save.get(), unitId, dishId))
 }
 
 /* ---------- Настройки ---------- */

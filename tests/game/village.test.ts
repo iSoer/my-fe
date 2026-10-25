@@ -1,91 +1,180 @@
 import { describe, expect, it } from "vitest"
 import {
+  campConnected,
+  campLayout,
+  canPlace,
+  entranceTiles,
+  findSpot,
   findVillagePath,
   heroFits,
   moveHero,
   normalizeInput,
-  npcInReach,
+  placeInReach,
   spotNear,
   walkableTile
 } from "@game/core/village"
-import { GRAVEYARD, HERO_RETURN, HERO_START, HOUSES, NPCS, PLACES, VILLAGE_H, VILLAGE_MAP, VILLAGE_W } from "@game/content/village"
+import {
+  BUILDING_SHAPES,
+  GRAVEYARD,
+  HALL,
+  HERO_RETURN,
+  HERO_START,
+  NPCS,
+  VILLAGE_H,
+  VILLAGE_MAP,
+  VILLAGE_W
+} from "@game/content/village"
+import { BUILDING_IDS } from "@game/content/buildings"
 import { npcAlerts, villageGuide } from "@game/state/village"
 import { createEmptySave } from "@game/core/save"
+import { moveBuilding, placeDecor, removeDecor, upgradeBuilding } from "@game/core/settlement"
 import { generateRoster } from "@game/core/units"
+import type { SaveGame } from "@game/core/types"
 
-describe("деревня: карта", () => {
-  it("прямоугольная, по краю — деревья, домики стоят на стенах с дверью снизу", () => {
+const rich = (): SaveGame => {
+  const save = createEmptySave(1)
+  return { ...save, profile: { ...save.profile, treats: 100000, food: 1000 } }
+}
+
+describe("лагерь: карта", () => {
+  const camp = campLayout(createEmptySave(1).settlement)
+
+  it("прямоугольная, по краю — лес и частокол, Ратуша стоит стенами с дверью снизу", () => {
     expect(VILLAGE_MAP.every(row => row.length === VILLAGE_W)).toBe(true)
     for (let x = 0; x < VILLAGE_W; x++) {
-      expect(walkableTile(x, 0)).toBe(false)
-      expect(walkableTile(x, VILLAGE_H - 1)).toBe(false)
+      expect(walkableTile(camp, x, 0)).toBe(false)
+      expect(walkableTile(camp, x, VILLAGE_H - 1)).toBe(false)
     }
-    for (const h of HOUSES) {
-      for (let y = h.y; y < h.y + h.h; y++) for (let x = h.x; x < h.x + h.w; x++) expect(walkableTile(x, y)).toBe(false)
-      expect(VILLAGE_MAP[h.y + h.h - 1]?.[h.x + Math.floor(h.w / 2)]).toBe("D")
+    for (let y = 0; y < VILLAGE_H; y++) {
+      expect(walkableTile(camp, 2, y)).toBe(false)
+      expect(walkableTile(camp, VILLAGE_W - 3, y)).toBe(false)
     }
+    for (let y = HALL.y; y < HALL.y + HALL.h; y++) for (let x = HALL.x; x < HALL.x + HALL.w; x++) expect(walkableTile(camp, x, y)).toBe(false)
+    expect(VILLAGE_MAP[HALL.y + HALL.h - 1]?.[HALL.x + Math.floor(HALL.w / 2)]).toBe("D")
+    for (let y = GRAVEYARD.y; y < GRAVEYARD.y + GRAVEYARD.h; y++)
+      for (let x = GRAVEYARD.x; x < GRAVEYARD.x + GRAVEYARD.w; x++) expect(walkableTile(camp, x, y)).toBe(false)
   })
 
-  it("старт и точка возвращения свободны, все NPC достижимы со старта", () => {
-    expect(heroFits(HERO_START)).toBe(true)
-    expect(heroFits(HERO_RETURN)).toBe(true)
-    for (const npc of NPCS) {
-      const spot = spotNear(npc)
-      expect(heroFits(spot)).toBe(true)
-      expect(npcInReach(spot)?.id).toBe(npc.id)
-      const path = findVillagePath(HERO_START, spot)
+  it("старт и точка возвращения свободны, до каждого места можно дойти шагами героя", () => {
+    expect(heroFits(camp, HERO_START)).toBe(true)
+    expect(heroFits(camp, HERO_RETURN)).toBe(true)
+    expect(campConnected(camp)).toBe(true)
+    expect(camp.places.map(p => p.id).sort()).toEqual(["barracks", "graveyard", "market", "settlement", "sorties"])
+    for (const place of camp.places) {
+      const spot = spotNear(camp, place.id)!
+      expect(heroFits(camp, spot)).toBe(true)
+      expect(placeInReach(camp, spot)?.id).toBe(place.id)
+      const path = findVillagePath(camp, HERO_START, spot)
       expect(path.length).toBeGreaterThan(0)
-      // идём по пути шагами героя — доходим до NPC
       let p = { ...HERO_START }
-      for (const wp of path) for (let i = 0; i < 40; i++) p = moveHero(p, (wp.x - p.x) * 0.25, (wp.y - p.y) * 0.25)
-      expect(npcInReach(p)?.id).toBe(npc.id)
+      for (const wp of [...path, spot]) for (let i = 0; i < 40; i++) p = moveHero(camp, p, (wp.x - p.x) * 0.25, (wp.y - p.y) * 0.25)
+      expect(placeInReach(camp, p)?.id, place.id).toBe(place.id)
     }
   })
 
-  it("стены и NPC не пропускают героя, вдоль стены он скользит", () => {
-    // упирается в домик Лавки снизу (стены — ряды 2–3)
-    const below = { x: 6.5, y: 4.6 }
-    const blocked = moveHero(below, 0, -3)
-    expect(blocked.y).toBeGreaterThan(4.2)
-    // диагональ в стену: по y стоит, по x проезжает
-    const slide = moveHero(below, 1, -1)
-    expect(slide.x).toBeGreaterThan(below.x + 0.9)
-    // сквозь NPC не пройти
-    const npc = NPCS[0]!
-    const near = { x: npc.pos.x, y: npc.pos.y + 1.2 }
-    expect(Math.hypot(moveHero(near, 0, -2).y - npc.pos.y, 0)).toBeGreaterThan(0.6)
+  it("стены и жители не пропускают героя, вдоль стены он скользит", () => {
+    // упирается в Казарму снизу: стены — ряды 14–15, герой подходит с ряда 16 левее входа
+    const below = { x: 4.5, y: 16.6 }
+    expect(moveHero(camp, below, 0, -3).y).toBeGreaterThan(16.2)
+    const slide = moveHero(camp, below, -1, -1)
+    expect(slide.x).toBeLessThan(below.x - 0.9)
+    const npc = NPCS.find(n => n.id === "settlement")!
+    const near = { x: npc.pos!.x, y: npc.pos!.y + 1.2 }
+    expect(Math.abs(moveHero(camp, near, 0, -2).y - npc.pos!.y)).toBeGreaterThan(0.6)
   })
 
   it("диагональ не быстрее прямой, тап по дереву ведёт к ближайшей проходимой клетке", () => {
     const d = normalizeInput(1, 1)
     expect(Math.hypot(d.x, d.y)).toBeCloseTo(1)
-    const path = findVillagePath(HERO_START, { x: 0.5, y: 8.5 })
+    const path = findVillagePath(camp, HERO_START, { x: 0.5, y: 12.5 })
     const last = path[path.length - 1]!
-    expect(walkableTile(Math.floor(last.x), Math.floor(last.y))).toBe(true)
+    expect(walkableTile(camp, Math.floor(last.x), Math.floor(last.y))).toBe(true)
   })
 })
 
-describe("деревня: город как меню", () => {
-  it("у каждого места — житель, иконка и вывеска; здание внутри карты, места не пересекаются", () => {
-    expect(PLACES.map(p => p.id).sort()).toEqual(NPCS.map(n => n.id).sort())
-    for (const p of PLACES) {
-      expect(p.icon.length).toBeGreaterThan(0)
-      expect(p.name.length).toBeGreaterThan(0)
-      expect(p.rect.x).toBeGreaterThanOrEqual(0)
-      expect(p.rect.x + p.rect.w).toBeLessThanOrEqual(VILLAGE_W)
-      expect(p.rect.y + p.rect.h).toBeLessThanOrEqual(VILLAGE_H)
-      for (const q of PLACES) {
-        if (q === p) continue
-        const apart = p.rect.x + p.rect.w <= q.rect.x || q.rect.x + q.rect.w <= p.rect.x
-          || p.rect.y + p.rect.h <= q.rect.y || q.rect.y + q.rect.h <= p.rect.y
-        expect(apart, `${p.id} / ${q.id}`).toBe(true)
-      }
+describe("лагерь: стройка", () => {
+  it("каждое здание встаёт на своё место по умолчанию, и все вместе не мешают друг другу", () => {
+    let save = rich()
+    for (const id of BUILDING_IDS) {
+      if (save.settlement.buildings[id] > 0) continue
+      expect(canPlace(save.settlement, id, BUILDING_SHAPES[id].pref).ok, id).toBe(true)
+      const r = upgradeBuilding(save, id, 1, BUILDING_SHAPES[id].pref)
+      expect(r.ok, id).toBe(true)
+      if (r.ok) save = r.value
     }
+    const camp = campLayout(save.settlement)
+    expect(campConnected(camp)).toBe(true)
+    expect(camp.places).toHaveLength(BUILDING_IDS.length + 3)
   })
-  it("Кладбище огорожено: его клетки непроходимы", () => {
-    for (let y = GRAVEYARD.y; y < GRAVEYARD.y + GRAVEYARD.h; y++)
-      for (let x = GRAVEYARD.x; x < GRAVEYARD.x + GRAVEYARD.w; x++) expect(walkableTile(x, y)).toBe(false)
+
+  it("на занятое место, тропинку и за частокол не поставить; вход должен быть свободен", () => {
+    const s = createEmptySave(1).settlement
+    expect(canPlace(s, "hospital", { x: 4, y: 14 })).toMatchObject({ ok: false })
+    // тропинка через лагерь — ряд 12
+    expect(canPlace(s, "hospital", { x: 6, y: 11 })).toMatchObject({ ok: false })
+    expect(canPlace(s, "hospital", { x: 0, y: 5 })).toMatchObject({ ok: false })
+    // вход Казармы занят: декор перед ним не ставится, а тропинка — можно
+    const door = entranceTiles("barracks", s.layout.buildings.barracks!)[0]!
+    expect(canPlace(s, "lantern", door)).toMatchObject({ ok: false })
+    expect(canPlace(s, "path", door).ok).toBe(true)
   })
+
+  it("вход не прячется под чужой крышей, и крыша не накрывает чужой вход", () => {
+    const s = createEmptySave(1).settlement
+    // полигон над Ратушей: его вход (11, 8) — под её крышей
+    const under = canPlace(s, "training", { x: 9, y: 5 })
+    expect(under.ok ? "" : under.error).toMatch(/roof|крыш/)
+    // Больница сразу под входом Казармы: её крыша легла бы на клетки перед дверью
+    const roof = canPlace(s, "hospital", { x: 5, y: 17 })
+    expect(roof.ok ? "" : roof.error).toMatch(/roof|крыш/)
+  })
+
+  it("постройку, которая перекроет проход к месту, поставить нельзя", () => {
+    let save = rich()
+    const r = upgradeBuilding(save, "hospital", 1, { x: 14, y: 8 })
+    expect(r.ok).toBe(true)
+    if (r.ok) save = r.value
+    // вход Больницы — (15, 10): закрываем соседей слева и справа, снизу — нельзя
+    for (const at of [{ x: 14, y: 10 }, { x: 16, y: 10 }]) {
+      const d = placeDecor(save, "barrels", at)
+      expect(d.ok).toBe(true)
+      if (d.ok) save = d.value
+    }
+    const last = canPlace(save.settlement, "barrels", { x: 15, y: 11 })
+    expect(last).toMatchObject({ ok: false })
+    expect(last.ok ? "" : last.error).toMatch(/block|Перекроет/)
+  })
+
+  it("новое здание без выбранного места встаёт на ближайшее свободное, перенос освобождает старое место", () => {
+    let save = rich()
+    const built = upgradeBuilding(save, "fields", 1)
+    expect(built.ok).toBe(true)
+    if (built.ok) save = built.value
+    const at = save.settlement.layout.buildings.fields!
+    expect(at).toEqual(BUILDING_SHAPES.fields.pref)
+    const spot = findSpot(save.settlement, "fields", { x: 4, y: 20 })!
+    const moved = moveBuilding(save, "fields", spot)
+    expect(moved.ok).toBe(true)
+    if (!moved.ok) return
+    expect(moved.value.settlement.layout.buildings.fields).toEqual(spot)
+    expect(canPlace(moved.value.settlement, "training", BUILDING_SHAPES.training.pref).ok).toBe(spot.x === 4 ? false : true)
+    expect(canPlace(moved.value.settlement, "lantern", at).ok).toBe(true)
+  })
+
+  it("декор стоит Вкусняшек, снос возвращает половину", () => {
+    const save = rich()
+    const placed = placeDecor(save, "well", { x: 7, y: 10 })
+    expect(placed.ok).toBe(true)
+    if (!placed.ok) return
+    expect(placed.value.profile.treats).toBe(save.profile.treats - 80)
+    expect(placeDecor({ ...save, profile: { ...save.profile, treats: 0 } }, "well", { x: 7, y: 10 }).ok).toBe(false)
+    const removed = removeDecor(placed.value, { x: 7, y: 10 })
+    expect(removed.ok).toBe(true)
+    if (removed.ok) expect(removed.value.save.profile.treats).toBe(save.profile.treats - 40)
+  })
+})
+
+describe("лагерь: подсказки", () => {
   it("следующий шаг: идёт бой — к воротам, нет отряда или ждёт награда — в Казарму, иначе — на вылазку", () => {
     const save = createEmptySave(1)
     expect(villageGuide(save)).toBe("barracks")

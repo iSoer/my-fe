@@ -2,6 +2,7 @@ import { createRng } from "../rng"
 import type { Army, Inventory, ItemCategory, StoreStock, UnitInstance } from "../types"
 import { rosterLevel } from "../progression"
 import { ITEMS } from "@game/content/balance"
+import { MARKET, atLevel } from "@game/content/buildings"
 import { TALISMANS, isTalismanId, talismanDef } from "@game/content/items"
 import { WEAPONS, gradeWeaponId, isWeaponId, weaponDef } from "@game/content/weapons"
 import { WEAPON_SKILLS, type WeaponGrade } from "@shared/character/skills"
@@ -92,11 +93,24 @@ function available(def: { minRosterLevel?: number, minGlory?: number }, level: n
   return (def.minRosterLevel ?? 0) <= level && (def.minGlory ?? 0) <= glory
 }
 
+/** Номер реального часа: витрина Торговой площадки меняется на его границе. */
+export function marketHour(now: number): number {
+  return Math.floor(now / MARKET.refreshMs)
+}
+
+/** Зерно витрины часа: детерминировано по зерну площадки и номеру часа. */
+export function marketSeed(baseSeed: number, hour: number): number {
+  return createRng(baseSeed).fork(`hour:${hour}`).int(0, 0x7fffffff)
+}
+
+const NEXT_GRADE: Partial<Record<WeaponGrade, WeaponGrade>> = { iron: "steel", steel: "silver" }
+
 /**
- * Ассортимент Лавки (детерминирован по seed): железное оружие всех навыков, сталь и серебро по уровню ростера,
- * пара разновидностей, все доступные расходники и несколько талисманов; Слава ≥ 150 — на позицию больше.
+ * Ассортимент Торговой площадки (детерминирован по seed): железное оружие всех навыков, сталь и серебро по уровню
+ * ростера, пара разновидностей и несколько талисманов; Слава ≥ 150 — на позицию больше. Уровень площадки
+ * добавляет товаров и шанс, что оружие придёт усиленным (железо → сталь, сталь → серебро).
  */
-export function generateStore(seed: number, army: Army | undefined, glory: number): StoreStock {
+export function generateStore(seed: number, army: Army | undefined, glory: number, marketLevel = 1, hour = 0): StoreStock {
   const rng = createRng(seed).fork("store")
   const level = rosterLevel(army)
   const extra = glory >= 150 ? 1 : 0
@@ -105,12 +119,22 @@ export function generateStore(seed: number, army: Army | undefined, glory: numbe
   const weapons = WEAPON_SKILLS.map(skill => gradeWeaponId(skill, "iron"))
   if (level >= ITEMS.steelFromLevel) weapons.push(...grade("steel", ITEMS.steelOffers))
   if (level >= ITEMS.silverFromLevel) weapons.push(...grade("silver", ITEMS.silverOffers))
+  const chance = atLevel(MARKET.upgradeChance, marketLevel)
+  if (chance > 0) {
+    for (const id of [...weapons]) {
+      const w = weaponDef(id)
+      const up = NEXT_GRADE[w.grade]
+      if (!up || !rng.chance(chance)) continue
+      const upgraded = gradeWeaponId(w.kind, up)
+      if (!weapons.includes(upgraded)) weapons.push(upgraded)
+    }
+  }
   const variants = rng.shuffle(WEAPONS.filter(w => w.variant !== "basic").map(w => w.id))
-  weapons.push(...variants.slice(0, ITEMS.variantOffers + extra))
+  weapons.push(...variants.slice(0, ITEMS.variantOffers + extra + atLevel(MARKET.extraVariants, marketLevel)))
   const talismans = rng
     .shuffle(TALISMANS.filter(t => available(t, level, glory)).map(t => t.id))
-    .slice(0, ITEMS.talismanOffers + extra)
-  return { seed, weapons, talismans, fresh: true }
+    .slice(0, ITEMS.talismanOffers + extra + atLevel(MARKET.extraTalismans, marketLevel))
+  return { seed, hour, weapons, talismans, fresh: true }
 }
 
 export function storeOffers(store: StoreStock, category: ItemCategory): string[] {
@@ -122,7 +146,7 @@ export function inStore(store: StoreStock, id: string): boolean {
 }
 
 /** Пустая Лавка до первой генерации (новый сейв). */
-export const EMPTY_STORE: StoreStock = { seed: 0, weapons: [], talismans: [], fresh: false }
+export const EMPTY_STORE: StoreStock = { seed: 0, hour: -1, weapons: [], talismans: [], fresh: false }
 
 /* ---------- Враги ---------- */
 

@@ -1,0 +1,70 @@
+/* Debug-панель — только при локальном запуске. Как и остальной CSS игры — только внутри .pawfield. */
+.pawfield {
+  .dbg-fab {
+    position: fixed;
+    z-index: 900;
+    top: 45%;
+    right: 0;
+    width: 36px;
+    height: 40px;
+    border: 2px solid var(--ink);
+    border-right: 0;
+    border-radius: 10px 0 0 10px;
+    background: #ffd166;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0.85;
+  }
+  .dbg-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .dbg-tab {
+    flex: 1;
+    padding: 6px 4px;
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .dbg-tab.on {
+    background: #ffd166;
+    color: #3b2614;
+  }
+  .dbg-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .dbg-label {
+    min-width: 104px;
+    font-weight: 700;
+  }
+  .dbg-btns {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .dbg-input {
+    min-width: 0;
+    flex: 1;
+    padding: 6px 8px;
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    background: #fff;
+    color: #15121a;
+    font: inherit;
+  }
+  .dbg-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+}

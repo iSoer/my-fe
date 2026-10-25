@@ -40,9 +40,9 @@
     flex: 1;
   }
   /* Нижняя панель города: те же места, что вывески на зданиях; «В бой» — главное действие */
+  /* Пять мест: ширина кнопки — по её подписи, лишнее место делится поровну, у Вылазки — больше */
   .vl-dock {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1.35fr;
+    display: flex;
     gap: 6px;
     max-width: 520px;
     width: 100%;
@@ -51,6 +51,7 @@
   }
   .vl-dock-btn {
     position: relative;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -95,8 +96,14 @@
   }
   /* На узком телефоне подпись «что внутри» остаётся только на вывесках зданий */
   @media (max-width: 430px) {
+    .vl-dock-btn {
+      padding: 6px 2px;
+    }
     .vl-dock-name {
-      font-size: 12px;
+      font-size: 11px;
+    }
+    .vl-dock-btn.is-main .vl-dock-name {
+      font-size: 13px;
     }
     .vl-dock-hint {
       display: none;
@@ -104,17 +111,17 @@
   }
   @media (max-width: 380px) {
     .vl-dock {
-      grid-template-columns: 1fr 1fr 1fr 1.2fr;
       gap: 4px;
     }
     .vl-dock-btn {
       padding: 6px 1px;
     }
     .vl-dock-name {
-      font-size: 11px;
+      font-size: 10px;
     }
   }
   .vl-dock-btn.is-main {
+    flex-grow: 1.6;
     background: var(--accent-grad);
     color: #fff;
   }
@@ -197,5 +204,197 @@
     font-size: 9px;
     opacity: 0.8;
     text-transform: uppercase;
+  }
+
+  /* Поселение: карточки зданий */
+  .bld-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .bld-card.is-empty {
+    border-style: dashed;
+  }
+  .bld-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .bld-ico {
+    font-size: 30px;
+    width: 40px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .bld-card.is-empty .bld-ico {
+    filter: grayscale(1);
+    opacity: 0.6;
+  }
+  .bld-pips {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .bld-pips i {
+    width: 12px;
+    height: 7px;
+    background: var(--paper-3);
+    transform: skewX(-20deg);
+  }
+  .bld-pips i.on {
+    background: var(--gold);
+    box-shadow: inset 0 0 0 1px var(--ink);
+  }
+  .bld-pips .muted {
+    margin-left: 6px;
+  }
+  .bld-desc {
+    margin: 0;
+  }
+  .bld-status {
+    font-weight: 700;
+  }
+  .bld-effects {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .bld-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bld-why {
+    color: var(--red-deep);
+  }
+  .bar > div.good {
+    background: var(--grass);
+  }
+  .store-item.is-locked {
+    opacity: 0.55;
+  }
+  .chip.training {
+    background: var(--teal);
+    color: var(--ink);
+  }
+  .chip.fatigue {
+    background: var(--paper-3);
+  }
+  .chip.fatigue.heavy {
+    background: var(--red);
+    color: #fff;
+  }
+  .meal-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .meal-btn {
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    color: var(--text-paper);
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .meal-btn.on {
+    background: var(--gold);
+  }
+  .meal-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  /* Лагерь: сводка здания в разговоре у входа */
+  .bld-info {
+    padding: 10px 12px;
+    border: 2px solid var(--line, rgba(255, 255, 255, 0.12));
+    border-radius: 12px;
+    gap: 6px;
+  }
+  .bld-ico--lg {
+    font-size: 40px;
+    width: 56px;
+  }
+  /* Каталог стройки */
+  .cat-title {
+    margin: 6px 0 0;
+    font-size: 15px;
+  }
+  .cat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+  }
+  .cat-row.is-new {
+    border-style: dashed;
+  }
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 8px;
+  }
+  .cat-decor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px;
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    background: #f3e2c0;
+    color: #3b2614;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+    font: inherit;
+    cursor: pointer;
+  }
+  .cat-decor:active {
+    transform: translateY(2px);
+  }
+  .cat-decor:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .cat-decor-ico {
+    font-size: 24px;
+    line-height: 1.1;
+  }
+  .cat-decor-name {
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+  }
+  .cat-decor-cost {
+    color: #6d4c2f;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  /* Панель стройки на месте нижнего меню */
+  .vl-buildbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 3px solid var(--ink);
+    border-radius: 14px;
+    background: rgba(243, 226, 192, 0.97);
+    color: #3b2614;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  }
+  .vl-buildbar .muted {
+    color: #6d4c2f;
+  }
+  .vl-buildbar-title {
+    white-space: nowrap;
+  }
+  .vl-buildbar .row.between {
+    flex-wrap: wrap;
+  }
+  .vl-buildbar .row > div > button {
+    flex: 1;
   }
 }

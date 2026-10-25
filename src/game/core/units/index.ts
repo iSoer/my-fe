@@ -22,6 +22,7 @@ import { PERSONALITIES } from "@game/content/personalities"
 import { ACCESSORIES, EYES, EYE_COLORS, FUR_PALETTES, PATTERNS } from "@game/content/appearance"
 import { COMBAT, HEALING, LEVEL_UP, MODEL_SCALE, ROSTER, recruitRarityWeights } from "@game/content/balance"
 import { classStatMods } from "@game/content/classStats"
+import { FATIGUE, dishDef } from "@game/content/buildings"
 import { factionDef } from "@game/content/factions"
 import { generateCharacter, validateCharacterRequest } from "@/server/character-model/generate"
 import { loadCharacterModel } from "@/server/character-model/model"
@@ -209,7 +210,20 @@ export function weaponMt(unit: UnitInstance): number {
   )
 }
 
-/** Видимые статы вне боя: уровень и класс + Mt оружия + постоянные бонусы. */
+/**
+ * Доли к статам от поселения: штраф усталости (`FATIGUE`, за каждый стак) и бафф блюда Столовой на бой.
+ * Ненулевая доля меняет стат хотя бы на 1.
+ */
+export function settlementMods(unit: Pick<UnitInstance, "fatigue" | "meal">): Partial<Stats> {
+  const out: Partial<Stats> = {}
+  const stacks = Math.min(FATIGUE.maxStacks, unit.fatigue ?? 0)
+  if (stacks > 0) for (const s of FATIGUE.stats) out[s] = -FATIGUE.perStack * stacks
+  const dish = unit.meal ? dishDef(unit.meal) : undefined
+  if (dish) for (const [s, v] of Object.entries(dish.buff) as [Stat, number][]) out[s] = (out[s] ?? 0) + v
+  return out
+}
+
+/** Видимые статы вне боя: уровень и класс + Mt оружия + постоянные бонусы + усталость и блюдо. */
 export function visibleStats(unit: UnitInstance): Stats {
   const base = statsAtLevel(unit, unit.level)
   // Mt оружия прибавляется к стату, которым оно бьёт
@@ -219,8 +233,13 @@ export function visibleStats(unit: UnitInstance): Stats {
     const b = COMBAT.bossBonus
     withBonus = addStats(withBonus, { hp: b, str: b, mag: b, spd: b, def: b, res: b })
   }
+  const mods = settlementMods(unit)
   const out = emptyStats()
-  for (const s of STATS) out[s] = Math.max(MIN_STAT, withBonus[s])
+  for (const s of STATS) {
+    const share = mods[s] ?? 0
+    const delta = share === 0 ? 0 : Math.round(withBonus[s] * share) || Math.sign(share)
+    out[s] = Math.max(MIN_STAT, withBonus[s] + delta)
+  }
   return out
 }
 

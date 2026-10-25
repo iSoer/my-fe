@@ -167,8 +167,8 @@ describe("награды за исход", () => {
     expect(lose.summary.rewards.lost).toBe(100 - lose.summary.rewards.treats)
     expect(flee.summary.rewards.treats).toBe(Math.round(100 * REWARDS.retreatLootShare))
     expect(lootShare("defeat")).toBeLessThan(lootShare("retreat"))
-    // Лавка обновлена
-    expect(lose.store.fresh).toBe(true)
+    // Выжившие вернулись уставшими
+    expect(win.summary.survivors[0]?.fatigue).toBe(1)
   })
 })
 

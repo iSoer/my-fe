@@ -5,9 +5,8 @@ import { initRouter } from "./state/router"
 import { $battleUi, confirm, endTurn, tapTile } from "./state/battleUi"
 import { $boardLayout } from "./state/boardLayout"
 import { $save, initSave } from "./state/save"
-import { $villageUi, openNpc, villageControl } from "./state/village"
-import { NPCS, type NpcId } from "./content/village"
-import { spotNear } from "./core/village"
+import { $villageUi, openNpc, startBuild, stopBuild, villageControl, type BuildMode } from "./state/village"
+import type { PlaceId } from "./content/village"
 import type { Pos } from "./core/types"
 import "./ui/styles.css"
 import "./ui/mobile.css"
@@ -27,15 +26,17 @@ export default function GameRoot() {
       layout: $boardLayout,
       // Действия игрока в бою — для смоук-тестов и проверки анимаций
       battle: { tapTile, confirm, endTurn },
-      // Деревня: телепорт героя (к NPC или в точку), подойти и заговорить, сразу открыть разговор
+      // Лагерь: телепорт героя (к месту или в точку), подойти и заговорить, сразу открыть разговор, стройка
       village: {
         ui: $villageUi,
-        teleport: (to: NpcId | Pos) => {
-          const npc = typeof to === "string" ? NPCS.find(n => n.id === to) : undefined
-          villageControl()?.teleport(npc ? spotNear(npc) : (to as Pos))
+        teleport: (to: PlaceId | Pos) => {
+          if (typeof to === "string") villageControl()?.teleportTo(to)
+          else villageControl()?.teleport(to)
         },
-        walkTo: (id: NpcId) => villageControl()?.walkTo(id),
-        talk: (id: NpcId) => openNpc(id)
+        walkTo: (id: PlaceId) => villageControl()?.walkTo(id),
+        talk: (id: PlaceId) => openNpc(id),
+        build: (mode: BuildMode | null) => (mode ? startBuild(mode) : stopBuild()),
+        ghost: (at: Pos) => villageControl()?.placeGhost(at)
       }
     }
   }, [])

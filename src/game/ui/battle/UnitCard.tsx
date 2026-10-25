@@ -8,6 +8,8 @@ import { UnitAvatar } from "../components/UnitAvatar"
 import { classRoleText, moveText } from "../components/ClassInfo"
 import { COLOR_CSS, STAT_LABELS, statChanges } from "../lib/format"
 import { terrainInfo } from "@game/content/terrain"
+import { FATIGUE, dishDef } from "@game/content/buildings"
+import { fatigueOf } from "@game/core/settlement"
 import { tr } from "@game/i18n"
 import { useStore } from "@nanostores/react"
 import { haptic } from "@game/platform/haptics"
@@ -76,6 +78,7 @@ export function UnitCard({
   // Бонус клетки, на которой стоит боец (заросли, укрытие)
   const ground = terrainInfo(state, bu.pos)
   const down = statChanges(bu.penalties)
+  const meal = unit.meal ? dishDef(unit.meal) : undefined
   const up = statChanges(bu.bonuses)
   const stat = (k: Exclude<keyof Stats, "hp">, label: string) => {
     const d = (bu.bonuses[k] ?? 0) + (bu.penalties[k] ?? 0)
@@ -166,6 +169,17 @@ export function UnitCard({
           <div className="bf-status bf-status-up">
             {`▲ ${tr("Boosted", "Усилен")}: ${up}`}
             <small>{tr(" · until its next phase", " · до начала его фазы")}</small>
+          </div>
+        )}
+        {fatigueOf(unit) > 0 && (
+          <div className="bf-status bf-status-down">
+            {`😮‍💨 ${tr("Tired", "Устал")} ×${fatigueOf(unit)}: −${Math.round(fatigueOf(unit) * FATIGUE.perStack * 100)} %`}
+            <small>{tr(" · cured at the Hospital", " · лечится в Больнице")}</small>
+          </div>
+        )}
+        {meal && (
+          <div className="bf-status bf-status-up">
+            {`${meal.icon} ${meal.name}: ${meal.desc}`}
           </div>
         )}
         {enemy && skills.length > 0 && <div className="bf-muted bf-skills">{skills.join(" · ")}</div>}

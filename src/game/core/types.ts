@@ -4,6 +4,8 @@ import { MAX_LEVEL as CHARACTER_MAX_LEVEL, type StatValues } from "@shared/chara
 import type { Movement } from "@shared/character/classes"
 import type { Aptitudes, WeaponSkill } from "@shared/character/skills"
 import { DEFAULT_LANG, type Lang } from "@game/i18n"
+import type { BuildingId } from "@game/content/buildings"
+import type { DecorId } from "@game/content/village"
 
 export type { WeaponSkill }
 
@@ -36,8 +38,6 @@ export const MAP_H = 8
 export const MAX_LEVEL = CHARACTER_MAX_LEVEL
 /** В бой выходят до 4 бойцов ростера. */
 export const SQUAD_SIZE = 4
-/** Ростер (армия) — до 20 персонажей; пополняется наградами за бой и покупкой в магазине. */
-export const BARRACKS_CAP = 20
 
 export function posKey(p: Pos): string {
   return `${p.x},${p.y}`
@@ -129,6 +129,10 @@ export interface UnitInstance {
   weaponTier: 0 | 1 | 2 | 3
   /** Талисман (`content/items.ts`): один слот, пассивные свойства через хуки навыков. */
   accessory?: string
+  /** Стаки усталости после боёв (`FATIGUE`): штраф к статам, снимает Больница. */
+  fatigue?: number
+  /** Блюдо Столовой (`DISHES`) — только у копии бойца внутри боя, бафф на этот бой. */
+  meal?: string
   skills: UnitSkills
   learned: string[]
   learnable: string[]
@@ -364,6 +368,8 @@ export interface Profile {
   treats: number
   wins: Record<Difficulty, number>
   armiesCreated: number
+  /** Еда с Полей: для Столовой и на продажу. */
+  food: number
   /** Высшая звезда, открытая перерождением бойца: случайные бойцы (ростер, магазин, награды) — ★1…maxRarity. */
   maxRarity: Rarity
 }
@@ -382,6 +388,8 @@ export interface PendingBattle {
   /** Выбранная вражеская команда 0…ENEMY_TEAMS−1. */
   team: number
   map: MapDef
+  /** Блюда Столовой на эту вылазку: id бойца отряда → id блюда. Еда списывается при старте боя. */
+  meals?: Record<string, string>
 }
 
 /** Инвентарь армии: id предмета (оружие, талисман) → количество. */
@@ -389,9 +397,11 @@ export type Inventory = Record<string, number>
 
 export type ItemCategory = "weapon" | "talisman"
 
-/** Ассортимент Лавки: обновляется после каждого боя, товаров не убывает. */
+/** Ассортимент Лавки (Торговой площадки): обновляется каждый реальный час, товаров не убывает. */
 export interface StoreStock {
   seed: number
+  /** Номер часа (`now / MARKET.refreshMs`), на который собрана витрина. */
+  hour: number
   weapons: string[]
   talismans: string[]
   /** Ассортимент обновился, а игрок ещё не заглядывал в Лавку («!» над торговцем). */
@@ -443,6 +453,40 @@ export interface BattleSummary {
   timeUp?: boolean
 }
 
+/** Поселение: уровни зданий и состояние их механик. Время — `Date.now()`, офлайн-прогресс считается при входе. */
+export interface Settlement {
+  /** Уровень здания 0–5 (0 — не построено). */
+  buildings: Record<BuildingId, number>
+  /** Зерно витрин Торговой площадки: витрина часа — от него и номера часа. */
+  marketSeed: number
+  training: {
+    /** Бойцы на полигоне (до `TRAINING.slots`); в отряд вылазки их не взять. */
+    unitIds: string[]
+    /** До какого момента опыт за время уже начислен. */
+    since: number
+    /** Накопленный, но ещё не забранный опыт по бойцам. */
+    bank: Record<string, number>
+  }
+  /** Поля: Еда растёт с момента `since` (до вместимости амбара). */
+  fields: { since: number }
+  /** Сколько бойцов Больница ещё вылечит до следующего боя. */
+  hospital: { charges: number }
+  /** Где что стоит в лагере: построенные здания (левый верхний угол участка) и декор. */
+  layout: CampLayoutSave
+}
+
+export interface DecorPlacement {
+  id: DecorId
+  x: number
+  y: number
+}
+
+export interface CampLayoutSave {
+  /** Есть у каждого построенного здания (уровень > 0). */
+  buildings: Partial<Record<BuildingId, Pos>>
+  decor: DecorPlacement[]
+}
+
 export interface SaveGame {
   version: number
   updatedAt: number
@@ -453,6 +497,7 @@ export interface SaveGame {
   inventory: Inventory
   store: StoreStock
   village: VillageState
+  settlement: Settlement
   memorial: MemorialEntry[]
   achievements: string[]
   settings: Settings

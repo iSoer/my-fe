@@ -21,7 +21,7 @@ class VillageFxScene extends Phaser.Scene {
   }
 }
 
-/** Монтирует Phaser-игру деревни в контейнер (отдельный чанк, как бой). */
+/** Монтирует Phaser-игру лагеря в контейнер (отдельный чанк, как бой). */
 export function mountVillageGame(parent: HTMLElement, opts: VillageSceneOptions): VillageGameHandle {
   const village = new VillageScene(opts)
   const game = new Phaser.Game({
@@ -31,12 +31,18 @@ export function mountVillageGame(parent: HTMLElement, opts: VillageSceneOptions)
     backgroundColor: "#2f6d2c",
     scale: { mode: Phaser.Scale.RESIZE, parent, width: "100%", height: "100%", autoRound: true },
     render: { pixelArt: false, antialias: true, roundPixels: false },
-    input: { activePointers: 1 },
+    input: { activePointers: 2 },
     scene: [village, VillageFxScene],
     audio: { noAudio: true },
     banner: false
   } as Phaser.Types.Core.GameConfig)
-  setVillageControl({ teleport: p => village.teleport(p), walkTo: id => village.walkTo(id) })
+  setVillageControl({
+    teleport: p => village.teleport(p),
+    teleportTo: id => village.teleportTo(id),
+    walkTo: id => village.walkTo(id),
+    build: mode => village.setBuild(mode),
+    placeGhost: at => village.placeGhost(at)
+  })
   return {
     destroy() {
       setVillageControl(null)

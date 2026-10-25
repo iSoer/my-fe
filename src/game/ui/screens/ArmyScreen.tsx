@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { useStore } from "@nanostores/react"
 import type { UnitInstance } from "@game/core/types"
-import { BARRACKS_CAP, SQUAD_SIZE } from "@game/core/types"
+import { SQUAD_SIZE } from "@game/core/types"
+import { isTraining, rosterCap } from "@game/core/settlement"
 import {
   attackOf,
   displayName,
@@ -22,6 +23,7 @@ import { UnitAvatar } from "../components/UnitAvatar"
 import { RarityStars, WeaponBadge } from "../components/Badges"
 import { ShopSheet } from "../components/ShopSheet"
 import { RewardPicker } from "../components/RewardPicker"
+import { UnitStatusChips } from "../components/UnitStatus"
 import { useToast } from "../components/Toast"
 import { MOVE_EMOJI, atkLabel } from "../lib/format"
 import { MOVE_RANGE } from "@game/content/classes"
@@ -35,12 +37,14 @@ function FilledSlot({
   index,
   justHired,
   inSquad,
+  training,
   onToggleSquad
 }: {
   unit: UnitInstance
   index: number
   justHired: boolean
   inSquad: boolean
+  training: boolean
   onToggleSquad: (id: string) => void
 }) {
   const cls = unitClass(unit)
@@ -72,7 +76,9 @@ function FilledSlot({
         <WeaponBadge skill={cls.weaponSkill} />
         {canLearn && <span className="chip red pop">{tr("New skill", "Есть навык")}</span>}
         {hasClassUpgrade(unit) && <span className="chip gold pop">{tr("New class", "Новый класс")}</span>}
-        <button
+        <UnitStatusChips unit={unit} training={training} />
+        {!training && (
+          <button
           type="button"
           className={`chip squad-toggle ${inSquad ? "squad" : ""}`}
           onClick={(e) => {
@@ -80,8 +86,9 @@ function FilledSlot({
             onToggleSquad(unit.id)
           }}
         >
-          {inSquad ? tr("✓ In squad", "✓ В отряде") : tr("+ To squad", "+ В отряд")}
-        </button>
+            {inSquad ? tr("✓ In squad", "✓ В отряде") : tr("+ To squad", "+ В отряд")}
+          </button>
+        )}
       </div>
       <div className="mini-stats">
         <span>
@@ -166,7 +173,7 @@ export function ArmyScreen() {
             {" "}
             <b>{army.units.length}</b>
             /
-            {BARRACKS_CAP}
+            {rosterCap(save)}
           </span>
           <span className="muted small">{`${tr("Squad", "Отряд")}: ${army.squadIds.length}/${SQUAD_SIZE}`}</span>
         </div>
@@ -178,6 +185,7 @@ export function ArmyScreen() {
               index={i}
               justHired={justHired === u.id}
               inSquad={squad.has(u.id)}
+              training={isTraining(save, u.id)}
               onToggleSquad={onToggleSquad}
             />
           ))}
@@ -198,7 +206,7 @@ export function ArmyScreen() {
         </Button>
         <p className="muted small hint-line">{tr("The Scout leads your squad into battle — he waits at the village gate.", "В бой отряд выводит Разведчик Шрам — он ждёт у ворот поселения.")}</p>
         {freeSlots(save) === 0 && (
-          <p className="muted small hint-line">{tr("Roster full: to take on new fighters, you’ll have to release someone.", "Ростер полон: чтобы взять новых, кого-то придётся отпустить.")}</p>
+          <p className="muted small hint-line">{tr("Roster full: upgrade the Barracks in the Settlement or release someone.", "Ростер полон: улучшите Казармы в Поселении или отпустите кого-нибудь.")}</p>
         )}
       </div>
       <ShopSheet open={shopOpen} onClose={() => setShopOpen(false)} toast={toast} onBought={welcome} />
