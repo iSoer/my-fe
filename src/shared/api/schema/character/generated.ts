@@ -1,11 +1,10 @@
 import { z } from "zod"
-import { infiniteRequest, infiniteResponse } from "../pagination"
-import { ARCHETYPES, pokemonNameSchema, seedSchema, statsSchema } from "../pokemon/generated"
+import { ARCHETYPES, nameSchema, seedSchema, statsSchema } from "../../../character/stats"
 import { MAX_LEVEL, MIN_LEVEL, RARITIES } from "../../../character/leveling"
-import { APTITUDES, MAX_TALENTS, MAX_WEAKNESSES, RANKS, SKILLS } from "../../../character/skills"
-import { CLASS_IDS, CLASS_TIERS } from "../../../character/classes"
+import { APTITUDES, MAX_TALENTS, RANKS, SKILLS } from "../../../character/skills"
+import { CLASS_IDS } from "../../../character/classes"
 
-// Contract of the character generator (src/server/character-model, docs/character-model.md)
+// Contract of the character generator (src/model/character-model)
 
 const distinct = (items: unknown[]) => new Set(items).size === items.length
 
@@ -18,8 +17,6 @@ export const skillSchema = z.enum(SKILLS)
 export const classIdSchema = z.enum(CLASS_IDS as [string, ...string[]])
 
 const talentsField = z.array(skillSchema).min(1).max(MAX_TALENTS).refine(distinct, { error: "Talents must be different" })
-
-const weaknessesField = z.array(skillSchema).max(MAX_WEAKNESSES).refine(distinct, { error: "Weaknesses must be different" })
 
 export const aptitudesSchema = z.record(skillSchema, z.enum(APTITUDES))
 
@@ -36,55 +33,14 @@ export const generateCharacterRequestSchema = z.object({
   level: levelSchema.optional(),
   // The class the character is in; picks talents and the level it needs when they are not given
   class: classIdSchema.optional(),
-  name: pokemonNameSchema.optional()
+  name: nameSchema.optional()
 })
 
-/** Chosen by hand (the /characters page); the server adds level 1 stats, size and experience */
-export const customCharacterSchema = z.object({
-  name: pokemonNameSchema.optional(),
-  rarity: raritySchema,
-  talents: talentsField,
-  weaknesses: weaknessesField.default([]),
-  // Stats at MAX_LEVEL
-  maxStats: statsSchema,
-  level: levelSchema,
-  class: classIdSchema,
-  archetype: z.enum(ARCHETYPES).optional()
-}).refine(item => item.talents.every(skill => !item.weaknesses.includes(skill)), {
-  error: "A skill cannot be a talent and a weakness"
-})
-
-/** What a character was generated from; stored in generated_character.request to reproduce it */
-export const characterInputSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("single"), request: generateCharacterRequestSchema }),
-  z.object({ mode: z.literal("custom"), character: customCharacterSchema })
-])
-
-/** Body of POST /api/character/generated and /preview; `mode` defaults to "single", `request` to {} */
-export const generateCharacterBodySchema = z.preprocess(
-  (value) => {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return value
-    }
-
-    const body = { mode: "single", ...value } as Record<string, unknown>
-
-    return body.mode === "single" && body.request === undefined ? { ...body, request: {} } : body
-  },
-  z.discriminatedUnion("mode", [
-    z.object({ mode: z.literal("single"), request: generateCharacterRequestSchema, seed: seedSchema.optional() }),
-    z.object({ mode: z.literal("custom"), character: customCharacterSchema, seed: seedSchema.optional() })
-  ])
-)
-
-/** PATCH /api/character/generated/[id]: level up and / or change the class */
-export const updateCharacterBodySchema = z.object({
-  level: levelSchema.optional(),
-  class: classIdSchema.optional()
-}).refine(body => body.level !== undefined || body.class !== undefined, { error: "Give a level or a class" })
+/** What a character was generated from, to reproduce it */
+export const characterInputSchema = z.object({ mode: z.literal("single"), request: generateCharacterRequestSchema })
 
 export const generatedCharacterItem = z.object({
-  name: pokemonNameSchema,
+  name: nameSchema,
   rarity: raritySchema,
   aptitudes: aptitudesSchema,
   heightDm: z.number().int(),
@@ -102,90 +58,10 @@ export const generatedCharacterItem = z.object({
   seed: seedSchema,
   modelVersion: z.number().int(),
   input: characterInputSchema,
-  // Decisions the generator made; only in generation responses, not stored
+  // Decisions the generator made
   explain: z.array(z.string()).optional()
-})
-
-export const savedGeneratedCharacterItem = generatedCharacterItem.extend({
-  id: z.uuid()
-})
-
-export const generateCharacterPreviewResponseSchema = z.object({
-  data: z.array(generatedCharacterItem)
-})
-
-export const generateCharacterSaveResponseSchema = z.object({
-  data: z.array(savedGeneratedCharacterItem)
-})
-
-export const generatedCharacterListRequestSchema = z.object({
-  rarity: z.coerce.number().pipe(raritySchema).optional(),
-  class: classIdSchema.optional(),
-  // asc: oldest first (default), desc: newest first
-  order: z.enum(["asc", "desc"]).default("asc")
-}).extend(infiniteRequest.shape)
-
-export const generatedCharacterListResponseSchema = z.object({
-  data: z.array(savedGeneratedCharacterItem),
-  pagination: infiniteResponse
-})
-
-/** GET and PATCH /api/character/generated/[id]: the character and the classes open to it at its level */
-export const generatedCharacterItemResponseSchema = z.object({
-  data: savedGeneratedCharacterItem,
-  availableClasses: z.array(classIdSchema)
-})
-
-const statNumbers = z.object({
-  hp: z.number(),
-  attack: z.number(),
-  defense: z.number(),
-  specialAttack: z.number(),
-  specialDefense: z.number(),
-  speed: z.number()
-})
-
-/**
- * GET /api/character/generated/model: rarity tiers and growth for the /characters page.
- * Skills, ranks and classes are constants of src/shared/character, the page imports them directly.
- */
-export const characterModelResponseSchema = z.object({
-  data: z.object({
-    version: z.number().int(),
-    minLevel: z.number().int(),
-    maxLevel: z.number().int(),
-    profileMean: statNumbers,
-    // 5★ ratio of the stat at MAX_LEVEL to the stat at level 1
-    growth: statNumbers,
-    // In RARITIES order
-    rarities: z.array(z.object({
-      rarity: raritySchema,
-      // Sum of the stats at MAX_LEVEL
-      budget: z.object({ min: z.number(), max: z.number(), mean: z.number() }),
-      // Any single stat at MAX_LEVEL
-      stat: z.object({ min: z.number(), max: z.number() }),
-      budgetFactor: z.number(),
-      baseMultiplier: z.number(),
-      growthMultiplier: z.number()
-    })),
-    tiers: z.array(z.object({ tier: z.enum(CLASS_TIERS), level: z.number().int() }))
-  })
 })
 
 export type GenerateCharacterRequestType = z.infer<typeof generateCharacterRequestSchema>
 
-export type CustomCharacterType = z.infer<typeof customCharacterSchema>
-
-export type CharacterInputType = z.infer<typeof characterInputSchema>
-
-export type GenerateCharacterBodyType = z.infer<typeof generateCharacterBodySchema>
-
-export type UpdateCharacterBodyType = z.infer<typeof updateCharacterBodySchema>
-
 export type GeneratedCharacterType = z.infer<typeof generatedCharacterItem>
-
-export type SavedGeneratedCharacterType = z.infer<typeof savedGeneratedCharacterItem>
-
-export type GeneratedCharacterListRequestType = z.infer<typeof generatedCharacterListRequestSchema>
-
-export type CharacterModelType = z.infer<typeof characterModelResponseSchema>["data"]

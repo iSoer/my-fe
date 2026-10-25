@@ -1,4 +1,4 @@
-import { STATS, type Stat } from "../api/schema/pokemon/generated"
+import { STATS, type Stat } from "./stats"
 import { MAX_LEVEL, MIN_LEVEL, statsAtLevel, type StatValues } from "./leveling"
 import {
   MOVEMENT_SKILLS, WEAPON_SKILLS, meanSkillShift, rankAtLevel, rankIndex, ranksAtLevel, type Aptitudes, type Rank, type Ranks, type Skill

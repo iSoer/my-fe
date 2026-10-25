@@ -1,4 +1,4 @@
-import { STATS, type Stat } from "../api/schema/pokemon/generated"
+import { STATS, type Stat } from "./stats"
 
 // Deterministic leveling of generated characters (docs/character-model.md, "Прокачка")
 
@@ -47,7 +47,7 @@ export const statsAtLevel = (baseStats: StatValues, maxStats: StatValues, level:
 
 export const totalOfStats = (stats: StatValues) => STATS.reduce((sum, stat) => sum + stats[stat], 0)
 
-/** Fire Emblem names of the six stats a character shares with pokemon */
+/** Fire Emblem names of the six model stats */
 export const CHARACTER_STAT_LABELS: Record<Stat, string> = {
   hp: "HP",
   attack: "Str",

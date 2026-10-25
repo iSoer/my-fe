@@ -1,7 +1,5 @@
-import { STATS } from "@shared/api/schema/pokemon/generated"
-import type {
-  CustomCharacterType, GenerateCharacterRequestType, GeneratedCharacterType, UpdateCharacterBodyType
-} from "@shared/api/schema/character/generated"
+import { STATS } from "@shared/character/stats"
+import type { GenerateCharacterRequestType, GeneratedCharacterType } from "@shared/api/schema/character/generated"
 import { MAX_LEVEL, MIN_LEVEL, RARITIES, levelOneStats, totalOfStats, type Rarity } from "@shared/character/leveling"
 import {
   CLASS_TIERS, TIER_LABELS, TIER_LEVELS, availableClasses, canTakeClass, classById, earliestLevelOf, statsInClass,
@@ -12,12 +10,12 @@ import {
   type Aptitudes, type Rank, type Skill
 } from "@shared/character/skills"
 import {
-  GenerateRequestError, GenerationError, distributeStats, fitBst, nearestArchetype, normalizeShares, pickArchetype, pickBst,
-  pickExperience, sampleProfile, sampleSize
-} from "@/server/pokemon-model/generate"
-import { cosine, toShares, toVector } from "@/server/pokemon-model/math"
-import { generateName } from "@/server/pokemon-model/names"
-import { createRng, type Rng } from "@/server/pokemon-model/random"
+  GenerateRequestError, GenerationError, distributeStats, fitBst, normalizeShares, pickArchetype, pickBst, pickExperience,
+  sampleProfile, sampleSize
+} from "@/server/stat-model/generate"
+import { cosine } from "@/server/stat-model/math"
+import { generateName } from "@/server/stat-model/names"
+import { createRng, type Rng } from "@/server/stat-model/random"
 import { budgetRangeOf, referenceBstOf, type CharacterModel } from "./model"
 import { validateCharacter } from "./validate"
 
@@ -132,8 +130,8 @@ const pickClass = (rng: Rng, classes: CharacterClass[]) => rng.pick(
 /** Height, weight and experience; size follows the 5★ BST, so a rarity does not change it */
 const finish = (model: CharacterModel, rng: Rng, rarity: Rarity, maxStats: GeneratedCharacter["maxStats"]) => {
   const total = totalOfStats(maxStats)
-  const size = sampleSize(model.pokemon, rng, referenceBstOf(model, rarity, total), [])
-  const { k, baseExperience } = pickExperience(model.pokemon, rng, model.referenceClass, total)
+  const size = sampleSize(model.statModel, rng, referenceBstOf(model, rarity, total))
+  const { k, baseExperience } = pickExperience(model.statModel, rng, model.referenceClass, total)
 
   return {
     heightDm: size.heightDm,
@@ -144,7 +142,7 @@ const finish = (model: CharacterModel, rng: Rng, rarity: Rarity, maxStats: Gener
 }
 
 /** Fields derived from the stored ones: stats at the level in the class and the ranks at the level */
-export const derivedOf = (character: Pick<GeneratedCharacter, "baseStats" | "maxStats" | "level" | "class" | "aptitudes">) => {
+const derivedOf = (character: Pick<GeneratedCharacter, "baseStats" | "maxStats" | "level" | "class" | "aptitudes">) => {
   const item = classById(character.class)
 
   if (!item) {
@@ -179,7 +177,7 @@ export const generateCharacter = (
     throw new GenerateRequestError(violations)
   }
 
-  const { pokemon } = model
+  const { statModel } = model
   const rng = createRng(seed)
   const explain: string[] = []
 
@@ -187,7 +185,7 @@ export const generateCharacter = (
   const info = model.rarities[rarity]
   explain.push(`rarity ${stars(rarity)}${request.rarity ? " (requested)" : ""}`)
 
-  const archetype = request.archetype ?? pickArchetype(pokemon, rng)
+  const archetype = request.archetype ?? pickArchetype(statModel, rng)
   explain.push(`archetype ${archetype}${request.archetype ? " (requested)" : ""}`)
 
   let budget: number
@@ -198,13 +196,13 @@ export const generateCharacter = (
   }
   else {
     // The 5★ budget is a final-stage BST, the rarity scales it
-    const picked = pickBst(pokemon, rng, model.referenceClass, [])
+    const bst = pickBst(statModel, rng, model.referenceClass)
 
-    budget = fitBst(pokemon, picked.bst * info.budgetFactor, budgetRangeOf(model, rarity))
-    explain.push(`budget ${budget}: 5★ BST ${picked.bst} × ${info.budgetFactor} for ${stars(rarity)}`)
+    budget = fitBst(statModel, bst * info.budgetFactor, budgetRangeOf(model, rarity))
+    explain.push(`budget ${budget}: 5★ BST ${bst} × ${info.budgetFactor} for ${stars(rarity)}`)
   }
 
-  const profile = sampleProfile(pokemon, rng, [], archetype)
+  const profile = sampleProfile(statModel, rng, archetype)
   const requestedClass = request.class === undefined ? undefined : classById(request.class)
 
   // Talents: requested, or what the requested class needs topped up at random, picked to fit the profile
@@ -248,8 +246,8 @@ export const generateCharacter = (
 
   const talentShift = meanSkillShift(talents)
   const weight = request.talents ? 1 : RANDOM_TALENT_SHIFT
-  const shares = normalizeShares(profile.shares.map((share, j) => share + weight * talentShift[STATS[j]]), [])
-  const maxStats = distributeStats(budget, shares, info.stat, budgetRangeOf(model, rarity), [])
+  const shares = normalizeShares(profile.shares.map((share, j) => share + weight * talentShift[STATS[j]]))
+  const maxStats = distributeStats(budget, shares, info.stat, budgetRangeOf(model, rarity))
   const baseStats = levelOneStats(maxStats, model.growth, info)
   const rest = finish(model, rng, rarity, maxStats)
 
@@ -281,82 +279,4 @@ export const generateCharacter = (
   }
 
   return character
-}
-
-/**
- * A character whose rarity, talents, weaknesses, stats at MAX_LEVEL, level and class were chosen by hand
- * (the /characters page). The model adds level 1, size, experience, archetype and a name; an implausible
- * character is a request error.
- */
-export const buildCustomCharacter = (model: CharacterModel, custom: CustomCharacterType, seed: number): GeneratedCharacter => {
-  const rng = createRng(seed)
-  const { rarity, maxStats, level } = custom
-  const aptitudes = aptitudesOf(custom.talents, custom.weaknesses)
-  const archetype = custom.archetype ?? nearestArchetype(model.pokemon, toShares(toVector(maxStats)), [])
-  const baseStats = levelOneStats(maxStats, model.growth, model.rarities[rarity])
-  const rest = finish(model, rng, rarity, maxStats)
-  const item = classById(custom.class)!
-
-  const stored = {
-    name: custom.name ?? generateName(rng),
-    rarity,
-    aptitudes,
-    heightDm: rest.heightDm,
-    weightHg: rest.weightHg,
-    baseExperience: rest.baseExperience,
-    baseStats,
-    maxStats,
-    level,
-    class: custom.class,
-    archetype,
-    seed,
-    modelVersion: model.version,
-    input: { mode: "custom" as const, character: custom }
-  }
-  const character: GeneratedCharacter = {
-    ...stored,
-    ...derivedOf(stored),
-    explain: [
-      `rarity ${stars(rarity)}, stats by hand: BST ${totalOfStats(maxStats)} at level ${model.maxLevel}`,
-      aptitudeLine(aptitudes),
-      `level ${level}, class ${classLabel(item)}`,
-      `archetype ${archetype}${custom.archetype ? " (requested)" : " (closest to the stats)"}`,
-      levelLine(model, { baseStats, maxStats }),
-      ...rest.explain
-    ]
-  }
-
-  // The choices are the user's: an implausible result is their error, not the generator's
-  const check = validateCharacter(model, character)
-
-  if (!check.ok) {
-    throw new GenerateRequestError(check.violations)
-  }
-
-  return character
-}
-
-/**
- * Levels up and / or changes the class of a saved character. Levels only go up; the class must be open
- * at the new level. Ranks never drop with the level, so the current class stays open when only the level changes.
- */
-export const updateCharacter = <T extends GeneratedCharacter>(character: T, update: UpdateCharacterBodyType): T => {
-  const level = update.level ?? character.level
-  const item = classById(update.class ?? character.class)!
-  const violations: string[] = []
-
-  if (level < character.level) {
-    violations.push(`level ${level} is below the current level ${character.level}: levels only go up`)
-  }
-  else if (!canTakeClass(item, ranksAtLevel(character.aptitudes, level), level)) {
-    violations.push(`${classLabel(item)} is not open at level ${level}`)
-  }
-
-  if (violations.length > 0) {
-    throw new GenerateRequestError(violations)
-  }
-
-  const updated = { ...character, level, class: item.id }
-
-  return { ...updated, ...derivedOf(updated) }
 }

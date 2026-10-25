@@ -1,5 +1,5 @@
 /** Базовые типы игрового ядра. Никаких зависимостей от DOM/Phaser. */
-import type { Archetype } from "@shared/api/schema/pokemon/generated"
+import type { Archetype } from "@shared/character/stats"
 import { MAX_LEVEL as CHARACTER_MAX_LEVEL, type StatValues } from "@shared/character/leveling"
 import type { Movement } from "@shared/character/classes"
 import type { Aptitudes, WeaponSkill } from "@shared/character/skills"

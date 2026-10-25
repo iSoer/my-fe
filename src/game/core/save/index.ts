@@ -1,7 +1,7 @@
 import { z } from "zod"
 import type { SaveGame } from "../types"
 import { DEFAULT_SETTINGS, MAX_LEVEL } from "../types"
-import { ARCHETYPES, statsSchema as modelStatsSchema } from "@shared/api/schema/pokemon/generated"
+import { ARCHETYPES, statsSchema as modelStatsSchema } from "@shared/character/stats"
 import { aptitudesSchema, classIdSchema } from "@shared/api/schema/character/generated"
 import { WEAPON_SKILLS } from "@shared/character/skills"
 import { isWeaponId } from "@game/content/weapons"

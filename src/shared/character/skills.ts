@@ -1,4 +1,4 @@
-import { STATS, type Stat } from "../api/schema/pokemon/generated"
+import { STATS, type Stat } from "./stats"
 import { MAX_LEVEL, MIN_LEVEL } from "./leveling"
 
 // Weapon and movement skills of characters, after Fire Emblem: Fortune's Weave (docs/character-model.md, "Навыки")
@@ -89,7 +89,7 @@ export const aptitudesOf = (talents: readonly Skill[], weaknesses: readonly Skil
 export const skillsWith = (aptitudes: Aptitudes, aptitude: Aptitude) => SKILLS.filter(skill => aptitudes[skill] === aptitude)
 
 /**
- * Share of the stat budget a talent moves to each stat (sums to 0), like a pokemon type shifts the profile.
+ * Share of the stat budget a talent moves to each stat (sums to 0).
  * Hand-set from the FE roles: axes and gauntlets are strength and HP, magic is magic and resistance,
  * swords and bows are speed, heavy armor is defense paid with speed.
  */

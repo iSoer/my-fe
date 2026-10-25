@@ -18,8 +18,3 @@ export const generateName = (rng: Rng) => {
 
   return name + rng.pick(ENDINGS, ENDINGS.map(() => 1))
 }
-
-const MAX_NAME_LENGTH = 40
-
-/** `<base>-<suffix>`, with the base cut so the result fits the name length limit */
-export const suffixedName = (base: string, suffix: string) => `${base.slice(0, MAX_NAME_LENGTH - suffix.length - 1)}-${suffix}`

@@ -1,15 +1,15 @@
-import { STATS } from "@shared/api/schema/pokemon/generated"
+import { STATS } from "@shared/character/stats"
 import type { GeneratedCharacterType } from "@shared/api/schema/character/generated"
 import { MAX_LEVEL, MIN_LEVEL, RARITIES, levelOneStats, totalOfStats } from "@shared/character/leveling"
 import { canTakeClass, classById, statsInClass } from "@shared/character/classes"
 import { MAX_TALENTS, MAX_WEAKNESSES, SKILLS, ranksAtLevel, skillsWith } from "@shared/character/skills"
-import { predictLnHeight, predictLnWeight } from "@/server/pokemon-model/predict"
-import { MIN_ROUND_SHARE, SIZE_SIGMAS, withinBand, type ValidationResult } from "@/server/pokemon-model/validate"
+import { predictLnHeight, predictLnWeight } from "@/server/stat-model/predict"
+import { MIN_ROUND_SHARE, SIZE_SIGMAS, withinBand, type ValidationResult } from "@/server/stat-model/validate"
 import { budgetRangeOf, referenceBstOf, type CharacterModel } from "./model"
 
 const result = (violations: string[]): ValidationResult => ({ ok: violations.length === 0, violations })
 
-/** Plausibility of one character: the pokemon rules for its MAX_LEVEL stats, its rarity tier, skills, level and class */
+/** Plausibility of one character: the stat model rules for its MAX_LEVEL stats, its rarity tier, skills, level and class */
 export const validateCharacter = (model: CharacterModel, character: GeneratedCharacterType): ValidationResult => {
   const violations: string[] = []
   const { rarity, maxStats, baseStats, aptitudes, level } = character
@@ -19,7 +19,7 @@ export const validateCharacter = (model: CharacterModel, character: GeneratedCha
   }
 
   const info = model.rarities[rarity]
-  const reference = model.pokemon.classes[model.referenceClass]
+  const reference = model.statModel.classes[model.referenceClass]
   const total = totalOfStats(maxStats)
   const range = budgetRangeOf(model, rarity)
 
@@ -92,14 +92,14 @@ export const validateCharacter = (model: CharacterModel, character: GeneratedCha
     violations.push(`base experience ${character.baseExperience} is not round(BST × k) for k in ${ks.join(", ")}`)
   }
 
-  const { height, weight, heightRange, weightRange } = model.pokemon.size
+  const { height, weight, heightRange, weightRange } = model.statModel.size
   const referenceBst = referenceBstOf(model, rarity, total)
 
-  if (!withinBand(character.heightDm, predictLnHeight(model.pokemon, referenceBst), height.sd, SIZE_SIGMAS, heightRange)) {
+  if (!withinBand(character.heightDm, predictLnHeight(model.statModel, referenceBst), height.sd, SIZE_SIGMAS, heightRange)) {
     violations.push(`height ${character.heightDm} dm is implausible for BST ${total}`)
   }
 
-  const expectedWeight = predictLnWeight(model.pokemon, character.heightDm, [])
+  const expectedWeight = predictLnWeight(model.statModel, character.heightDm)
 
   if (!withinBand(character.weightHg, expectedWeight, weight.sd, SIZE_SIGMAS, weightRange)) {
     violations.push(`weight ${character.weightHg} hg is implausible for height ${character.heightDm} dm`)

@@ -1,14 +1,14 @@
-import { STATS } from "@shared/api/schema/pokemon/generated"
+import { STATS } from "@shared/character/stats"
 import { MAX_LEVEL, MIN_LEVEL, RARITIES, type Rarity, type RarityScale, type StatValues } from "@shared/character/leveling"
-import { loadModel } from "@/server/pokemon-model/loadModel"
-import { ceil5, floor5, fromVector, roundTo } from "@/server/pokemon-model/math"
-import type { ClassKey, PokemonModel } from "@/server/pokemon-model/schema"
+import { loadModel } from "@/server/stat-model/loadModel"
+import { ceil5, floor5, fromVector, roundTo } from "@/server/stat-model/math"
+import type { ClassKey, StatModel } from "@/server/stat-model/schema"
 
 /** Bump when the derivation or the meaning of a field changes */
 export const CHARACTER_MODEL_VERSION = 2
 
 /**
- * Pokemon class a 5★ character at MAX_LEVEL corresponds to: its BST tier, stat range and experience.
+ * Stat model class a 5★ character at MAX_LEVEL corresponds to: its BST tier, stat range and experience.
  * Level 1 is the first stage of the same line, so the whole growth is the stage 1 → 3 growth of a line of three.
  */
 export const REFERENCE_CLASS: ClassKey = "stage3of3"
@@ -44,19 +44,19 @@ export type CharacterModel = {
   // The same for the BST
   bstGrowth: number
   rarities: Record<Rarity, CharacterRarity>
-  // Profile, archetypes and size come from the pokemon model; pokemon types and abilities are not used
-  pokemon: PokemonModel
+  // Profile, archetypes and size come from the stat model
+  statModel: StatModel
 }
 
 const growthMultiplierOf = (rarity: Rarity) => (FEH_GROWTH_BASE + FEH_GROWTH_PER_STAR * rarity)
   / (FEH_GROWTH_BASE + FEH_GROWTH_PER_STAR * 5)
 
-/** Pure derivation from the pokemon model; nothing is fitted again */
-export const buildCharacterModel = (pokemon: PokemonModel): CharacterModel => {
-  const steps = GROWTH_STEPS.map(step => pokemon.evolution.steps[step])
+/** Pure derivation from the stat model; nothing is fitted again */
+const buildCharacterModel = (statModel: StatModel): CharacterModel => {
+  const steps = GROWTH_STEPS.map(step => statModel.evolution.steps[step])
   const growth = fromVector(STATS.map(stat => roundTo(steps.reduce((ratio, step) => ratio * step.statRatio[stat], 1))))
   const bstGrowth = roundTo(steps.reduce((ratio, step) => ratio * step.bstRatio.median, 1))
-  const reference = pokemon.classes[REFERENCE_CLASS]
+  const reference = statModel.classes[REFERENCE_CLASS]
 
   const rarities = Object.fromEntries(RARITIES.map((rarity) => {
     const baseMultiplier = roundTo(1 - BASE_LOSS_PER_STAR * (5 - rarity))
@@ -89,7 +89,7 @@ export const buildCharacterModel = (pokemon: PokemonModel): CharacterModel => {
     growth,
     bstGrowth,
     rarities,
-    pokemon
+    statModel
   }
 }
 

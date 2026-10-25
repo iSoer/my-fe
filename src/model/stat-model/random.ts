@@ -1,10 +1,8 @@
-import { MAX_SEED } from "@shared/api/schema/pokemon/generated"
-
 export type Rng = ReturnType<typeof createRng>
 
 /**
  * Seeded PRNG (mulberry32). Every random decision of the generator goes through it,
- * so the same seed always gives the same pokemon.
+ * so the same seed always gives the same result.
  */
 export const createRng = (seed: number) => {
   let state = seed >>> 0
@@ -66,12 +64,7 @@ export const createRng = (seed: number) => {
 
   const pick = <T>(items: T[], weights: number[]) => items[pickIndex(weights)]
 
-  const chance = (p: number) => next() < p
-
   const int = (min: number, max: number) => min + Math.floor(next() * (max - min + 1))
 
-  return { next, normal, truncatedNormal, pickIndex, pick, chance, int }
+  return { next, truncatedNormal, pickIndex, pick, int }
 }
-
-/** A fresh seed for requests that did not give one; never used inside the generator itself */
-export const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0] % (MAX_SEED + 1)
