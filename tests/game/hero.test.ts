@@ -30,4 +30,22 @@ describe("арт: главный герой", () => {
     expect(heroSvg({ facing: "down", eyes: false })).not.toContain("#cfd8ff")
     expect(heroSvg({ facing: "down" })).toContain("#cfd8ff")
   })
+
+  it("без капюшона — белый котёнок: глаза видны спереди и сбоку, со спины нет; моргание — свой кадр", () => {
+    const FUR = "#f4f1ec"
+    const IRIS = "#7fb6e6"
+    for (const facing of ["down", "up", "left", "right"] as HeroFacing[]) {
+      const off = heroSvg({ facing, hood: false })
+      expect(off, facing).toContain(FUR)
+      expect(off, facing).not.toContain("#050507")
+      expect(heroSvg({ facing }), facing).not.toContain(FUR)
+      expect(heroArtKey({ facing, hood: false }), facing).not.toBe(heroArtKey({ facing }))
+      expect(heroArtKey({ facing, hood: false, blink: true }), facing).not.toBe(heroArtKey({ facing, hood: false }))
+      if (facing === "up") expect(off).not.toContain(IRIS)
+      else {
+        expect(off, facing).toContain(IRIS)
+        expect(heroSvg({ facing, hood: false, blink: true }), facing).not.toContain(IRIS)
+      }
+    }
+  })
 })

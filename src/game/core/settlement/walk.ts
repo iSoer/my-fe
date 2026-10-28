@@ -20,6 +20,11 @@ import {
 // и жителями, путь по сетке для «тап по земле». Жители стоят только у построенных зданий, поэтому функции берут
 // список тех, кто сейчас на карте (`activeNpcs`). Без DOM и Phaser.
 
+/** Кто стоит на пути героя: жители у зданий и рыбак у пруда — важна только позиция. */
+export interface Blocker {
+  pos: Pos
+}
+
 export function settlementTile(x: number, y: number): SettlementTile {
   const ch = SETTLEMENT_TILES[y]?.[x]
   return (ch && TILE_LEGEND[ch]) || "tree"
@@ -35,7 +40,7 @@ export function activeNpcs(save: Pick<SaveGame, "settlement">): NpcDef[] {
 }
 
 /** Свободна ли точка для героя: круг радиуса HERO_RADIUS не задевает стен и жителей. */
-export function heroFits(p: Pos, npcs: readonly NpcDef[]): boolean {
+export function heroFits(p: Pos, npcs: readonly Blocker[]): boolean {
   const r = HERO_RADIUS
   for (const [dx, dy] of [[-r, -r], [r, -r], [-r, r], [r, r]] as const)
     if (!walkableTile(Math.floor(p.x + dx), Math.floor(p.y + dy))) return false
@@ -46,7 +51,7 @@ export function heroFits(p: Pos, npcs: readonly NpcDef[]): boolean {
  * Сдвиг героя на (dx, dy) клеток со скольжением вдоль препятствий: сначала по x, потом по y,
  * длинный шаг дробится, чтобы не проскочить сквозь стену.
  */
-export function moveHero(from: Pos, dx: number, dy: number, npcs: readonly NpcDef[]): Pos {
+export function moveHero(from: Pos, dx: number, dy: number, npcs: readonly Blocker[]): Pos {
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / (HERO_RADIUS * 0.9)))
   let p = { ...from }
   for (let i = 0; i < steps; i++) {
@@ -78,12 +83,12 @@ const DIRS = [
 const tileKey = (x: number, y: number) => y * SETTLEMENT_W + x
 
 /** Клетка для пути: проходима и без жителя в центре. */
-function pathTile(x: number, y: number, npcs: readonly NpcDef[]): boolean {
+function pathTile(x: number, y: number, npcs: readonly Blocker[]): boolean {
   return walkableTile(x, y) && npcs.every(n => Math.floor(n.pos.x) !== x || Math.floor(n.pos.y) !== y)
 }
 
 /** Ближайшая к точке клетка, куда можно прийти (если тапнули по дереву или дому). */
-export function nearestPathTile(p: Pos, npcs: readonly NpcDef[]): Pos | null {
+export function nearestPathTile(p: Pos, npcs: readonly Blocker[]): Pos | null {
   const cx = Math.floor(p.x)
   const cy = Math.floor(p.y)
   let best: { x: number, y: number, d: number } | null = null
@@ -103,7 +108,7 @@ export function nearestPathTile(p: Pos, npcs: readonly NpcDef[]): Pos | null {
  * Путь по сетке (8 направлений, без срезания углов) от позиции героя к точке: список центров клеток.
  * Пусто — идти некуда или уже на месте.
  */
-export function findPath(from: Pos, to: Pos, npcs: readonly NpcDef[]): Pos[] {
+export function findPath(from: Pos, to: Pos, npcs: readonly Blocker[]): Pos[] {
   const start = { x: Math.floor(from.x), y: Math.floor(from.y) }
   const goal = nearestPathTile(to, npcs)
   if (!goal) return []

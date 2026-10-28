@@ -6,9 +6,13 @@ import {
   moveHero,
   normalizeInput,
   placeInReach,
+  settlementTile,
   walkableTile
 } from "@game/core/settlement/walk"
+import { FISHER_MUTTERS } from "@game/content/dialogues"
+import { setLang } from "@game/i18n"
 import {
+  FISHER,
   HERO_RETURN,
   HERO_START,
   NPCS,
@@ -34,9 +38,11 @@ const ALL_BUILT = (): SaveGame => {
 }
 
 const PLACE_IDS = [...PLOTS.map(p => p.id), "gate"]
+/** Все, кто может стоять на пути: жители всех зданий и рыбак. */
+const EVERYONE = [...NPCS, FISHER]
 
 /** Пройти путь шагами героя. */
-function walk(from: Pos, path: Pos[], npcs = NPCS): Pos {
+function walk(from: Pos, path: Pos[], npcs = EVERYONE): Pos {
   let p = { ...from }
   for (const wp of path) for (let i = 0; i < 40; i++) p = moveHero(p, (wp.x - p.x) * 0.25, (wp.y - p.y) * 0.25, npcs)
   return p
@@ -84,16 +90,38 @@ describe("поселение: карта", () => {
 
 describe("поселение: герой", () => {
   it("старт и точка возвращения свободны при всех жителях", () => {
-    expect(heroFits(HERO_START, NPCS)).toBe(true)
-    expect(heroFits(HERO_RETURN, NPCS)).toBe(true)
+    expect(heroFits(HERO_START, EVERYONE)).toBe(true)
+    expect(heroFits(HERO_RETURN, EVERYONE)).toBe(true)
+  })
+
+  it("рыбак стоит на траве у самой воды, лицом к ней, и не мешает дойти до мест", () => {
+    const tx = Math.floor(FISHER.pos.x)
+    const ty = Math.floor(FISHER.pos.y)
+    expect(walkableTile(tx, ty)).toBe(true)
+    expect(settlementTile(tx - 1, ty)).toBe("water")
+    expect(FISHER.faceLeft).toBe(true)
+    expect(NPCS.every(n => Math.hypot(n.pos.x - FISHER.pos.x, n.pos.y - FISHER.pos.y) > 2)).toBe(true)
+    // в него не войти
+    expect(heroFits(FISHER.pos, [FISHER])).toBe(false)
+  })
+
+  it("рыбак бубнит про рыбу: реплик хватает, все разные, на обоих языках", () => {
+    for (const lang of ["ru", "en"] as const) {
+      setLang(lang)
+      const lines = FISHER_MUTTERS()
+      expect(lines.length).toBeGreaterThanOrEqual(8)
+      expect(new Set(lines).size).toBe(lines.length)
+      for (const l of lines) expect(l.length, l).toBeLessThanOrEqual(70)
+    }
+    setLang("en")
   })
 
   it("к каждому месту можно дойти со старта и открыть его, даже когда построено всё", () => {
     for (const id of PLACE_IDS) {
       const front = placeFront(id)!
-      expect(heroFits(front, NPCS), id).toBe(true)
+      expect(heroFits(front, EVERYONE), id).toBe(true)
       expect(placeInReach(front), id).toBe(id)
-      const path = findPath(HERO_START, front, NPCS)
+      const path = findPath(HERO_START, front, EVERYONE)
       expect(path.length, id).toBeGreaterThan(0)
       expect(placeInReach(walk(HERO_START, [...path, front])), id).toBe(id)
     }

@@ -35,6 +35,22 @@ export interface DialogueScene {
   lines: () => DialogueLine[]
 }
 
+/** Что бормочет себе под нос рыбак у пруда (`FISHER`): по одной реплике в облачке, вразнобой. */
+export const FISHER_MUTTERS = (): string[] => [
+  tr("Bite, you scaly devil… bite…", "Клюй, чешуйчатый… ну клюй же…"),
+  tr("Caught a boot yesterday. A good boot, though.", "Вчера сапог вытащил. Хороший сапог, между прочим."),
+  tr("The carp here have teeth now. Didn’t use to.", "У здешних карасей теперь зубы. Раньше не было."),
+  tr("Zombies don’t swim. Probably. Hopefully.", "Мертвяки не плавают. Наверное. Надеюсь."),
+  tr("A perch this big… no, THIS big. Got away.", "Окунь был — во! Нет, вот такой. Ушёл."),
+  tr("Fish don’t care about the end of the world.", "Рыбе-то что. Рыбе конец света не указ."),
+  tr("Shh… don’t stomp. You’ll scare the bream.", "Тс-с… не топай. Леща распугаешь."),
+  tr("Worms are getting scarce. Everyone’s digging.", "Червей всё меньше. Все копают, все."),
+  tr("If it glows, throw it back.", "Если светится — отпускай обратно."),
+  tr("Fish soup tonight. If I’m lucky. And if it’s fish.", "Вечером уха. Если повезёт. И если это рыба."),
+  tr("Something big nibbled the float. Very big.", "Кто-то большой поплавок пощупал. Очень большой."),
+  tr("Grandpa said: the pike remembers everyone.", "Дед говорил: щука всех помнит.")
+]
+
 /** Все сцены. Фоновые — первыми по каждому жителю, сюжетные — ниже. */
 export const SCENES: readonly DialogueScene[] = [
   {

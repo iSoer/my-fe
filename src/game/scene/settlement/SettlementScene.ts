@@ -7,10 +7,14 @@ import {
   moveHero,
   normalizeInput,
   placeInReach,
-  settlementTile
+  settlementTile,
+  type Blocker
 } from "@game/core/settlement/walk"
+import { FISHER_MUTTERS } from "@game/content/dialogues"
 import {
+  FISHER,
   HERO_SPEED,
+  MUTTER_TIMING,
   HERO_START,
   NPCS,
   PLOTS,
@@ -70,6 +74,13 @@ const FACINGS: readonly Facing[] = ["down", "up", "left", "right"]
 const WATER_FRAMES = TILE_FRAME_COUNT.water ?? 1
 /** Высота героя и жителей на экране (в клетках). */
 const HERO_H = 1.2
+/** Через сколько секунд простоя герой снимает капюшон (под ним белый котёнок). */
+const HOOD_OFF_AFTER = 5
+/** Пошёл без капюшона — надевает его через столько секунд ходьбы (остановился раньше — отсчёт заново). */
+const HOOD_ON_AFTER = 3
+/** Котёнок без капюшона моргает раз в столько секунд (от и до), моргание длится `BLINK_S`. */
+const BLINK_EVERY = [2.5, 5] as const
+const BLINK_S = 0.14
 const NPC_W = 1.25
 /** Сколько рядов «за околицей» дорисовано под воротами (не проходимо): дорога уходит из поселения. */
 const OUTSIDE_ROWS = 1
@@ -128,6 +139,28 @@ interface NpcView {
   /** Пузырь «!»: у жителя новая сюжетная сцена. */
   story: Phaser.GameObjects.Container
   tween?: Phaser.Tweens.Tween
+}
+
+/** Облачко бубнежа: `box` — сама плашка (w × h без хвостика), сдвигается вбок, чтобы не вылезать за экран. */
+interface MutterBubble {
+  root: Phaser.GameObjects.Container
+  box: Phaser.GameObjects.Container
+  w: number
+  h: number
+}
+
+/** Рыбак у пруда: спрайт, удочка с поплавком и облачко бубнежа. */
+interface FisherView {
+  img: Phaser.GameObjects.Image
+  float: Phaser.GameObjects.Arc
+  /** Точка над именем — под хвостик облачка (мировые пиксели). */
+  head: Pos
+  bubble?: MutterBubble
+  /** Через сколько секунд следующая реплика. */
+  nextT: number
+  /** Реплики вразнобой без повторов подряд: очередь перемешанных номеров и последняя показанная. */
+  queue: number[]
+  lastLine?: number
 }
 
 /** Участок: спрайт здания и пустого места (виден один из них). */
@@ -217,6 +250,7 @@ export class SettlementScene extends Phaser.Scene {
   private facing: Facing
   private hero?: Phaser.GameObjects.Image
   private npcs: NpcView[] = []
+  private fisher?: FisherView
   /** Жители, которые сейчас стоят на карте (у построенных зданий): с ними сталкивается герой. */
   private active: NpcDef[] = []
   private plots: PlotView[] = []
@@ -237,6 +271,12 @@ export class SettlementScene extends Phaser.Scene {
   private moving = false
   private walkT = 0
   private idleT = 0
+  /** Сколько секунд герой стоит на месте; капюшон снят и когда котёнок моргнёт в следующий раз. */
+  private restT = 0
+  private hoodOff = false
+  /** Сколько ещё идти без капюшона, прежде чем надеть его. */
+  private hoodOnT = 0
+  private blinkAt = 0
   private stepT = 0
   private stuckT = 0
   private signT = 0
@@ -307,13 +347,25 @@ export class SettlementScene extends Phaser.Scene {
         jobs.push(t(texKey.npc(n.id, pose), svg, T * NPC_W, (T * NPC_W * 140) / 120))
       }
     }
+    const f = FISHER
+    const fisherSvg = critterSvg({ species: f.species, fur: furArt(f.fur), iris: eyeArt(f.eyes), pattern: 0, eyes: f.eyes, accessory: f.accessory, pose: "idle" })
+    jobs.push(t(texKey.npc(f.id, "idle"), fisherSvg, T * NPC_W, (T * NPC_W * 140) / 120))
     const heroH = T * HERO_H
     const heroW = (heroH * HERO_VIEW.w) / HERO_VIEW.h
     for (const facing of FACINGS) {
-      for (let f = 0; f < HERO_IDLE_FRAMES; f++)
+      for (let f = 0; f < HERO_IDLE_FRAMES; f++) {
         jobs.push(t(heroArtKey({ facing, pose: "idle", frame: f }), heroSvg({ facing, pose: "idle", frame: f }), heroW, heroH))
+        // без капюшона — только в покое: открытый и моргающий котёнок
+        for (const blink of [false, true]) {
+          const a = { facing, pose: "idle", frame: f, hood: false, blink } as const
+          jobs.push(t(heroArtKey(a), heroSvg(a), heroW, heroH))
+        }
+      }
       for (let f = 0; f < HERO_WALK_FRAMES; f++)
-        jobs.push(t(heroArtKey({ facing, pose: "walk", frame: f }), heroSvg({ facing, pose: "walk", frame: f }), heroW, heroH))
+        for (const hood of [true, false]) {
+          const a = { facing, pose: "walk", frame: f, hood } as const
+          jobs.push(t(heroArtKey(a), heroSvg(a), heroW, heroH))
+        }
     }
     return Promise.all(jobs)
   }
@@ -416,6 +468,7 @@ export class SettlementScene extends Phaser.Scene {
       .setDisplaySize(SORTIE_GATE.w * T, T * GATE_H)
       .setDepth(gateBottom)
     for (const def of NPCS) this.npcs.push(this.makeNpc(def))
+    this.fisher = this.makeFisher()
     for (const p of PLOTS) this.signs.push(this.makeSign(p.id))
     this.signs.push(this.makeSign("gate"))
 
@@ -437,7 +490,7 @@ export class SettlementScene extends Phaser.Scene {
 
     this.refreshSigns()
     // Сохранённая позиция могла оказаться на месте жителя или в стене (сменилась карта) — тогда на старт
-    if (!heroFits(this.pos, this.active)) this.pos = { ...HERO_START }
+    if (!heroFits(this.pos, this.blockers)) this.pos = { ...HERO_START }
     this.hero.setPosition(this.pos.x * T, this.pos.y * T).setDepth(this.pos.y * T)
 
     this.setupInput()
@@ -514,6 +567,151 @@ export class SettlementScene extends Phaser.Scene {
         ]
       })
     }
+  }
+
+  /** Рыбак у пруда с удочкой: поплавок покачивается на воде, иногда ныряет — клюёт. */
+  private makeFisher(): FisherView {
+    const def = FISHER
+    const w = T * NPC_W
+    const h = (w * 140) / 120
+    const x = def.pos.x * T
+    const y = def.pos.y * T
+    const img = this.add.image(x, y + h * 0.14, texKey.npc(def.id, "idle")).setOrigin(0.5, 1).setDisplaySize(w, h).setDepth(y).setFlipX(def.faceLeft)
+    const dir = def.faceLeft ? -1 : 1
+    // Удилище из лап вверх-вбок над водой, леска провисает к поплавку
+    const grip = { x: x + dir * w * 0.2, y: y - h * 0.18 }
+    const tip = { x: x + dir * T * 1.15, y: y - h * 0.95 }
+    const floatAt = { x: x + dir * T * 1.45, y: y - T * 0.25 }
+    const rod = this.add.graphics().setDepth(y + 1)
+    rod.lineStyle(3, 0x5a3b22, 1).lineBetween(grip.x, grip.y, tip.x, tip.y)
+    rod.lineStyle(1, 0xd8d2c0, 0.7).lineBetween(tip.x, tip.y, floatAt.x, floatAt.y)
+    const float = this.add.circle(floatAt.x, floatAt.y, 3.5, 0xd64545).setStrokeStyle(1.5, 0xf3e2c0).setDepth(y + 1)
+    if (!reducedMotion()) this.tweens.add({ targets: float, y: floatAt.y + 2, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+    const label = this.add
+      .text(x, y - h * 0.78, def.name, textStyle(12, "#ffffff", true, 3))
+      .setOrigin(0.5, 1)
+      .setResolution(2)
+      .setDepth(9000)
+    const queue: number[] = []
+    return { img, float, head: { x, y: label.getTopCenter().y ?? label.y }, nextT: MUTTER_TIMING.first, queue }
+  }
+
+  /** Рыбак бубнит: тихо по таймеру, а по тапу — сразу (поплавок при этом дёргается). */
+  private tickFisher(dt: number): void {
+    const f = this.fisher
+    if (!f) return
+    if (f.bubble) this.fitBubble(f.bubble)
+    f.nextT -= dt
+    if (f.nextT > 0) return
+    if (this.opts.paused()) {
+      f.nextT = 1
+      return
+    }
+    this.mutter()
+  }
+
+  private mutter(): void {
+    const f = this.fisher
+    if (!f) return
+    const lines = FISHER_MUTTERS()
+    if (f.queue.length === 0) {
+      const order = Phaser.Utils.Array.Shuffle(lines.map((_, i) => i))
+      // Новый круг не начинается с той же реплики, что закончил прошлый
+      if (order[0] === f.lastLine && order.length > 1) order.push(order.shift() as number)
+      f.queue.push(...order)
+    }
+    const i = f.queue.shift() as number
+    f.lastLine = i
+    const text = lines[i] ?? ""
+    const hold = MUTTER_TIMING.hold + text.length * MUTTER_TIMING.perChar
+    const [lo, hi] = MUTTER_TIMING.gap
+    f.nextT = hold + lo + Math.random() * (hi - lo)
+    this.showBubble(f, text, hold)
+    if (!reducedMotion()) this.tweens.add({ targets: f.float, scaleX: 0.7, scaleY: 0.4, duration: 120, yoyo: true, repeat: 1 })
+  }
+
+  /**
+   * Облачко над рыбаком: экранного размера (не мельчает при отдалении камеры), хвостик вниз к голове.
+   * Новая реплика сменяет старую.
+   */
+  private showBubble(f: FisherView, text: string, hold: number): void {
+    f.bubble?.root.destroy()
+    const label = this.add
+      .text(0, 0, text, {
+        ...textStyle(13, "#2a1d10", false, 0),
+        fontStyle: "italic",
+        wordWrap: { width: 190, useAdvancedWrap: true },
+        lineSpacing: 2
+      })
+      .setOrigin(0.5, 1)
+      .setResolution(3)
+    const padX = 10
+    const padY = 7
+    const tail = 9
+    const w = label.width + padX * 2
+    const h = label.height + padY * 2
+    label.setPosition(0, -tail - padY)
+    const g = this.add.graphics()
+    g.fillStyle(0x000000, 0.35).fillRoundedRect(-w / 2 + 2, -tail - h + 3, w, h, 10)
+    g.fillStyle(0xf3e2c0, 1).fillRoundedRect(-w / 2, -tail - h, w, h, 10)
+    g.lineStyle(2.5, 0x2a1d10, 1).strokeRoundedRect(-w / 2, -tail - h, w, h, 10)
+    const tip = this.add.graphics()
+    tip.fillStyle(0xf3e2c0, 1).fillTriangle(-7, -tail - 1.5, 7, -tail - 1.5, 0, 0)
+    tip.lineStyle(2.5, 0x2a1d10, 1).lineBetween(-7, -tail, 0, 0).lineBetween(7, -tail, 0, 0)
+    const box = this.add.container(0, 0, [g, label])
+    const scale = 1 / this.view.zoom
+    const root = this.add.container(f.head.x, f.head.y - 2, [box, tip]).setDepth(9600).setScale(scale * 0.6).setAlpha(0)
+    const bubble = { root, box, w, h: h + tail }
+    f.bubble = bubble
+    this.fitBubble(bubble)
+    const still = reducedMotion()
+    this.tweens.add({ targets: root, alpha: 1, scale, duration: still ? 0 : 180, ease: "Back.easeOut" })
+    this.tweens.add({
+      targets: root,
+      alpha: 0,
+      delay: hold * 1000,
+      duration: 350,
+      onComplete: () => {
+        root.destroy()
+        if (f.bubble === bubble) f.bubble = undefined
+      }
+    })
+  }
+
+  /** Попал ли тап (клетки) в облачко рыбака — вместе с хвостиком. */
+  private hitBubble(p: Pos): boolean {
+    const b = this.fisher?.bubble
+    if (!b) return false
+    const k = 1 / this.view.zoom
+    const cx = b.root.x + b.box.x * k
+    const x = p.x * T
+    const y = p.y * T
+    return Math.abs(x - cx) <= (b.w / 2) * k && y <= b.root.y && y >= b.root.y - b.h * k
+  }
+
+  /** Убрать облачко по тапу: быстро гаснет; следующая реплика — в свой срок. */
+  private closeBubble(): void {
+    const f = this.fisher
+    const b = f?.bubble
+    if (!f || !b) return
+    f.bubble = undefined
+    this.tweens.killTweensOf(b.root)
+    this.tweens.add({ targets: b.root, alpha: 0, scale: b.root.scale * 0.85, duration: reducedMotion() ? 0 : 120, onComplete: () => b.root.destroy() })
+  }
+
+  /** Сдвинуть плашку облачка вбок, чтобы она целиком была на экране (хвостик не двигается, пока хватает места). */
+  private fitBubble(b: MutterBubble): void {
+    const view = this.cameras.main.worldView
+    const k = 1 / this.view.zoom
+    const gap = 8 * k
+    const half = (b.w / 2) * k
+    const x = b.root.x
+    let dx = 0
+    if (x - half < view.left + gap) dx = view.left + gap - (x - half)
+    else if (x + half > view.right - gap) dx = view.right - gap - (x + half)
+    // хвостик должен остаться под плашкой: сдвиг не больше полуширины без скругления
+    const max = half - 14 * k
+    b.box.setX(Phaser.Math.Clamp(dx, -max, max) / k)
   }
 
   private makeNpc(def: NpcDef): NpcView {
@@ -631,7 +829,7 @@ export class SettlementScene extends Phaser.Scene {
     // Житель появился там, где стоит герой (здание построили) — герой отходит к входу, чтобы не застрять
     const fresh = active.filter(n => !this.active.includes(n))
     this.active = active
-    if (this.hero && fresh.length > 0 && !heroFits(this.pos, active)) this.teleport(fresh[0]?.place as PlaceId)
+    if (this.hero && fresh.length > 0 && !heroFits(this.pos, [...active, FISHER])) this.teleport(fresh[0]?.place as PlaceId)
     for (const v of this.signs) {
       const s = signs[v.id]
       if (!s) continue
@@ -741,8 +939,15 @@ export class SettlementScene extends Phaser.Scene {
     this.joy = undefined
   }
 
-  /** Тап по земле — идти туда; по жителю, зданию или его вывеске — подойти и открыть карточку места. */
+  /** Кто стоит на пути героя: жители у построенных зданий и рыбак. */
+  private get blockers(): Blocker[] {
+    return [...this.active, FISHER]
+  }
+
+  /** Тап по земле — идти туда; по жителю, зданию или его вывеске — подойти и открыть карточку места; по рыбаку — он бубнит. */
   private tapAt(p: Pos): void {
+    if (this.hitBubble(p)) return this.closeBubble()
+    if (Math.abs(FISHER.pos.x - p.x) < 0.7 && p.y > FISHER.pos.y - 1.3 && p.y < FISHER.pos.y + 0.5) return this.mutter()
     const npc = this.active.find(n => Math.abs(n.pos.x - p.x) < 0.7 && p.y > n.pos.y - 1.3 && p.y < n.pos.y + 0.5)
     if (npc && this.opts.canTalk(npc.id)) return this.talkTo(npc)
     if (npc) return this.walkTo(npc.place)
@@ -753,7 +958,7 @@ export class SettlementScene extends Phaser.Scene {
     if (place) return this.walkTo(place)
     this.openOnArrive = undefined
     this.talkOnArrive = undefined
-    this.path = findPath(this.pos, p, this.active)
+    this.path = findPath(this.pos, p, this.blockers)
     this.showMarker(this.path[this.path.length - 1])
   }
 
@@ -767,7 +972,7 @@ export class SettlementScene extends Phaser.Scene {
     }
     const front = placeFront(npc.place)
     if (!front) return
-    this.path = [...findPath(this.pos, front, this.active), front]
+    this.path = [...findPath(this.pos, front, this.blockers), front]
     this.showMarker(front)
   }
 
@@ -786,14 +991,14 @@ export class SettlementScene extends Phaser.Scene {
       this.path = []
       return
     }
-    this.path = [...findPath(this.pos, front, this.active), front]
+    this.path = [...findPath(this.pos, front, this.blockers), front]
     this.showMarker(front)
   }
 
   /** Переставить героя к входу в место (панель мест, смоук-тесты); камера переезжает сразу. */
   teleport(id: PlaceId): void {
     const front = placeFront(id)
-    if (!front || !heroFits(front, this.active)) return
+    if (!front || !heroFits(front, this.blockers)) return
     this.pos = { ...front }
     this.path = []
     this.openOnArrive = undefined
@@ -827,6 +1032,7 @@ export class SettlementScene extends Phaser.Scene {
     const dt = Math.min(deltaMs, 50) / 1000
     this.animateWater(dt)
     this.animateFx(dt)
+    this.tickFisher(dt)
     this.signT += dt
     if (this.signT > 0.5) {
       this.signT = 0
@@ -865,7 +1071,7 @@ export class SettlementScene extends Phaser.Scene {
     const dir = normalizeInput(v.x, v.y)
     const from = this.pos
     if (speed > 0) {
-      this.pos = moveHero(from, dir.x * speed * dt, dir.y * speed * dt, this.active)
+      this.pos = moveHero(from, dir.x * speed * dt, dir.y * speed * dt, this.blockers)
       this.facing = facingOf(dir.x, dir.y, this.facing)
     }
     const moved = Math.hypot(this.pos.x - from.x, this.pos.y - from.y) > 1e-4
@@ -916,8 +1122,41 @@ export class SettlementScene extends Phaser.Scene {
 
   private setMoving(on: boolean): void {
     if (this.moving && !on) this.opts.onRest(this.pos, this.facing)
-    if (!this.moving && on) this.walkT = 0
+    if (!this.moving && on) {
+      this.walkT = 0
+      this.restT = 0
+      this.hoodOnT = HOOD_ON_AFTER
+    }
     this.moving = on
+  }
+
+  /**
+   * Снять (true) или надеть капюшон: короткое «присел — выпрямился», вид меняется в нижней точке (надевая на ходу,
+   * приседает глубже — натягивает капюшон). Сняв капюшон, котёнок поворачивается к игроку — показать мордочку.
+   */
+  private setHood(off: boolean): void {
+    const hero = this.hero
+    if (!hero) return
+    this.blinkAt = this.idleT + BLINK_EVERY[0]
+    this.tweens.killTweensOf(hero)
+    const sy = (T * HERO_H) / hero.height
+    hero.setScale(hero.scaleX, sy)
+    const reveal = () => {
+      this.hoodOff = off
+      if (off && this.facing !== "down") {
+        this.facing = "down"
+        this.opts.onRest(this.pos, this.facing)
+      }
+    }
+    if (reducedMotion()) return reveal()
+    this.tweens.add({
+      targets: hero,
+      scaleY: sy * (off ? 0.9 : 0.86),
+      duration: 110,
+      yoyo: true,
+      ease: "Quad.easeOut",
+      onYoyo: reveal
+    })
   }
 
   private animateHero(dt: number): void {
@@ -925,12 +1164,23 @@ export class SettlementScene extends Phaser.Scene {
     if (this.moving) {
       this.walkT += dt
       const frame = Math.floor(this.walkT * 8) % HERO_WALK_FRAMES
-      this.hero.setTexture(heroArtKey({ facing: this.facing, pose: "walk", frame }))
+      if (this.hoodOff && !this.tweens.isTweening(this.hero)) {
+        this.hoodOnT -= dt
+        if (this.hoodOnT <= 0) this.setHood(false)
+      }
+      this.hero.setTexture(heroArtKey({ facing: this.facing, pose: "walk", frame, hood: !this.hoodOff }))
     }
     else {
       this.idleT += dt
+      this.restT += dt
+      if (!this.hoodOff && this.restT >= HOOD_OFF_AFTER && !this.tweens.isTweening(this.hero)) this.setHood(true)
       const frame = Math.floor(this.idleT * 1.6) % HERO_IDLE_FRAMES
-      this.hero.setTexture(heroArtKey({ facing: this.facing, pose: "idle", frame }))
+      let blink = false
+      if (this.hoodOff && this.idleT >= this.blinkAt) {
+        blink = this.idleT < this.blinkAt + BLINK_S
+        if (!blink) this.blinkAt = this.idleT + BLINK_EVERY[0] + Math.random() * (BLINK_EVERY[1] - BLINK_EVERY[0])
+      }
+      this.hero.setTexture(heroArtKey({ facing: this.facing, pose: "idle", frame, hood: !this.hoodOff, blink }))
     }
   }
 

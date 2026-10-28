@@ -323,6 +323,37 @@ export const NPCS: readonly NpcDef[] = [
 ]
 
 /**
+ * Рыбак у пруда: живёт сам по себе — не привязан к месту, не разговаривает, только удит и бубнит под нос про рыбу
+ * (облачко над головой, `FISHER_MUTTERS`). Стоит всегда; герой обходит его, как жителя.
+ */
+export interface AmbientNpcDef {
+  id: string
+  name: string
+  species: Species
+  pos: Pos
+  fur: number
+  eyes: number
+  accessory: number
+  /** Смотрит влево (к воде). */
+  faceLeft: boolean
+}
+
+export const FISHER: AmbientNpcDef = {
+  id: "fisher",
+  get name() { return tr("Old Perch", "Дед Окунь") },
+  species: "cat",
+  // справа от пруда (клетки `~` x 7–8, y 8–9), лицом к воде
+  pos: { x: 9.5, y: 9.4 },
+  fur: 2,
+  eyes: 3,
+  accessory: 2,
+  faceLeft: true
+}
+
+/** Бубнёж рыбака: первая реплика — через столько секунд, потом пауза между репликами (от и до), с. */
+export const MUTTER_TIMING = { first: 3, gap: [7, 13], hold: 3.5, perChar: 0.045 } as const
+
+/**
  * Дождь над поселением: время делится на окна по `cycleMs`, в доле `share` окон (выбор детерминирован номером окна)
  * идёт дождь. Чистая презентация — на игру не влияет.
  */

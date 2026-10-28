@@ -1,6 +1,6 @@
 /**
- * Главный герой деревни: маленький чиби в чёрном плаще, лицо наглухо скрыто капюшоном.
- * Четыре направления (left — зеркало right), кадры ходьбы и дыхания. Без градиентов и id,
+ * Главный герой деревни: маленький чиби в чёрном плаще, лицо наглухо скрыто капюшоном. Заскучав, он снимает
+ * капюшон (`hood: false`) — под ним белый котёнок в больших наушниках; капюшон тогда лежит складками на плечах. Четыре направления (left — зеркало right), кадры ходьбы и дыхания. Без градиентов и id,
  * чтобы несколько копий в одном DOM не конфликтовали.
  */
 
@@ -14,6 +14,10 @@ export interface HeroArt {
   frame?: number
   /** Тусклые блики глаз в темноте капюшона. */
   eyes?: boolean
+  /** Капюшон надет (по умолчанию). false — откинут, видна голова котёнка. */
+  hood?: boolean
+  /** Котёнок моргает (только без капюшона). */
+  blink?: boolean
 }
 
 export const HERO_VIEW = { w: 64, h: 80 } as const
@@ -33,6 +37,45 @@ const C = {
   boot: "#0c0c10",
   eye: "#cfd8ff"
 } as const
+
+/** Котёнок под капюшоном: белая шёрстка, розовые уши и нос, голубые глаза; наушники — тёмные с алым кольцом. */
+const K = {
+  fur: "#f4f1ec",
+  shade: "#d6d0c7",
+  ear: "#f2a7b8",
+  nose: "#e57d94",
+  iris: "#7fb6e6",
+  pupil: "#1b1a24",
+  line: "#6b5f66",
+  whisker: "#b9b0aa",
+  phone: "#26262f",
+  phoneLight: "#4a4a58",
+  phoneRing: "#dc3341"
+} as const
+
+/** Чашка наушника: корпус, алое кольцо, амбушюра и блик. */
+function cup(cx: number, cy: number, rx: number, ry: number): string {
+  return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${K.phone}" />`
+    + `<ellipse cx="${cx}" cy="${cy}" rx="${r(rx * 0.68)}" ry="${r(ry * 0.72)}" fill="none" stroke="${K.phoneRing}" stroke-width="1.6" />`
+    + `<ellipse cx="${r(cx - rx * 0.3)}" cy="${r(cy - ry * 0.45)}" rx="${r(rx * 0.28)}" ry="${r(ry * 0.18)}" fill="#fff" opacity=".35" />`
+}
+
+/** Большие наушники: дужка через макушку между ушками и две чашки по бокам головы (сбоку видна одна). */
+function headphones(view: "front" | "back" | "side"): string {
+  if (view === "side")
+    return `<path d="M26 22 C25 11 33 7.5 40 10.5" fill="none" stroke="${K.phone}" stroke-width="3.4" stroke-linecap="round" />`
+      + `<path d="M27.4 19 C27.4 12.5 32 9.8 37 10.8" fill="none" stroke="${K.phoneLight}" stroke-width="1" stroke-linecap="round" />`
+      + `<rect x="24" y="20.5" width="4" height="4" rx="1" fill="${K.phone}" />`
+      + cup(26, 28, 6.4, 8)
+  const band = `<path d="M14.5 25 C14 9.5 50 9.5 49.5 25" fill="none" stroke="${K.phone}" stroke-width="3.4" stroke-linecap="round" />`
+    + (view === "front" ? `<path d="M18 17 C22 11.5 42 11.5 46 17" fill="none" stroke="${K.phoneLight}" stroke-width="1" stroke-linecap="round" />` : "")
+  // со спины видна тыльная сторона чашек — без бликов кольца
+  const cups = view === "front"
+    ? cup(14.5, 28.5, 5.4, 7.4) + cup(49.5, 28.5, 5.4, 7.4)
+    : `<ellipse cx="14.5" cy="28.5" rx="5.4" ry="7.4" fill="${K.phone}" /><ellipse cx="49.5" cy="28.5" rx="5.4" ry="7.4" fill="${K.phone}" />`
+      + `<path d="M12 23.5 Q14.5 22 17 23.5 M47 23.5 Q49.5 22 52 23.5" fill="none" stroke="${K.phoneLight}" stroke-width="1" stroke-linecap="round" />`
+  return band + cups
+}
 
 interface Motion {
   /** Подъём всего тела (шаг/вдох). */
@@ -127,13 +170,92 @@ function hoodSide(eyes: boolean): string {
     + `<circle cx="38" cy="46" r="2.1" fill="${C.clasp}" />`
 }
 
+/* ---------- Без капюшона: котёнок ---------- */
+
+/** Откинутый капюшон анфас: складки ткани за головой на плечах, видна алая изнанка. */
+function droppedFront(): string {
+  return `<path d="M9 45 Q10 33 21 33.5 L43 33.5 Q54 33 55 45 Q45 50.5 32 50.5 Q19 50.5 9 45 Z" fill="${C.cloak}" />`
+    + `<path d="M13 40.5 Q15 35.5 23 36 L41 36 Q49 35.5 51 40.5" fill="none" stroke="${C.lining}" stroke-width="2.2" stroke-linecap="round" />`
+    + `<path d="M11 44 Q12 38 17 36.5" fill="none" stroke="${C.rim}" stroke-width="1.3" stroke-linecap="round" />`
+}
+
+/** Голова котёнка анфас: круглая, ушки с розовым, большие глаза, нос, «w»-ротик, румянец и усы. */
+function kittenFront(blink: boolean): string {
+  const eye = (x: number): string => blink
+    ? `<path d="M${x - 2.8} 29.5 Q${x} 31.8 ${x + 2.8} 29.5" fill="none" stroke="${K.pupil}" stroke-width="1.4" stroke-linecap="round" />`
+    : `<ellipse cx="${x}" cy="29" rx="2.9" ry="3.4" fill="${K.iris}" /><ellipse cx="${x}" cy="29.3" rx="1.6" ry="2.6" fill="${K.pupil}" />`
+      + `<circle cx="${x - 0.9}" cy="27.8" r="0.95" fill="#fff" />`
+  return `<path d="M17 22 L15.5 7 L28 14.5 Z" fill="${K.fur}" /><path d="M18.6 19 L17.8 10.4 L25.2 14.8 Z" fill="${K.ear}" />`
+    + `<path d="M47 22 L48.5 7 L36 14.5 Z" fill="${K.fur}" /><path d="M45.4 19 L46.2 10.4 L38.8 14.8 Z" fill="${K.ear}" />`
+    + `<ellipse cx="32" cy="28" rx="16.5" ry="14.5" fill="${K.fur}" />`
+    + `<path d="M17 32 Q20 41.5 32 42.5 Q44 41.5 47 32 Q44 39 32 39.5 Q20 39 17 32 Z" fill="${K.shade}" />`
+    + `<path d="M28 15 Q29.5 17.5 29 20 M32 14.2 L32 18.6 M36 15 Q34.5 17.5 35 20" fill="none" stroke="${K.shade}" stroke-width="1.3" stroke-linecap="round" />`
+    + eye(25.5) + eye(38.5)
+    + `<ellipse cx="21" cy="34" rx="2.8" ry="1.6" fill="${K.ear}" opacity=".55" /><ellipse cx="43" cy="34" rx="2.8" ry="1.6" fill="${K.ear}" opacity=".55" />`
+    + `<path d="M30.6 33 L33.4 33 L32 34.6 Z" fill="${K.nose}" />`
+    + `<path d="M29.4 35.6 Q30.7 37.2 32 35.6 Q33.3 37.2 34.6 35.6" fill="none" stroke="${K.line}" stroke-width="0.9" stroke-linecap="round" />`
+    + headphones("front")
+    + `<g stroke="${K.whisker}" stroke-width="0.8" stroke-linecap="round"><path d="M18 33 L11 31.5 M18 35 L11.5 36" /><path d="M46 33 L53 31.5 M46 35 L52.5 36" /></g>`
+}
+
+/** Откинутый капюшон сзади: тряпичным мешком висит на спине, прикрывая шею. */
+function droppedBack(): string {
+  return `<path d="M15 38 Q32 33 49 38 Q50 47 43 52 Q32 56 21 52 Q14 47 15 38 Z" fill="${C.cloak}" />`
+    + `<path d="M18 40 Q32 36 46 40" fill="none" stroke="${C.rim}" stroke-width="1.3" stroke-linecap="round" />`
+    + `<path d="M32 39 Q31 46 32 53" fill="none" stroke="${C.shade}" stroke-width="1.5" />`
+}
+
+/** Голова котёнка со спины: ушки и затылок. */
+function kittenBack(): string {
+  return `<path d="M17 22 L15.5 7 L28 14.5 Z" fill="${K.fur}" /><path d="M47 22 L48.5 7 L36 14.5 Z" fill="${K.fur}" />`
+    + `<path d="M17.8 19.5 L17 10 L25 14.6" fill="none" stroke="${K.shade}" stroke-width="1.2" stroke-linejoin="round" />`
+    + `<path d="M46.2 19.5 L47 10 L39 14.6" fill="none" stroke="${K.shade}" stroke-width="1.2" stroke-linejoin="round" />`
+    + `<ellipse cx="32" cy="28" rx="16.5" ry="14.5" fill="${K.fur}" />`
+    + `<path d="M19 34 Q24 41.5 32 41.5 Q40 41.5 45 34 Q40 38.5 32 38.5 Q24 38.5 19 34 Z" fill="${K.shade}" />`
+    + `<path d="M29 16 Q30 20 29.5 24 M35 16 Q34 20 34.5 24" fill="none" stroke="${K.shade}" stroke-width="1.3" stroke-linecap="round" />`
+    + headphones("back")
+}
+
+/** Откинутый капюшон сбоку (вид справа): складки за затылком. */
+function droppedSide(): string {
+  return `<path d="M9 44 Q8 32 20 32.5 L38 35 Q44 40 41 47 Q28 51 15 48 Z" fill="${C.cloak}" />`
+    + `<path d="M12 39 Q14 34.5 21 35 L36 37" fill="none" stroke="${C.lining}" stroke-width="2.2" stroke-linecap="round" />`
+}
+
+/** Голова котёнка в профиль (смотрит вправо): ушки, глаз, мордочка с носом и усами. */
+function kittenSide(blink: boolean): string {
+  const eye = blink
+    ? `<path d="M37.6 29.5 Q40.2 31.8 42.8 29.5" fill="none" stroke="${K.pupil}" stroke-width="1.4" stroke-linecap="round" />`
+    : `<ellipse cx="40.4" cy="29" rx="2.5" ry="3.4" fill="${K.iris}" /><ellipse cx="41" cy="29.3" rx="1.4" ry="2.6" fill="${K.pupil}" />`
+      + `<circle cx="40" cy="27.8" r="0.9" fill="#fff" />`
+  return `<path d="M19 21 L15.5 7.5 L28 14 Z" fill="${K.shade}" />`
+    + `<path d="M33 15 L41 4.5 L44.5 19 Z" fill="${K.fur}" /><path d="M35.6 14.6 L40.6 8 L42.6 17 Z" fill="${K.ear}" />`
+    + `<ellipse cx="32" cy="28" rx="16" ry="14.5" fill="${K.fur}" />`
+    + `<ellipse cx="46" cy="33" rx="5.2" ry="4" fill="${K.fur}" />`
+    + `<path d="M18 33 Q22 41.5 32 42.5 Q40 42 44 37.5 Q38 40 31 39.5 Q22 39 18 33 Z" fill="${K.shade}" />`
+    + `<path d="M24 15.5 Q25.5 18.5 25 21.5 M28.5 14.5 Q29.5 17.5 29 20.5" fill="none" stroke="${K.shade}" stroke-width="1.3" stroke-linecap="round" />`
+    + eye
+    + `<ellipse cx="38.5" cy="35" rx="2.6" ry="1.5" fill="${K.ear}" opacity=".55" />`
+    + `<path d="M49.6 30.8 L51.6 31.6 L50 33 Z" fill="${K.nose}" />`
+    + `<path d="M47.6 35.2 Q48.8 36.6 50.2 35.4" fill="none" stroke="${K.line}" stroke-width="0.9" stroke-linecap="round" />`
+    + headphones("side")
+    + `<g stroke="${K.whisker}" stroke-width="0.8" stroke-linecap="round"><path d="M47 33.4 L55 31.8 M47 35 L54.6 36" /></g>`
+}
+
 export function heroSvg(a: HeroArt = {}): string {
   const facing = a.facing ?? "down"
   const pose = a.pose ?? "idle"
   const m = motionOf(pose, a.frame ?? 0)
   const eyes = a.eyes ?? true
   const side = facing === "left" || facing === "right"
-  const hood = facing === "up" ? hoodBack() : side ? hoodSide(eyes) : hoodFront(eyes)
+  const blink = !!a.blink
+  const hood = a.hood === false
+    ? facing === "up"
+      ? kittenBack() + droppedBack()
+      : side
+        ? droppedSide() + kittenSide(blink) + `<circle cx="38" cy="46" r="2.1" fill="${C.clasp}" />`
+        : droppedFront() + kittenFront(blink) + `<circle cx="32" cy="46" r="2.3" fill="${C.clasp}" /><circle cx="31.4" cy="45.4" r=".8" fill="#e6e9f0" />`
+    : facing === "up" ? hoodBack() : side ? hoodSide(eyes) : hoodFront(eyes)
   const shadow = `<ellipse cx="32" cy="73" rx="${r(15 + m.bob * 0.6)}" ry="3.6" fill="#000" opacity=".28" />`
   const figure = `<g transform="translate(0 ${r(m.bob)})">${cloak(m, facing === "up")}${hood}</g>`
   const body = `${shadow}${feet(m, side)}${figure}`
@@ -147,7 +269,8 @@ export function heroArtKey(a: HeroArt = {}): string {
   const pose = a.pose ?? "idle"
   const n = pose === "walk" ? HERO_WALK_FRAMES : HERO_IDLE_FRAMES
   const f = (((a.frame ?? 0) % n) + n) % n
-  return `hero:${a.facing ?? "down"}:${pose}:${f}:${a.eyes === false ? 0 : 1}`
+  const head = a.hood === false ? (a.blink ? "kb" : "k") : a.eyes === false ? 0 : 1
+  return `hero:${a.facing ?? "down"}:${pose}:${f}:${head}`
 }
 
 /** Портрет героя для окна разговора: капюшон крупно, анфас. */
