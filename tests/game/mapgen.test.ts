@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest"
+import { beforeAll, describe, expect, it } from "vitest"
 import fc from "fast-check"
 import { generateMap } from "@game/core/map/generate"
 import { LAYOUTS, LAYOUT_WEIGHTS, bridgeVertical, decorMask, layoutDef } from "@game/core/map/layouts"
 import { isPassable } from "@game/core/map/pathing"
-import type { Difficulty, Pos, TerrainId } from "@game/core/types"
+import type { Difficulty, MapDef, Pos, TerrainId } from "@game/core/types"
 import { MAP_H, MAP_W, MAX_LEVEL, posKey } from "@game/core/types"
 import { ENEMY_TEAMS, TERRAIN_SHARE, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
 import { BIOMES, waterFillsTile } from "@game/content/biomes"
@@ -180,22 +180,24 @@ describe("препятствия", () => {
 })
 
 describe("раскладки карт", () => {
-  const maps = (layout: string, biomes = ALL_BIOMES) => {
-    const out = []
-    for (const biomeId of biomes) {
-      for (let seed = 1; seed < 400; seed++) {
-        const m = generateMap({ seed, biomeId, difficulty: "normal", team: 1, squadSize: 4 })
-        if (m.layout === layout) out.push(m)
-        if (out.length >= 30) return out
-      }
+  // Карты генерируются один раз на все тесты блока (генерация с врагами — самое долгое; на медленном CI повторная
+  // генерация в каждом тесте упиралась в таймаут). Тесты только фильтруют общий набор.
+  const POOL_SEEDS = 120
+  const pool = new Map<string, MapDef[]>()
+  beforeAll(() => {
+    for (const biomeId of ALL_BIOMES) {
+      pool.set(biomeId, Array.from({ length: POOL_SEEDS }, (_, seed) =>
+        generateMap({ seed, biomeId, difficulty: "normal", team: 1, squadSize: 4 })))
     }
-    return out
-  }
+  }, 60_000)
+
+  /** До 30 карт раскладки из набора — по биомам по порядку. */
+  const maps = (layout: string, biomes = ALL_BIOMES) =>
+    biomes.flatMap(b => (pool.get(b) ?? []).filter(m => m.layout === layout)).slice(0, 30)
 
   it("в каждом биоме выпадает несколько разных раскладок; вода — только там, где она заливает клетку", () => {
     for (const biomeId of ALL_BIOMES) {
-      const seen = new Set<string>()
-      for (let seed = 0; seed < 120; seed++) seen.add(generateMap({ seed, biomeId, difficulty: "normal", team: 0, squadSize: 4 }).layout ?? "")
+      const seen = new Set((pool.get(biomeId) ?? []).map(m => m.layout ?? ""))
       expect(seen.size, biomeId).toBeGreaterThanOrEqual(3)
       if (!waterFillsTile(biomeId)) {
         expect(seen.has("riverBridge"), biomeId).toBe(false)
