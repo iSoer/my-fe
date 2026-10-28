@@ -38,12 +38,15 @@ import {
   edgeKey,
   ensureEnvTextures,
   ensureEnvTileTextures,
+  bridgeKey,
   envTileKey,
   groundKey,
+  pathKey,
   tileVariantAt,
   wallImpactFx
 } from "./env"
 import { isTallTerrain, waterFillsTile } from "@game/art/tile"
+import { bridgeVertical, decorMask } from "@game/core/map/layouts"
 import { clearGoreStains } from "./gore"
 import { tr } from "@game/i18n"
 
@@ -873,7 +876,9 @@ export class MapScene extends Phaser.Scene {
     const waterSpots: { x: number, y: number }[] = []
     const plainSpots: { x: number, y: number }[] = []
     const tallAt = (p: Pos): boolean => inBounds(p) && isTallTerrain(terrainAt(st, p))
-    const waterAt = (p: Pos): boolean => !inBounds(p) || terrainAt(st, p) === "water"
+    const decor = st.map.decor
+    // Под мостом течёт вода: для берегов клетка моста — тоже вода (пена у его краёв не рисуется)
+    const waterAt = (p: Pos): boolean => !inBounds(p) || terrainAt(st, p) === "water" || decor?.[posKey(p)] === "bridge"
     const shoreKey = edgeKey(biome.id, "shore", 0)
     const shadeKey = edgeKey(biome.id, "shade")
     const rubbleKey = edgeKey(biome.id, "rubble")
@@ -883,8 +888,11 @@ export class MapScene extends Phaser.Scene {
         const terrain: TerrainId = terrainAt(st, pos)
         const o = tileOrigin(l, pos)
         const c = tileCenter(l, pos)
-        const variant = tileVariantAt(terrain, x, y, seed)
-        const texKey = envTileKey(st.map.biomeId, terrain, 0, variant)
+        const cellDecor = terrain === "plain" ? decor?.[posKey(pos)] : undefined
+        // Клетка моста рисуется водой с настилом поверх; по правилам она — обычная земля
+        const look: TerrainId = cellDecor === "bridge" ? "water" : terrain
+        const variant = tileVariantAt(look, x, y, seed)
+        const texKey = envTileKey(st.map.biomeId, look, 0, variant)
         const hasArt = hasTexture(this, texKey)
         if (terrain === "forest" || terrain === "cover") flyAnchors.push(c)
         if (terrain === "water") waterSpots.push(c)
@@ -900,9 +908,15 @@ export class MapScene extends Phaser.Scene {
             : this.add.image(o.x, o.y, texKey).setOrigin(0, 0).setDisplaySize(l.tile, l.tile)
           this.tileLayer.add(img)
           if (terrain === "wall" || terrain === "wall_breakable") this.wallImgs.set(posKey(pos), img)
-          const frames = tileFrameCount(terrain)
+          const frames = tileFrameCount(look)
           const phase = ((x * 73 + y * 151) % 997) * 3 // детерминированный сдвиг фазы, мс
-          if (frames > 1) this.animTiles.push({ img, terrain, frames, phase, frame: 0, variant })
+          if (frames > 1) this.animTiles.push({ img, terrain: look, frames, phase, frame: 0, variant })
+          // Тропинка — автотайл по соседям, мост — поперёк воды
+          const overlay = cellDecor === "path"
+            ? pathKey(biome.id, decorMask(decor, pos))
+            : cellDecor === "bridge" ? bridgeKey(biome.id, bridgeVertical(st.map.tiles, pos)) : undefined
+          if (overlay && hasTexture(this, overlay))
+            this.tileLayer.add(this.add.image(o.x, o.y, overlay).setOrigin(0, 0).setDisplaySize(l.tile, l.tile))
           if (sway) {
             this.tileTweens.push(
               this.tweens.add({

@@ -379,3 +379,11 @@ export function biomeDef(id: string): BiomeDef {
   if (!b) throw new Error(`unknown biome ${id}`)
   return b
 }
+
+/**
+ * Вода заливает клетку целиком (а не лежит лужей или предметом на земле): у такой воды есть берега с пеной,
+ * из её клеток без швов складываются река и озеро. Ванна в доме — предмет на полу; ручей, масло и жижа — сплошь.
+ */
+export function waterFillsTile(biomeId: string): boolean {
+  return !["roofs", "dump", "desert", "glacier", "canyon", "indoors"].includes(biomeId)
+}

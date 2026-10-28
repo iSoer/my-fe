@@ -278,17 +278,31 @@ export function rosterLevel(army: Pick<Army, "units"> | undefined): number {
   return Math.max(1, Math.round(top.reduce((a, u) => a + u.level, 0) / top.length))
 }
 
-function candidates(seed: number, label: string, count: number, level: number, weights: Record<Rarity, number>, now: number) {
-  const rng = createRng(seed).fork(label)
-  return Array.from({ length: count }, () =>
-    generateUnit({ seed: rng.int(0, 0x7fffffff), level: Math.max(1, level + rng.int(-2, 1)), rarityWeights: weights, now })
-  )
+/**
+ * Уровень, до которого предлагаются кандидаты звезды `rarity`: средний уровень сильнейших бойцов ростера этой
+ * звезды и выше. Каждая звезда растёт с нуля: только что открытая перерождением ★2 даёт кандидатов около уровня
+ * перерождённого бойца (1-го), а не около 80-го, как сильнейшие ★1 ростера; нет бойцов этой звезды — 1-й уровень.
+ * Для ★1 это обычный `rosterLevel`.
+ */
+export function recruitLevel(army: Pick<Army, "units"> | undefined, rarity: Rarity): number {
+  return rosterLevel(army ? { units: army.units.filter(u => u.rarity >= rarity) } : undefined)
 }
 
-/** Витрина магазина: персонажи около уровня ростера, звёзды — только открытые перерождением, размер — по Славе. */
+/** Кандидаты набора: сначала звезда (по весам открытых), потом уровень около уровня ростера этой звезды. */
+function candidates(seed: number, label: string, count: number, army: Pick<Army, "units"> | undefined, weights: Record<Rarity, number>, now: number) {
+  const rng = createRng(seed).fork(label)
+  return Array.from({ length: count }, () => {
+    const unitSeed = rng.int(0, 0x7fffffff)
+    const rarity = rng.weighted(([1, 2, 3, 4, 5] as Rarity[]).map(r => ({ item: r, w: weights[r] })))
+    const level = Math.max(1, recruitLevel(army, rarity) + rng.int(-2, 1))
+    return generateUnit({ seed: unitSeed, level, rarity, now })
+  })
+}
+
+/** Витрина магазина: звёзды — только открытые перерождением, уровень — по ростеру своей звезды (`recruitLevel`), размер — по Славе. */
 export function generateShop(seed: number, army: Army | undefined, profile: Pick<Profile, "glory" | "maxRarity">, now: number): Shelter {
   const size = profile.glory >= 150 ? SHOP.sizeWithGlory150 : SHOP.size
-  return { candidates: candidates(seed, "shop", size, rosterLevel(army), recruitRarityWeights(profile.maxRarity), now), seed }
+  return { candidates: candidates(seed, "shop", size, army, recruitRarityWeights(profile.maxRarity), now), seed }
 }
 
 /** Бесплатная награда за бой: три кандидата открытых звёзд; после победы высшая открытая звезда вдвое чаще. */
@@ -300,7 +314,7 @@ export function generateRewardChoice(
   now: number
 ): UnitInstance[] {
   const weights = recruitRarityWeights(profile.maxRarity, victory)
-  return candidates(seed, "reward", REWARDS.rewardChoices, rosterLevel(army), weights, now)
+  return candidates(seed, "reward", REWARDS.rewardChoices, army, weights, now)
 }
 
 export function biomeName(id: string): string {

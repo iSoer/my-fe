@@ -109,6 +109,8 @@ const mapSchema = z.object({
   factionId: z.string(),
   difficulty,
   objective: z.enum(["rout", "killBoss"]),
+  layout: z.enum(["glade", "forestEdge", "riverBridge", "crossroads", "pass", "lake", "fort", "ruins"]).optional(),
+  decor: z.record(z.string(), z.enum(["path", "bridge"])).optional(),
   tiles: z.array(z.array(terrain)),
   playerSpawns: z.array(pos),
   enemies: z.array(z.object({ unit: unitSchema, pos, stance })),

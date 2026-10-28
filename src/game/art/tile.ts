@@ -4,7 +4,7 @@
  * Варианты (`variant`) меняют фактуру и зеркалят объект, чтобы поле не выглядело плиткой.
  */
 import type { TerrainId } from "@game/core/types"
-import { biomeDef } from "@game/content/biomes"
+import { biomeDef, waterFillsTile } from "@game/content/biomes"
 import { hex, shade } from "./palettes"
 
 const S = 64
@@ -521,11 +521,7 @@ export const TILE_FRAME_COUNT: Partial<Record<TerrainId, number>> = { water: 4, 
 /** Сколько вариантов внешнего вида у местности: фактура и зеркальный объект, чтобы поле не было «плиткой». */
 export const TILE_VARIANTS: Partial<Record<TerrainId, number>> = { plain: 3, forest: 2, mountain: 2, cover: 2, wall: 2, wall_breakable: 2 }
 
-/** Вода заливает клетку целиком (а не лежит лужей на земле): у такой воды есть берега с пеной. */
-export function waterFillsTile(biomeId: string): boolean {
-  // Ванна в доме — предмет на полу; ручей, масло и жижа заливают клетки сплошь
-  return !["roofs", "dump", "desert", "glacier", "canyon", "indoors"].includes(biomeId)
-}
+export { waterFillsTile }
 
 /* ---------- Фактура земли ---------- */
 
@@ -886,6 +882,128 @@ export function tileEdgeSvg(biomeId: string, kind: TileEdgeKind, frame = 0): str
     }
   }
   return `<svg viewBox="0 0 ${S} ${S}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`
+}
+
+/* ---------- Тропинки и мосты (автотайлы оформления) ---------- */
+
+type PathLook = "pebbles" | "planks" | "slabs" | "carpet" | "stripes"
+
+/** Тропинка в биоме: цвет, кромка и фактура (утоптанная земля, доски на крышах, ковровая дорожка в доме…). */
+const PATH_STYLE: Record<string, { fill: string, edge: string, look: PathLook, trim?: string }> = {
+  yard: { fill: "#c9a46a", edge: "#8a6a3e", look: "pebbles" },
+  roofs: { fill: "#8a6340", edge: "#4a3320", look: "planks" },
+  basement: { fill: "#a9a9a4", edge: "#5f5f5a", look: "slabs" },
+  dump: { fill: "#7b6a4c", edge: "#4a3f2c", look: "pebbles" },
+  winter_park: { fill: "#c9d6e3", edge: "#8ea3b8", look: "pebbles" },
+  jungle: { fill: "#8a6238", edge: "#4f3518", look: "pebbles" },
+  desert: { fill: "#c4a174", edge: "#8a6a44", look: "slabs" },
+  glacier: { fill: "#f4fbff", edge: "#8fb8d4", look: "pebbles" },
+  canyon: { fill: "#b8774c", edge: "#7a4628", look: "pebbles" },
+  deep_forest: { fill: "#7d5a37", edge: "#3e2a17", look: "pebbles" },
+  indoors: { fill: "#9e2b3a", edge: "#5c1520", look: "carpet", trim: "#e0b04a" },
+  factory: { fill: "#4b545c", edge: "#22272b", look: "stripes", trim: "#f2c230" },
+  infested: { fill: "#5b4a36", edge: "#2e2418", look: "pebbles" }
+}
+
+function pathStyle(biomeId: string): { fill: string, edge: string, look: PathLook, trim?: string } {
+  return PATH_STYLE[biomeId] ?? { fill: "#c9a46a", edge: "#8a6a3e", look: "pebbles" }
+}
+
+/** Биты маски, как в `core/map/layouts` (`MASK`): сверху, справа, снизу, слева. */
+const PATH_BITS = { n: 1, e: 2, s: 4, w: 8 } as const
+
+/**
+ * Фигура тропинки ширины `w`: круг в центре и «рукава» к соединённым сторонам до края клетки. Соседние клетки
+ * с встречными рукавами стыкуются без шва при любой маске (поворот, тупик, развилка, перекрёсток).
+ */
+function pathShape(mask: number, w: number, fill: string, extra = ""): string {
+  const h = w / 2
+  const c = S / 2
+  let out = `<circle cx="${c}" cy="${c}" r="${f1(h)}" fill="${fill}"${extra} />`
+  if (mask & PATH_BITS.n) out += `<rect x="${f1(c - h)}" y="0" width="${f1(w)}" height="${c}" fill="${fill}"${extra} />`
+  if (mask & PATH_BITS.s) out += `<rect x="${f1(c - h)}" y="${c}" width="${f1(w)}" height="${c}" fill="${fill}"${extra} />`
+  if (mask & PATH_BITS.w) out += `<rect x="0" y="${f1(c - h)}" width="${c}" height="${f1(w)}" fill="${fill}"${extra} />`
+  if (mask & PATH_BITS.e) out += `<rect x="${c}" y="${f1(c - h)}" width="${c}" height="${f1(w)}" fill="${fill}"${extra} />`
+  return out
+}
+
+/** Точка внутри фигуры тропинки (для камушков и стыков досок). */
+function inPath(mask: number, w: number, x: number, y: number): boolean {
+  const h = w / 2
+  const c = S / 2
+  if (Math.hypot(x - c, y - c) <= h) return true
+  const inV = Math.abs(x - c) <= h
+  const inH = Math.abs(y - c) <= h
+  return (inV && ((mask & PATH_BITS.n && y <= c) || (mask & PATH_BITS.s && y >= c)) as boolean)
+    || (inH && ((mask & PATH_BITS.w && x <= c) || (mask & PATH_BITS.e && x >= c)) as boolean)
+}
+
+/**
+ * Тропинка-автотайл 64×64 для маски соседей 0…15 (`decorMask`): прозрачный фон, кладётся поверх земли.
+ * Фактура детерминирована по биому и маске — соседние клетки одного вида выглядят одинаково.
+ */
+export function pathSvg(biomeId: string, mask: number): string {
+  const st = pathStyle(biomeId)
+  const r = rng(hashStr(`${biomeId}:path:${mask}`))
+  const W = 30
+  const vertical = (mask & (PATH_BITS.n | PATH_BITS.s)) !== 0 && (mask & (PATH_BITS.e | PATH_BITS.w)) === 0
+  let body = pathShape(mask, W + 8, st.edge, " opacity=\".45\"") + pathShape(mask, W + 3, st.edge, " opacity=\".55\"") + pathShape(mask, W, st.fill)
+  if (st.look === "carpet" || st.look === "stripes") body += pathShape(mask, W - 7, st.trim ?? st.edge) + pathShape(mask, W - 11, st.fill)
+  let deco = ""
+  switch (st.look) {
+    case "pebbles":
+      for (let i = 0; i < 40 && deco.length < 2400; i++) {
+        const x = r() * S
+        const y = r() * S
+        if (!inPath(mask, W - 6, x, y)) continue
+        const rad = 0.8 + r() * 2
+        deco += `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="${f1(rad * 1.3)}" ry="${f1(rad)}" fill="${shade(st.fill, r() < 0.5 ? -0.22 : 0.18)}" opacity=".85" />`
+      }
+      break
+    case "planks":
+    case "slabs": {
+      // Стыки досок поперёк хода (у плит — сетка), только внутри дорожки
+      const step = st.look === "planks" ? 8 : 15
+      for (let t = step; t < S; t += step) {
+        const across = vertical || st.look === "slabs"
+        for (let u = 2; u < S - 2; u += 4) {
+          if (across && inPath(mask, W - 2, u, t)) deco += `<rect x="${u}" y="${t}" width="4" height="1.4" fill="${st.edge}" opacity=".55" />`
+          if ((!vertical || st.look === "slabs") && inPath(mask, W - 2, t, u)) deco += `<rect x="${t}" y="${u}" width="1.4" height="4" fill="${st.edge}" opacity=".55" />`
+        }
+      }
+      break
+    }
+    case "stripes":
+      // Пунктир посередине дорожки
+      for (let t = 4; t < S; t += 12) {
+        if (inPath(mask, 4, S / 2, t) && (mask & (PATH_BITS.n | PATH_BITS.s))) deco += `<rect x="${S / 2 - 1}" y="${t}" width="2" height="6" fill="${st.trim}" opacity=".8" />`
+        if (inPath(mask, 4, t, S / 2) && (mask & (PATH_BITS.e | PATH_BITS.w))) deco += `<rect x="${t}" y="${S / 2 - 1}" width="6" height="2" fill="${st.trim}" opacity=".8" />`
+      }
+      break
+    case "carpet":
+      break
+  }
+  return `<svg viewBox="0 0 ${S} ${S}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}${deco}</svg>`
+}
+
+/** Мост через воду: дощатый (или металлический в подвале и на фабрике) настил с перилами и тенью на воде. */
+export function bridgeSvg(biomeId: string, vertical: boolean): string {
+  const metal = biomeId === "factory" || biomeId === "basement"
+  const deck = metal ? "#8f9aa3" : "#a8743f"
+  const dark = metal ? "#4f575e" : "#5e3a1c"
+  const light = shade(deck, 0.25)
+  let planks = ""
+  for (let y = 0; y < S; y += 8) {
+    planks += `<rect x="15" y="${y}" width="34" height="7" rx="1" fill="${y % 16 === 0 ? deck : shade(deck, -0.08)}" stroke="${dark}" stroke-width="1" />`
+    planks += metal
+      ? `<path d="M18 ${y + 3.5} h28" stroke="${dark}" stroke-width=".8" opacity=".6" />`
+      : `<circle cx="18.5" cy="${y + 3.5}" r=".9" fill="${dark}" /><circle cx="45.5" cy="${y + 3.5}" r=".9" fill="${dark}" />`
+  }
+  const rail = (x: number) => `<rect x="${x - 2.5}" y="0" width="5" height="${S}" fill="${dark}" /><rect x="${x - 1.5}" y="0" width="2" height="${S}" fill="${light}" opacity=".6" />`
+    + [10, 32, 54].map(y => `<rect x="${x - 3.5}" y="${y - 3}" width="7" height="6" rx="1.5" fill="${dark}" />`).join("")
+  const body = `<rect x="48" y="0" width="9" height="${S}" fill="#000" opacity=".22" />${planks}${rail(14)}${rail(50)}`
+  const turn = vertical ? "" : ` transform="rotate(90 ${S / 2} ${S / 2})"`
+  return `<svg viewBox="0 0 ${S} ${S}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g${turn}>${body}</g></svg>`
 }
 
 export const TILE_SIZE = S

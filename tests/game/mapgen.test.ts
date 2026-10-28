@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
 import fc from "fast-check"
 import { generateMap } from "@game/core/map/generate"
+import { LAYOUTS, LAYOUT_WEIGHTS, bridgeVertical, decorMask, layoutDef } from "@game/core/map/layouts"
 import { isPassable } from "@game/core/map/pathing"
 import type { Difficulty, Pos, TerrainId } from "@game/core/types"
 import { MAP_H, MAP_W, MAX_LEVEL, posKey } from "@game/core/types"
 import { ENEMY_TEAMS, TERRAIN_SHARE, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
-import { BIOMES } from "@game/content/biomes"
+import { BIOMES, waterFillsTile } from "@game/content/biomes"
 import { unitClass } from "@game/content/classes"
 import { generateUnit } from "@game/core/units"
 
@@ -164,15 +165,110 @@ describe("случайный биом", () => {
 })
 
 describe("препятствия", () => {
-  it("непроходимых клеток немного: не больше TERRAIN_SHARE.maxBlocked на любой карте (property)", () => {
+  it("непроходимых клеток немного: не больше предела раскладки (обычно TERRAIN_SHARE.maxBlocked) на любой карте (property)", () => {
     const diffs: Difficulty[] = ["easy", "normal", "hard", "nightmare"]
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 0x7fffffff }), fc.integer({ min: 0, max: 3 }), (seed, d) => {
         const map = generateMap({ seed, biomeId: "random", difficulty: diffs[d]!, team: seed % ENEMY_TEAMS, squadSize: 4 })
         const blocked = map.tiles.flat().filter(t => !isPassable(t, "infantry")).length
-        expect(blocked).toBeLessThanOrEqual(TERRAIN_SHARE.maxBlocked)
+        expect(blocked).toBeLessThanOrEqual(layoutDef(map.layout ?? "glade").maxBlocked)
+        expect(layoutDef(map.layout ?? "glade").maxBlocked).toBeLessThanOrEqual(TERRAIN_SHARE.maxBlocked + 2)
       }),
       { numRuns: 200 }
     )
+  })
+})
+
+describe("раскладки карт", () => {
+  const maps = (layout: string, biomes = ALL_BIOMES) => {
+    const out = []
+    for (const biomeId of biomes) {
+      for (let seed = 1; seed < 400; seed++) {
+        const m = generateMap({ seed, biomeId, difficulty: "normal", team: 1, squadSize: 4 })
+        if (m.layout === layout) out.push(m)
+        if (out.length >= 30) return out
+      }
+    }
+    return out
+  }
+
+  it("в каждом биоме выпадает несколько разных раскладок; вода — только там, где она заливает клетку", () => {
+    for (const biomeId of ALL_BIOMES) {
+      const seen = new Set<string>()
+      for (let seed = 0; seed < 120; seed++) seen.add(generateMap({ seed, biomeId, difficulty: "normal", team: 0, squadSize: 4 }).layout ?? "")
+      expect(seen.size, biomeId).toBeGreaterThanOrEqual(3)
+      if (!waterFillsTile(biomeId)) {
+        expect(seen.has("riverBridge"), biomeId).toBe(false)
+        expect(seen.has("lake"), biomeId).toBe(false)
+      }
+    }
+    for (const w of Object.values(LAYOUT_WEIGHTS)) for (const id of Object.keys(w)) expect(LAYOUTS).toHaveProperty(id)
+  })
+
+  it("переправа: река делит поле на две части, через неё ведёт мост посередине, тропинка доходит до моста с обеих сторон", () => {
+    const list = maps("riverBridge", ["yard", "jungle", "deep_forest"])
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      const bridges = Object.entries(m.decor ?? {}).filter(([, d]) => d === "bridge").map(([k]) => k.split(",").map(Number) as [number, number])
+      expect(bridges.length).toBe(1)
+      const [bx, by] = bridges[0]!
+      expect([2, 3]).toContain(bx)
+      expect(m.tiles[by]![bx]).toBe("plain")
+      expect(bridgeVertical(m.tiles, { x: bx, y: by })).toBe(true)
+      // река: в рядах 3–4 воды не меньше 4 клеток, без моста и бродов пехоте не пройти
+      const water = m.tiles.slice(3, 5).flat().filter(t => t === "water").length
+      expect(water).toBeGreaterThanOrEqual(4)
+      expect(m.decor?.[posKey({ x: bx, y: by - 1 })]).toBe("path")
+      expect(m.decor?.[posKey({ x: bx, y: by + 1 })]).toBe("path")
+    }
+  })
+
+  it("опушка: лес гуще с одного края, посередине — тропинка снизу доверху", () => {
+    const list = maps("forestEdge", ["yard", "deep_forest", "jungle", "winter_park"])
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      const col = (x: number) => m.tiles.filter(r => r[x] === "forest").length
+      const left = col(0) + col(1)
+      const right = col(MAP_W - 1) + col(MAP_W - 2)
+      expect(Math.max(left, right)).toBeGreaterThan(Math.min(left, right) + 3)
+      const pathRows = new Set(Object.entries(m.decor ?? {}).filter(([, d]) => d === "path").map(([k]) => Number(k.split(",")[1])))
+      expect(pathRows.size).toBe(MAP_H)
+    }
+  })
+
+  it("тропинки — проходимая земля, связная линия без одиночных клеток; лес без одиночных кустов посреди поля", () => {
+    for (const layout of ["forestEdge", "crossroads", "glade", "lake", "fort", "pass"]) {
+      for (const m of maps(layout)) {
+        const decor = m.decor ?? {}
+        for (const [k, d] of Object.entries(decor)) {
+          const [x, y] = k.split(",").map(Number) as [number, number]
+          if (d === "path") expect(isPassable(m.tiles[y]![x]!, "infantry")).toBe(true)
+          // у каждой клетки тропинки есть продолжение (соседняя тропинка, мост или край поля)
+          expect(decorMask(decor, { x, y }), `${layout} ${k}`).not.toBe(0)
+        }
+      }
+    }
+    // в рощах поляны лесные клетки держатся вместе
+    let lonely = 0
+    let forest = 0
+    for (const m of maps("glade")) {
+      for (let y = 0; y < MAP_H; y++) {
+        for (let x = 0; x < MAP_W; x++) {
+          if (m.tiles[y]![x] !== "forest") continue
+          forest++
+          const near = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dy]) => m.tiles[y + dy!]?.[x + dx!] === "forest")
+          if (!near) lonely++
+        }
+      }
+    }
+    expect(lonely / Math.max(1, forest)).toBeLessThan(0.1)
+  })
+
+  it("маска автотайла: прямой участок, поворот, перекрёсток и выход за край поля", () => {
+    const decor = { "2,3": "path", "2,2": "path", "2,4": "path", "3,3": "path" } as const
+    expect(decorMask(decor, { x: 2, y: 3 })).toBe(1 | 2 | 4)
+    expect(decorMask(decor, { x: 3, y: 3 })).toBe(8)
+    expect(decorMask({ "0,0": "path", "0,1": "path" }, { x: 0, y: 0 })).toBe(1 | 4)
+    expect(decorMask({ "5,4": "path", "4,4": "path" }, { x: 5, y: 4 })).toBe(2 | 8)
   })
 })

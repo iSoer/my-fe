@@ -68,10 +68,12 @@ export function terrainInfo(state: BattleState, pos: Pos): TerrainInfo {
   }
   const bonus = bonusText(terrain)
   if (!bonus && terrain === "plain") notes.push(tr("No effects", "Без эффектов"))
+  // Мост — та же проходимая земля, но игрок видит под ним воду
+  const bridge = terrain === "plain" && state.map.decor?.[posKey(pos)] === "bridge"
   return {
     terrain,
-    icon: ICON[terrain],
-    name: biomeDef(state.map.biomeId).terrainNames[terrain],
+    icon: bridge ? "🌉" : ICON[terrain],
+    name: bridge ? tr("Bridge", "Мост") : biomeDef(state.map.biomeId).terrainNames[terrain],
     move: moveText(terrain),
     bonus,
     notes

@@ -163,12 +163,25 @@ export interface ReinforcementWave {
   units: { unit: UnitInstance, pos: Pos }[]
 }
 
+/** Раскладка поля: узнаваемый шаблон карты (опушка, переправа, ущелье…), см. `core/map/layouts`. */
+export type MapLayout = "glade" | "forestEdge" | "riverBridge" | "crossroads" | "pass" | "lake" | "fort" | "ruins"
+
+/**
+ * Оформление клетки поверх местности, без влияния на правила: тропинка по проходимой клетке и мост через воду
+ * (клетка моста — обычная проходимая земля, под настилом рисуется вода).
+ */
+export type MapDecor = "path" | "bridge"
+
 export interface MapDef {
   seed: number
   biomeId: string
   factionId: string
   difficulty: Difficulty
   objective: ObjectiveKind
+  /** Шаблон раскладки (в старых сейвах нет). */
+  layout?: MapLayout
+  /** Оформление клеток по `posKey`: тропинки и мосты. */
+  decor?: Record<string, MapDecor>
   tiles: TerrainId[][]
   playerSpawns: Pos[]
   enemies: EnemyPlacement[]
