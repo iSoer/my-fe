@@ -2,8 +2,9 @@ import type { WeaponSkill } from "@shared/character/skills"
 
 /**
  * Звук игры без файлов: всё синтезируется на Web Audio — музыкальные темы (секвенсор с опережающим планированием)
- * и эффекты. Музыка и джинглы стилизованы под SNES (SPC700): «сэмпловые» инструменты, длинное эхо, приглушённый
- * верх и лёгкое огрубление. Контекст создаётся по первому жесту пользователя (политика автоплея), до этого вызовы молчат.
+ * и эффекты. Музыка и джинглы — 8-битные, в духе звукового чипа старых приставок: два импульсных канала, ступенчатый
+ * треугольник и шум на сдвиговом регистре, без реверберации. Контекст создаётся по первому жесту пользователя
+ * (политика автоплея), до этого вызовы молчат.
  */
 
 export type MusicTheme = "main" | "battle"
@@ -46,12 +47,9 @@ export interface StrikeSound {
 let ctx: AudioContext | null = null
 let sfxBus: GainNode | null = null
 let musicBus: GainNode | null = null
-/** Вход музыки и джинглов: окраска SPC700 перед шиной. */
+/** Вход музыки и джинглов: окраска чипа перед шиной (своя у музыки и у джинглов — громкость по своим ползункам). */
 let musicIn: AudioNode | null = null
 let jingleIn: AudioNode | null = null
-/** Посылы в эхо SPC700 (своё у музыки и у джинглов — громкость по своим ползункам). */
-let musicEcho: GainNode | null = null
-let jingleEcho: GainNode | null = null
 let noiseBuf: AudioBuffer | null = null
 let musicVol = 0.36
 let sfxVol = 0.64
@@ -97,10 +95,10 @@ function unlock(): void {
   sfxBus.connect(comp)
   musicBus = c.createGain()
   musicBus.connect(comp)
-  musicIn = snesColor(c, musicBus)
-  jingleIn = snesColor(c, sfxBus)
-  musicEcho = snesEcho(c, musicIn)
-  jingleEcho = snesEcho(c, jingleIn)
+  musicIn = chipColor(c, musicBus)
+  jingleIn = chipColor(c, sfxBus)
+  noiseLong = lfsrNoise(c, false)
+  noiseShort = lfsrNoise(c, true)
   noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate)
   const data = noiseBuf.getChannelData(0)
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
@@ -110,44 +108,31 @@ function unlock(): void {
 }
 
 /**
- * Окраска SPC700: лёгкое огрубление амплитуды (сэмплы BRR) и срез верхов (32 кГц и гауссова интерполяция
- * давали характерный «ватный» звук). Возвращает вход цепочки.
+ * Окраска чипа: огрубление амплитуды (у каналов была 4-битная громкость и 7-битный ЦАП), срез верха около
+ * 4,5 кГц (чтобы импульсы не пищали) и два фильтра низов, как на выходе приставки (около 90 и 440 Гц, второй — мягко). Возвращает вход цепочки.
  */
-function snesColor(c: AudioContext, dest: AudioNode): AudioNode {
+function chipColor(c: AudioContext, dest: AudioNode): AudioNode {
   const crush = c.createWaveShaper()
   const n = 8192
-  const levels = 1024
+  const levels = 128
   const curve = new Float32Array(n)
   for (let i = 0; i < n; i++) curve[i] = Math.round(((i / (n - 1)) * 2 - 1) * levels) / levels
   crush.curve = curve
   const lp = c.createBiquadFilter()
-  lp.frequency.value = 7200
+  lp.frequency.value = 4500
   lp.Q.value = 0.5
   const hp = c.createBiquadFilter()
   hp.type = "highpass"
-  hp.frequency.value = 45
+  hp.frequency.value = 90
+  const low = c.createBiquadFilter()
+  low.type = "lowshelf"
+  low.frequency.value = 440
+  low.gain.value = -3
   crush.connect(lp)
   lp.connect(hp)
-  hp.connect(dest)
+  hp.connect(low)
+  low.connect(dest)
   return crush
-}
-
-/** Эхо SPC700: задержка ~240 мс с сильной обратной связью и мягким FIR-срезом в петле. Возвращает посыл. */
-function snesEcho(c: AudioContext, dest: AudioNode): GainNode {
-  const send = c.createGain()
-  send.gain.value = 0.38
-  const delay = c.createDelay(1)
-  delay.delayTime.value = 0.24
-  const fb = c.createGain()
-  fb.gain.value = 0.46
-  const lp = c.createBiquadFilter()
-  lp.frequency.value = 2600
-  send.connect(delay)
-  delay.connect(lp)
-  lp.connect(fb)
-  fb.connect(delay)
-  lp.connect(dest)
-  return send
 }
 
 /** Громкость из настроек (0–100); кривая квадратичная — так ползунок ощущается ровнее. */
@@ -315,124 +300,184 @@ function midi(name: string): number {
 
 const hz = (m: number): number => 440 * 2 ** ((m - 69) / 12)
 
-/* ---------- Инструменты SNES ---------- */
+/* ---------- Звуковой чип (8 бит) ---------- */
 
-// SPC700 играл короткие сэмплы с ADSR, а вибрато и эхо добавлял драйвер. Здесь — их подражания из осцилляторов.
+// Подражание звуковому чипу 8-битных приставок: два импульсных канала с переключаемой скважностью (12,5/25/50 %),
+// ступенчатый 4-битный треугольник для баса и шумовой канал на сдвиговом регистре для ударных. Реверберации у чипа
+// не было — «эхо» композиторы делали повтором ноты тише и позже; так и здесь.
 
-type InstName = "flute" | "oboe" | "brass" | "strings" | "harp" | "pizz" | "bass" | "slap"
+type Duty = 0.125 | 0.25 | 0.5
+/** Канал ноты: импульсный (скважность) или треугольник. */
+type Ch = Duty | "tri"
 
-interface Play {
+const waves = new Map<string, PeriodicWave>()
+
+/** Импульс скважности `duty`: ряд Фурье прямоугольника, центрированного в нуле. */
+function pulseWave(c: AudioContext, duty: Duty): PeriodicWave {
+  const key = `p${duty}`
+  const hit = waves.get(key)
+  if (hit) return hit
+  const n = 48
+  const real = new Float32Array(n)
+  const imag = new Float32Array(n)
+  for (let k = 1; k < n; k++) real[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty)
+  const w = c.createPeriodicWave(real, imag)
+  waves.set(key, w)
+  return w
+}
+
+/**
+ * Треугольник чипа: 32 ступени по 16 уровням — отсюда его «зернистый» бас. Гармоники — только до 15-й: выше
+ * половины числа ступеней дискретный спектр зеркалится, и вместо мягкого баса выходил бы свист в 30 раз выше ноты.
+ */
+function triWave(c: AudioContext): PeriodicWave {
+  const hit = waves.get("tri")
+  if (hit) return hit
+  const steps = 32
+  const s = Array.from({ length: steps }, (_, k) => (k < 16 ? 15 - k : k - 16) / 7.5 - 1)
+  const n = steps / 2
+  const real = new Float32Array(n)
+  const imag = new Float32Array(n)
+  for (let h = 1; h < n; h++) {
+    for (let k = 0; k < steps; k++) {
+      real[h] = (real[h] ?? 0) + (2 / steps) * (s[k] ?? 0) * Math.cos((2 * Math.PI * h * k) / steps)
+      imag[h] = (imag[h] ?? 0) + (2 / steps) * (s[k] ?? 0) * Math.sin((2 * Math.PI * h * k) / steps)
+    }
+  }
+  const w = c.createPeriodicWave(real, imag)
+  waves.set("tri", w)
+  return w
+}
+
+/**
+ * Шум чипа: 15-битный сдвиговый регистр. Длинный режим — шипение (малый барабан, тарелка), короткий (отвод с 6-го
+ * бита, период 93 такта) — металлический звон (хэт). Высота — скоростью воспроизведения буфера.
+ */
+function lfsrNoise(c: AudioContext, short: boolean): AudioBuffer {
+  const len = c.sampleRate
+  const buf = c.createBuffer(1, len, c.sampleRate)
+  const d = buf.getChannelData(0)
+  let reg = 1
+  for (let i = 0; i < len; i++) {
+    if (i % 2 === 0) {
+      const bit = (reg & 1) ^ ((reg >> (short ? 6 : 1)) & 1)
+      reg = (reg >> 1) | (bit << 14)
+    }
+    d[i] = reg & 1 ? 0.8 : -0.8
+  }
+  return buf
+}
+
+let noiseLong: AudioBuffer | null = null
+let noiseShort: AudioBuffer | null = null
+
+interface ChipNote {
   at: number
   /** MIDI. */
   m: number
   dur: number
   gain: number
+  ch: Ch
+  /** Доля громкости после атаки (у чипа — спад счётчиком огибающей). Треугольник громкости не имеет: всегда 1. */
+  sustain?: number
+  /** Вибрато в центах; вступает с задержкой, как в драйверах 8-битных игр. */
+  vib?: number
+  /** Подъезд к ноте с высоты на столько полутонов (≈60 мс). */
+  slide?: number
   out?: AudioNode
-  send?: AudioNode
 }
 
-const INST: Record<InstName, (p: Play) => void> = {
-  // Флейта: мягкий треугольник, «чифф» дыхания на атаке и вибрато, вступающее после начала ноты
-  flute: (p) => {
-    const f = hz(p.m)
-    tone({ ...p, f, wave: "triangle", attack: 0.05, hold: 0.75, vib: [5.5, f * 0.012], vibDelay: 0.2 })
-    tone({ ...p, f: f * 2, gain: p.gain * 0.15, attack: 0.05, hold: 0.75 })
-    hiss({ at: p.at, dur: 0.07, gain: p.gain * 0.5, f: f * 2, q: 3, out: p.out })
-  },
-  // Гобой: узкий квадрат с резонансом — носовой тембр
-  oboe: (p) => {
-    const f = hz(p.m)
-    tone({ ...p, f, wave: "square", lp: 1500, q: 3, gain: p.gain * 0.7, attack: 0.04, hold: 0.7, vib: [5, f * 0.01], vibDelay: 0.18 })
-  },
-  // Медь: две расстроенные пилы, фильтр раскрывается на атаке
-  brass: (p) => {
-    const f = hz(p.m)
-    for (const d of [-6, 6])
-      tone({ ...p, f, wave: "sawtooth", lp: 450, lpPeak: 2800, lpEnd: 1300, q: 1.5, attack: 0.035, hold: 0.7, detune: d, gain: p.gain * 0.6, vib: [5, f * 0.008], vibDelay: 0.25 })
-  },
-  // Струнные: три пилы с медленной атакой и лёгким хоровым вибрато
-  strings: (p) => {
-    const f = hz(p.m)
-    for (const d of [-11, 0, 11])
-      tone({ ...p, f, wave: "sawtooth", lp: 2000, attack: Math.min(0.2, p.dur * 0.3), hold: 0.8, detune: d, gain: p.gain * 0.4, vib: [5.8, f * 0.005] })
-  },
-  // Арфа: щипок с быстрым спадом и тихим октавным призвуком
-  harp: (p) => {
-    const f = hz(p.m)
-    const dur = Math.max(0.6, p.dur)
-    tone({ ...p, dur, f, wave: "triangle", attack: 0.002 })
-    tone({ ...p, dur: dur * 0.5, f: f * 2, gain: p.gain * 0.3, attack: 0.002 })
-  },
-  // Пиццикато: короткий щипок
-  pizz: (p) => {
-    const f = hz(p.m)
-    tone({ ...p, dur: 0.18, f, wave: "triangle", attack: 0.002 })
-    tone({ ...p, dur: 0.1, f, wave: "square", lp: 1200, gain: p.gain * 0.3, attack: 0.002 })
-  },
-  // Бас пальцами: треугольник с квадратом под мягким фильтром
-  bass: (p) => {
-    const f = hz(p.m)
-    tone({ ...p, f, wave: "triangle", attack: 0.004, hold: 0.25 })
-    tone({ ...p, f, wave: "square", lp: 700, gain: p.gain * 0.35, attack: 0.004, hold: 0.25 })
-  },
-  // Слэп-бас: щелчок фильтра на атаке
-  slap: (p) => {
-    const f = hz(p.m)
-    tone({ ...p, f, wave: "sawtooth", lp: 300, lpPeak: 2200, lpEnd: 400, attack: 0.004, hold: 0.15, gain: p.gain * 0.7 })
-    tone({ ...p, f, wave: "triangle", attack: 0.004, hold: 0.2, gain: p.gain * 0.6 })
+function chip(n: ChipNote): void {
+  const c = ctx
+  if (!c || !sfxBus) return
+  const osc = c.createOscillator()
+  osc.setPeriodicWave(n.ch === "tri" ? triWave(c) : pulseWave(c, n.ch))
+  const f = hz(n.m)
+  if (n.slide) {
+    osc.frequency.setValueAtTime(hz(n.m + n.slide), n.at)
+    osc.frequency.exponentialRampToValueAtTime(f, n.at + 0.06)
   }
+  else osc.frequency.setValueAtTime(f, n.at)
+  const g = c.createGain()
+  const sus = n.ch === "tri" ? 1 : (n.sustain ?? 0.55)
+  const end = n.at + Math.max(0.03, n.dur)
+  g.gain.setValueAtTime(0.0001, n.at)
+  g.gain.linearRampToValueAtTime(n.gain, n.at + 0.004)
+  if (sus < 1) g.gain.setTargetAtTime(n.gain * sus, n.at + 0.004, 0.07)
+  g.gain.setTargetAtTime(0.0001, end - 0.012, 0.01)
+  osc.connect(g)
+  g.connect(n.out ?? sfxBus)
+  if (n.vib && n.dur > 0.25) {
+    const lfo = c.createOscillator()
+    const depth = c.createGain()
+    lfo.frequency.value = 6
+    depth.gain.setValueAtTime(0, n.at)
+    depth.gain.setValueAtTime(0, n.at + 0.18)
+    depth.gain.linearRampToValueAtTime(n.vib, n.at + 0.35)
+    lfo.connect(depth)
+    depth.connect(osc.detune)
+    lfo.start(n.at)
+    lfo.stop(end + 0.08)
+  }
+  osc.start(n.at)
+  osc.stop(end + 0.08)
 }
 
-/** Мелодия инструментом: [нота, длительность в долях], «.» — пауза. Возвращает время конца. */
-function phrase(at: number, notes: [string, number][], beat: number, inst: InstName, gain: number, out?: AudioNode, send?: AudioNode): number {
+/** Удар шумового канала: `rate` — высота (меньше — глуше), спад за `dur`. */
+function noise(at: number, dur: number, gain: number, rate: number, short = false, out?: AudioNode): void {
+  const c = ctx
+  const buf = short ? noiseShort : noiseLong
+  if (!c || !sfxBus || !buf) return
+  const src = c.createBufferSource()
+  src.buffer = buf
+  src.loop = true
+  src.playbackRate.value = rate
+  const g = c.createGain()
+  g.gain.setValueAtTime(gain, at)
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur)
+  src.connect(g)
+  g.connect(out ?? sfxBus)
+  src.start(at, Math.random() * 0.5)
+  src.stop(at + dur + 0.02)
+}
+
+/** Бочка чипа: треугольник с резким падением высоты и щелчок шума. */
+function chipKick(at: number, gain: number, out?: AudioNode): void {
+  const c = ctx
+  if (!c || !sfxBus) return
+  const osc = c.createOscillator()
+  osc.setPeriodicWave(triWave(c))
+  osc.frequency.setValueAtTime(190, at)
+  osc.frequency.exponentialRampToValueAtTime(42, at + 0.09)
+  const g = c.createGain()
+  g.gain.setValueAtTime(gain, at)
+  g.gain.setTargetAtTime(0.0001, at + 0.07, 0.02)
+  osc.connect(g)
+  g.connect(out ?? sfxBus)
+  osc.start(at)
+  osc.stop(at + 0.18)
+  noise(at, 0.025, gain * 0.35, 0.35, false, out)
+}
+
+const chipSnare = (at: number, gain: number, out?: AudioNode): void => noise(at, 0.13, gain, 0.4, false, out)
+const chipHat = (at: number, gain: number, open = false, out?: AudioNode): void => noise(at, open ? 0.12 : 0.035, gain, 1.1, true, out)
+const chipCrash = (at: number, gain: number, out?: AudioNode): void => noise(at, 0.9, gain, 0.5, false, out)
+
+/** Мелодия одним каналом: [нота, длительность в долях], «.» — пауза. Возвращает время конца. */
+function seq(at: number, notes: [string, number][], beat: number, ch: Ch, gain: number, out?: AudioNode, sustain?: number): number {
   let t = at
   for (const [n, len] of notes) {
-    if (n !== ".") INST[inst]({ at: t, m: midi(n), dur: len * beat * 0.95, gain, out, send })
+    if (n !== ".") chip({ at: t, m: midi(n), dur: len * beat * 0.92, gain, ch, sustain, vib: len * beat > 0.3 ? 12 : 0, out })
     t += len * beat
   }
   return t
 }
 
-function chordOn(at: number, names: string[], dur: number, inst: InstName, gain: number, out?: AudioNode, send?: AudioNode): void {
-  for (const n of names) INST[inst]({ at, m: midi(n), dur, gain, out, send })
-}
-
-/* ---------- Ударные SNES ---------- */
-
-/** Маршевый малый барабан: шум с «телом»; эхо даёт ему характерный хвост. */
-function snare(at: number, gain: number, out?: AudioNode, send?: AudioNode): void {
-  hiss({ at, dur: 0.16, gain, f: 1100, filter: "highpass", out, send })
-  hiss({ at, dur: 0.05, gain: gain * 0.6, f: 3500, q: 1.2, out })
-  tone({ at, dur: 0.08, f: 210, to: 160, wave: "triangle", gain: gain * 0.6, out })
-}
-
-/** Литавры: низкий тон с обертоном 1.5 и мягкий удар колотушки. */
-function timpani(at: number, m: number, gain: number, out?: AudioNode, send?: AudioNode): void {
-  const f = hz(m)
-  tone({ at, dur: 1, f, to: f * 0.97, gain, out, send })
-  tone({ at, dur: 0.45, f: f * 1.5, gain: gain * 0.3, out })
-  hiss({ at, dur: 0.08, gain: gain * 0.5, f: 400, filter: "lowpass", out })
-}
-
-/** Дробь литавр с нарастанием. */
-function timpaniRoll(at: number, m: number, dur: number, gain: number, out?: AudioNode, send?: AudioNode): void {
-  const n = Math.max(3, Math.round(dur / 0.045))
-  for (let i = 0; i < n; i++) timpani(at + (i * dur) / n, m, gain * (0.3 + (0.7 * i) / n), out, send)
-}
-
-/** Тарелка: длинный шипящий хвост. */
-function crash(at: number, gain: number, out?: AudioNode, send?: AudioNode): void {
-  hiss({ at, dur: 1.4, gain, f: 5000, filter: "highpass", out, send })
-  hiss({ at, dur: 0.6, gain: gain * 0.5, f: 9000, q: 0.8, out })
-}
-
-/** Оркестровый стаб: медь и струнные аккордом плюс щелчок — визитная карточка боевых тем SNES. */
-function stab(at: number, ms: number[], gain: number, out?: AudioNode, send?: AudioNode): void {
-  for (const m of ms) {
-    INST.brass({ at, m, dur: 0.22, gain, out, send })
-    INST.strings({ at, m: m + 12, dur: 0.18, gain: gain * 0.6, out })
-  }
-  hiss({ at, dur: 0.08, gain: gain * 2, f: 3000, filter: "lowpass", out })
+/** Аккорд «по-чиповому»: каналов мало, поэтому звуки аккорда перебираются тридцать вторыми. */
+function chipChord(at: number, names: string[], dur: number, ch: Ch, gain: number, out?: AudioNode): void {
+  const ms = names.map(midi)
+  const step = 1 / 32
+  for (let t = 0, i = 0; t < dur; t += step, i++) chip({ at: at + t, m: ms[i % ms.length] ?? 60, dur: step * 0.95, gain, ch, sustain: 1, out })
 }
 
 /* ---------- Эффекты ---------- */
@@ -475,13 +520,11 @@ export function sfx(kind: SfxKind): void {
       tone({ at: t, dur: 0.12, f: hz(midi("E5")), wave: "square", lp: 1200, gain: 0.07 })
       return tone({ at: t + 0.09, dur: 0.28, f: hz(midi("A#4")), to: hz(midi("G4")), wave: "square", lp: 1200, gain: 0.07 })
     case "levelUp": {
-      // Глиссандо арфы и аккорд меди с колокольчиком на вершине
+      // Взлёт арпеджио и мажорный аккорд-перебор
       const o = jingleIn ?? undefined
-      const e = jingleEcho ?? undefined
-      const end = phrase(t, [["C5", 1], ["E5", 1], ["G5", 1], ["C6", 1], ["E6", 1], ["G6", 1]], 0.05, "harp", 0.12, o, e)
-      chordOn(end, ["C5", "E5", "G5"], 0.75, "brass", 0.06, o, e)
-      INST.flute({ at: end, m: midi("C6"), dur: 0.75, gain: 0.08, out: o, send: e })
-      return bell(end, hz(midi("C7")), 0.06, 0.8)
+      const end = seq(t, [["C4", 1], ["E4", 1], ["G4", 1], ["C5", 1], ["E5", 1], ["G5", 1]], 0.05, 0.5, 0.07, o)
+      chipChord(end, ["C4", "E4", "G4", "C5"], 0.6, 0.25, 0.05, o)
+      return chip({ at: end, m: midi("C3"), dur: 0.6, gain: 0.12, ch: "tri", out: o })
     }
     case "loot":
       tone({ at: t, dur: 0.08, f: hz(midi("B5")), wave: "square", lp: 4000, gain: 0.08 })
@@ -494,63 +537,54 @@ export function sfx(kind: SfxKind): void {
       hiss({ at: t, dur: 0.6, gain: 0.35, f: 3000, to: 200, q: 3, attack: 0.1 })
       return tone({ at: t, dur: 0.5, f: 600, to: 80, wave: "sawtooth", lp: 1200, gain: 0.1 })
     case "special":
-      // Разгон и аккорд-удар под заставку приёма
-      hiss({ at: t, dur: 0.35, gain: 0.35, f: 200, to: 4000, attack: 0.3 })
-      stab(t + 0.3, ["D4", "F#4", "A4", "D5"].map(midi), 0.06, jingleIn ?? undefined, jingleEcho ?? undefined)
-      return thud(t + 0.3, 0.6, 90, 0.4)
+      // Разгон шумом вверх и аккорд-удар под заставку приёма
+      for (let k = 0; k < 8; k++) noise(t + k * 0.04, 0.05, 0.12 + k * 0.02, 0.3 + k * 0.12, false, jingleIn ?? undefined)
+      chipChord(t + 0.32, ["D4", "F#4", "A4"], 0.35, 0.25, 0.07, jingleIn ?? undefined)
+      chip({ at: t + 0.32, m: midi("D3"), dur: 0.4, gain: 0.16, ch: "tri", out: jingleIn ?? undefined })
+      return chipKick(t + 0.32, 0.5, jingleIn ?? undefined)
     case "phasePlayer": {
-      // Фанфара меди «та-та-та-там» под дробь малого барабана
+      // «Та-та-та-там!» импульсом 25 % с подбивкой шума и перебором мажора
       const o = jingleIn ?? undefined
-      const e = jingleEcho ?? undefined
-      const b = 0.09
-      for (let i = 0; i < 3; i++) {
-        INST.brass({ at: t + i * b, m: midi("A4"), dur: b * 0.85, gain: 0.09, out: o, send: e })
-        snare(t + i * b, 0.16, o, e)
+      const b = 0.085
+      for (let k = 0; k < 3; k++) {
+        chip({ at: t + k * b, m: midi("A3"), dur: b * 0.8, gain: 0.07, ch: 0.25, out: o })
+        chipSnare(t + k * b, 0.1, o)
       }
-      chordOn(t + 3 * b, ["F#4", "A4", "D5"], 0.6, "brass", 0.07, o, e)
-      chordOn(t + 3 * b, ["D4", "A4"], 0.7, "strings", 0.06, o, e)
-      return crash(t + 3 * b, 0.12, o, e)
+      chip({ at: t + 3 * b, m: midi("D4"), dur: 0.5, gain: 0.07, ch: 0.25, vib: 14, out: o })
+      chipChord(t + 3 * b, ["D3", "F#3", "A3"], 0.5, 0.25, 0.035, o)
+      chip({ at: t + 3 * b, m: midi("D3"), dur: 0.55, gain: 0.13, ch: "tri", out: o })
+      return chipCrash(t + 3 * b, 0.08, o)
     }
     case "phaseEnemy": {
-      // Дробь литавр и мрачный уменьшённый аккорд низкой меди
+      // Тревожный спуск по полутонам в низах и уменьшённый перебор
       const o = jingleIn ?? undefined
-      const e = jingleEcho ?? undefined
-      timpaniRoll(t, midi("E3"), 0.32, 0.55, o, e)
-      timpani(t + 0.34, midi("E3"), 0.7, o, e)
-      chordOn(t + 0.34, ["E3", "G3", "A#3"], 0.9, "brass", 0.08, o, e)
-      chordOn(t + 0.34, ["E4", "A#4"], 1, "strings", 0.05, o, e)
-      return crash(t + 0.34, 0.08, o, e)
+      seq(t, [["E3", 1], ["D#3", 1], ["D3", 1], ["C#3", 3]], 0.1, "tri", 0.15, o)
+      for (let k = 0; k < 4; k++) chipKick(t + k * 0.1, 0.25, o)
+      chipChord(t + 0.3, ["E3", "G3", "A#3"], 0.6, 0.5, 0.035, o)
+      return chipCrash(t + 0.3, 0.06, o)
     }
     case "victory": {
-      // Фанфара меди со струнными, дробь литавр, финальный удар с тарелкой и глиссандо арфы
+      // Победный проигрыш: восходящий ход, удержание с вибрато и перебор до мажора поверх баса
       const o = jingleIn ?? undefined
-      const e = jingleEcho ?? undefined
-      const beat = 0.14
-      timpaniRoll(t, midi("C3"), beat * 3, 0.4, o, e)
-      const end = phrase(t, [["G4", 1], ["C5", 1], ["E5", 1], ["G5", 2], ["E5", 1], ["G5", 1], ["C6", 6]], beat, "brass", 0.1, o, e)
-      phrase(t, [["E4", 1], ["G4", 1], ["C5", 1], ["E5", 2], ["C5", 1], ["E5", 1], ["G5", 6]], beat, "strings", 0.05, o, e)
+      const beat = 0.12
+      const end = seq(t, [["G3", 1], ["C4", 1], ["E4", 1], ["G4", 2], ["E4", 1], ["G4", 1], ["C5", 6]], beat, 0.25, 0.07, o)
+      seq(t, [["E3", 1], ["G3", 1], ["C4", 1], ["E4", 2], ["C4", 1], ["E4", 1], ["G4", 6]], beat, 0.25, 0.03, o)
       const hit = end - beat * 6
-      timpani(hit, midi("C3"), 0.7, o, e)
-      crash(hit, 0.14, o, e)
-      chordOn(hit, ["C4", "E4", "G4"], beat * 6, "strings", 0.05, o, e)
-      INST.bass({ at: hit, m: midi("C3"), dur: beat * 6, gain: 0.2, out: o })
-      return void phrase(hit, [["C5", 1], ["E5", 1], ["G5", 1], ["C6", 1], ["E6", 1], ["G6", 1], ["C7", 3]], 0.045, "harp", 0.08, o, e)
+      seq(t, [["C3", 2], ["G3", 2], ["C3", 3], ["C3", 6]], beat, "tri", 0.14, o)
+      chipChord(hit, ["C4", "E4", "G4"], beat * 6, 0.5, 0.025, o)
+      for (let k = 0; k < 6; k++) chipSnare(hit - beat * 0.5 + k * (beat / 6), 0.04 + k * 0.012, o)
+      return chipCrash(hit, 0.1, o)
     }
     case "defeat": {
-      // Гобой нисходит над струнными в ля миноре, в конце — тихий щипок арфы
+      // Медленный спуск в ля миноре мягким импульсом и тихий бас
       const o = jingleIn ?? undefined
-      const e = jingleEcho ?? undefined
-      const end = phrase(t, [["E5", 2], ["D5", 2], ["C5", 2], ["B4", 2], ["A4", 6]], 0.22, "oboe", 0.12, o, e)
-      chordOn(t, ["A3", "C4", "E4"], 3.4, "strings", 0.05, o, e)
-      INST.bass({ at: t, m: midi("A2"), dur: 3.2, gain: 0.15, out: o })
-      timpani(t, midi("A2"), 0.4, o, e)
-      return void phrase(end - 1.2, [["A4", 1], ["C5", 1], ["E5", 1], ["A5", 3]], 0.12, "harp", 0.06, o, e)
+      seq(t, [["E4", 2], ["D4", 2], ["C4", 2], ["B3", 2], ["A3", 6]], 0.22, 0.5, 0.06, o, 0.5)
+      return void seq(t, [["A2", 4], ["F2", 4], ["E2", 2], ["A2", 6]], 0.22, "tri", 0.12, o)
     }
     case "retreat": {
       const o = jingleIn ?? undefined
-      const e = jingleEcho ?? undefined
-      phrase(t, [["A4", 2], ["G4", 2], ["E4", 4]], 0.16, "flute", 0.12, o, e)
-      return chordOn(t, ["E4", "G4", "B4"], 1.4, "strings", 0.04, o, e)
+      seq(t, [["A3", 2], ["G3", 2], ["E3", 4]], 0.16, 0.25, 0.06, o)
+      return void seq(t, [["A2", 4], ["E2", 4]], 0.16, "tri", 0.1, o)
     }
     case "deathPlayer":
       // Жалобное «мяу» с дрожью и глухой удар о землю
@@ -660,127 +694,119 @@ export function strikeSfx(s: StrikeSound): void {
 
 interface ThemeDef {
   bpm: number
-  /** По аккорду на такт, через пробел: «D», «Bm», «F#m». */
+  /** По аккорду на такт, через пробел: «Am», «F», «G#m». */
   chords: string
-  /** По строке на такт: 8 восьмых — нота, «-» тянуть предыдущую, «.» пауза. */
+  /** По строке на такт: 8 восьмых или 16 шестнадцатых — нота, «-» тянуть предыдущую, «.» пауза. */
   lead: string[]
-  leadInst: InstName
+  leadDuty: Duty
   leadGain: number
   /** Сдвиг мелодии в полутонах. */
   leadShift: number
-  /** Удвоение мелодии другим инструментом; `shift` — относительно мелодии. */
-  double: { inst: InstName, shift: number, gain: number } | null
-  /** Аккорд на весь такт. */
-  padInst: InstName
-  padGain: number
-  /** 8 восьмых: смещение баса от тоники аккорда в полутонах, null — пауза. */
+  /** На каких проходах цикла звучит мелодия: [true, false] — каждый второй проход только аккомпанемент. */
+  leadPasses: boolean[]
+  /** «Эхо» мелодии вторым импульсным каналом: задержка в шестнадцатых и громкость. */
+  echo: { steps: number, gain: number } | null
+  /** Ломаный аккорд: 16 шестнадцатых — номер звука аккорда (0–5, вверх через октаву), null — пауза. */
+  arp: { duty: Duty, gain: number, octave: number, pattern: (number | null)[] } | null
+  /** Бас треугольником: 16 шестнадцатых — смещение от тоники в полутонах, null — пауза; длина ноты в шестнадцатых. */
   bass: (number | null)[]
-  bassInst: InstName
+  bassLen: number
   bassGain: number
-  /** Ломаный аккорд: 8 восьмых — номер звука аккорда (0–5, вверх через октаву), null — пауза. */
-  arp: { inst: InstName, gain: number, pattern: (number | null)[] } | null
-  /** Шестнадцатые такта с оркестровым стабом. */
-  stab: number[]
-  stabGain: number
-  /** 16 шестнадцатых: «x» — удар, «r» — дробь (у малого барабана). */
+  /** 16 шестнадцатых: «x» — удар (у хэта «o» — открытый). */
   kick: string
   snare: string
   hat: string
+  /** Сбивка: последний такт каждых `every` — свой рисунок малого барабана. */
+  fill: { every: number, snare: string } | null
   drumGain: number
-  /** Каждые N тактов: удар литавр по тонике и тарелка (0 — нет). */
-  timpani: number
+  /** Тарелка в начале каждых N тактов (0 — нет). */
   crash: number
 }
 
 const THEMES: Record<MusicTheme, ThemeDef> = {
-  // Главная тема: тёплый ре мажор — флейта на фоне струнных и арфы, бас пальцами, лёгкий ритм с эхом
+  // Поселение: тихая ля-минорная тема на фоне — медленно, с долгими паузами, импульс 25 % в средних регистрах,
+  // каждый второй проход без мелодии (только перебор и бас), ударных почти нет. Не мешает думать.
   main: {
-    bpm: 92,
-    chords: "D A Bm G D A G A Bm G D A Bm G Em A",
+    bpm: 72,
+    chords: "Am Am F F C C G G Am Am F F Dm Dm E E",
     lead: [
-      "D5 - F#5 - A5 - - F#5",
-      "E5 - - C#5 E5 - A5 -",
-      "F#5 - - D5 F#5 - B5 -",
-      "A5 - G5 - F#5 - E5 -",
-      "D5 - F#5 - A5 - D6 -",
-      "C#6 - B5 - A5 - E5 -",
-      "G5 - F#5 - E5 - D5 E5",
-      "C#5 - - - A4 . . .",
-      "B4 - D5 - F#5 - - E5",
-      "D5 - - B4 G5 - - F#5",
-      "F#5 - A5 - - F#5 E5 D5",
-      "E5 - - - . . A4 C#5",
-      "D5 - F#5 - B5 - A5 -",
-      "G5 - B5 - D6 - B5 -",
-      "G5 - F#5 - E5 - G5 -",
-      "A5 - - - C#5 - E5 -"
+      "A4 - - - C5 - E5 -",
+      "D5 - - - . . . .",
+      "C5 - - - A4 - F4 -",
+      "G4 - - - . . . .",
+      "E4 - G4 - C5 - - -",
+      "B4 - A4 - G4 - . .",
+      "D5 - - - B4 - G4 -",
+      "A4 - - - . . . .",
+      "A4 - - - C5 - E5 -",
+      "G5 - - - F5 - E5 -",
+      "F5 - - - . . A4 -",
+      "C5 - - - . . . .",
+      "D5 - - - F5 - A5 -",
+      "G5 - F5 - E5 - D5 -",
+      "E5 - - - G#4 - B4 -",
+      "A4 - - - . . . ."
     ],
-    leadInst: "flute",
-    leadGain: 0.1,
-    leadShift: 0,
-    double: null,
-    padInst: "strings",
-    padGain: 0.028,
-    bass: [0, null, null, 0, null, null, 7, null],
-    bassInst: "bass",
-    bassGain: 0.2,
-    arp: { inst: "harp", gain: 0.055, pattern: [0, 1, 2, 3, 4, 3, 2, 1] },
-    stab: [],
-    stabGain: 0,
-    kick: "x.......x.......",
-    snare: "....x.......x...",
-    hat: "..x...x...x...x.",
-    drumGain: 0.18,
-    timpani: 0,
-    crash: 16
-  },
-  // Боевая тема: ми минор — медь ведёт мелодию, струнные удваивают октавой выше, слэп-бас, марш с дробью,
-  // оркестровые стабы, литавры и тарелки на стыках фраз
-  battle: {
-    bpm: 148,
-    chords: "Em C D Em Em C D B Am Em C D Am C B B",
-    lead: [
-      "E5 - - B4 E5 - G5 -",
-      "G5 - E5 - C5 - E5 -",
-      "F#5 - - D5 A5 - F#5 -",
-      "G5 - F#5 - E5 - - -",
-      "B5 - - G5 E5 - B5 -",
-      "C6 - B5 - G5 - E5 -",
-      "D6 - C6 - B5 - A5 -",
-      "D#5 - F#5 - B5 - - -",
-      "A5 - - E5 A5 - C6 -",
-      "B5 - - G5 E5 - - -",
-      "E5 - G5 - C6 - B5 -",
-      "A5 - - F#5 D5 - - -",
-      "C6 - B5 - A5 - E5 -",
-      "G5 - E5 - C5 - E5 -",
-      "D#5 - - F#5 B5 - - -",
-      "A5 - G5 - F#5 - D#5 -"
-    ],
-    leadInst: "brass",
-    leadGain: 0.085,
+    leadDuty: 0.25,
+    leadGain: 0.042,
     leadShift: -12,
-    double: { inst: "strings", shift: 12, gain: 0.05 },
-    padInst: "strings",
-    padGain: 0.022,
-    bass: [0, 0, 12, 0, 0, 0, 12, 0],
-    bassInst: "slap",
-    bassGain: 0.17,
-    arp: null,
-    stab: [0],
-    stabGain: 0.045,
-    kick: "x.....x.x.....x.",
-    snare: "....x..x....x.rr",
-    hat: "x.x.x.x.x.x.x.x.",
-    drumGain: 0.38,
-    timpani: 4,
+    leadPasses: [true, false],
+    echo: { steps: 3, gain: 0.014 },
+    arp: { duty: 0.5, gain: 0.014, octave: 4, pattern: [0, null, 1, null, 2, null, 1, null, 0, null, 1, null, 2, null, 3, null] },
+    bass: [0, null, null, null, null, null, null, null, 7, null, null, null, null, null, null, null],
+    bassLen: 7,
+    bassGain: 0.09,
+    kick: "................",
+    snare: "................",
+    hat: "........x.......",
+    fill: null,
+    drumGain: 0.05,
+    crash: 0
+  },
+  // Бой: быстрый ми минор — мелодия импульсом 25 % с эхом, перебор аккорда шестнадцатыми, бас качает октавами
+  // восьмыми, бочка в каждую долю, хэт шестнадцатыми, сбивка малого барабана в конце каждых четырёх тактов.
+  battle: {
+    bpm: 168,
+    chords: "Em Em C D Em Em C B Am Am Em Em C D B B",
+    lead: [
+      "E5 - B4 - E5 F#5 G5 -",
+      "F#5 - E5 - D5 - B4 -",
+      "C5 - E5 - G5 - E5 C5",
+      "D5 - F#5 - A5 - F#5 D5",
+      "E5 - B4 - E5 F#5 G5 A5",
+      "B5 - A5 - G5 - F#5 -",
+      "E5 - G5 - C6 - B5 A5",
+      "B5 - - - D#5 - F#5 -",
+      "A5 - C6 - B5 - A5 -",
+      "E5 - - - A5 - B5 C6",
+      "B5 - G5 - E5 - G5 -",
+      "B5 - - - E6 - D6 -",
+      "C6 - B5 - A5 - G5 -",
+      "A5 - B5 - C6 - D6 -",
+      "D#6 - B5 - F#5 - B5 -",
+      "D#6 - E6 - F#6 - D#6 -"
+    ],
+    leadDuty: 0.25,
+    leadGain: 0.05,
+    leadShift: -12,
+    leadPasses: [true],
+    echo: { steps: 3, gain: 0.016 },
+    arp: { duty: 0.5, gain: 0.018, octave: 3, pattern: [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3] },
+    bass: [0, null, 12, null, 0, null, 12, null, 0, null, 12, null, 7, null, 12, null],
+    bassLen: 2,
+    bassGain: 0.13,
+    kick: "x...x...x...x.x.",
+    snare: "....x.......x...",
+    hat: "xxoxxxoxxxoxxxox",
+    fill: { every: 4, snare: "....x...x.xxxxxx" },
+    drumGain: 0.2,
     crash: 8
   }
 }
 
 interface Note {
   m: number
-  /** В восьмых. */
+  /** В слотах строки (восьмых или шестнадцатых). */
   len: number
 }
 
@@ -788,6 +814,8 @@ interface Bar {
   /** Тоника аккорда, высота 0–11. */
   root: number
   third: number
+  /** Сколько шестнадцатых в слоте мелодии: 2 — восьмые, 1 — шестнадцатые. */
+  slot: number
   lead: (Note | null)[]
 }
 
@@ -812,7 +840,7 @@ function compile(name: MusicTheme): Compiled {
       while (tokens[slot + len] === "-") len++
       return { m: midi(tok), len }
     })
-    return { root, third: m[3] ? 3 : 4, lead }
+    return { root, third: m[3] ? 3 : 4, slot: tokens.length >= 16 ? 1 : 2, lead }
   })
   const out = { ...def, bars }
   compiled.set(name, out)
@@ -874,7 +902,7 @@ function stopPlayer(fade: number): void {
   p.out.gain.cancelScheduledValues(now)
   p.out.gain.setValueAtTime(p.out.gain.value, now)
   p.out.gain.linearRampToValueAtTime(0, now + fade)
-  window.setTimeout(() => p.out.disconnect(), (fade + 2.5) * 1000)
+  window.setTimeout(() => p.out.disconnect(), (fade + 1) * 1000)
 }
 
 /** Опережающее планирование: ноты ставятся в очередь на 150 мс вперёд, таймер лишь подкидывает новые. */
@@ -898,47 +926,35 @@ function scheduleStep(p: Player, n: number, at: number, step: number): void {
   if (!bar) return
   const s = n % 16
   const out = p.out
-  // Эхо — на всём, кроме баса и бочки: так звучали SNES-миксы
-  const send = musicEcho ?? undefined
-  const g = t.drumGain
-  if (s === 0) {
-    for (const iv of [0, bar.third, 7]) {
-      let m = 60 + bar.root + iv
-      if (m > 69) m -= 12
-      INST[t.padInst]({ at, m, dur: step * 16.3, gain: t.padGain, out, send })
-    }
-    if (t.timpani && barNo % t.timpani === 0) timpani(at, 48 + bar.root - (bar.root > 7 ? 12 : 0), g * 0.6, out, send)
-    if (t.crash && barNo % t.crash === 0) crash(at, g * 0.35, out, send)
-  }
-  if (t.stab.includes(s)) {
-    const r = 60 + bar.root - (bar.root > 5 ? 12 : 0)
-    stab(at, [r, r + bar.third, r + 7], t.stabGain, out, send)
-  }
-  if (s % 2 === 0) {
-    const slot = s / 2
-    const b = t.bass[slot]
-    if (b !== null && b !== undefined) INST[t.bassInst]({ at, m: 48 + bar.root + b, dur: step * 1.8, gain: t.bassGain, out })
-    const note = bar.lead[slot]
+  const pass = Math.floor(n / 16 / t.bars.length)
+  // Мелодия (импульс 1) и её эхо (импульс 2)
+  if (t.leadPasses[pass % t.leadPasses.length] && s % bar.slot === 0) {
+    const note = bar.lead[s / bar.slot]
     if (note) {
-      const dur = note.len * step * 2 * 0.95
-      INST[t.leadInst]({ at, m: note.m + t.leadShift, dur, gain: t.leadGain, out, send })
-      if (t.double) INST[t.double.inst]({ at, m: note.m + t.leadShift + t.double.shift, dur, gain: t.double.gain, out, send })
-    }
-    const idx = t.arp?.pattern[slot]
-    if (t.arp && idx !== null && idx !== undefined) {
-      const tones = [0, bar.third, 7, 12, 12 + bar.third, 19]
-      const base = 60 + bar.root - (bar.root >= 6 ? 12 : 0)
-      INST[t.arp.inst]({ at, m: base + (tones[idx] ?? 0), dur: step * 4, gain: t.arp.gain, out, send })
+      const dur = note.len * bar.slot * step * 0.92
+      const m = note.m + t.leadShift
+      chip({ at, m, dur, gain: t.leadGain, ch: t.leadDuty, vib: 14, out })
+      if (t.echo) chip({ at: at + t.echo.steps * step, m, dur, gain: t.echo.gain, ch: t.leadDuty, out })
     }
   }
-  if (t.kick[s] === "x") thud(at, 0.9 * g, 120, 0.2, out)
-  const sn = t.snare[s]
-  if (sn === "x") snare(at, 0.5 * g, out, send)
-  else if (sn === "r") {
-    snare(at, 0.3 * g, out, send)
-    snare(at + step / 2, 0.38 * g, out, send)
+  // Ломаный аккорд (импульс 2)
+  const idx = t.arp?.pattern[s]
+  if (t.arp && idx !== null && idx !== undefined) {
+    const tones = [0, bar.third, 7, 12, 12 + bar.third, 19]
+    const base = 12 * (t.arp.octave + 1) + bar.root - (bar.root >= 6 ? 12 : 0)
+    chip({ at, m: base + (tones[idx] ?? 0), dur: step * 0.9, gain: t.arp.gain, ch: t.arp.duty, sustain: 0.35, out })
   }
-  if (t.hat[s] === "x") hiss({ at, dur: s % 4 === 0 ? 0.05 : 0.03, gain: 0.2 * g, f: 8000, filter: "highpass", out })
+  // Бас (треугольник)
+  const b = t.bass[s]
+  if (b !== null && b !== undefined) chip({ at, m: 36 + bar.root + b, dur: t.bassLen * step * 0.9, gain: t.bassGain, ch: "tri", out })
+  // Ударные (шум)
+  const g = t.drumGain
+  const fill = t.fill && barNo % t.fill.every === t.fill.every - 1
+  if (s === 0 && t.crash && barNo % t.crash === 0) chipCrash(at, g * 0.5, out)
+  if (t.kick[s] === "x") chipKick(at, g * 1.6, out)
+  if ((fill ? t.fill?.snare : t.snare)?.[s] === "x") chipSnare(at, g * 0.9, out)
+  const h = t.hat[s]
+  if (h === "x" || h === "o") chipHat(at, g * 0.35, h === "o", out)
 }
 
 /* ---------- Гибель ---------- */
