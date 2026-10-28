@@ -1,142 +1,65 @@
-/* Деревня и Лавка. Как и остальной CSS игры — только внутри .pawfield. */
+/* Поселение и Лавка. Как и остальной CSS игры — только внутри .pawfield. */
 .pawfield {
-  .vl-root {
+  /* Поселение: Phaser-локация во весь экран, поверх — шапка и панель мест */
+  .st-root {
     position: relative;
     width: 100%;
     height: 100dvh;
     overflow: hidden;
     background: #2f6d2c;
   }
-  .vl-canvas {
+  .st-canvas {
     position: absolute;
     inset: 0;
   }
-  .vl-hud {
+  .st-hud {
     position: absolute;
     inset: 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     pointer-events: none;
-    padding: calc(10px + var(--tg-safe-top, 0px)) 12px calc(14px + var(--tg-safe-bottom, 0px));
+    padding: calc(10px + var(--tg-safe-top, 0px)) 0 0;
   }
-  .vl-top {
+  .st-top {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 0 12px;
   }
-  .vl-top > * {
+  .st-top > * {
     pointer-events: auto;
   }
-  .vl-top .resources {
+  .st-top .resources {
     background: rgba(13, 11, 16, 0.72);
     border-radius: 10px;
     padding: 4px 10px;
   }
-  .vl-top .icon-btn {
+  .st-top .icon-btn {
     background: rgba(13, 11, 16, 0.72);
   }
-  .vl-grow {
+  .st-grow {
     flex: 1;
   }
-  /* Нижняя панель города: те же места, что вывески на зданиях; «В бой» — главное действие */
-  .vl-dock {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1.35fr;
-    gap: 6px;
-    max-width: 520px;
-    width: 100%;
-    margin: 0 auto;
-    pointer-events: auto;
+  .st-pips {
+    display: inline-flex;
+    gap: 3px;
   }
-  .vl-dock-btn {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    min-height: 62px;
-    min-width: 0;
-    padding: 6px 4px;
-    border: 3px solid var(--ink);
-    border-radius: 12px;
-    background: #f3e2c0;
-    color: #3b2614;
-    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
-    font: inherit;
-    cursor: pointer;
-    transition: transform 0.12s ease;
+  .st-pips i {
+    width: 9px;
+    height: 9px;
+    border: 2px solid #5a3b22;
+    border-radius: 2px;
+    background: transparent;
+    transform: rotate(45deg);
   }
-  .vl-dock-btn:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  .st-pips i.on {
+    background: #ffb703;
   }
-  .vl-dock-ico {
-    font-size: 22px;
-    line-height: 1;
-  }
-  .vl-dock-name {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: 13px;
-    font-weight: 800;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .vl-dock-hint {
-    max-width: 100%;
-    overflow: hidden;
-    color: #6d4c2f;
-    font-size: 10px;
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  /* На узком телефоне подпись «что внутри» остаётся только на вывесках зданий */
-  @media (max-width: 430px) {
-    .vl-dock-name {
-      font-size: 12px;
-    }
-    .vl-dock-hint {
-      display: none;
-    }
-  }
-  @media (max-width: 380px) {
-    .vl-dock {
-      grid-template-columns: 1fr 1fr 1fr 1.2fr;
-      gap: 4px;
-    }
-    .vl-dock-btn {
-      padding: 6px 1px;
-    }
-    .vl-dock-name {
-      font-size: 11px;
-    }
-  }
-  .vl-dock-btn.is-main {
-    background: var(--accent-grad);
-    color: #fff;
-  }
-  .vl-dock-btn.is-main .vl-dock-ico {
-    font-size: 26px;
-  }
-  .vl-dock-btn.is-main .vl-dock-name {
-    font-size: 15px;
-    text-transform: uppercase;
-  }
-  /* Следующий шаг — золотая обводка с пульсом (та же стрелка, что над зданием) */
-  .vl-dock-btn.is-guide {
-    border-color: #ffb703;
-    animation: vl-guide 1.4s ease-in-out infinite;
-  }
-  .vl-dock-btn.is-near:not(.is-main) {
-    background: #fff7e0;
-  }
-  .vl-badge {
+  .st-badge {
     position: absolute;
-    top: -8px;
-    right: -6px;
+    top: -9px;
+    right: -8px;
     display: grid;
     place-items: center;
     width: 22px;
@@ -149,30 +72,219 @@
     font-style: normal;
     font-weight: 900;
   }
-  @keyframes vl-guide {
+  /* Нижняя панель: сразу к месту на карте; «Вылазка» — главное действие */
+  .st-dock {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) 1.15fr;
+    gap: 6px;
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 8px 10px calc(10px + var(--tg-safe-bottom, 0px));
+    pointer-events: auto;
+  }
+  .st-dock-btn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 58px;
+    min-width: 0;
+    padding: 5px 3px;
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    background: #f3e2c0;
+    color: #3b2614;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+    font: inherit;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+  .st-dock-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  }
+  .st-dock-btn.is-unbuilt {
+    background: #e2d6bf;
+  }
+  .st-dock-btn.is-unbuilt .st-dock-ico {
+    filter: grayscale(1);
+    opacity: 0.6;
+  }
+  .st-dock-ico {
+    font-size: 21px;
+    line-height: 1;
+  }
+  .st-dock-name,
+  .st-dock-hint {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .st-dock-name {
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .st-dock-hint {
+    color: #8a5f0a;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .st-dock-btn.is-main {
+    background: var(--red);
+    color: #fff;
+  }
+  .st-dock-btn.is-main .st-dock-name {
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+  .st-dock-btn.is-near:not(.is-main) {
+    background: #fff7e0;
+  }
+  .st-dock-btn.is-guide {
+    border-color: #ffb703;
+    animation: st-guide 1.4s ease-in-out infinite;
+  }
+  @media (max-width: 400px) {
+    .st-dock {
+      gap: 4px;
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+    .st-dock-btn {
+      padding-left: 1px;
+      padding-right: 1px;
+      border-width: 2px;
+    }
+    .st-dock-name {
+      font-size: 11px;
+    }
+    .st-dock-btn.is-main .st-dock-name {
+      font-size: 12px;
+    }
+  }
+  /* Самые узкие телефоны (320–360): полные названия вместо «Казар…» — плотнее и без капса у «Вылазки» */
+  @media (max-width: 360px) {
+    .st-dock {
+      /* Ширина кнопок — по подписи (остаток поровну): «Лавке» хватает меньше, «Кладбищу» нужно больше */
+      display: flex;
+      gap: 3px;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+    .st-dock-btn {
+      flex: 1 1 auto;
+    }
+    /* «построить» не помещается — непостроенное и так видно по серой иконке */
+    .st-dock-hint {
+      display: none;
+    }
+    .st-dock-name {
+      letter-spacing: -0.03em;
+      font-weight: 700;
+    }
+    .st-dock-btn.is-main .st-dock-name {
+      font-size: 11px;
+      text-transform: none;
+    }
+  }
+  @keyframes st-guide {
     50% {
       box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 0 4px rgba(255, 183, 3, 0.55);
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .vl-dock-btn.is-guide {
+    .st-dock-btn.is-guide {
       animation: none;
-      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 0 3px rgba(255, 183, 3, 0.6);
     }
   }
-  .npc-head {
+  /* На низких экранах (телефон боком) панель компактнее */
+  @media (max-height: 460px) {
+    .st-dock-btn {
+      min-height: 44px;
+    }
+    .st-dock-hint {
+      display: none;
+    }
+  }
+
+  /* Карточка здания (в белой шторке) */
+  .st-panel .section-title {
+    color: var(--text-paper);
+  }
+  .st-head {
     display: flex;
     gap: 12px;
+    align-items: flex-start;
+  }
+  .st-head-ico {
+    font-size: 36px;
+    line-height: 1;
+  }
+  .st-head-name {
+    font-size: 18px;
+  }
+  .st-head .st-pips i {
+    border-color: var(--ink);
+  }
+  .st-stats {
+    display: grid;
+    gap: 4px;
+  }
+  .st-stat {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .st-next {
+    color: var(--ok-text);
+  }
+  .st-why {
+    margin: 0;
+  }
+  .st-state-locked {
+    color: #6b6672;
+  }
+  .st-max {
+    margin: 0;
+    color: var(--gold-text);
+    font-weight: 800;
+  }
+  .st-meter {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .st-list {
+    display: grid;
+    gap: 8px;
+  }
+  .st-trainee {
+    display: flex;
+    gap: 10px;
     align-items: center;
   }
-  .npc-head .critter-svg {
-    flex-shrink: 0;
+  .st-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .npc-say {
-    font-style: italic;
+  .st-revive {
+    padding: 8px 10px;
+    border-left: 4px solid var(--grey);
+    background: var(--paper-2);
+    color: var(--text-paper);
+    font-size: 13px;
   }
-  .npc-line {
-    margin: 0;
+  .st-revive.is-ready {
+    border-left-color: var(--gold);
+    background: #fff7e0;
   }
 
   .store-item {
@@ -186,7 +298,14 @@
     text-align: center;
     flex-shrink: 0;
   }
+  .store-price-old {
+    margin-right: 4px;
+    opacity: 0.7;
+    text-decoration: line-through;
+  }
   .squad-toggle {
+    min-height: 32px;
+    padding: 4px 10px;
     cursor: pointer;
     border: none;
     font: inherit;
@@ -194,7 +313,7 @@
 
   .bf-loot-risk {
     margin-left: 4px;
-    font-size: 9px;
+    font-size: 11px;
     opacity: 0.8;
     text-transform: uppercase;
   }

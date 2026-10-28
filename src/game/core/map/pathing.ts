@@ -1,7 +1,8 @@
-import type { BattleState, BattleUnit, MoveType, Pos, Side, TerrainId } from "../types"
-import { inBounds, manhattan, posKey } from "../types"
+import type { BattleState, BattleUnit, BoardSize, MoveType, Pos, Side, TerrainId } from "../types"
+import { MAP_H, MAP_W, inMap, manhattan, mapSize, posKey } from "../types"
 import { livingUnits, otherSide, terrainAt, unitAt } from "../battle/query"
 import { hasPassThrough, moveRange } from "../skills/engine"
+import { buffMoveBonus } from "../battle/buffs"
 import { unitClass } from "@game/content/classes"
 import { weaponDef } from "@game/content/weapons"
 
@@ -34,7 +35,7 @@ export interface ReachNode {
 }
 export type ReachMap = Map<string, ReachNode>
 
-function orthoNeighbors(p: Pos): Pos[] {
+function orthoNeighbors(p: Pos, size: BoardSize): Pos[] {
   const out: Pos[] = []
   for (const d of [
     { x: 1, y: 0 },
@@ -43,7 +44,7 @@ function orthoNeighbors(p: Pos): Pos[] {
     { x: 0, y: -1 }
   ]) {
     const n = { x: p.x + d.x, y: p.y + d.y }
-    if (inBounds(n)) out.push(n)
+    if (inMap(size, n)) out.push(n)
   }
   return out
 }
@@ -61,16 +62,17 @@ export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?
   const unit = state.roster[bu.unitId]
   if (!unit) return new Map()
   const cls = unitClass(unit)
-  const budget = budgetOverride ?? moveRange(unit)
+  const budget = budgetOverride ?? moveRange(unit) + buffMoveBonus(state, bu.unitId)
   const pass = hasPassThrough(unit)
   const start = fromOverride ?? moveOrigin(bu)
   const result: ReachMap = new Map()
   result.set(posKey(start), { pos: start, cost: 0, canStop: true })
   const frontier: ReachNode[] = [{ pos: start, cost: 0, canStop: true }]
+  const size = mapSize(state.map)
   while (frontier.length > 0) {
     frontier.sort((a, b) => a.cost - b.cost)
     const cur = frontier.shift() as ReachNode
-    for (const n of orthoNeighbors(cur.pos)) {
+    for (const n of orthoNeighbors(cur.pos, size)) {
       const c = moveCost(terrainAt(state, n), cls.moveType)
       if (c === null) continue
       const total = cur.cost + c
@@ -106,14 +108,15 @@ export function pathTo(reach: ReachMap, target: Pos): Pos[] {
   return path
 }
 
-export function tilesAtDistance(from: Pos, dist: number): Pos[] {
+/** Клетки на расстоянии `dist` (манхэттен) внутри поля `size` (по умолчанию обычное 6×8). */
+export function tilesAtDistance(from: Pos, dist: number, size: BoardSize = { w: MAP_W, h: MAP_H }): Pos[] {
   const out: Pos[] = []
   for (let dx = -dist; dx <= dist; dx++) {
     const dy = dist - Math.abs(dx)
     const a = { x: from.x + dx, y: from.y + dy }
     const b = { x: from.x + dx, y: from.y - dy }
-    if (inBounds(a)) out.push(a)
-    if (dy !== 0 && inBounds(b)) out.push(b)
+    if (inMap(size, a)) out.push(a)
+    if (dy !== 0 && inMap(size, b)) out.push(b)
   }
   return out
 }
@@ -138,7 +141,7 @@ export function isBreakableWall(state: BattleState, p: Pos): boolean {
 /** Хлипкие стены, атакуемые с клетки from. */
 export function wallsFrom(state: BattleState, bu: BattleUnit, from: Pos): Pos[] {
   const range = weaponRange(state, bu)
-  return tilesAtDistance(from, range).filter(p => isBreakableWall(state, p))
+  return tilesAtDistance(from, range, mapSize(state.map)).filter(p => isBreakableWall(state, p))
 }
 
 export interface WallOption {
@@ -180,7 +183,7 @@ export function threatTiles(state: BattleState, bu: BattleUnit): Set<string> {
   const out = new Set<string>()
   for (const node of reach.values()) {
     if (!node.canStop) continue
-    for (const p of tilesAtDistance(node.pos, range)) out.add(posKey(p))
+    for (const p of tilesAtDistance(node.pos, range, mapSize(state.map))) out.add(posKey(p))
   }
   return out
 }
@@ -209,10 +212,11 @@ export function distanceField(state: BattleState, sources: Pos[], moveType: Move
     dist.set(posKey(s), 0)
     queue.push(s)
   }
+  const size = mapSize(state.map)
   while (queue.length > 0) {
     const cur = queue.shift() as Pos
     const d = dist.get(posKey(cur)) as number
-    for (const n of orthoNeighbors(cur)) {
+    for (const n of orthoNeighbors(cur, size)) {
       if (!isPassable(terrainAt(state, n), moveType)) continue
       const k = posKey(n)
       if (dist.has(k)) continue

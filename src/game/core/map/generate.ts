@@ -3,7 +3,9 @@ import { createRng } from "../rng"
 import type {
   Difficulty,
   EnemyPlacement,
+  MapDecor,
   MapDef,
+  MapLayout,
   MoveType,
   ObjectiveKind,
   Pos,
@@ -16,10 +18,11 @@ import type {
 } from "../types"
 import { MAP_H, MAP_W, MAX_LEVEL, clamp, inBounds, posKey } from "../types"
 import { isPassable } from "./pathing"
+import { emptyDraft, layoutDef, pickLayout } from "./layouts"
 import { generateUnit, loadoutsAt, type Loadout } from "../units"
 import type { StatValues } from "@shared/character/leveling"
 import { enemyWeaponGrade } from "../items"
-import { BIOMES, biomeDef } from "@game/content/biomes"
+import { BIOMES, biomeDef, waterFillsTile } from "@game/content/biomes"
 import { DIFFICULTIES, TERRAIN_SHARE, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
 import { DANCER_CLASS, unitClass } from "@game/content/classes"
 import { weaponRange } from "@game/content/weapons"
@@ -88,42 +91,6 @@ function scatter(g: Grid, rng: Rng, terrain: TerrainId, count: number, allowed: 
   }
 }
 
-function growBlob(g: Grid, rng: Rng, terrain: TerrainId, size: number, allowed: (p: Pos) => boolean): void {
-  let start: Pos | null = null
-  for (let i = 0; i < 50 && !start; i++) {
-    const p = { x: rng.int(0, MAP_W - 1), y: rng.int(0, MAP_H - 1) }
-    if (get(g, p) === "plain" && allowed(p)) start = p
-  }
-  if (!start) return
-  const blob: Pos[] = [start]
-  set(g, start, terrain)
-  let guard = 0
-  while (blob.length < size && guard++ < 60) {
-    const from = rng.pick(blob)
-    const n = rng.pick(neighbors4(from))
-    if (get(g, n) === "plain" && allowed(n)) {
-      set(g, n, terrain)
-      blob.push(n)
-    }
-  }
-}
-
-/** Отрезок стены 2–3 клетки; возвращает, сколько клеток реально стало стеной. */
-function wallSegment(g: Grid, rng: Rng, allowed: (p: Pos) => boolean): number {
-  const len = rng.int(2, 3)
-  let placed = 0
-  const horizontal = rng.chance(0.5)
-  const start = { x: rng.int(0, MAP_W - (horizontal ? len : 1)), y: rng.int(1, MAP_H - 2 - (horizontal ? 0 : len - 1)) }
-  for (let i = 0; i < len; i++) {
-    const p = horizontal ? { x: start.x + i, y: start.y } : { x: start.x, y: start.y + i }
-    if (get(g, p) === "plain" && allowed(p)) {
-      set(g, p, "wall")
-      placed++
-    }
-  }
-  return placed
-}
-
 function bfsReach(g: Grid, from: Pos, moveType: MoveType): Set<string> {
   const seen = new Set<string>([posKey(from)])
   const q = [from]
@@ -139,10 +106,10 @@ function bfsReach(g: Grid, from: Pos, moveType: MoveType): Set<string> {
   return seen
 }
 
-function validate(g: Grid, playerSpawns: Pos[], enemySpawns: Pos[]): boolean {
+function validate(g: Grid, playerSpawns: Pos[], enemySpawns: Pos[], maxBlocked: number): boolean {
   const all = cells()
   const passable = all.filter(p => isPassable(get(g, p), "infantry"))
-  if (all.length - passable.length > TERRAIN_SHARE.maxBlocked) return false
+  if (all.length - passable.length > maxBlocked) return false
   for (let y = 0; y < MAP_H; y++) if ((g[y] ?? []).filter(t => isPassable(t, "infantry")).length < 2) return false
   const first = playerSpawns[0]
   if (!first) return false
@@ -157,12 +124,12 @@ function validate(g: Grid, playerSpawns: Pos[], enemySpawns: Pos[]): boolean {
   return true
 }
 
-type EnemyRoles = { melee: number, ranged: number, healer: number, dancer: number, heavy: number }
+export type EnemyRoles = { melee: number, ranged: number, healer: number, dancer: number, heavy: number }
 
 const isMelee = (skill: WeaponSkill): boolean => weaponRange(skill) === 1
 
 /** Комплект врага (класс FW + оружие) из доступных модели на его уровне, с поправками на роли отряда. */
-function pickEnemyLoadout(rng: Rng, level: number, roles: EnemyRoles, difficulty: Difficulty): Loadout {
+export function pickEnemyLoadout(rng: Rng, level: number, roles: EnemyRoles, difficulty: Difficulty): Loadout {
   const pool = loadoutsAt(level).filter(l => l.classId !== DANCER_CLASS || roles.dancer === 0)
   const weightOf = (l: Loadout): number => {
     let w = l.weight
@@ -182,7 +149,7 @@ function pickEnemyLoadout(rng: Rng, level: number, roles: EnemyRoles, difficulty
   return rng.weighted(pool.map(l => ({ item: l, w: weightOf(l) })))
 }
 
-function makeEnemy(
+export function makeEnemy(
   rng: Rng,
   level: number,
   rarityRange: [Rarity, Rarity],
@@ -218,109 +185,6 @@ function makeEnemy(
   return { ...unit, baseStats: scale(unit.baseStats), maxStats: scale(unit.maxStats) }
 }
 
-/** Мотивы раскладки поля: добавляют узнаваемую структуру поверх случайной местности. */
-export type MapMotif = "open" | "river" | "corridor" | "islands" | "fort" | "ruins"
-
-const MOTIF_WEIGHTS: Record<string, Partial<Record<MapMotif, number>>> = {
-  default: { open: 4, river: 2, corridor: 2, islands: 1, fort: 1, ruins: 1 },
-  yard: { open: 4, river: 1, corridor: 2, islands: 1, fort: 2, ruins: 1 },
-  roofs: { open: 3, corridor: 3, islands: 2, fort: 1, ruins: 2 },
-  basement: { open: 2, corridor: 4, fort: 2, ruins: 2 },
-  dump: { open: 3, corridor: 2, islands: 1, fort: 1, ruins: 3 },
-  winter_park: { open: 3, river: 2, corridor: 1, islands: 2, fort: 1 },
-  jungle: { open: 2, river: 4, islands: 2, ruins: 3, corridor: 1 },
-  desert: { open: 5, corridor: 2, ruins: 2, fort: 1 },
-  glacier: { open: 2, islands: 4, river: 2, corridor: 1 },
-  canyon: { open: 2, corridor: 5, fort: 2, ruins: 1 },
-  deep_forest: { open: 3, river: 3, islands: 1, ruins: 1 },
-  indoors: { open: 2, corridor: 4, fort: 2, ruins: 1 },
-  factory: { open: 2, corridor: 4, fort: 1, ruins: 2 },
-  infested: { open: 2, river: 1, islands: 2, ruins: 4 }
-}
-
-function pickMotif(rng: Rng, biomeId: string): MapMotif {
-  const w = MOTIF_WEIGHTS[biomeId] ?? MOTIF_WEIGHTS["default"] ?? {}
-  return rng.weighted((Object.entries(w) as [MapMotif, number][]).map(([item, wt]) => ({ item, w: wt })))
-}
-
-/** Применить мотив к уже засеянной сетке. Валидация ниже отбросит непроходимые варианты. */
-function applyMotif(g: Grid, rng: Rng, motif: MapMotif, allowed: (p: Pos) => boolean, waterLike: TerrainId): void {
-  switch (motif) {
-    case "river": {
-      // Полоса воды поперёк поля с двумя бродами
-      const horizontal = rng.chance(0.65)
-      if (horizontal) {
-        const y = rng.int(3, 4)
-        // Три брода: река делит поле, но не запирает его
-        const first = rng.int(0, MAP_W - 1)
-        const fords = new Set([first, (first + 2) % MAP_W, (first + 4) % MAP_W])
-        for (let x = 0; x < MAP_W; x++) {
-          const p = { x, y }
-          if (!allowed(p)) continue
-          set(g, p, fords.has(x) ? "plain" : waterLike)
-        }
-      }
-      else {
-        const x = rng.int(2, 3)
-        const fords = new Set([rng.int(1, 2), rng.int(3, 4), rng.int(5, MAP_H - 2)])
-        for (let y = 1; y < MAP_H - 1; y++) {
-          const p = { x, y }
-          if (!allowed(p)) continue
-          set(g, p, fords.has(y) ? "plain" : waterLike)
-        }
-      }
-      break
-    }
-    case "corridor": {
-      // Две стены-«направляющие», между ними проход
-      const x1 = rng.int(1, 2)
-      const x2 = rng.int(3, 4)
-      const y0 = rng.int(2, 3)
-      const len = 2
-      for (let i = 0; i < len; i++) {
-        for (const x of [x1, x2]) {
-          const p = { x, y: y0 + i }
-          if (allowed(p) && get(g, p) !== "water" && get(g, p) !== "mountain")
-            set(g, p, rng.chance(0.2) ? "wall_breakable" : "wall")
-        }
-      }
-      break
-    }
-    case "islands": {
-      for (let i = 0; i < rng.int(1, 2); i++)
-        growBlob(g, rng, waterLike, 2, p => allowed(p) && p.y > 1 && p.y < MAP_H - 2)
-      break
-    }
-    case "fort": {
-      // Вражеская зона огорожена стеной: открытый проход и «ворота» из хлипкой стены через клетку
-      const y = 3
-      const open = rng.int(0, MAP_W - 1)
-      for (let x = 0; x < MAP_W; x++) {
-        const p = { x, y }
-        if (!allowed(p)) continue
-        const d = Math.abs(x - open)
-        set(g, p, d === 0 || d === 3 ? "plain" : d % 2 === 0 ? "wall_breakable" : "wall")
-      }
-      // внутри крепости — укрытия
-      for (let i = 0; i < 2; i++) {
-        const p = { x: rng.int(0, MAP_W - 1), y: rng.int(1, 2) }
-        if (allowed(p) && get(g, p) === "plain") set(g, p, "cover")
-      }
-      break
-    }
-    case "ruins": {
-      // Разбросанные обломки стен и укрытия
-      for (let i = 0; i < rng.int(3, 5); i++) {
-        const p = { x: rng.int(0, MAP_W - 1), y: rng.int(1, MAP_H - 2) }
-        if (allowed(p) && get(g, p) === "plain") set(g, p, rng.chance(0.3) ? "wall_breakable" : "cover")
-      }
-      break
-    }
-    default:
-      break
-  }
-}
-
 export function generateMap(opts: GenerateMapOptions): MapDef {
   const root = createRng(opts.seed)
   const diff = difficultyDef(opts.difficulty)
@@ -334,57 +198,27 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
   let enemySpawns: Pos[] = []
   const reserved = new Set<string>(playerSpawns.map(posKey))
 
+  const env = { waterOk: waterFillsTile(biome.id), forestBias: biome.bias.forest }
+  let layout: MapLayout = pickLayout(root.fork("layout"), biome.id, env)
+  let decor = new Map<string, MapDecor>()
+
   for (let attempt = 0; attempt < 50 && !tiles; attempt++) {
     const rng = root.fork(`terrain:${attempt}`)
-    const g = emptyGrid()
-    const total = MAP_W * MAP_H
-    const allowed = (p: Pos): boolean => !reserved.has(posKey(p))
-
-    const forestShare = clamp(
-      rng.next() * (TERRAIN_SHARE.forest[1] - TERRAIN_SHARE.forest[0]) + TERRAIN_SHARE.forest[0] + biome.bias.forest,
-      0.05,
-      0.35
-    )
-    const wallShare = clamp(
-      rng.next() * (TERRAIN_SHARE.walls[1] - TERRAIN_SHARE.walls[0]) + TERRAIN_SHARE.walls[0] + biome.bias.walls,
-      0,
-      0.08
-    )
-    const impShare = clamp(
-      rng.next() * (TERRAIN_SHARE.impassable[1] - TERRAIN_SHARE.impassable[0])
-      + TERRAIN_SHARE.impassable[0]
-      + biome.bias.impassable,
-      0,
-      0.06
-    )
-
-    const forestCells = Math.round(total * forestShare)
-    let placedForest = 0
-    while (placedForest < forestCells) {
-      const size = rng.int(2, 4)
-      growBlob(g, rng, "forest", size, allowed)
-      placedForest += size
-    }
-    const wallCells = Math.round(total * wallShare)
-    // Считаем поставленные клетки, а не попытки; попыток не больше 3× клеток — на тесном поле отрезок может не встать
-    for (let placed = 0, tries = 0; placed < wallCells && tries < wallCells * 3; tries++) placed += wallSegment(g, rng, allowed)
-    const impCells = Math.round(total * impShare)
-    let placedImp = 0
-    while (placedImp < impCells) {
-      const size = rng.int(1, 3)
-      const t: TerrainId = rng.chance(biome.bias.mountainVsWater) ? "mountain" : "water"
-      growBlob(g, rng, t, size, p => allowed(p) && p.y > 0 && p.y < MAP_H - 1)
-      placedImp += size
-    }
-    // Мотив раскладки — узнаваемая структура поля
-    const motif = pickMotif(rng.fork("motif"), biome.id)
-    applyMotif(g, rng.fork("motif-apply"), motif, allowed, biome.bias.mountainVsWater > 0.75 ? "mountain" : "water")
-
+    // Шаблон не сложился за 30 попыток (тесный биом, неудачные спавны) — поляна: она складывается всегда
+    if (attempt === 30) layout = "glade"
+    const def = layoutDef(layout)
+    const draft = emptyDraft(reserved)
+    def.build(draft, rng.fork("layout"), env)
+    const g = draft.g
+    const allowed = (p: Pos): boolean => !reserved.has(posKey(p)) && !draft.decor.has(posKey(p))
+    // Укрытия — у края зарослей и стен (за ними прячутся), а не посреди чистого поля; два укрытия рядом не встают
+    const sheltered = (p: Pos): boolean =>
+      neighbors4(p).some(n => get(g, n) !== "plain" && get(g, n) !== "cover") && !neighbors4(p).some(n => get(g, n) === "cover")
     const covers = rng.int(TERRAIN_SHARE.covers[0], TERRAIN_SHARE.covers[1]) + biome.bias.covers
-    scatter(g, rng, "cover", covers, p => allowed(p) && p.y > 2 && p.y < 6)
-    scatter(g, rng, "cover", diff.enemyCovers, p => allowed(p) && p.y <= 2)
+    scatter(g, rng, "cover", covers, p => allowed(p) && p.y > 2 && p.y < 6 && (sheltered(p) || (rng.chance(0.25) && !neighbors4(p).some(n => get(g, n) === "cover"))))
+    scatter(g, rng, "cover", diff.enemyCovers, p => allowed(p) && p.y <= 2 && !neighbors4(p).some(n => get(g, n) === "cover"))
     const breakable = rng.int(TERRAIN_SHARE.breakable[0], TERRAIN_SHARE.breakable[1])
-    scatter(g, rng, "wall_breakable", breakable, p => allowed(p) && p.y > 1 && p.y < 6)
+    scatter(g, rng, "wall_breakable", breakable, p => allowed(p) && p.y > 1 && p.y < 6 && sheltered(p))
 
     // Спавны игрока — всегда проходимы
     for (const p of playerSpawns) set(g, p, "plain")
@@ -393,10 +227,15 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
     const candidates = rng.shuffle(cells().filter(p => p.y <= 2 && isPassable(get(g, p), "infantry")))
     enemySpawns = candidates.slice(0, enemyCount)
     if (enemySpawns.length < enemyCount) continue
-    if (validate(g, playerSpawns, enemySpawns)) tiles = g
+    if (validate(g, playerSpawns, enemySpawns, def.maxBlocked)) {
+      tiles = g
+      decor = draft.decor
+    }
   }
 
   if (!tiles) {
+    layout = "glade"
+    decor = new Map()
     tiles = emptyGrid()
     for (const p of [
       { x: 0, y: 3 },
@@ -508,6 +347,8 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
     factionId,
     difficulty: opts.difficulty,
     objective,
+    layout,
+    decor: Object.fromEntries(decor),
     tiles,
     playerSpawns,
     enemies,

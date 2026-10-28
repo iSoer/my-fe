@@ -2,6 +2,7 @@ import { createRng } from "../rng"
 import type { Army, Inventory, ItemCategory, StoreStock, UnitInstance } from "../types"
 import { rosterLevel } from "../progression"
 import { ITEMS } from "@game/content/balance"
+import { STORE } from "@game/content/settlement"
 import { TALISMANS, isTalismanId, talismanDef } from "@game/content/items"
 import { WEAPONS, gradeWeaponId, isWeaponId, weaponDef } from "@game/content/weapons"
 import { WEAPON_SKILLS, type WeaponGrade } from "@shared/character/skills"
@@ -92,25 +93,36 @@ function available(def: { minRosterLevel?: number, minGlory?: number }, level: n
   return (def.minRosterLevel ?? 0) <= level && (def.minGlory ?? 0) <= glory
 }
 
+/** Товары витрины без служебных полей периода. */
+export type StoreGoods = Pick<StoreStock, "seed" | "weapons" | "talismans">
+
 /**
- * Ассортимент Лавки (детерминирован по seed): железное оружие всех навыков, сталь и серебро по уровню ростера,
- * пара разновидностей, все доступные расходники и несколько талисманов; Слава ≥ 150 — на позицию больше.
+ * Ассортимент Лавки (детерминирован по seed): `count` позиций (Слава ≥ 150 — на одну больше) из пулов оружия
+ * (железо всех навыков, сталь и серебро по уровню ростера, пара разновидностей) и доступных талисманов; каждая
+ * `STORE.talismanEvery`-я позиция — талисман. При том же seed витрина побольше начинается с тех же товаров, поэтому
+ * улучшение Лавки только добавляет позиции.
  */
-export function generateStore(seed: number, army: Army | undefined, glory: number): StoreStock {
+export function generateStore(seed: number, army: Army | undefined, glory: number, count: number = STORE.offers[0]): StoreGoods {
   const rng = createRng(seed).fork("store")
   const level = rosterLevel(army)
-  const extra = glory >= 150 ? 1 : 0
-  const grade = (g: WeaponGrade, count: number) =>
-    rng.shuffle([...WEAPON_SKILLS]).slice(0, count).map(skill => gradeWeaponId(skill, g))
-  const weapons = WEAPON_SKILLS.map(skill => gradeWeaponId(skill, "iron"))
-  if (level >= ITEMS.steelFromLevel) weapons.push(...grade("steel", ITEMS.steelOffers))
-  if (level >= ITEMS.silverFromLevel) weapons.push(...grade("silver", ITEMS.silverOffers))
-  const variants = rng.shuffle(WEAPONS.filter(w => w.variant !== "basic").map(w => w.id))
-  weapons.push(...variants.slice(0, ITEMS.variantOffers + extra))
-  const talismans = rng
-    .shuffle(TALISMANS.filter(t => available(t, level, glory)).map(t => t.id))
-    .slice(0, ITEMS.talismanOffers + extra)
-  return { seed, weapons, talismans, fresh: true }
+  const total = count + (glory >= 150 ? 1 : 0)
+  const grade = (g: WeaponGrade, n: number) =>
+    rng.shuffle([...WEAPON_SKILLS]).slice(0, n).map(skill => gradeWeaponId(skill, g))
+  const pool = WEAPON_SKILLS.map(skill => gradeWeaponId(skill, "iron"))
+  if (level >= ITEMS.steelFromLevel) pool.push(...grade("steel", ITEMS.steelOffers))
+  if (level >= ITEMS.silverFromLevel) pool.push(...grade("silver", ITEMS.silverOffers))
+  pool.push(...rng.shuffle(WEAPONS.filter(w => w.variant !== "basic").map(w => w.id)).slice(0, ITEMS.variantOffers))
+  const weaponPool = rng.shuffle(pool)
+  const talismanPool = rng.shuffle(TALISMANS.filter(t => available(t, level, glory)).map(t => t.id))
+  const weapons: string[] = []
+  const talismans: string[] = []
+  for (let i = 0; i < total && (weaponPool.length > 0 || talismanPool.length > 0); i++) {
+    const wantTalisman = i % STORE.talismanEvery === STORE.talismanEvery - 1
+    const fromTalismans = wantTalisman ? talismanPool.length > 0 : weaponPool.length === 0
+    if (fromTalismans) talismans.push(talismanPool.shift() as string)
+    else weapons.push(weaponPool.shift() as string)
+  }
+  return { seed, weapons, talismans }
 }
 
 export function storeOffers(store: StoreStock, category: ItemCategory): string[] {
@@ -121,8 +133,8 @@ export function inStore(store: StoreStock, id: string): boolean {
   return [...store.weapons, ...store.talismans].includes(id)
 }
 
-/** Пустая Лавка до первой генерации (новый сейв). */
-export const EMPTY_STORE: StoreStock = { seed: 0, weapons: [], talismans: [], fresh: false }
+/** Пустая Лавка: до постройки и до первой генерации. */
+export const EMPTY_STORE: StoreStock = { seed: 0, weapons: [], talismans: [], fresh: false, period: 0, salt: 0 }
 
 /* ---------- Враги ---------- */
 

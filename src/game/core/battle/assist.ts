@@ -1,5 +1,5 @@
 import type { BattleState, BattleUnit, Pos, Stats } from "../types"
-import { inBounds, manhattan } from "../types"
+import { inMap, manhattan, mapSize } from "../types"
 import { terrainAt, unitAt } from "./query"
 import { isPassable } from "../map/pathing"
 import { assistDef } from "@game/content/skills/assists"
@@ -37,7 +37,7 @@ const invalid = (reason: string): AssistPlan => ({
 })
 
 function canStand(state: BattleState, bu: BattleUnit, pos: Pos, ignoreIds: string[]): boolean {
-  if (!inBounds(pos)) return false
+  if (!inMap(mapSize(state.map), pos)) return false
   const unit = state.roster[bu.unitId]
   if (!unit) return false
   if (!isPassable(terrainAt(state, pos), unitClass(unit).moveType)) return false

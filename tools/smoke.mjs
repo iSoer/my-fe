@@ -1,5 +1,5 @@
-// Headless smoke test игрового цикла: главный экран → новая игра → деревня → Лавка → вылазка (2 шага) → бой →
-// сдача → итоги → деревня → «Продолжить» после перезагрузки. Нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`.
+// Headless smoke test игрового цикла: главный экран → новая игра → поселение (герой идёт по карте в три экрана) → постройка Лавки
+// и покупка → вылазка (2 шага) → бой → сдача → итоги → поселение → «Продолжить» после перезагрузки. Нужен запущенный `VITE_BASE_PATH=/my-fe/ pnpm preview`.
 //   node tools/smoke.mjs [url] [путь к Chromium]
 import { chromium } from 'playwright-core';
 
@@ -38,27 +38,40 @@ await step('splash → главный экран', async () => {
   await page.getByText('Tap to start').click({ timeout: 30000 });
   await page.getByRole('button', { name: /New game/ }).waitFor();
 });
-await step('новая игра → деревня', async () => {
+await step('новая игра → поселение: Phaser-карта, построены одни Казармы, герой доходит до третьего экрана', async () => {
   await page.getByRole('button', { name: /New game/ }).click();
-  await page.locator('.vl-canvas canvas').waitFor({ timeout: 30000 });
+  await page.locator('.st-canvas canvas').waitFor({ timeout: 30000 });
+  const built = await pf(() => Object.keys(window.__pf.save.get().settlement.buildings));
+  if (built.join() !== 'barracks') throw new Error(`построено: ${built}`);
   await page.waitForTimeout(1500);
+  await page.screenshot({ path: process.env.SMOKE_SHOT ?? '/tmp/smoke-settlement.png' });
+  // Кладбище ещё не построено, но к участку можно подойти: герой идёт сам и открывает карточку
+  await pf(() => window.__pf.settlement.walkTo('plot-graveyard'));
+  await page.waitForFunction(() => window.__pf.settlement.panel.get() === 'plot-graveyard', null, { timeout: 20000 });
+  const hero = await pf(() => window.__pf.save.get().settlement.hero);
+  if (!hero || hero.pos.x < 22) throw new Error(`герой не дошёл до третьего экрана: ${JSON.stringify(hero)}`);
+  await page.getByRole('button', { name: /^Build ·/ }).waitFor();
+  await page.screenshot({ path: '/tmp/smoke-settlement-graveyard.png' });
+  await page.keyboard.press('Escape');
+  await pf(() => window.__pf.settlement.panel.set(null));
 });
-await step('Лавка: покупка талисмана', async () => {
+await step('Лавка: постройка и покупка талисмана', async () => {
   await pf(() => {
     const s = window.__pf.save.get();
     window.__pf.save.set({ ...s, profile: { ...s.profile, treats: 500 } });
   });
-  await pf(() => window.__pf.village.walkTo('store'));
-  await page.getByRole('button', { name: /Shop: weapons/ }).click({ timeout: 15000 });
+  await page.locator('.st-dock-btn', { hasText: 'Shop' }).click();
+  await page.getByRole('button', { name: /^Build ·/ }).click();
+  await page.getByRole('button', { name: /Open the shop/ }).click({ timeout: 15000 });
   await page.getByRole('tab', { name: 'Talismans' }).click();
   await page.locator('.store-item button').first().click();
   const inv = await pf(() => window.__pf.save.get().inventory);
   if (!Object.keys(inv).some((id) => id.startsWith('tal_'))) throw new Error(`инвентарь: ${JSON.stringify(inv)}`);
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.locator('.vl-canvas canvas').waitFor();
+  await page.locator('.st-canvas canvas').waitFor();
 });
 await step('ворота → вылазка 1/2 и 2/2', async () => {
-  await pf(() => window.__pf.village.talk('sorties'));
+  await page.locator('.st-dock-btn.is-main').click();
   await page.getByRole('button', { name: /Plan a sortie/ }).click();
   await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();
@@ -81,7 +94,7 @@ await step('сдача → итоги → деревня', async () => {
     await page.waitForTimeout(300);
   }
   await village.click({ timeout: 15000 });
-  await page.locator('.vl-canvas canvas').waitFor();
+  await page.locator('.st-canvas canvas').waitFor();
 });
 await step('перезагрузка → «Продолжить»', async () => {
   await page.reload();

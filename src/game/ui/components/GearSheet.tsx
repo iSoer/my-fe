@@ -4,7 +4,8 @@ import { weaponMt, weaponRank } from "@game/core/units"
 import { itemCount } from "@game/core/items"
 import { WEAPONS, weaponDef, woodWeaponId } from "@game/content/weapons"
 import { TALISMANS, talismanDef } from "@game/content/items"
-import { SKILL_LABELS, WEAPON_SKILLS, rankAtLevel, rankIndex } from "@shared/character/skills"
+import { SKILL_LABELS, WEAPON_SKILLS, rankIndex } from "@shared/character/skills"
+import { skillRank } from "@game/core/units/proficiency"
 import { $inventory, equipTalismanAction, equipWeaponAction } from "@game/state/save"
 import { haptic } from "@game/platform/haptics"
 import { BottomSheet } from "./Sheet"
@@ -25,7 +26,7 @@ interface GearSheetProps {
 /** Как боец владеет оружием: ранг его навыка против требуемого рангом оружия. */
 function rankNote(unit: UnitInstance, weaponId: string): { text: string, short: boolean } {
   const w = weaponDef(weaponId)
-  const rank = rankAtLevel(unit.aptitudes[w.kind], unit.level)
+  const rank = skillRank(unit, w.kind)
   const short = rankIndex(rank) < rankIndex(w.requiredRank)
   return { text: `${SKILL_LABELS[w.kind]} ${rank}${short ? tr(` · needs ${w.requiredRank}`, ` · нужен ${w.requiredRank}`) : ""}`, short }
 }

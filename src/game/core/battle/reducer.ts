@@ -11,7 +11,7 @@ import type {
   Stats,
   UnitInstance
 } from "../types"
-import { MAP_H, MAP_W, STATS, manhattan, posKey, samePos } from "../types"
+import { STATS, inMap, manhattan, mapSize, posKey, samePos } from "../types"
 import { livingUnits, otherSide, unitAt } from "./query"
 import { planAssist } from "./assist"
 import { moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
@@ -19,7 +19,11 @@ import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
 import { lootFor } from "../progression"
-import { BATTLE, difficultyDef, SP, XP } from "@game/content/balance"
+import { BUFF, difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
+import { BUFFS } from "@game/content/expedition"
+import { buffLootMult } from "./buffs"
+import { gainSkillXp } from "../units/proficiency"
+import { MOVEMENT_SKILLS, type Skill } from "@shared/character/skills"
 import { MAX_LEVEL } from "../types"
 import { tr } from "@game/i18n"
 
@@ -85,7 +89,20 @@ export function createBattle(opts: CreateBattleOptions): ReduceResult {
   })
   for (const e of opts.map.enemies) {
     state.roster[e.unit.id] = e.unit
-    state.units[e.unit.id] = makeBattleUnit(e.unit, "enemy", e.pos, e.stance, 1)
+    const bu = makeBattleUnit(e.unit, "enemy", e.pos, e.stance, 1)
+    if (e.post) bu.post = { ...e.post }
+    if (e.leash !== undefined) bu.leash = e.leash
+    state.units[e.unit.id] = bu
+  }
+  // Вылазка в чащу: ключ от каждого сундука — у одного из его стражей
+  if (opts.map.expedition) {
+    state.expedition = {
+      keys: Object.fromEntries(opts.map.expedition.chests.map(c => [c.id, { unitId: c.keyHolderId }])),
+      opened: [],
+      pickups: opts.map.expedition.pickups.map(p => ({ ...p, pos: { ...p.pos } })),
+      buffs: { team: [], units: {} },
+      found: []
+    }
   }
   const events: BattleEvent[] = []
   startPhase(state, "player", events)
@@ -134,11 +151,100 @@ function applyEffects(state: BattleState, effects: Effect[], events: BattleEvent
   }
 }
 
+/**
+ * Павший с ключом: ключ забирает убивший его боец игрока, иначе (убит врагом, эффектом, пал сам боец игрока)
+ * ключ падает на клетку павшего — его подберёт тот, кто на неё встанет.
+ */
+function passKeys(state: BattleState, u: BattleUnit, killerId: string | undefined, events: BattleEvent[]): void {
+  const exp = state.expedition
+  if (!exp) return
+  const killer = killerId ? state.units[killerId] : undefined
+  const taker = killer && killer.alive && killer.side === "player" && u.side === "enemy" ? killer : undefined
+  // Усиленный одиночка: на его клетке остаётся бонус — его нужно подобрать
+  const elite = state.map.expedition?.elites.find(e => e.unitId === u.unitId)
+  if (elite) {
+    exp.pickups.push({ id: `buff_${u.unitId}`, pos: { ...u.pos }, kind: elite.buff })
+    events.push({ type: "pickupDropped", pos: { ...u.pos }, kind: elite.buff })
+  }
+  for (const [chestId, spot] of Object.entries(exp.keys)) {
+    if (spot.unitId !== u.unitId) continue
+    if (taker) {
+      exp.keys[chestId] = { unitId: taker.unitId }
+      events.push({ type: "keyTaken", chestId, unitId: taker.unitId, pos: { ...u.pos } })
+    }
+    else {
+      exp.keys[chestId] = { pos: { ...u.pos } }
+      events.push({ type: "keyDropped", chestId, pos: { ...u.pos } })
+    }
+  }
+}
+
+/**
+ * Боец игрока встал на клетку в чаще (любой шаг, в том числе перестановка в пределах хода): подобрал ключ, что
+ * лежит на ней, и сразу открыл сундук, если стоит на нём с ключом от него, — содержимое идёт в добычу вылазки.
+ * Отдельного действия не нужно, ход бойца не тратится.
+ */
+function expeditionStepOn(state: BattleState, unitId: string, events: BattleEvent[]): void {
+  const exp = state.expedition
+  const def = state.map.expedition
+  const bu = state.units[unitId]
+  if (!exp || !def || !bu || !bu.alive || bu.side !== "player" || state.result) return
+  for (const [chestId, spot] of Object.entries(exp.keys)) {
+    if (spot.pos && samePos(spot.pos, bu.pos)) {
+      exp.keys[chestId] = { unitId }
+      events.push({ type: "keyTaken", chestId, unitId, pos: { ...bu.pos } })
+    }
+  }
+  // Сердечко — полное здоровье подобравшему; бонус — ему или всему отряду до конца вылазки
+  for (const p of exp.pickups.filter(q => samePos(q.pos, bu.pos))) {
+    exp.pickups = exp.pickups.filter(q => q.id !== p.id)
+    if (p.kind === "heart") {
+      const healed = bu.maxHp - bu.hp
+      bu.hp = bu.maxHp
+      events.push({ type: "pickup", unitId, pos: { ...bu.pos }, kind: p.kind, healed })
+      continue
+    }
+    if (BUFFS[p.kind].scope === "team") {
+      if (!exp.buffs.team.includes(p.kind)) exp.buffs.team.push(p.kind)
+    }
+    else exp.buffs.units[unitId] = [...new Set([...(exp.buffs.units[unitId] ?? []), p.kind])]
+    events.push({ type: "pickup", unitId, pos: { ...bu.pos }, kind: p.kind })
+  }
+  for (const chest of def.chests) {
+    if (exp.opened.includes(chest.id) || exp.keys[chest.id]?.unitId !== unitId || !samePos(chest.pos, bu.pos)) continue
+    exp.opened.push(chest.id)
+    delete exp.keys[chest.id]
+    state.stats.loot += chest.treats
+    if (chest.itemId) exp.found.push(chest.itemId)
+    const ev: BattleEvent = { type: "chestOpened", chestId: chest.id, unitId, pos: { ...chest.pos }, treats: chest.treats }
+    if (chest.itemId) ev.itemId = chest.itemId
+    events.push(ev)
+  }
+}
+
+/**
+ * Действие бойца игрока в чаще завершено: всё, что даёт клетка (`expeditionStepOn`), а встал на выход, когда открыт
+ * хоть один сундук, — отряд уходит с добычей (победа). Выход — только по завершённому действию, не от перестановки.
+ */
+function expeditionStep(state: BattleState, unitId: string, events: BattleEvent[]): void {
+  expeditionStepOn(state, unitId, events)
+  const exp = state.expedition
+  const def = state.map.expedition
+  const bu = state.units[unitId]
+  if (!exp || !def || !bu || !bu.alive || bu.side !== "player" || state.result) return
+  if (exp.opened.length > 0 && def.exits.some(e => samePos(bu.pos, e))) {
+    events.push({ type: "extracted", unitId, pos: { ...bu.pos } })
+    state.result = "victory"
+    events.push({ type: "battleEnded", result: "victory" })
+  }
+}
+
 function killUnit(state: BattleState, u: BattleUnit, killerId: string | undefined, events: BattleEvent[]): void {
   if (!u.alive) return
   u.alive = false
   u.hp = 0
   u.acted = true
+  passKeys(state, u, killerId, events)
   state.decals.push({ pos: { ...u.pos }, kind: "pool" })
   if (u.side === "player") state.stats.deaths.push(u.unitId)
   if (killerId && state.units[killerId]?.side === "player") {
@@ -164,7 +270,7 @@ function killUnit(state: BattleState, u: BattleUnit, killerId: string | undefine
   // Павший враг роняет Вкусняшки: копятся за бой и достаются игроку при любом исходе
   const fallen = state.roster[u.unitId]
   if (u.side === "enemy" && fallen) {
-    const amount = lootFor(fallen, difficultyDef(state.difficulty).treatsMult)
+    const amount = Math.round(lootFor(fallen, difficultyDef(state.difficulty).treatsMult) * buffLootMult(state))
     state.stats.loot += amount
     events.push({ type: "loot", unitId: u.unitId, pos: { ...u.pos }, amount })
   }
@@ -212,7 +318,24 @@ export function xpForHeal(healed: number): number {
   return Math.min(XP.healMax, XP.heal + Math.round(healed * XP.healPerHp))
 }
 
-function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"]): void {
+/**
+ * Опыт навыков бойца игрока от использования (`SKILL_XP`): множители класса и склонности — в `gainSkillXp`.
+ * Новый ранг — событие `rankUp`. Враги после боя не сохраняются, им не начисляется.
+ */
+function grantSkillXp(state: BattleState, unitId: string, gains: Partial<Record<Skill, number>>, events: BattleEvent[]): void {
+  const bu = state.units[unitId]
+  const unit = state.roster[unitId]
+  if (!bu || !unit || bu.side !== "player") return
+  const r = gainSkillXp(unit, gains)
+  state.roster[unitId] = r.unit
+  for (const up of r.rankUps) events.push({ type: "rankUp", unitId, skill: up.skill, rank: up.rank })
+}
+
+/** Каждое действие тренирует передвижение: свой тип класса — быстрее (×3), остальные понемногу. */
+const MOVE_TRAINING: Partial<Record<Skill, number>> = Object.fromEntries(MOVEMENT_SKILLS.map(s => [s, SKILL_XP.move]))
+
+function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"], events?: BattleEvent[]): void {
+  if (events && bu.alive) grantSkillXp(state, bu.unitId, MOVE_TRAINING, events)
   bu.acted = true
   delete bu.turnStart
   bu.penalties = {}
@@ -227,6 +350,8 @@ function checkEnd(state: BattleState, events: BattleEvent[]): boolean {
     events.push({ type: "battleEnded", result: "defeat" })
     return true
   }
+  // Вылазка в чащу: перебить всех мало — победа только уходом с добычей через выход (`expeditionStep`)
+  if (state.map.objective === "extract") return false
   const enemies = livingUnits(state, "enemy")
   const allWavesSpawned = state.map.reinforcements.every(w => state.spawnedWaves.includes(w.turn))
   if (state.map.objective === "killBoss") {
@@ -260,7 +385,7 @@ function spawnReinforcements(state: BattleState, events: BattleEvent[]): void {
           { x: pos.x, y: pos.y + 1 }
         ].find(
           p =>
-            p.x >= 0 && p.x < 6 && p.y >= 0 && p.y < 8 && !unitAt(state, p) && state.map.tiles[p.y]?.[p.x] === "plain"
+            inMap(mapSize(state.map), p) && !unitAt(state, p) && state.map.tiles[p.y]?.[p.x] === "plain"
         )
         if (!alt) continue
         pos = alt
@@ -289,6 +414,12 @@ function startPhase(state: BattleState, side: Side, events: BattleEvent[]): void
     if (!unit) continue
     for (const h of unitKit(unit).hooks) fx.push(...(h.onTurnStart?.(state, u) ?? []))
   }
+  // Вылазка: «живица» лечит отряд в начале его хода
+  if (side === "player" && state.expedition?.buffs.team.includes("regen")) {
+    for (const u of livingUnits(state, "player")) {
+      if (u.hp < u.maxHp) fx.push({ type: "heal", unitId: u.unitId, amount: Math.max(1, Math.round(u.maxHp * BUFF.regen)) })
+    }
+  }
   applyEffects(state, fx, events)
 }
 
@@ -299,7 +430,7 @@ function endPhase(state: BattleState, events: BattleEvent[]): void {
     delete u.turnStart
   }
   if (side === "player") startPhase(state, "enemy", events)
-  else if (state.turn >= BATTLE.turnLimit) {
+  else if (state.turn >= turnLimitOf(state.map)) {
     // Лимит ходов: отряд отступает — живые бойцы возвращаются, добыча — как при отступлении
     state.result = "retreat"
     state.timeUp = true
@@ -325,7 +456,7 @@ function moveUnit(state: BattleState, bu: BattleUnit, to: Pos, events: BattleEve
   let path = pathTo(reach, to)
   if (!samePos(bu.pos, origin)) {
     // Уже переставлен: идём от текущей клетки (с запасом хода — дорогу назад бюджет не ограничивает)
-    const here = reachableTiles(state, bu, bu.pos, MAP_W * MAP_H)
+    const here = reachableTiles(state, bu, bu.pos, mapSize(state.map).w * mapSize(state.map).h)
     path = here.has(posKey(to)) ? pathTo(here, to) : [{ ...bu.pos }, { ...to }]
   }
   bu.pos = { ...to }
@@ -365,7 +496,7 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
     case "wait": {
       const bu = validateActor(state, action.unitId)
       moveUnit(state, bu, action.to, events)
-      finishAction(state, bu, action.newStance)
+      finishAction(state, bu, action.newStance, events)
       events.push({ type: "waited", unitId: bu.unitId })
       break
     }
@@ -376,7 +507,7 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       if (!wallsFrom(state, bu, bu.pos).some(p => posKey(p) === key)) throw new Error(tr("wall out of reach", "стена недоступна"))
       state.walls[key] = Math.max(0, (state.walls[key] ?? 0) - 1)
       events.push({ type: "wallHit", unitId: bu.unitId, pos: action.wall, hpAfter: state.walls[key] ?? 0 })
-      finishAction(state, bu, action.newStance)
+      finishAction(state, bu, action.newStance, events)
       break
     }
     case "assist": {
@@ -420,12 +551,15 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
         targetHpAfter: target.hp,
         unitHpAfter: bu.hp
       })
-      finishAction(state, bu, action.newStance)
+      finishAction(state, bu, action.newStance, events)
       // Лечение — по вылеченному (с лечением всех союзников спецприёмом), танец и Ободрение — фиксированно
       const kind = plan.assist.kind
       const healed = kind === "heal" || kind === "sacrifice" || kind === "reciprocal" ? plan.heal + healedAll : 0
       const xp = healed > 0 ? xpForHeal(healed) : kind === "refresh" ? XP.dance : kind === "rally" ? XP.rally : XP.assist
       grantXp(state, bu.unitId, xp, SP.assist, events)
+      // Лечение посохом тренирует белую магию
+      const healer = state.roster[bu.unitId]
+      if (healed > 0 && healer?.weaponSkill === "whiteMagic") grantSkillXp(state, bu.unitId, { whiteMagic: SKILL_XP.heal }, events)
       break
     }
     case "attack": {
@@ -435,11 +569,14 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       if (!target || !target.alive || target.side === bu.side) throw new Error(tr("target unavailable", "цель недоступна"))
       if (!targetsFrom(state, bu, bu.pos).some(t => t.unitId === target.unitId)) throw new Error(tr("target out of range", "цель вне дальности"))
       resolveCombat(state, bu, target, events)
-      finishAction(state, bu, action.newStance ?? (bu.side === "enemy" ? "advance" : undefined))
+      finishAction(state, bu, action.newStance ?? (bu.side === "enemy" ? "advance" : undefined), events)
       break
     }
   }
 
+  if (action.type === "move") expeditionStepOn(state, action.unitId, events)
+  else if (action.type === "wait" || action.type === "attack" || action.type === "assist" || action.type === "attackWall")
+    expeditionStep(state, action.unitId, events)
   checkEnd(state, events)
   return { state, events }
 }
@@ -503,13 +640,19 @@ function resolveCombat(state: BattleState, bu: BattleUnit, target: BattleUnit, e
   const aStruck = outcome.strikes.some(s => s.attackerId === bu.unitId)
   const dStruck = outcome.strikes.some(s => s.attackerId === target.unitId)
   const result = (killed: boolean, dealt: number): CombatXpResult => (killed ? "kill" : dealt > 0 ? "hit" : "none")
+  // Владение оружием в лапах растёт от каждой схватки: удар, добивание сверху, без урона — понемногу
+  const weaponXp = (res: CombatXpResult) => (res === "kill" ? SKILL_XP.hit + SKILL_XP.kill : res === "hit" ? SKILL_XP.hit : SKILL_XP.none)
   if (!aDied) {
-    const xp = xpForCombat(aUnit.level, dUnit.level, result(dDied, dealtByA), !!dUnit.isBoss)
+    const res = result(dDied, dealtByA)
+    const xp = xpForCombat(aUnit.level, dUnit.level, res, !!dUnit.isBoss)
     grantXp(state, bu.unitId, xp, dDied ? SP.kill : aStruck ? SP.combat : 0, events)
+    grantSkillXp(state, bu.unitId, { [aUnit.weaponSkill]: weaponXp(res) }, events)
   }
   if (!dDied) {
-    const xp = xpForCombat(dUnit.level, aUnit.level, result(aDied, dealtByD), !!aUnit.isBoss)
+    const res = result(aDied, dealtByD)
+    const xp = xpForCombat(dUnit.level, aUnit.level, res, !!aUnit.isBoss)
     grantXp(state, target.unitId, xp, aDied ? SP.kill : dStruck ? SP.combat : 0, events)
+    if (dStruck) grantSkillXp(state, target.unitId, { [dUnit.weaponSkill]: weaponXp(res) }, events)
   }
 }
 

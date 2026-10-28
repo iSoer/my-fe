@@ -102,7 +102,9 @@ await step('сейв по id пользователя, отступы Telegram, 
   const { ctx, page, errors } = await open({});
   await page.getByText('Tap to start').click({ timeout: 30000 });
   await page.getByRole('button', { name: /New game/ }).click();
-  await page.locator('.vl-canvas canvas').waitFor({ timeout: 30000 });
+  await page.locator('.st-canvas canvas').waitFor({ timeout: 30000 });
+  // Сейв пишется с задержкой в 100 мс, а поселение открывается сразу
+  await page.waitForFunction(() => Object.keys(localStorage).some((k) => k.startsWith('pawfield:save:')), null, { timeout: 5000 });
   const key = await page.evaluate(() =>
     Object.keys(localStorage).find((k) => k.startsWith('pawfield:save:')),
   );
@@ -130,7 +132,7 @@ await step('кнопка «Назад»: из деревни — в меню, в
     .getByRole('button', { name: /Continue/ })
     .first()
     .click();
-  await page.evaluate(() => window.__pf.village.talk('sorties'));
+  await page.evaluate(() => window.__pf.settlement.open('gate'));
   await page.getByRole('button', { name: /Plan a sortie/ }).click();
   await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();
@@ -139,7 +141,7 @@ await step('кнопка «Назад»: из деревни — в меню, в
   await page.waitForFunction(() => window.__tg.closing === true);
   await page.evaluate(() => window.__tg.back.handlers.at(-1)());
   await page
-    .getByText(/Отступить/)
+    .getByText(/Retreat|Отступить/)
     .first()
     .waitFor({ timeout: 5000 });
   await ctx.close();

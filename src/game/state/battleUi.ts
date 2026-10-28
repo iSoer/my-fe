@@ -1,7 +1,7 @@
 import { atom } from "nanostores"
 import type { BattleAction, BattleEvent, BattleState, BattleUnit, Pos, UnitInstance } from "@game/core/types"
 import { unitKit } from "@game/core/skills/engine"
-import { MAP_H, MAP_W, manhattan, posKey, samePos } from "@game/core/types"
+import { manhattan, mapSize, posKey, samePos } from "@game/core/types"
 import {
   attackOptions,
   dangerZone,
@@ -188,7 +188,7 @@ function pathFor(reach: ReachMap, to: Pos): Pos[] {
 /** Стрелка пути для предпросмотра: от клетки, где боец стоит сейчас (а не от клетки начала хода). */
 function previewPath(st: BattleState, bu: BattleUnit, reach: ReachMap, to: Pos): Pos[] {
   if (samePos(bu.pos, moveOrigin(bu))) return pathFor(reach, to)
-  const here = reachableTiles(st, bu, bu.pos, MAP_W * MAP_H)
+  const here = reachableTiles(st, bu, bu.pos, mapSize(st.map).w * mapSize(st.map).h)
   return here.has(posKey(to)) ? pathFor(here, to) : [bu.pos, to]
 }
 
@@ -537,9 +537,11 @@ async function moveTo(unitId: string, to: Pos, animate: boolean): Promise<void> 
     return
   }
   haptic("light")
-  if (animate) {
+  // Без анимации шага (боец уже на клетке под пальцем) всё равно показать, что дала клетка: ключ, открытый сундук
+  const extra = animate ? [] : result.events.filter(e => e.type === "chestOpened" || e.type === "keyTaken")
+  if (animate || extra.length > 0) {
     patch({ ...NO_PREVIEW, mode: "busy", busy: true })
-    await playEvents(result.events, before, result.state)
+    await playEvents(animate ? result.events : extra, before, result.state)
     patch({ busy: false })
   }
   const bu = result.state.units[unitId]
@@ -628,7 +630,8 @@ async function runEnemyPhase(): Promise<void> {
   let guard = 0
   for (;;) {
     const before = state()
-    if (!before || before.result || before.phase !== "enemy" || guard++ > 100) break
+    // Предохранитель от зацикливания: по нескольку действий на каждого врага (в чаще их десятки)
+    if (!before || before.result || before.phase !== "enemy" || guard++ > 100 + Object.keys(before.units).length * 3) break
     const action = nextEnemyAction(before)
     let r: { state: BattleState, events: BattleEvent[] }
     try {

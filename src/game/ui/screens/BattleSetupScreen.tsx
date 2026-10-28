@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
 import { useStore } from "@nanostores/react"
-import type { Difficulty } from "@game/core/types"
-import { DIFFICULTIES } from "@game/content/balance"
+import type { BattleMode, Difficulty } from "@game/core/types"
+import { DIFFICULTIES, EXPEDITION } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
 import {
   $save,
+  $sortieMode,
   difficultyUnlocked,
   enemyTeams,
   ensureRoster,
@@ -95,12 +96,17 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
       </div>
       <div className="team-foot">
         <span className="small">
-          {tr(`${offer.count} enemies`, `врагов: ${offer.count}`)}
+          {offer.map.expedition
+            ? tr(
+                `${offer.map.expedition.chests.length} chests · ${offer.count} guards`,
+                `сундуков: ${offer.map.expedition.chests.length} · стражей: ${offer.count}`
+              )
+            : tr(`${offer.count} enemies`, `врагов: ${offer.count}`)}
           {offer.reinforcements > 0 ? tr(` (${offer.reinforcements} as reinforcements)`, ` (из них ${offer.reinforcements} — подкрепление)`) : ""}
         </span>
         <span className="team-reward">
           {`🦴 ${offer.treats} · ✦ ${offer.glory}`}
-          <small>{tr(" for victory + loot", " за победу + добыча")}</small>
+          <small>{offer.map.expedition ? tr(" for escaping + chests + loot", " за уход + сундуки + добыча") : tr(" for victory + loot", " за победу + добыча")}</small>
         </span>
         <span className={`team-xp ${xp.cls}`}>{xp.text}</span>
       </div>
@@ -108,9 +114,28 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
   )
 }
 
-/** Вылазка, шаг 1 из 3: сложность. Тап по открытой сложности ведёт к выбору вражеской армии. */
+const MODES: { id: BattleMode, icon: string, name: () => string, desc: () => string }[] = [
+  {
+    id: "skirmish",
+    icon: "⚔️",
+    name: () => tr("Skirmish", "Схватка"),
+    desc: () => tr("A small field: rout the enemy army.", "Небольшое поле: разбейте вражескую армию.")
+  },
+  {
+    id: "expedition",
+    icon: "🌲",
+    name: () => tr("Dark Thicket", "Мрачная чаща"),
+    desc: () => tr(
+      `A forest ${EXPEDITION.w}×${EXPEDITION.h}: guarded chests, a key on one guard, escape through the glowing corner.`,
+      `Лес ${EXPEDITION.w}×${EXPEDITION.h}: сундуки под охраной, ключ у одного из стражей, уход — через светящийся угол.`
+    )
+  }
+]
+
+/** Вылазка, шаг 1 из 3: режим и сложность. Тап по открытой сложности ведёт к выбору вражеской армии. */
 export function BattleSetupScreen() {
   const save = useStore($save)
+  const mode = useStore($sortieMode)
   const [toastEl, toast] = useToast()
 
   useEffect(() => {
@@ -122,6 +147,26 @@ export function BattleSetupScreen() {
     <div className="screen">
       <TopBar title={tr("Sortie · 1/3", "Вылазка · 1/3")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
       <div className="screen-body">
+        <div className="section-title">{tr("Mode", "Режим")}</div>
+        <div className="mode-pick" role="radiogroup" aria-label={tr("Mode", "Режим")}>
+          {MODES.map(m => (
+            <button
+              key={m.id}
+              type="button"
+              role="radio"
+              aria-checked={mode === m.id}
+              className={`mode-card ${mode === m.id ? "selected" : ""}`}
+              onClick={() => {
+                haptic("select")
+                $sortieMode.set(m.id)
+              }}
+            >
+              <span className="mode-ico" aria-hidden="true">{m.icon}</span>
+              <b>{m.name()}</b>
+              <span className="muted small">{m.desc()}</span>
+            </button>
+          ))}
+        </div>
         <div className="section-title">{tr("Difficulty", "Сложность")}</div>
         <div className="stack">
           {DIFFICULTIES.map((d, i) => {
@@ -194,8 +239,10 @@ export function BattleSetupScreen() {
  */
 export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
   const save = useStore($save)
+  const mode = useStore($sortieMode)
   const pending = save.pendingBattle
-  const [team, setTeam] = useState<number | null>(pending?.difficulty === difficulty ? pending.team : null)
+  const samePending = pending?.difficulty === difficulty && (pending.map.mode ?? "skirmish") === mode
+  const [team, setTeam] = useState<number | null>(samePending ? pending.team : null)
   const [toastEl, toast] = useToast()
   const unlocked = difficultyUnlocked(save, difficulty)
 
@@ -209,14 +256,14 @@ export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
   }, [unlocked])
 
   // Команды появляются, когда есть зерно вылазки (создаётся при входе на экран)
-  const offers = unlocked && save.sortieSeed !== undefined && save.army ? enemyTeams(difficulty) : []
+  const offers = unlocked && save.sortieSeed !== undefined && save.army ? enemyTeams(difficulty, mode) : []
   const armyLevel = rosterLevel(save.army)
   const picked = team ?? closestTeam(offers, armyLevel)
   const diff = DIFFICULTIES.find(d => d.id === difficulty)
   const st = DIFF_STYLE[difficulty]
 
   const onNext = () => {
-    const r = scoutBattle(difficulty, picked)
+    const r = scoutBattle(difficulty, picked, mode)
     if (!r.ok) return toast(r.error ?? tr("Error", "Ошибка"), true)
     haptic("medium")
     navigate("/battle/squad")
@@ -227,7 +274,9 @@ export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
       <TopBar title={tr("Sortie · 2/3", "Вылазка · 2/3")} right={<ResourceBar />} onBack={() => navigate("/battle/setup", true)} />
       <div className="screen-body">
         <div className="row between">
-          <div className="section-title">{`${st.icon} ${diff?.name ?? ""} · ${tr("enemy army", "армия врага")}`}</div>
+          <div className="section-title">
+            {`${st.icon} ${diff?.name ?? ""} · ${mode === "expedition" ? tr("thicket guards", "стражи чащи") : tr("enemy army", "армия врага")}`}
+          </div>
           <span className="muted small">{tr(`your army: Lv. ${armyLevel}`, `ваша армия: ур. ${armyLevel}`)}</span>
         </div>
         <div className="stack">

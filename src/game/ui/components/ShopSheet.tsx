@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { useStore } from "@nanostores/react"
 import type { UnitInstance } from "@game/core/types"
-import { BARRACKS_CAP } from "@game/core/types"
 import { unitPrice } from "@game/core/progression"
 import { $save, buyAction, freeSlots } from "@game/state/save"
+import { rosterCapacity } from "@game/core/settlement"
 import { haptic } from "@game/platform/haptics"
 import { BottomSheet } from "./Sheet"
 import { Button } from "./Button"
@@ -49,7 +49,7 @@ export function ShopSheet({
         {" "}
         {tr("of", "из")}
         {" "}
-        {BARRACKS_CAP}
+        {rosterCapacity(save)}
       </p>
       <div className="stack">
         {save.shelter.candidates.map((unit, i) => {

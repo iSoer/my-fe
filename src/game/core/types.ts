@@ -2,7 +2,7 @@
 import type { Archetype } from "@shared/character/stats"
 import { MAX_LEVEL as CHARACTER_MAX_LEVEL, type StatValues } from "@shared/character/leveling"
 import type { Movement } from "@shared/character/classes"
-import type { Aptitudes, WeaponSkill } from "@shared/character/skills"
+import type { Aptitudes, Rank, Skill, WeaponSkill } from "@shared/character/skills"
 import { DEFAULT_LANG, type Lang } from "@game/i18n"
 
 export type { WeaponSkill }
@@ -21,7 +21,11 @@ export type Difficulty = "easy" | "normal" | "hard" | "nightmare"
 export type TerrainId = "plain" | "forest" | "mountain" | "water" | "wall" | "wall_breakable" | "cover"
 export type SkillSlot = "weapon" | "assist" | "special" | "a" | "b" | "c"
 export type Stance = "hold" | "advance" | "guard"
-export type ObjectiveKind = "rout" | "killBoss"
+/** Цель боя: перебить всех, убить вожака или (вылазка в чащу) вскрыть сундук и уйти через выход. */
+export type ObjectiveKind = "rout" | "killBoss" | "extract"
+
+/** Режим вылазки: обычная схватка на поле 6×8 или вылазка в мрачную чащу на поле втрое больше. */
+export type BattleMode = "skirmish" | "expedition"
 export type BattleResult = "victory" | "defeat" | "retreat"
 
 export interface Pos {
@@ -36,8 +40,6 @@ export const MAP_H = 8
 export const MAX_LEVEL = CHARACTER_MAX_LEVEL
 /** В бой выходят до 4 бойцов ростера. */
 export const SQUAD_SIZE = 4
-/** Ростер (армия) — до 20 персонажей; пополняется наградами за бой и покупкой в магазине. */
-export const BARRACKS_CAP = 20
 
 export function posKey(p: Pos): string {
   return `${p.x},${p.y}`
@@ -48,6 +50,22 @@ export function samePos(a: Pos, b: Pos): boolean {
 export function manhattan(a: Pos, b: Pos): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 }
+/** Размер поля карты: обычный бой — `MAP_W`×`MAP_H`, вылазка в чащу — больше (см. `MapDef.mode`). */
+export interface BoardSize {
+  w: number
+  h: number
+}
+
+export function mapSize(map: { tiles: unknown[][] }): BoardSize {
+  return { w: map.tiles[0]?.length ?? MAP_W, h: map.tiles.length || MAP_H }
+}
+
+/** Клетка внутри поля конкретной карты. */
+export function inMap(size: BoardSize, p: Pos): boolean {
+  return p.x >= 0 && p.y >= 0 && p.x < size.w && p.y < size.h
+}
+
+/** Клетка внутри обычного поля 6×8 (генератор схваток и всё, что не знает карты). */
 export function inBounds(p: Pos): boolean {
   return p.x >= 0 && p.y >= 0 && p.x < MAP_W && p.y < MAP_H
 }
@@ -123,6 +141,11 @@ export interface UnitInstance {
   sp: number
   /** Модель персонажа: склонности к навыкам и собственные статы на 1-м и 80-м уровне (шкала модели). */
   aptitudes: Aptitudes
+  /**
+   * Опыт владения каждым навыком (оружие и передвижение): растёт от использования в бою, ранг — по порогам
+   * `SKILL_XP.ranks` (`core/units/proficiency`). От уровня не зависит и переживает перерождение.
+   */
+  skillXp: Record<Skill, number>
   baseStats: StatValues
   maxStats: StatValues
   archetype: Archetype
@@ -158,6 +181,64 @@ export interface EnemyPlacement {
   unit: UnitInstance
   pos: Pos
   stance: Stance
+  /** Страж сундука: стоит у поста и не преследует игрока дальше `leash` клеток от него. */
+  post?: Pos
+  leash?: number
+}
+
+/** Что лежит в сундуке: Вкусняшки, оружие или талисман (видно только клеймо категории на крышке). */
+export type ChestKind = "treats" | "weapon" | "talisman"
+
+/** Сундук вылазки в чащу: где стоит, что внутри, у какого стража ключ. */
+export interface ExpeditionChest {
+  id: string
+  pos: Pos
+  kind: ChestKind
+  /** Вкусняшки внутри (сундук с Вкусняшками): при открытии идут в добычу вылазки. */
+  treats: number
+  /** Оружие или талисман внутри: достаётся армии, если отряд уйдёт через выход. */
+  itemId?: string
+  /** Враг, у которого ключ от этого сундука. */
+  keyHolderId: string
+}
+
+/** Бонус до конца вылазки: выпадает из усиленного врага-одиночки, действует с момента, как его подобрали. */
+export type BuffKind = "fury" | "swift" | "aegis" | "regen" | "fortune"
+
+/** Что лежит на клетке: сердечко (полное здоровье подобравшему) или бонус. */
+export type PickupKind = "heart" | BuffKind
+
+export interface Pickup {
+  id: string
+  pos: Pos
+  kind: PickupKind
+}
+
+export interface ExpeditionDef {
+  chests: ExpeditionChest[]
+  /** Выходы в углах карты (три, кроме угла старта): боец на любом уводит отряд с добычей, если открыт хоть один сундук. */
+  exits: Pos[]
+  /** Сердечки на карте с начала вылазки. */
+  pickups: Pickup[]
+  /** Усиленные враги-одиночки и бонус, который остаётся на месте их гибели. */
+  elites: { unitId: string, buff: BuffKind }[]
+}
+
+/** Где ключ от сундука: у бойца или на земле. */
+export interface KeySpot {
+  unitId?: string
+  pos?: Pos
+}
+
+/** Ход вылазки: ключи, открытые сундуки, что лежит на земле, действующие бонусы и найденные предметы. */
+export interface ExpeditionState {
+  keys: Record<string, KeySpot>
+  opened: string[]
+  pickups: Pickup[]
+  /** Бонусы всему отряду и личные (по id бойца). */
+  buffs: { team: BuffKind[], units: Record<string, BuffKind[]> }
+  /** Оружие и талисманы из сундуков: армия получит их, если отряд уйдёт через выход. */
+  found: string[]
 }
 
 export interface ReinforcementWave {
@@ -165,12 +246,29 @@ export interface ReinforcementWave {
   units: { unit: UnitInstance, pos: Pos }[]
 }
 
+/** Раскладка поля: узнаваемый шаблон карты (опушка, переправа, ущелье…), см. `core/map/layouts`. */
+export type MapLayout = "glade" | "forestEdge" | "riverBridge" | "crossroads" | "pass" | "lake" | "fort" | "ruins"
+
+/**
+ * Оформление клетки поверх местности, без влияния на правила: тропинка по проходимой клетке и мост через воду
+ * (клетка моста — обычная проходимая земля, под настилом рисуется вода).
+ */
+export type MapDecor = "path" | "bridge"
+
 export interface MapDef {
   seed: number
   biomeId: string
   factionId: string
   difficulty: Difficulty
   objective: ObjectiveKind
+  /** Шаблон раскладки (в старых сейвах нет). */
+  layout?: MapLayout
+  /** Режим: нет — обычная схватка. */
+  mode?: BattleMode
+  /** Сундуки и выход вылазки в чащу. */
+  expedition?: ExpeditionDef
+  /** Оформление клеток по `posKey`: тропинки и мосты. */
+  decor?: Record<string, MapDecor>
   tiles: TerrainId[][]
   playerSpawns: Pos[]
   enemies: EnemyPlacement[]
@@ -199,6 +297,9 @@ export interface BattleUnit {
    * можно сколько угодно раз, но дальность хода всегда считается от неё.
    */
   turnStart?: Pos
+  /** Страж сундука: пост и поводок (`EnemyPlacement`). */
+  post?: Pos
+  leash?: number
 }
 
 export interface Decal {
@@ -226,6 +327,8 @@ export interface MemorialEntry {
   biomeId?: string
   epitaph: string
   reason: "killed" | "released"
+  /** Воскрешён на Кладбище: запись остаётся в истории, но воскресить по ней снова нельзя. */
+  revivedAt?: number
 }
 
 export interface Settings {
@@ -235,6 +338,11 @@ export interface Settings {
   animSpeed: 1 | 2
   cinematic: "always" | "mine" | "never"
   autoEndTurn: boolean
+  /**
+   * Подтверждение «Завершить ход», если не все бойцы действовали: двойным нажатием (по умолчанию: первое меняет
+   * надпись, второе в течение 2 с завершает ход), окном с вопросом или без подтверждения.
+   */
+  endTurnConfirm: "modal" | "none" | "double"
   dangerZoneDefault: boolean
   blood: "sea" | "pools"
   confirmAttack: boolean
@@ -249,6 +357,7 @@ export const DEFAULT_SETTINGS: Settings = {
   animSpeed: 1,
   cinematic: "always",
   autoEndTurn: false,
+  endTurnConfirm: "double",
   dangerZoneDefault: false,
   blood: "sea",
   confirmAttack: true,
@@ -278,6 +387,8 @@ export interface BattleState {
   /** Порядок хода врагов в текущей фазе (null = не рассчитан). */
   enemyQueue: string[] | null
   startedAt: number
+  /** Вылазка в чащу: где ключи, какие сундуки открыты. */
+  expedition?: ExpeditionState
 }
 
 export type Effect
@@ -345,10 +456,21 @@ export type BattleEvent
     | { type: "loot", unitId: string, pos: Pos, amount: number }
     | { type: "xp", unitId: string, amount: number, sp: number }
     | { type: "levelUp", unitId: string, level: number, gains: Partial<Stats> }
+    /** Навык (оружие или передвижение) бойца вырос до нового ранга от использования. */
+    | { type: "rankUp", unitId: string, skill: Skill, rank: Rank }
     | { type: "waited", unitId: string }
     | { type: "phaseChanged", phase: Side, turn: number }
     | { type: "reinforcements", unitIds: string[] }
     | { type: "battleEnded", result: BattleResult }
+    /** Вылазка в чащу: ключ перешёл к бойцу (убил носителя или подобрал с земли) или упал на землю. */
+    | { type: "keyTaken", chestId: string, unitId: string, pos: Pos }
+    | { type: "keyDropped", chestId: string, pos: Pos }
+    | { type: "chestOpened", chestId: string, unitId: string, pos: Pos, treats: number, itemId?: string }
+    /** Боец подобрал сердечко (`healed` — сколько HP вернулось) или бонус. */
+    | { type: "pickup", unitId: string, pos: Pos, kind: PickupKind, healed?: number }
+    /** Усиленный одиночка пал — на его клетке остался бонус. */
+    | { type: "pickupDropped", pos: Pos, kind: PickupKind }
+    | { type: "extracted", unitId: string, pos: Pos }
 
 export interface ReduceResult {
   state: BattleState
@@ -389,19 +511,60 @@ export type Inventory = Record<string, number>
 
 export type ItemCategory = "weapon" | "talisman"
 
-/** Ассортимент Лавки: обновляется после каждого боя, товаров не убывает. */
+/**
+ * Ассортимент Лавки: сменяется раз в период (`STORE.refreshHours`), товаров не убывает. Период — номер интервала
+ * от эпохи Unix, поэтому перезапуск игры не обновляет витрину раньше времени.
+ */
 export interface StoreStock {
   seed: number
   weapons: string[]
   talismans: string[]
-  /** Ассортимент обновился, а игрок ещё не заглядывал в Лавку («!» над торговцем). */
+  /** Ассортимент обновился, а игрок ещё не заглядывал в Лавку («!» над зданием). */
   fresh: boolean
+  /** Период, к которому относится витрина. */
+  period: number
+  /** Соль игры: зерно витрины периода — `salt` + `period`. */
+  salt: number
+}
+
+/* ---------- Поселение ---------- */
+
+export type BuildingId = "barracks" | "training" | "store" | "graveyard"
+
+/** Построенное здание: уровень 1…`BUILDING_MAX_LEVEL`. */
+export interface BuildingState {
+  level: number
+  builtAt: number
+}
+
+/** Боец на тренировочном полигоне: опыт капает со временем (от `lastTick`) и после каждой вылазки. */
+export interface TrainingSlot {
+  unitId: string
+  since: number
+  /** Время последнего начисления опыта. */
+  lastTick: number
+  /** Остаток времени (мс), который ещё не дал целой единицы опыта. */
+  carryMs: number
+  /** Опыта получено за эту тренировку. */
+  xp: number
+}
+
+export interface SettlementState {
+  /** Построенные здания; места под строительство заданы картой (`content/settlement`). */
+  buildings: Partial<Record<BuildingId, BuildingState>>
+  training: TrainingSlot[]
+  /** Бои, за которые полигон уже начислил опыт (последние несколько) — повторно за них не начисляется. */
+  sortiesTrained: string[]
+  /** Последнее успешное воскрешение на Кладбище. */
+  lastReviveAt?: number
+  /** Где стоит герой на карте поселения; нет — появляется на стартовой точке. */
+  hero?: HeroSpot
 }
 
 export type Facing = "down" | "up" | "left" | "right"
 
-/** Герой в деревне: позиция в клетках карты (дробная — движение свободное). */
-export interface VillageState {
+/** Герой в поселении: позиция в клетках карты (дробная — движение свободное). */
+export interface HeroSpot {
   pos: Pos
   facing: Facing
 }
@@ -441,6 +604,10 @@ export interface BattleSummary {
   armyFell: boolean
   /** Отступление по лимиту ходов, а не по решению игрока. */
   timeUp?: boolean
+  /** Бойцов осталось меньше, чем мест в отряде, — недостающие пришли сами (`reinforcements`). */
+  recruits?: UnitInstance[]
+  /** Вылазка в чащу: оружие и талисманы из сундуков, унесённые через выход. */
+  found?: string[]
 }
 
 export interface SaveGame {
@@ -452,7 +619,7 @@ export interface SaveGame {
   shelter: Shelter
   inventory: Inventory
   store: StoreStock
-  village: VillageState
+  settlement: SettlementState
   memorial: MemorialEntry[]
   achievements: string[]
   settings: Settings

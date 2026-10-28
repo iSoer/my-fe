@@ -1,6 +1,7 @@
 import type { MoveType, TerrainId, UnitInstance } from "@game/core/types"
 import { classInfo, classRole } from "@game/content/classes"
-import { SKILL_LABELS, rankAtLevel } from "@shared/character/skills"
+import { SKILL_LABELS } from "@shared/character/skills"
+import { skillRank } from "@game/core/units/proficiency"
 import { moveCost } from "@game/core/map/pathing"
 import { TERRAIN_BONUS } from "@game/content/balance"
 import { unitClassName } from "@game/core/units"
@@ -62,7 +63,7 @@ export function ClassFacts({ classId, unit }: { classId: string, unit?: UnitInst
       <dt>{tr("Weapons", "Оружие")}</dt>
       <dd>
         {info.weapons
-          .map(w => (unit ? `${SKILL_LABELS[w]} ${rankAtLevel(unit.aptitudes[w], unit.level)}` : SKILL_LABELS[w]))
+          .map(w => (unit ? `${SKILL_LABELS[w]} ${skillRank(unit, w)}` : SKILL_LABELS[w]))
           .join(", ")}
       </dd>
       <dt>{tr("Needs", "Нужно")}</dt>
@@ -188,7 +189,7 @@ export function ClassPanel({ unit, openCount, upgrade, nextTierLevel, onChange }
             <span key={w} className="class-weapon">
               <GearIcon svg={weaponIconSvg(w, "iron")} size={28} />
               <span className="small">{SKILL_LABELS[w]}</span>
-              <b>{rankAtLevel(unit.aptitudes[w], unit.level)}</b>
+              <b>{skillRank(unit, w)}</b>
             </span>
           ))}
         </div>

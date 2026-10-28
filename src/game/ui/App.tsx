@@ -11,7 +11,7 @@ import { BattleScreen } from "./screens/BattleScreen"
 import { BattleResultScreen } from "./screens/BattleResultScreen"
 import { MemorialScreen } from "./screens/MemorialScreen"
 import { SettingsScreen } from "./screens/SettingsScreen"
-import { VillageScreen } from "./screens/VillageScreen"
+import { SettlementScreen } from "./screens/SettlementScreen"
 import { StoreScreen } from "./screens/StoreScreen"
 import { critterSvg, furArt } from "@game/art/index"
 import { gameHost } from "@game/platform/host"
@@ -81,7 +81,7 @@ function Screen({ route }: { route: Route }) {
     case "menu":
       return <MenuScreen />
     case "village":
-      return <VillageScreen />
+      return <SettlementScreen />
     case "store":
       return <StoreScreen />
     case "army":

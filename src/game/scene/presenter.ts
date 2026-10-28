@@ -34,6 +34,9 @@ import {
 } from "./motionFx"
 import type { UnitView } from "./UnitView"
 import { tr } from "@game/i18n"
+import { SKILL_LABELS } from "@shared/character/skills"
+import { BUFFS, pickupIcon } from "@game/content/expedition"
+import { itemInfo } from "@game/core/items"
 
 /** Проигрывает события боя на сцене карты (и в кинематике). Логики игры не содержит. */
 export class GamePresenter implements Presenter {
@@ -60,6 +63,12 @@ export class GamePresenter implements Presenter {
     if (!map) return
     await Promise.race([map.ready, wait(map, 1500)])
     if (!map.sys.isActive()) return
+    // Враг просто стоит на месте (спящий страж чащи): без подсветки, наезда камеры и пауз — иначе фаза врага
+    // на большой карте тянулась бы на каждого из десятков стражей
+    if (before.phase === "enemy" && events.length > 0 && events.every(e => e.type === "waited")) {
+      map.syncFromState(after)
+      return
+    }
     map.playing = true
     try {
       // Смещённый предпросмотр: вид уже стоит на клетке назначения — не дёргаем его назад,
@@ -68,6 +77,9 @@ export class GamePresenter implements Presenter {
       map.syncFromState(before, skip)
       const actor = this.enemyActor(events, before)
       if (actor) {
+        // Большое поле: камера наезжает на того, кто сейчас ходит
+        const at = before.units[actor]?.pos
+        if (at) await map.focusOn(at, 260 / this.speed())
         map.flashActor(actor, this.speed())
         await wait(map, 220 / this.speed())
       }
@@ -119,6 +131,54 @@ export class GamePresenter implements Presenter {
         return this.combat(ev, before, after, map, sp)
       case "died":
         return this.died(ev.unitId, ev.pos, ev.side, after, map, sp)
+      case "keyTaken": {
+        // Ключ у бойца: значок над ним появляется при синхронизации, здесь — всплывающая подсказка
+        map.refreshExpedition(after)
+        const view = map.units.get(ev.unitId)
+        const c = view ? { x: view.x, y: view.y } : map.center(ev.pos)
+        sfx("loot")
+        haptic("light")
+        floatText(map, c.x, c.y - map.tile * 0.55, tr("🗝 Key!", "🗝 Ключ!"), "#ffe08a", sp, { size: map.tile * 0.28, rise: 30, duration: 900 })
+        return wait(map, 260 / sp)
+      }
+      case "keyDropped": {
+        map.refreshExpedition(after)
+        const c = map.center(ev.pos)
+        floatText(map, c.x, c.y - map.tile * 0.4, tr("Key dropped", "Ключ упал"), "#ffe08a", sp, { size: map.tile * 0.22 })
+        return wait(map, 200 / sp)
+      }
+      case "chestOpened": {
+        await map.focusOn(ev.pos, 240 / sp)
+        map.refreshExpedition(after)
+        const c = map.center(ev.pos)
+        sfx("loot")
+        haptic("success")
+        // Что было внутри — видно только сейчас: Вкусняшки или предмет (он достанется армии при уходе через выход)
+        const text = ev.itemId ? `${itemInfo(ev.itemId).icon} ${itemInfo(ev.itemId).name}` : `+${ev.treats} 🦴`
+        floatText(map, c.x, c.y - map.tile * 0.5, text, "#ffd166", sp, { size: map.tile * (ev.itemId ? 0.28 : 0.36), rise: 46, duration: 1400 })
+        return wait(map, 480 / sp)
+      }
+      case "pickup": {
+        map.refreshExpedition(after)
+        const view = map.units.get(ev.unitId)
+        const c = view ? { x: view.x, y: view.y } : map.center(ev.pos)
+        haptic("success")
+        sfx(ev.kind === "heart" ? "heal" : "levelUp")
+        const text = ev.kind === "heart" ? `❤️ +${ev.healed ?? 0} HP` : `${BUFFS[ev.kind].icon} ${BUFFS[ev.kind].name}`
+        floatText(map, c.x, c.y - map.tile * 0.55, text, ev.kind === "heart" ? "#ff8fa3" : "#ffd166", sp, { size: map.tile * 0.28, rise: 40, duration: 1300 })
+        if (ev.kind !== "heart" && BUFFS[ev.kind].scope === "team")
+          return banner(map, `${BUFFS[ev.kind].icon} ${BUFFS[ev.kind].desc}`, 0xffd166, sp, 600)
+        return wait(map, 380 / sp)
+      }
+      case "pickupDropped": {
+        map.refreshExpedition(after)
+        const c = map.center(ev.pos)
+        floatText(map, c.x, c.y - map.tile * 0.4, `${pickupIcon(ev.kind)} ${tr("Bonus!", "Бонус!")}`, "#ffd166", sp, { size: map.tile * 0.26 })
+        return wait(map, 260 / sp)
+      }
+      case "extracted":
+        haptic("success")
+        return banner(map, tr("The squad slips away with the loot!", "Отряд уходит с добычей!"), 0x7dffb0, sp, 500, { slash: true })
       case "loot": {
         // Выбитые Вкусняшки всплывают над местом гибели врага
         const c = map.center(ev.pos)
@@ -158,8 +218,11 @@ export class GamePresenter implements Presenter {
         haptic("light")
         return wait(map, 150 / sp)
       }
-      case "phaseChanged":
+      case "phaseChanged": {
         sfx(ev.phase === "player" ? "phasePlayer" : "phaseEnemy")
+        // Большое поле: к началу своей фазы камера возвращается к отряду
+        const lead = ev.phase === "player" ? Object.values(after.units).find(u => u.side === "player" && u.alive) : undefined
+        if (lead) await map.focusOn(lead.pos, 300 / sp)
         return banner(
           map,
           ev.phase === "player"
@@ -173,6 +236,7 @@ export class GamePresenter implements Presenter {
             blood: ev.phase === "enemy"
           }
         )
+      }
       case "reinforcements": {
         await banner(map, tr("Reinforcements!", "Подкрепление!"), 0xe63946, sp, 300, { slash: true, blood: true })
         // Каждый боец выходит из портала: вихрь, дым, вспышка, затем «вырастает» с пружиной
@@ -204,6 +268,15 @@ export class GamePresenter implements Presenter {
       }
       case "xp":
         return
+      case "rankUp": {
+        // Оружие или передвижение выросло от использования: подпись над бойцом
+        const view = map.units.get(ev.unitId)
+        if (view) {
+          floatText(map, view.x, view.y - map.tile * 0.55, `${SKILL_LABELS[ev.skill]} ${ev.rank}!`, "#8ecae6", sp, { size: map.tile * 0.26 })
+          return wait(map, 380 / sp)
+        }
+        return
+      }
       case "waited":
         return wait(map, 60 / sp)
       case "battleEnded": {
@@ -494,7 +567,8 @@ export class GamePresenter implements Presenter {
   ): Promise<void> {
     return new Promise<void>((resolve) => {
       const data: CinematicData = { event: ev, before, after, speed: sp, resolve }
-      // Зум камеры карты к цели перед переходом
+      // Зум камеры карты к цели перед переходом (вид запоминается — после кинематики камера вернётся)
+      map.saveView()
       const c = map.center(ev.defenderPos)
       map.cameras.main.pan(c.x, c.y, 150 / sp, "Sine.easeInOut")
       map.cameras.main.zoomTo(
@@ -511,8 +585,7 @@ export class GamePresenter implements Presenter {
       )
     }).then(() => {
       if (!map.sys.isActive()) return
-      map.cameras.main.zoomTo(1, 120 / sp)
-      map.cameras.main.pan(map.scale.width / 2, map.scale.height / 2, 120 / sp)
+      map.restoreView(120 / sp)
       return wait(map, 130 / sp)
     })
   }

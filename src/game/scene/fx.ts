@@ -160,7 +160,8 @@ export async function banner(
   const skew = bandH * 0.45
   const cy = h / 2
   // Плашка в духе Persona: чернильный параллелограмм с цветной кромкой и белой тонкой полосой.
-  const band = scene.add.graphics().setDepth(30)
+  // Экранные координаты: на большом поле камера сдвинута — плашка не должна уезжать
+  const band = scene.add.graphics().setDepth(30).setScrollFactor(0)
   const bw = w + skew * 2
   band.fillStyle(0x0d0b10, 0.96)
   band.fillPoints(
@@ -204,6 +205,7 @@ export async function banner(
     })
     .setOrigin(0.5)
     .setDepth(31)
+    .setScrollFactor(0)
   const label = scene.add
     .text(-w / 2, cy, upper, {
       fontFamily: FONT,
@@ -213,11 +215,13 @@ export async function banner(
     })
     .setOrigin(0.5)
     .setDepth(31)
+    .setScrollFactor(0)
   let slash: Phaser.GameObjects.Rectangle | null = null
   if (opts.slash) {
     slash = scene.add
       .rectangle(-w, cy, w * 0.3, bandH * 2.8, 0xffffff, 0.18)
       .setDepth(29)
+      .setScrollFactor(0)
       .setAngle(-18)
     scene.tweens.add({ targets: slash, x: w * 2, duration: (220 + hold * 0.5) / speed, ease: "Cubic.easeOut" })
   }
@@ -227,7 +231,7 @@ export async function banner(
     const sy = cy - bandH * 0.42 + (i / 8) * bandH * 0.84
     const len = w * (0.15 + ((i * 37) % 10) / 25)
     const r = scene.add.rectangle(-len, sy, len, 1 + (i % 3), i % 4 === 0 ? color : 0xffffff, 0.25 + (i % 3) * 0.12)
-    r.setDepth(30.5).setOrigin(0, 0.5)
+    r.setDepth(30.5).setOrigin(0, 0.5).setScrollFactor(0)
     streaks.push(r)
     scene.tweens.add({
       targets: r,
@@ -464,7 +468,7 @@ export function confettiRain(scene: Phaser.Scene, count: number, speed: number):
     emitting: false,
     quantity: count
   })
-  emitter.setDepth(61)
+  emitter.setDepth(61).setScrollFactor(0)
   emitter.explode(count)
   scene.time.delayedCall(2500 / speed + 100, () => emitter.destroy())
 }

@@ -1,5 +1,5 @@
-import type { Pos } from "@game/core/types"
-import { MAP_H, MAP_W, inBounds } from "@game/core/types"
+import type { BoardSize, Pos } from "@game/core/types"
+import { MAP_H, MAP_W, inMap } from "@game/core/types"
 
 export interface BoardLayout {
   tile: number
@@ -7,6 +7,9 @@ export interface BoardLayout {
   oy: number
   width: number
   height: number
+  /** Размер поля в клетках (обычный бой — 6×8, вылазка в чащу — больше). */
+  cols: number
+  rows: number
 }
 
 /**
@@ -47,8 +50,25 @@ export function computeLayout(
     ox: Math.floor((width - tile * MAP_W) / 2),
     oy,
     width,
-    height
+    height,
+    cols: MAP_W,
+    rows: MAP_H
   }
+}
+
+/**
+ * Большое поле (вылазка в чащу): клетка того же размера, что в обычном бою (6 колонок на экран), поле — в мировых
+ * координатах от (0, 0), а камера сцены двигается и масштабируется по нему. `screen` — раскладка обычного поля
+ * для DOM-накладок (высота панели сведений не меняется).
+ */
+export function computeWorldLayout(
+  width: number,
+  height: number,
+  insets: LayoutInsets,
+  board: BoardSize
+): { world: BoardLayout, screen: BoardLayout } {
+  const screen = computeLayout(width, height, insets)
+  return { world: { ...screen, ox: 0, oy: 0, cols: board.w, rows: board.h }, screen }
 }
 
 export function tileCenter(l: BoardLayout, pos: Pos): { x: number, y: number } {
@@ -63,5 +83,5 @@ export function pixelToGrid(l: BoardLayout, x: number, y: number): Pos | null {
   const gx = Math.floor((x - l.ox) / l.tile)
   const gy = Math.floor((y - l.oy) / l.tile)
   const p = { x: gx, y: gy }
-  return inBounds(p) ? p : null
+  return inMap({ w: l.cols, h: l.rows }, p) ? p : null
 }

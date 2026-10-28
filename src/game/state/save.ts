@@ -1,9 +1,8 @@
 import { atom, computed } from "nanostores"
 import type {
   Army,
-  Facing,
+  BattleMode,
   MapDef,
-  Pos,
   Rarity,
   BattleAction,
   BattleEvent,
@@ -15,7 +14,7 @@ import type {
   UnitInstance,
   UnitSkills
 } from "@game/core/types"
-import { BARRACKS_CAP, MAX_LEVEL, SQUAD_SIZE } from "@game/core/types"
+import { MAX_LEVEL, SQUAD_SIZE } from "@game/core/types"
 import { createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { createRng, randomSeed } from "@game/core/rng"
 import {
@@ -33,22 +32,33 @@ import {
 import {
   addAll,
   addItem,
-  generateStore,
   inStore,
   isWoodWeapon,
   itemCategory,
   itemCount,
-  itemPrice,
   removeItem,
   unitGear
 } from "@game/core/items"
+import {
+  applySortieTraining,
+  freeRosterSlots,
+  isBuilt,
+  isTraining,
+  pruneTraining,
+  rosterCapacity,
+  settleStore,
+  storePrice
+} from "@game/core/settlement"
 import { isTalismanId } from "@game/content/items"
+import { HERO_RETURN } from "@game/content/settlement"
 import { ENEMY_TEAMS, ITEMS, REWARDS } from "@game/content/balance"
-import { HERO_RETURN } from "@game/content/village"
 import { generateMap } from "@game/core/map/generate"
+import { generateExpedition } from "@game/core/map/expedition"
 import { applyAction, createBattle } from "@game/core/battle/reducer"
 import {
   generateShop,
+  reinforcements,
+  withRecruits,
   memorialEntry,
   resolveBattle,
   rosterLevel,
@@ -148,13 +158,19 @@ export function initSave(): void {
 
 /**
  * Выдать стартовый ростер, если армии нет (новая игра или все пали): персонажи модели с гарантиями ролей,
- * первые 4 — в отряде. Заодно заполняет пустую витрину магазина.
+ * первые 4 — в отряде. Если армия есть, но бойцов в ней меньше, чем мест в отряде, — недостающие приходят сами
+ * под нехватку ролей (`reinforcements`), так выручаются и сейвы, застрявшие до этого правила. Заодно заполняет
+ * пустую витрину магазина.
  */
 export function ensureRoster(): void {
   ensureStore()
   const s = $save.get()
   if (s.army && s.army.units.length > 0) {
-    if (s.shelter.candidates.length === 0)
+    if (s.army.units.length < SQUAD_SIZE) {
+      const recruits = reinforcements(randomSeed(), s.army, s.profile, Date.now())
+      if (recruits.length > 0) updateSave(st => (st.army ? { ...st, army: withRecruits(st.army, recruits) } : st))
+    }
+    if ($save.get().shelter.candidates.length === 0)
       updateSave(st => ({ ...st, shelter: generateShop(randomSeed(), st.army, st.profile, Date.now()) }))
     return
   }
@@ -185,10 +201,11 @@ export function ensureRoster(): void {
   })
 }
 
-/** Сгенерировать ассортимент Лавки, если его ещё нет (новый сейв или миграция с v5). */
-export function ensureStore(): void {
-  if ($save.get().store.weapons.length > 0) return
-  updateSave(st => ({ ...st, store: generateStore(randomSeed(), st.army, st.profile.glory) }))
+/** Выложить витрину Лавки, если её период прошёл или её ещё нет (Лавка должна быть построена). */
+export function ensureStore(now = Date.now()): void {
+  const s = $save.get()
+  const next = settleStore(s, now)
+  if (next !== s) updateSave(() => next)
 }
 
 /**
@@ -203,9 +220,14 @@ export function newGame(): void {
   ensureRoster()
 }
 
-/** Свободные места в ростере (из 20). */
+/** Свободные места в ростере: вместимость — по уровню Казарм. */
 export function freeSlots(save: SaveGame): number {
-  return Math.max(0, BARRACKS_CAP - (save.army?.units.length ?? 0))
+  return freeRosterSlots(save)
+}
+
+function rosterFullError(save: SaveGame): string {
+  const cap = rosterCapacity(save)
+  return tr(`Roster full (${cap}) — upgrade the Barracks or release someone`, `Ростер полон (${cap}) — улучшите Казармы или отпустите кого-нибудь`)
 }
 
 function joinRoster(st: SaveGame, cand: UnitInstance): Army {
@@ -221,7 +243,7 @@ function joinRoster(st: SaveGame, cand: UnitInstance): Army {
 export function buyAction(index: number): { ok: boolean, error?: string, unit?: UnitInstance } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
-  if (freeSlots(s) === 0) return { ok: false, error: tr(`Roster full (${BARRACKS_CAP})`, `Ростер полон (${BARRACKS_CAP})`) }
+  if (freeSlots(s) === 0) return { ok: false, error: rosterFullError(s) }
   const cand = s.shelter.candidates[index]
   if (!cand) return { ok: false, error: tr("No recruit", "нет кандидата") }
   const cost = unitPrice(cand)
@@ -240,7 +262,7 @@ export function claimRewardAction(index: number): { ok: boolean, error?: string,
   const s = $save.get()
   const cand = s.rewardChoice?.[index]
   if (!s.army || !cand) return { ok: false, error: tr("No reward", "нет награды") }
-  if (freeSlots(s) === 0) return { ok: false, error: tr(`Roster full (${BARRACKS_CAP}) — release someone`, `Ростер полон (${BARRACKS_CAP}) — отпустите кого-нибудь`) }
+  if (freeSlots(s) === 0) return { ok: false, error: rosterFullError(s) }
   updateSave((st) => {
     const next: SaveGame = { ...st, army: joinRoster(st, cand) }
     delete next.rewardChoice
@@ -262,6 +284,8 @@ function replaceUnit(army: Army, unit: UnitInstance): Army {
   return { ...army, units: army.units.map(u => (u.id === unit.id ? unit : u)) }
 }
 
+const trainingError = () => tr("Training at the Training Ground — collect them first", "Тренируется на полигоне — сначала заберите")
+
 export function setSquad(ids: string[]): void {
   updateSave(s => (s.army ? { ...s, army: { ...s.army, squadIds: ids.slice(0, SQUAD_SIZE) } } : s))
 }
@@ -281,6 +305,7 @@ export function assignSquadSlot(slot: number, unitId: string | null): { ok: bool
     return { ok: true }
   }
   if (!s.army.units.some(u => u.id === unitId)) return { ok: false, error: tr("No such fighter", "нет бойца") }
+  if (isTraining(s, unitId)) return { ok: false, error: trainingError() }
   const cur = ids.indexOf(unitId)
   if (slot >= ids.length) {
     if (cur >= 0) return { ok: true }
@@ -296,6 +321,7 @@ export function toggleSquad(unitId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
   const inSquad = s.army.squadIds.includes(unitId)
+  if (!inSquad && isTraining(s, unitId)) return { ok: false, error: trainingError() }
   if (!inSquad && s.army.squadIds.length >= SQUAD_SIZE) return { ok: false, error: tr("Squad is full", "Отряд полон") }
   setSquad(inSquad ? s.army.squadIds.filter(id => id !== unitId) : [...s.army.squadIds, unitId])
   return { ok: true }
@@ -385,11 +411,20 @@ export function rebirthAction(unitId: string): { ok: boolean, error?: string, un
 
 /* ---------- Лавка и снаряжение ---------- */
 
-/** Купить предмет из ассортимента Лавки в инвентарь армии. */
-export function buyItemAction(itemId: string): { ok: boolean, error?: string } {
-  const s = $save.get()
-  if (!inStore(s.store, itemId)) return { ok: false, error: tr("No such item in stock", "Такого товара нет") }
-  const price = itemPrice(itemId)
+/**
+ * Купить предмет из ассортимента Лавки в инвентарь армии по цене со скидкой Лавки. `period` — витрина, которую видел
+ * игрок: если она успела смениться, покупка не проходит (новая витрина выкладывается, игрок решает заново).
+ * Списание и выдача — одним обновлением сейва.
+ */
+export function buyItemAction(itemId: string, period?: number, now = Date.now()): { ok: boolean, error?: string, restocked?: boolean } {
+  const before = $save.get()
+  if (!isBuilt(before, "store")) return { ok: false, error: tr("Build the Trading Post first", "Сначала постройте Лавку") }
+  const s = settleStore(before, now)
+  if (s !== before) updateSave(() => s)
+  if (period !== undefined && s.store.period !== period)
+    return { ok: false, restocked: true, error: tr("The stock has just changed — take a look at the new goods", "Ассортимент только что сменился — взгляните на новые товары") }
+  if (!inStore(s.store, itemId)) return { ok: false, error: tr("This item is no longer in stock", "Этого товара больше нет") }
+  const price = storePrice(s, itemId)
   if (s.profile.treats < price) return { ok: false, error: tr("Not enough Treats", "Недостаточно Вкусняшек") }
   if (itemCount(s.inventory, itemId) >= ITEMS.stackCap) return { ok: false, error: tr("Can’t carry any more", "Больше не унести") }
   updateSave(st => ({
@@ -445,15 +480,6 @@ export function equipTalismanAction(unitId: string, talismanId: string | undefin
   return { ok: true }
 }
 
-/* ---------- Деревня ---------- */
-
-/** Запомнить, где стоит герой (сцена зовёт это при остановке и уходе, а не каждый кадр). */
-export function setHeroPosition(pos: Pos, facing: Facing): void {
-  const v = $save.get().village
-  if (Math.abs(v.pos.x - pos.x) < 0.01 && Math.abs(v.pos.y - pos.y) < 0.01 && v.facing === facing) return
-  updateSave(st => ({ ...st, village: { pos: { x: pos.x, y: pos.y }, facing } }))
-}
-
 export function sharpenAction(unitId: string): { ok: boolean, error?: string } {
   const s = $save.get()
   const unit = s.army?.units.find(u => u.id === unitId)
@@ -487,7 +513,8 @@ export function releaseUnit(unitId: string): { ok: boolean, armyFell?: boolean }
       next.stats = { ...st.stats, armiesLost: st.stats.armiesLost + 1 }
     }
     else next.army = { ...(st.army as Army), units: remaining, squadIds: (st.army as Army).squadIds.filter(id => id !== unitId) }
-    return next
+    // Отпущенный уходит и с полигона
+    return pruneTraining(next)
   })
   return { ok: true, armyFell: remaining.length === 0 }
 }
@@ -522,21 +549,26 @@ export function ensureSortieSeed(): number {
   return seed
 }
 
+/** Режим, выбранный на первом шаге вылазки: обычная схватка или вылазка в мрачную чащу. */
+export const $sortieMode = atom<BattleMode>("skirmish")
+
 /**
  * Четыре вражеские команды на сложности: уровни — окна диапазона сложности (`teamLevels`), не уровень армии;
- * биом у каждой случайный из всех. Детерминированы по `sortieSeed`: переключение сложности туда-обратно
- * не перебрасывает врагов.
+ * биом у каждой случайный из всех (в чаще — мрачный лес). Детерминированы по `sortieSeed`: переключение
+ * сложности и режима туда-обратно не перебрасывает врагов.
  */
-export function enemyTeams(difficulty: Difficulty): EnemyTeamOffer[] {
+export function enemyTeams(difficulty: Difficulty, mode: BattleMode = "skirmish"): EnemyTeamOffer[] {
   const s = $save.get()
   const sortie = s.sortieSeed ?? ensureSortieSeed()
   const armyLevel = rosterLevel(s.army)
-  const key = `${sortie}:${difficulty}:${armyLevel}`
+  const key = `${sortie}:${difficulty}:${mode}:${armyLevel}`
   const cached = offerCache.get(key)
   if (cached) return cached
   const offers = Array.from({ length: ENEMY_TEAMS }, (_, team): EnemyTeamOffer => {
-    const seed = createRng(sortie).fork(`${difficulty}:${team}`).int(0, 0x7fffffff)
-    const map = generateMap({ seed, biomeId: "random", difficulty, team, squadSize: SQUAD_SIZE, now: Date.now() })
+    const seed = createRng(sortie).fork(`${difficulty}:${team}${mode === "expedition" ? ":expedition" : ""}`).int(0, 0x7fffffff)
+    const map = mode === "expedition"
+      ? generateExpedition({ seed, difficulty, team, squadSize: SQUAD_SIZE, now: Date.now() })
+      : generateMap({ seed, biomeId: "random", difficulty, team, squadSize: SQUAD_SIZE, now: Date.now() })
     const units = [...map.enemies.map(e => e.unit), ...map.reinforcements.flatMap(w => w.units.map(u => u.unit))]
     const lv = units.map(u => u.level)
     const levels: [number, number] = [Math.min(...lv), Math.max(...lv)]
@@ -561,13 +593,13 @@ export function enemyTeams(difficulty: Difficulty): EnemyTeamOffer[] {
  * Разведка: выбранная вражеская команда на сложности становится боем; отряд выбирается на следующем шаге.
  * Карта та же, что в предложении команды (тот же seed и случайный биом).
  */
-export function scoutBattle(difficulty: Difficulty, team = 0): { ok: boolean, error?: string } {
+export function scoutBattle(difficulty: Difficulty, team = 0, mode: BattleMode = "skirmish"): { ok: boolean, error?: string } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
   if (!difficultyUnlocked(s, difficulty)) return { ok: false, error: tr("Difficulty locked", "Сложность закрыта") }
   const pb = s.pendingBattle
-  if (pb && pb.difficulty === difficulty && pb.team === team) return { ok: true }
-  const offer = enemyTeams(difficulty)[team]
+  if (pb && pb.difficulty === difficulty && pb.team === team && (pb.map.mode ?? "skirmish") === mode) return { ok: true }
+  const offer = enemyTeams(difficulty, mode)[team]
   if (!offer) return { ok: false, error: tr("No such enemy army", "Нет такой армии врагов") }
   updateSave(st => ({ ...st, pendingBattle: { seed: offer.seed, difficulty, biomeId: offer.map.biomeId, team, map: offer.map } }))
   return { ok: true }
@@ -583,6 +615,7 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
   const squad = squadIds.map(id => s.army?.units.find(u => u.id === id)).filter((u): u is UnitInstance => !!u)
   if (squad.length === 0) return { ok: false, error: tr("Squad is empty", "Пустой отряд") }
   if (squad.length > SQUAD_SIZE) return { ok: false, error: tr(`Squad holds at most ${SQUAD_SIZE}`, `В отряде не больше ${SQUAD_SIZE}`) }
+  if (squad.some(u => isTraining(s, u.id))) return { ok: false, error: trainingError() }
   const { state, events } = createBattle({
     map: pb.map,
     squad,
@@ -631,9 +664,6 @@ export function finishBattle(): BattleSummary | null {
       memorial: res.memorial,
       shelter: res.shelter,
       inventory: res.inventory,
-      store: res.store,
-      // После боя герой возвращается в деревню через ворота
-      village: { pos: { ...HERO_RETURN }, facing: "down" },
       lastBattle: res.summary,
       stats: {
         ...st.stats,
@@ -651,7 +681,10 @@ export function finishBattle(): BattleSummary | null {
     else delete next.army
     if (res.rewardChoice) next.rewardChoice = res.rewardChoice
     else delete next.rewardChoice
-    return next
+    // После боя герой возвращается в поселение через ворота
+    next.settlement = { ...next.settlement, hero: { pos: { ...HERO_RETURN }, facing: "up" } }
+    // Павшие уходят с полигона; тренирующиеся получают опыт за вылазку (за этот бой — один раз)
+    return applySortieTraining(pruneTraining(next), state.id, now).save
   })
   return res.summary
 }

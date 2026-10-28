@@ -3,6 +3,7 @@ import { useStore } from "@nanostores/react"
 import type { Stance, UnitInstance } from "@game/core/types"
 import { SQUAD_SIZE } from "@game/core/types"
 import { attackOf, displayName, unitClassName, visibleStats } from "@game/core/units"
+import { trainingIds } from "@game/core/settlement"
 import { difficultyDef } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
 import { $save, assignSquadSlot, startBattle } from "@game/state/save"
@@ -117,7 +118,9 @@ export function SquadScreen() {
   const barClass = ratio >= 1.0 ? "good" : ratio >= 0.75 ? "mid" : "bad"
   const diff = difficultyDef(pending.difficulty)
   const slotUnit = slot !== null ? squad[slot] : undefined
-  const roster = [...army.units].sort((a, b) => b.level - a.level)
+  const training = trainingIds(save)
+  // Тренирующиеся остаются на полигоне — в конце списка и неактивны
+  const roster = [...army.units].sort((a, b) => Number(training.has(a.id)) - Number(training.has(b.id)) || b.level - a.level)
 
   const pick = (unitId: string | null) => {
     if (slot === null) return
@@ -205,6 +208,7 @@ export function SquadScreen() {
           {roster.map((u, i) => {
             const at = squad.findIndex(x => x.id === u.id)
             const here = slotUnit?.id === u.id
+            const busy = training.has(u.id)
             return (
               <UnitRow
                 key={u.id}
@@ -212,11 +216,14 @@ export function SquadScreen() {
                 index={i}
                 animated={false}
                 selected={here}
+                dim={busy}
                 onClick={() => pick(u.id)}
                 right={
                   here
                     ? <span className="chip squad">{tr("Here", "Здесь")}</span>
-                    : at >= 0 ? <span className="chip">{tr(`Slot ${at + 1}`, `Слот ${at + 1}`)}</span> : undefined
+                    : at >= 0
+                      ? <span className="chip">{tr(`Slot ${at + 1}`, `Слот ${at + 1}`)}</span>
+                      : busy ? <span className="chip">{tr("🎯 Training", "🎯 На полигоне")}</span> : undefined
                 }
               />
             )

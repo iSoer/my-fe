@@ -99,6 +99,11 @@ export class UnitView extends Phaser.GameObjects.Container {
   private hitTweens: Phaser.Tweens.Tween[] = []
   private lowHp = false
   private hpFlash: Phaser.GameObjects.Graphics | null = null
+  /** Вылазка в чащу: ключ от сундука у этого бойца — значок над головой. */
+  private keyIcon: Phaser.GameObjects.Image | null = null
+  private keyTween: Phaser.Tweens.Tween | null = null
+  /** Значки над головой справа: бонус, который уронит одиночка, или личные бонусы бойца. */
+  private mark: Phaser.GameObjects.Text | null = null
 
   constructor(scene: Phaser.Scene, unit: UnitInstance, side: Side, opts: UnitViewOptions) {
     super(scene, 0, 0)
@@ -339,8 +344,43 @@ export class UnitView extends Phaser.GameObjects.Container {
     }
   }
 
+  /** Показать или убрать значок ключа над бойцом (текстура `key` должна быть загружена сценой). */
+  setKey(on: boolean, texture: string): void {
+    if (!on) {
+      this.keyTween?.stop()
+      this.keyTween = null
+      this.keyIcon?.destroy()
+      this.keyIcon = null
+      return
+    }
+    if (this.keyIcon || !this.scene || !this.scene.textures.exists(texture)) return
+    this.keyIcon = this.scene.add.image(-this.size * 0.34, -this.size * 0.5, texture).setDisplaySize(this.size * 0.42, this.size * 0.42)
+    this.add(this.keyIcon)
+    this.keyTween = this.scene.tweens.add({ targets: this.keyIcon, y: -this.size * 0.58, duration: 650, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+  }
+
+  /** Поставить значки над бойцом (эмодзи); пустая строка — убрать. */
+  setMark(text: string): void {
+    if (!text) {
+      this.mark?.destroy()
+      this.mark = null
+      return
+    }
+    if (!this.scene) return
+    if (!this.mark) {
+      this.mark = this.scene.add.text(0, 0, text, textStyle(Math.max(10, Math.round(this.size * 0.26)), "#ffffff", false, 2)).setOrigin(0.5, 1)
+      this.add(this.mark)
+    }
+    else if (this.mark.text !== text) this.mark.setText(text)
+    this.mark.setPosition(this.size * 0.2, -this.size * 0.46)
+  }
+
   resize(size: number): void {
     this.size = size
+    if (this.mark) this.mark.setFontSize(Math.max(10, Math.round(size * 0.26))).setPosition(size * 0.2, -size * 0.46)
+    if (this.keyIcon) {
+      this.keyIcon.setDisplaySize(size * 0.42, size * 0.42).setPosition(-size * 0.34, -size * 0.5)
+    }
     const feetY = size * 0.36
     const k = this.lifted ? 0.7 : 1
     this.shadow.setDisplaySize(size * 0.7 * k, size * 0.25 * k)

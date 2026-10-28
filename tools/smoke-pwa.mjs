@@ -62,13 +62,13 @@ try {
     await splash.first().click();
     await page.getByRole('button', { name: /New game/ }).first().waitFor({ timeout: 5000 });
   });
-  await step('офлайн: новая игра и деревня (Phaser)', async () => {
+  await step('офлайн: новая игра и поселение', async () => {
     await page.getByRole('button', { name: /New game/ }).first().click();
     await page.waitForURL(/#\/village$/, { timeout: 5000 });
-    await page.waitForSelector('.vl-canvas canvas', { timeout: 10000 });
+    await page.waitForSelector('.st-canvas canvas', { timeout: 10000 });
   });
   await step('офлайн: вылазка у ворот и бой с канвасом Phaser', async () => {
-    await page.evaluate(() => window.__pf.village.talk('sorties'));
+    await page.evaluate(() => window.__pf.settlement.open('gate'));
     await page.getByRole('button', { name: /Plan a sortie/ }).first().click();
     await page.locator('.diff-card:not(.locked)').first().click();
     await page.getByRole('button', { name: /^Next/ }).first().click();

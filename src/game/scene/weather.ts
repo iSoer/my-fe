@@ -76,6 +76,8 @@ export interface WeatherOptions {
   /** Якоря для мух (мировые координаты) и радиус роения. */
   anchors?: { x: number, y: number }[]
   anchorRadius?: number
+  /** Частицы в экранных координатах: не уезжают с камерой (большое поле, по которому двигается камера). */
+  fixed?: boolean
 }
 
 const KIND_TEX: Record<WeatherKind, string> = {
@@ -127,6 +129,7 @@ export class WeatherLayer {
     const tex = KIND_TEX[this.kind]
     for (let i = 0; i < this.maxCount; i++) {
       const img = scene.add.image(0, 0, tex).setDepth(this.depth).setVisible(false)
+      if (opts.fixed) img.setScrollFactor(0)
       // Угольки и пылинки светятся
       if (this.kind === "embers" || this.kind === "motes") img.setBlendMode(Phaser.BlendModes.ADD)
       const p: Particle = {

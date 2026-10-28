@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { $save, ensureRoster, rebirthAction } from "@game/state/save"
 import { createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { canRebirth, generateRoster, generateUnit, rebirthUnit, rescaleRarity, statsAtLevel } from "@game/core/units"
-import { generateShop } from "@game/core/progression"
+import { generateRewardChoice, generateShop, recruitLevel } from "@game/core/progression"
 import { MAX_LEVEL, STATS, type Rarity, type UnitInstance } from "@game/core/types"
 import { recruitRarityWeights } from "@game/content/balance"
 import { loadCharacterModel } from "@/server/character-model/model"
@@ -110,5 +110,49 @@ describe("перерождение", () => {
     delete old.profile.maxRarity
     const r = parseSave(JSON.stringify(old))
     expect(r.ok && r.save.profile.maxRarity).toBe(1)
+  })
+})
+
+describe("уровень бойцов новой звезды", () => {
+  /** Ростер ★1 80-го уровня, один из бойцов только что переродился в ★2 (1-й уровень). */
+  function veteranArmy(): { units: UnitInstance[], id: string, squadIds: string[], createdAt: number, battles: number, wins: number } {
+    const units = [1, 2, 3, 4, 5].map(seed => generateUnit({ seed, level: MAX_LEVEL, rarity: 1 }))
+    units[0] = rebirthUnit(units[0]!)
+    return { id: "a", units, squadIds: units.slice(0, 4).map(u => u.id), createdAt: 1, battles: 0, wins: 0 }
+  }
+
+  it("каждая звезда растёт с нуля: ★2 сразу после открытия — около 1-го уровня, ★1 — около уровня ростера", () => {
+    const army = veteranArmy()
+    expect(recruitLevel(army, 1)).toBeGreaterThan(70)
+    expect(recruitLevel(army, 2)).toBe(1)
+    // звезды без своих бойцов — тоже с 1-го уровня
+    expect(recruitLevel(army, 3)).toBe(1)
+    let twos = 0
+    for (let seed = 0; seed < 60; seed++) {
+      const offered = [
+        ...generateShop(seed, army, { glory: 0, maxRarity: 2 }, 1).candidates,
+        ...generateRewardChoice(seed, army, { maxRarity: 2 }, true, 1)
+      ]
+      for (const u of offered) {
+        if (u.rarity === 2) {
+          twos++
+          expect(u.level).toBeLessThanOrEqual(2)
+        }
+        else expect(u.level).toBeGreaterThan(70)
+      }
+    }
+    expect(twos).toBeGreaterThan(10)
+  })
+
+  it("потолок звезды растёт вместе с её бойцами: прокачанный ★2 поднимает уровень кандидатов ★2", () => {
+    const army = veteranArmy()
+    army.units[0] = { ...army.units[0]!, level: 30 }
+    expect(recruitLevel(army, 2)).toBe(30)
+    for (let seed = 0; seed < 40; seed++) {
+      for (const u of generateShop(seed, army, { glory: 0, maxRarity: 2 }, 1).candidates) {
+        if (u.rarity === 2) expect(u.level).toBeGreaterThanOrEqual(28)
+        if (u.rarity === 2) expect(u.level).toBeLessThanOrEqual(31)
+      }
+    }
   })
 })
