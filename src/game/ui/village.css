@@ -157,6 +157,10 @@
       flex: 1 0 auto;
       min-width: 42px;
     }
+    /* «построить» не помещается в шесть кнопок — непостроенное и так видно по серой иконке и фону */
+    .st-dock-hint {
+      display: none;
+    }
   }
   @media (max-width: 430px) {
     .st-dock {

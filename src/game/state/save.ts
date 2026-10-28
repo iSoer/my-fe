@@ -1,3 +1,4 @@
+import { recordEvent } from "@game/core/story/facts"
 import { drinkForBattle } from "@game/core/settlement/tavern"
 import { atom, computed } from "nanostores"
 import type {
@@ -632,11 +633,14 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
     }
     delete next.pendingBattle
     // Кружка из бара выпита: она на одну вылазку
+    let out = recordEvent(next, { type: "sortieStarted", mode: pb.map.mode ?? "skirmish", difficulty: pb.difficulty })
     if (next.settlement.drink) {
-      const settlement = { ...next.settlement }
+      out = recordEvent(out, { type: "drinkDrunk", drinkId: next.settlement.drink.id })
+      const settlement = { ...out.settlement }
       delete settlement.drink
-      next.settlement = settlement
+      out = { ...out, settlement }
     }
+    return out
     return next
   })
   return { ok: true, events }
@@ -692,7 +696,15 @@ export function finishBattle(): BattleSummary | null {
     // После боя герой возвращается в поселение через ворота
     next.settlement = { ...next.settlement, hero: { pos: { ...HERO_RETURN }, facing: "up" } }
     // Павшие уходят с полигона; тренирующиеся получают опыт за вылазку (за этот бой — один раз)
-    return applySortieTraining(pruneTraining(next), state.id, now).save
+    const trained = applySortieTraining(pruneTraining(next), state.id, now).save
+    return recordEvent(trained, {
+      type: "sortieFinished",
+      mode: state.map.mode ?? "skirmish",
+      difficulty: state.difficulty,
+      result: res.summary.result,
+      kills: res.summary.kills,
+      fallen: res.summary.fallen.length
+    })
   })
   return res.summary
 }

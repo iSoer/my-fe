@@ -17,7 +17,7 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
  * v8: без предметов лечения и рюкзака вылазки. v9: поселение со зданиями и уровнями вместо деревни с героем,
  * тренировочный полигон, витрина Лавки по периодам, воскрешение на Кладбище; герой ходит по карте поселения.
  */
-export const SAVE_VERSION = 10
+export const SAVE_VERSION = 11
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -317,6 +317,7 @@ export const saveSchema = z.object({
     deaths: z.number(),
     armiesLost: z.number()
   }),
+  story: z.object({ counters: z.record(z.string(), z.number()), seen: z.array(z.string()) }),
   pendingBattle: z
     .object({
       seed: z.number(),
@@ -350,7 +351,8 @@ export function createEmptySave(now: number): SaveGame {
     memorial: [],
     achievements: [],
     settings: { ...DEFAULT_SETTINGS },
-    stats: { battles: 0, wins: 0, kills: 0, deaths: 0, armiesLost: 0 }
+    stats: { battles: 0, wins: 0, kills: 0, deaths: 0, armiesLost: 0 },
+    story: { counters: {}, seen: [] }
   }
 }
 
@@ -487,7 +489,22 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
   },
   // v9 → v10: на пустыре встал бар (здание `tavern`), в поселении — заказанная кружка, в бою — выпитый напиток.
   // Всё новое необязательно: старый сейв читается как есть, бара в нём просто ещё нет.
-  9: (old) => ({ ...old, version: 10 })
+  9: (old) => ({ ...old, version: 10 }),
+  // v10 → v11: сюжетные факты для триггеров диалогов. Что можно восстановить из общей статистики — переносится
+  // (вылазки, победы, убитые, павшие), остальные счётчики начинаются с нуля.
+  10: (old) => {
+    const st = (old["stats"] ?? {}) as Partial<Record<"battles" | "wins" | "kills" | "deaths", number>>
+    const counters: Record<string, number> = {}
+    const put = (k: string, v: number | undefined) => {
+      if (v) counters[k] = v
+    }
+    put("sortie.started", st.battles)
+    put("sortie.finished", st.battles)
+    put("sortie.victory", st.wins)
+    put("kills", st.kills)
+    put("fallen", st.deaths)
+    return { ...old, story: { counters, seen: [] }, version: 11 }
+  }
 }
 
 /** Первая версия сейва, которую ещё можно прочитать. */

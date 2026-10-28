@@ -27,7 +27,7 @@ import { ResourceBar } from "../components/ResourceBar"
 import { useToast } from "../components/Toast"
 import { BuildingPanel, GatePanel } from "../settlement/BuildingPanel"
 import { DialogueBox } from "../settlement/DialogueBox"
-import { $dialogue, canTalk, openDialogue, skipDialogue } from "@game/state/dialogue"
+import { $dialogue, canTalk, npcStoryAlerts, openDialogue, skipDialogue } from "@game/state/dialogue"
 import { tr } from "@game/i18n"
 import "../village.css"
 
@@ -96,6 +96,7 @@ export function SettlementScreen() {
           },
           onRest: setHeroSpot,
           canTalk,
+          npcAlerts: npcStoryAlerts,
           onTalk: (npcId) => {
             closePanel()
             if (openDialogue(npcId)) haptic("light")

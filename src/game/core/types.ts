@@ -568,6 +568,15 @@ export interface SettlementState {
   drink?: OrderedDrink
 }
 
+/**
+ * Сюжетные факты (`core/story`): счётчики событий по иерархическим ключам («sortie.victory», «drink.drunk.pale_ale»)
+ * и увиденные сцены разговоров.
+ */
+export interface StoryState {
+  counters: Record<string, number>
+  seen: string[]
+}
+
 /** Заказанный напиток: сорт и уровень бара на момент заказа (от него сила). */
 export interface OrderedDrink {
   id: string
@@ -643,6 +652,8 @@ export interface SaveGame {
   achievements: string[]
   settings: Settings
   stats: GlobalStats
+  /** Сюжетные факты для триггеров диалогов. */
+  story: StoryState
   pendingBattle?: PendingBattle
   /** Зерно вражеских команд вылазки: держится до конца следующего боя, смена сложности не перебрасывает врагов. */
   sortieSeed?: number

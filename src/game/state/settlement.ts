@@ -1,3 +1,4 @@
+import { recordEvent, type GameEvent } from "@game/core/story/facts"
 import { orderDrink } from "@game/core/settlement/tavern"
 import { atom } from "nanostores"
 import type { BuildingId, Facing, LevelUpSummary, Pos, SaveGame, UnitInstance } from "@game/core/types"
@@ -36,17 +37,22 @@ function commit<T>(r: Outcome<T>): ActionResult<Omit<T, "save">> {
   return { ok: true, ...(rest as Omit<T, "save">) }
 }
 
+/** Успешное действие ещё и сообщает сюжету о событии (триггеры диалогов). */
+function withEvent<T>(r: Outcome<T>, ev: (save: SaveGame) => GameEvent): Outcome<T> {
+  return r.ok ? { ...r, save: recordEvent(r.save, ev(r.save)) } : r
+}
+
 export function buildAction(id: BuildingId, now = Date.now()): ActionResult {
-  return commit(build($save.get(), id, now))
+  return commit(withEvent(build($save.get(), id, now), () => ({ type: "built", building: id })))
 }
 
 export function upgradeAction(id: BuildingId, now = Date.now()): ActionResult {
-  return commit(upgrade($save.get(), id, now))
+  return commit(withEvent(upgrade($save.get(), id, now), s => ({ type: "upgraded", building: id, level: buildingLevel(s, id) })))
 }
 
 /** Заказать кружку в баре на следующую вылазку. */
 export function orderDrinkAction(drinkId: string): ActionResult {
-  return commit(orderDrink($save.get(), drinkId))
+  return commit(withEvent(orderDrink($save.get(), drinkId), () => ({ type: "drinkOrdered", drinkId })))
 }
 
 export function trainAction(unitId: string, now = Date.now()): ActionResult {

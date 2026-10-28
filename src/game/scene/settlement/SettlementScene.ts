@@ -102,6 +102,8 @@ export interface SettlementSceneOptions {
   /** Заговорить с жителем: true — разговор открыт; false — диалоги выключены, тап ведёт к месту жителя. */
   canTalk: (npcId: string) => boolean
   onTalk: (npcId: string) => void
+  /** Жители с новой сюжетной сценой — «!» над головой (опрашивается вместе с вывесками). */
+  npcAlerts: () => Record<string, boolean>
   /** Герой остановился — запомнить позицию в сейве. */
   onRest: (pos: Pos, facing: Facing) => void
 }
@@ -123,6 +125,8 @@ interface NpcView {
   def: NpcDef
   img: Phaser.GameObjects.Image
   label: Phaser.GameObjects.Text
+  /** Пузырь «!»: у жителя новая сюжетная сцена. */
+  story: Phaser.GameObjects.Container
   tween?: Phaser.Tweens.Tween
 }
 
@@ -524,7 +528,17 @@ export class SettlementScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setResolution(2)
       .setDepth(9000)
-    const view: NpcView = { def, img, label }
+    // Пузырь «!» над именем: есть что рассказать
+    const bubble = this.add.graphics()
+    bubble.fillStyle(0x000000, 0.3).fillCircle(1, 3, 15)
+    bubble.fillStyle(0xffd166, 1).fillTriangle(-6, 11, 6, 11, 0, 21)
+    bubble.fillStyle(0xffd166, 1).fillCircle(0, 0, 15)
+    bubble.lineStyle(3, 0x2a1d10, 1).strokeCircle(0, 0, 15)
+    const mark = this.add.text(0, 1, "!", textStyle(21, "#2a1d10", true, 0)).setOrigin(0.5).setResolution(2)
+    // над подписью с именем (её высота ≈ 16 px), с зазором под хвостик
+    const story = this.add.container(x, y - h * 0.78 - 44, [bubble, mark]).setDepth(9001).setVisible(false)
+    if (!reducedMotion()) this.tweens.add({ targets: story, y: story.y - 4, duration: 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+    const view: NpcView = { def, img, label, story }
     if (!reducedMotion()) {
       const duration = 900 + (hash(Math.round(def.pos.x * 10), 3) % 300)
       view.tween = this.tweens.add({ targets: img, y: img.y - 2, duration, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
@@ -606,10 +620,12 @@ export class SettlementScene extends Phaser.Scene {
       else p.lot.clearTint()
     }
     const active: NpcDef[] = []
+    const stories = this.opts.npcAlerts()
     for (const n of this.npcs) {
       const on = !!signs[n.def.place]?.built
       n.img.setVisible(on)
       n.label.setVisible(on)
+      n.story.setVisible(on && !!stories[n.def.id])
       if (on) active.push(n.def)
     }
     // Житель появился там, где стоит герой (здание построили) — герой отходит к входу, чтобы не застрять

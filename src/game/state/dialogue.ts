@@ -1,21 +1,21 @@
 import { atom } from "nanostores"
-import { DIALOGUES, type DialogueLine } from "@game/content/dialogues"
+import type { DialogueLine } from "@game/content/dialogues"
 import { NPCS } from "@game/content/settlement"
-import { $save } from "./save"
+import { hasNewStory, pickScene } from "@game/core/story/dialogue"
+import { recordEvent } from "@game/core/story/facts"
+import { $save, updateSave } from "./save"
 
-// Разговор с жителем: какая сцена идёт и на какой реплике. Сцены жителя идут по кругу (счётчик — на сессию,
-// в сейв не пишется). Отключены диалоги в настройках — разговоры не открываются.
+// Разговор с жителем: какая сцена идёт и на какой реплике. Какую сцену показать, решает `core/story/dialogue`
+// (сюжетные — по триггерам, фоновые — по кругу). Отключены диалоги в настройках — разговоры не открываются.
 
 export interface DialogueState {
   npcId: string
+  sceneId: string
   lines: DialogueLine[]
   index: number
 }
 
 export const $dialogue = atom<DialogueState | null>(null)
-
-/** Какую сцену жителя показать следующей. */
-const nextScene: Record<string, number> = {}
 
 export function dialoguesEnabled(): boolean {
   return $save.get().settings.dialogues
@@ -23,18 +23,27 @@ export function dialoguesEnabled(): boolean {
 
 /** Есть ли у жителя что сказать (и включены ли диалоги вообще). */
 export function canTalk(npcId: string): boolean {
-  return dialoguesEnabled() && (DIALOGUES[npcId]?.length ?? 0) > 0 && NPCS.some(n => n.id === npcId)
+  return dialoguesEnabled() && NPCS.some(n => n.id === npcId) && !!pickScene($save.get(), npcId)
 }
 
-/** Начать разговор с жителем; false — диалоги выключены или сказать нечего. */
+/** Жители, у которых ждёт новая сюжетная сцена («!» над головой); при выключенных диалогах — никто. */
+export function npcStoryAlerts(): Record<string, boolean> {
+  const save = $save.get()
+  const on = save.settings.dialogues
+  return Object.fromEntries(NPCS.map(n => [n.id, on && hasNewStory(save, n.id)]))
+}
+
+/**
+ * Начать разговор с жителем; false — диалоги выключены или сказать нечего. Сцена считается увиденной сразу при
+ * открытии: пропустил — значит, видел, и сюжет не застрянет на одной сцене.
+ */
 export function openDialogue(npcId: string): boolean {
-  if (!canTalk(npcId)) return false
-  const scenes = DIALOGUES[npcId] ?? []
-  const i = nextScene[npcId] ?? 0
-  nextScene[npcId] = (i + 1) % scenes.length
-  const lines = scenes[i % scenes.length]?.() ?? []
-  if (lines.length === 0) return false
-  $dialogue.set({ npcId, lines, index: 0 })
+  if (!dialoguesEnabled()) return false
+  const scene = pickScene($save.get(), npcId)
+  const lines = scene?.lines() ?? []
+  if (!scene || lines.length === 0) return false
+  updateSave(s => recordEvent(s, { type: "talked", npcId, sceneId: scene.id }))
+  $dialogue.set({ npcId, sceneId: scene.id, lines, index: 0 })
   return true
 }
 
@@ -48,11 +57,5 @@ export function advanceDialogue(): void {
 
 /** Пропустить разговор целиком. */
 export function skipDialogue(): void {
-  $dialogue.set(null)
-}
-
-/** Для тестов: сцены снова с первой. */
-export function resetDialogues(): void {
-  for (const k of Object.keys(nextScene)) delete nextScene[k]
   $dialogue.set(null)
 }
