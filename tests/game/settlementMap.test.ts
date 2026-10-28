@@ -23,6 +23,9 @@ import {
 import { placeSigns } from "@game/state/settlement"
 import { createEmptySave } from "@game/core/save"
 import type { Pos, SaveGame } from "@game/core/types"
+import { buildingWear } from "@game/art/village"
+import { rainAt, rainyCycle } from "@game/core/settlement/rain"
+import { SETTLEMENT_RAIN } from "@game/content/settlement"
 
 const ALL_BUILT = (): SaveGame => {
   const save = createEmptySave(1)
@@ -40,13 +43,19 @@ function walk(from: Pos, path: Pos[], npcs = NPCS): Pos {
 }
 
 describe("поселение: карта", () => {
-  it("три экрана шириной, прямоугольная, по краю — деревья, ворота внизу", () => {
+  it("три экрана шириной, прямоугольная, по краю — частокол, выйти можно только через ворота внизу", () => {
     expect(SETTLEMENT_W).toBe(SCREEN_W * 3)
     expect(SETTLEMENT_TILES.every(row => row.length === SETTLEMENT_W)).toBe(true)
     for (let x = 0; x < SETTLEMENT_W; x++) {
       expect(walkableTile(x, 0)).toBe(false)
       expect(walkableTile(x, SETTLEMENT_H - 1)).toBe(false)
     }
+    for (let y = 0; y < SETTLEMENT_H; y++) {
+      expect(SETTLEMENT_TILES[y]?.[0]).toBe("F")
+      expect(SETTLEMENT_TILES[y]?.[SETTLEMENT_W - 1]).toBe("F")
+    }
+    const border = SETTLEMENT_TILES[0]! + SETTLEMENT_TILES[SETTLEMENT_H - 1]!
+    expect(border.replace(/[FG]/g, "")).toBe("")
     for (let x = SORTIE_GATE.x; x < SORTIE_GATE.x + SORTIE_GATE.w; x++) expect(SETTLEMENT_TILES[SORTIE_GATE.y]?.[x]).toBe("G")
   })
 
@@ -137,5 +146,34 @@ describe("поселение: вывески", () => {
     expect(signs["plot-training"]?.status).toBe("free")
     expect(signs["plot-reserve"]?.status).toBe("locked")
     expect(signs["gate"]?.built).toBe(true)
+  })
+})
+
+describe("поселение: вид", () => {
+  it("каждый уровень здания чинит часть поломок, но целым оно не становится", () => {
+    const wear = [1, 2, 3, 4, 5].map(buildingWear)
+    for (let i = 1; i < wear.length; i++) expect(wear[i]).toBeLessThan(wear[i - 1]!)
+    expect(wear[0]).toBe(1)
+    expect(Math.min(...wear)).toBeGreaterThan(0.15)
+  })
+
+  it("дождь идёт иногда: доля дождливых окон около заданной, сила 0…1 и плавно нарастает", () => {
+    const n = 4000
+    let wet = 0
+    for (let c = 0; c < n; c++) if (rainyCycle(c)) wet++
+    expect(wet / n).toBeGreaterThan(SETTLEMENT_RAIN.share - 0.05)
+    expect(wet / n).toBeLessThan(SETTLEMENT_RAIN.share + 0.05)
+    // начало дождливого окна после сухого — дождь набирает силу, а не обрушивается
+    const c = Array.from({ length: 200 }, (_, i) => i + 1).find(i => rainyCycle(i) && !rainyCycle(i - 1))!
+    const start = c * SETTLEMENT_RAIN.cycleMs
+    expect(rainAt(start)).toBe(0)
+    expect(rainAt(start + 4_000)).toBeGreaterThan(0)
+    expect(rainAt(start + 4_000)).toBeLessThan(1)
+    expect(rainAt(start + 60_000)).toBe(1)
+    for (let t = 0; t < 50; t++) {
+      const v = rainAt(start + t * 9_000)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
   })
 })

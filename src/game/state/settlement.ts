@@ -152,6 +152,8 @@ export interface PlaceSign {
   guide: boolean
   /** Построено ли здание (у ворот — всегда). */
   built: boolean
+  /** Уровень здания (0 — не построено; у ворот и пустыря — 0): от него зависит, насколько оно разбито на карте. */
+  level: number
 }
 
 /** Вывески всех мест: сцена опрашивает их раз в полсекунды и перерисовывает изменившиеся. */
@@ -164,7 +166,7 @@ export function placeSigns(save: SaveGame, now = Date.now()): Record<PlaceId, Pl
     const id = plot.building
     const status = plotStatus(save, plot)
     if (!id) {
-      out[plot.id] = { title: `🚧 ${tr("Vacant lot", "Пустырь")}`, sub: `🔒 ${tr("Coming soon", "Скоро")}`, status, alert: false, guide: false, built: false }
+      out[plot.id] = { title: `🚧 ${tr("Vacant lot", "Пустырь")}`, sub: `🔒 ${tr("Coming soon", "Скоро")}`, status, alert: false, guide: false, built: false, level: 0 }
       continue
     }
     const def = buildingDef(id)
@@ -172,7 +174,7 @@ export function placeSigns(save: SaveGame, now = Date.now()): Record<PlaceId, Pl
     const sub = level > 0
       ? `${"◆".repeat(level)}${"◇".repeat(BUILDING_MAX_LEVEL - level)}${canUp.has(id) ? " ⬆" : ""}`
       : status === "locked" ? `🔒 ${tr("Unavailable", "Недоступно")}` : `🔨 ${levelCost(id, 0) ?? 0} 🦴`
-    out[plot.id] = { title: `${def.icon} ${def.name}`, sub, status, alert: alerts[id], guide: guide === id, built: level > 0 }
+    out[plot.id] = { title: `${def.icon} ${def.name}`, sub, status, alert: alerts[id], guide: guide === id, built: level > 0, level }
   }
   const battleOn = !!save.battle && !save.battle.result
   out["gate"] = {
@@ -181,7 +183,8 @@ export function placeSigns(save: SaveGame, now = Date.now()): Record<PlaceId, Pl
     status: "gate",
     alert: alerts.gate,
     guide: guide === "gate",
-    built: true
+    built: true,
+    level: 0
   }
   return out
 }

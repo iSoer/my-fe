@@ -25,23 +25,34 @@ import {
 } from "@game/content/settlement"
 import type { PlaceSign } from "@game/state/settlement"
 import { critterSvg, eyeArt, furArt, tileSvg } from "@game/art/index"
+import { BUILDING_MAX_LEVEL } from "@game/content/settlement"
 import { TILE_FRAME_COUNT } from "@game/art/tile"
 import { HERO_ANCHOR, HERO_IDLE_FRAMES, HERO_VIEW, HERO_WALK_FRAMES, heroArtKey, heroSvg } from "@game/art/hero"
 import {
   GATE_H,
   GRAVEYARD_H_OVER,
   HOUSE_ROOF_OVER,
+  PALISADE_H,
   PLOT_H,
+  TORCH_H,
   TRAINING_H,
   TREE_H,
-  villageFlowersSvg,
+  TREE_VARIANTS,
+  buildingWear,
+  villageBushSvg,
   villageGateSvg,
+  villageGrassSvg,
   villageGraveyardSvg,
   villageHouseSvg,
+  villagePalisadeSideSvg,
+  villagePalisadeSvg,
   villagePathSvg,
   villagePlotSvg,
+  villageSpikesSvg,
+  villageTorchSvg,
   villageTrainingSvg,
-  villageTreeSvg
+  villageTreeSvg,
+  villageWeedsSvg
 } from "@game/art/village"
 import { ensureTexture } from "../svgTextures"
 import { ensureTextures } from "../textures"
@@ -62,6 +73,17 @@ const HERO_H = 1.2
 const NPC_W = 1.25
 /** Сколько рядов «за околицей» дорисовано под воротами (не проходимо): дорога уходит из поселения. */
 const OUTSIDE_ROWS = 1
+/** Вариантов фактур земли и частокола: клетки берут вариант по хэшу координат, чтобы поле не выглядело плиткой. */
+const GROUND_VARIANTS = 4
+const FENCE_VARIANTS = 5
+/** Факелы на частоколе (клетка стены, к которой прибит факел): по верхней и нижней стене и по бокам. */
+const TORCHES: readonly Pos[] = [
+  { x: 6, y: 0 }, { x: 13, y: 0 }, { x: 21, y: 0 }, { x: 28, y: 0 },
+  { x: 7, y: SETTLEMENT_H - 1 }, { x: 25, y: SETTLEMENT_H - 1 },
+  { x: 0, y: 7 }, { x: SETTLEMENT_W - 1, y: 6 }
+]
+/** Где за оградой в темноте иногда загораются глаза (клетки ряда за околицей; x — колонка). */
+const EYES_X: readonly number[] = [3, 9, 23, 29]
 /** Ворота как место для тапа и вывески: арка над клетками `G`. */
 const GATE_RECT = { x: SORTIE_GATE.x, y: SORTIE_GATE.y - 1.3, w: SORTIE_GATE.w, h: 2.3 }
 
@@ -79,6 +101,19 @@ export interface SettlementSceneOptions {
   onOpen: (id: PlaceId) => void
   /** Герой остановился — запомнить позицию в сейве. */
   onRest: (pos: Pos, facing: Facing) => void
+}
+
+/** Факел: огонь мерцает свечением поверх (аддитивно). */
+interface TorchView {
+  glow: Phaser.GameObjects.Image
+  phase: number
+}
+
+/** Пара глаз в темноте за оградой: загорается, моргает и гаснет. */
+interface EyesView {
+  img: Phaser.GameObjects.Container
+  /** Когда загорятся в следующий раз (секунды сцены). */
+  next: number
 }
 
 interface NpcView {
@@ -113,29 +148,48 @@ type Keys = Record<"W" | "A" | "S" | "D" | "UP" | "DOWN" | "LEFT" | "RIGHT" | "E
 const texKey = {
   grass: (v: number) => `st:grass:${v}`,
   path: (v: number) => `st:path:${v}`,
-  flowers: (v: number) => `st:flowers:${v}`,
+  weeds: (v: number) => `st:weeds:${v}`,
   water: (f: number) => `st:water:${f}`,
-  bush: "st:bush",
+  bush: (v: number) => `st:bush:${v}`,
   tree: (v: number) => `st:tree:${v}`,
+  fence: (v: number) => `st:fence:${v}`,
+  fenceSide: (side: "left" | "right", v: number) => `st:fence:${side}:${v}`,
+  torch: "st:torch",
+  spikes: (v: number) => `st:spikes:${v}`,
+  glow: "st:glow",
   gate: "st:gate",
-  building: (id: string) => `st:building:${id}`,
+  building: (id: string, level: number) => `st:building:${id}:${level}`,
   lot: (id: string) => `st:lot:${id}`,
   npc: (id: string, pose: string) => `st:npc:${id}:${pose}`
 }
 
 const hash = (x: number, y: number): number => ((x * 73856093) ^ (y * 19349663)) >>> 0
 
-/** Спрайт здания: svg и сколько клеток он поднимается над участком (крыша, мишень, надгробия). */
-function buildingArt(id: BuildingId, p: PlotDef): { svg: string, over: number } {
+/** Сколько клеток спрайт здания поднимается над участком (крыша, мишень, крест). */
+function buildingOver(id: BuildingId, p: PlotDef): number {
   switch (id) {
     case "barracks":
-      return { svg: villageHouseSvg({ w: p.w, h: p.h, roof: "#8c3b2e", wall: "#d9b48a", npc: "barracks" }), over: HOUSE_ROOF_OVER }
     case "store":
-      return { svg: villageHouseSvg({ w: p.w, h: p.h, roof: "#2f6b4f", wall: "#e3c89b", npc: "store" }), over: HOUSE_ROOF_OVER }
+      return HOUSE_ROOF_OVER
     case "training":
-      return { svg: villageTrainingSvg(p.w), over: TRAINING_H - p.h }
+      return TRAINING_H - p.h
     case "graveyard":
-      return { svg: villageGraveyardSvg(p.w, p.h), over: GRAVEYARD_H_OVER }
+      return GRAVEYARD_H_OVER
+  }
+}
+
+/** Спрайт здания на уровне `level`: чем выше уровень, тем меньше разбито (`buildingWear`), но целым не бывает. */
+function buildingSvg(id: BuildingId, p: PlotDef, level: number): string {
+  const wear = buildingWear(level)
+  switch (id) {
+    case "barracks":
+      return villageHouseSvg({ w: p.w, h: p.h, roof: "#5e3a2e", wall: "#7d6a52", npc: "barracks", wear })
+    case "store":
+      return villageHouseSvg({ w: p.w, h: p.h, roof: "#3b4a3c", wall: "#857256", npc: "store", wear })
+    case "training":
+      return villageTrainingSvg(p.w, wear)
+    case "graveyard":
+      return villageGraveyardSvg(p.w, p.h, wear)
   }
 }
 
@@ -158,6 +212,10 @@ export class SettlementScene extends Phaser.Scene {
   private plots: PlotView[] = []
   private signs: SignView[] = []
   private water: Phaser.GameObjects.Image[] = []
+  private torches: TorchView[] = []
+  private eyes: EyesView[] = []
+  /** Время сцены для мерцания факелов и глаз, с. */
+  private fxT = 0
   private keys?: Keys
   private path: Pos[] = []
   /** Место, карточку которого открыть, когда герой дойдёт по тапу. */
@@ -186,7 +244,7 @@ export class SettlementScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor("#2f6d2c")
+    this.cameras.main.setBackgroundColor("#141a12")
     // Общие текстуры частиц (пыль шагов и т. п.)
     ensureTextures(this)
     void this.loadTextures().then(() => {
@@ -201,20 +259,27 @@ export class SettlementScene extends Phaser.Scene {
   private loadTextures(): Promise<unknown> {
     const t = (key: string, svg: string, w: number, h: number) => ensureTexture(this, key, svg, w * RES, h * RES)
     const jobs: Promise<string>[] = []
-    for (let v = 0; v < 3; v++) jobs.push(t(texKey.grass(v), tileSvg("yard", "plain", 0, v), T, T))
-    for (let v = 0; v < 4; v++) {
+    for (let v = 0; v < GROUND_VARIANTS; v++) {
+      jobs.push(t(texKey.grass(v), villageGrassSvg(v), T, T))
       jobs.push(t(texKey.path(v), villagePathSvg(v), T, T))
-      jobs.push(t(texKey.flowers(v), villageFlowersSvg(v), T, T))
+      jobs.push(t(texKey.weeds(v), villageWeedsSvg(v), T, T))
+      jobs.push(t(texKey.fenceSide("left", v), villagePalisadeSideSvg(v, "left"), T, T * PALISADE_H))
+      jobs.push(t(texKey.fenceSide("right", v), villagePalisadeSideSvg(v, "right"), T, T * PALISADE_H))
     }
+    for (let v = 0; v < 3; v++) {
+      jobs.push(t(texKey.bush(v), villageBushSvg(v), T, T))
+      jobs.push(t(texKey.spikes(v), villageSpikesSvg(v), T, T))
+    }
+    for (let v = 0; v < FENCE_VARIANTS; v++) jobs.push(t(texKey.fence(v), villagePalisadeSvg(v), T, T * PALISADE_H))
+    jobs.push(t(texKey.torch, villageTorchSvg(), T, T * TORCH_H))
     for (let f = 0; f < WATER_FRAMES; f++) jobs.push(t(texKey.water(f), tileSvg("yard", "water", f, 0), T, T))
-    jobs.push(t(texKey.bush, tileSvg("yard", "forest", 0, 0), T, T))
-    for (let v = 0; v < 3; v++) jobs.push(t(texKey.tree(v), villageTreeSvg(v), T, T * TREE_H))
+    for (let v = 0; v < TREE_VARIANTS; v++) jobs.push(t(texKey.tree(v), villageTreeSvg(v), T, T * TREE_H))
     jobs.push(t(texKey.gate, villageGateSvg(SORTIE_GATE.w), SORTIE_GATE.w * T, T * GATE_H))
+    // Здания — сразу в нынешнем уровне; другие уровни догружаются, когда здание улучшат
+    const signs = this.opts.signs()
     for (const p of PLOTS) {
       jobs.push(t(texKey.lot(p.id), villagePlotSvg(p.w, !p.building), p.w * T, PLOT_H * T))
-      if (!p.building) continue
-      const art = buildingArt(p.building, p)
-      jobs.push(t(texKey.building(p.id), art.svg, p.w * T, (p.h + art.over) * T))
+      if (p.building) jobs.push(this.loadBuilding(p, Math.max(1, signs[p.id]?.level ?? 1)))
     }
     for (const n of NPCS) {
       for (const pose of ["idle", "happy"] as const) {
@@ -241,6 +306,28 @@ export class SettlementScene extends Phaser.Scene {
     return Promise.all(jobs)
   }
 
+  /** Текстура здания на уровне `level` (растеризуется один раз). */
+  private loadBuilding(p: PlotDef, level: number): Promise<string> {
+    const id = p.building as BuildingId
+    return ensureTexture(this, texKey.building(p.id, level), buildingSvg(id, p, level), p.w * T * RES, (p.h + buildingOver(id, p)) * T * RES)
+  }
+
+  /** Свечение огня: мягкое пятно (канвас с радиальным градиентом), его тонируют и мерцают. */
+  private makeGlowTexture(): void {
+    if (this.textures.exists(texKey.glow)) return
+    const size = 128
+    const tex = this.textures.createCanvas(texKey.glow, size, size)
+    const ctx = tex?.getContext()
+    if (!tex || !ctx) return
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    g.addColorStop(0, "rgba(255,255,255,0.9)")
+    g.addColorStop(0.35, "rgba(255,255,255,0.35)")
+    g.addColorStop(1, "rgba(255,255,255,0)")
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, size, size)
+    tex.refresh()
+  }
+
   /* ---------- Сборка мира ---------- */
 
   private build(): void {
@@ -250,34 +337,46 @@ export class SettlementScene extends Phaser.Scene {
         const h = hash(x, y)
         const px = x * T
         const py = y * T
-        this.add.image(px, py, texKey.grass(h % 3)).setOrigin(0).setDisplaySize(T, T).setDepth(-10)
+        this.add.image(px, py, texKey.grass(h % GROUND_VARIANTS)).setOrigin(0).setDisplaySize(T, T).setDepth(-10)
         if (tile === "path" || tile === "door" || tile === "gate")
-          this.add.image(px, py, texKey.path(h % 4)).setOrigin(0).setDisplaySize(T, T).setDepth(-9)
+          this.add.image(px, py, texKey.path(h % GROUND_VARIANTS)).setOrigin(0).setDisplaySize(T, T).setDepth(-9)
         else if (tile === "flowers")
-          this.add.image(px, py, texKey.flowers(h % 4)).setOrigin(0).setDisplaySize(T, T).setDepth(-9)
-        else if (tile === "water")
-          this.water.push(this.add.image(px, py, texKey.water(0)).setOrigin(0).setDisplaySize(T, T).setDepth(-9))
-        else if (tile === "bush") this.add.image(px, py, texKey.bush).setOrigin(0).setDisplaySize(T, T).setDepth(py + T)
+          this.add.image(px, py, texKey.weeds(h % GROUND_VARIANTS)).setOrigin(0).setDisplaySize(T, T).setDepth(-9)
+        else if (tile === "water") {
+          // Пруд в сумерках — тёмный, холодный
+          this.water.push(this.add.image(px, py, texKey.water(0)).setOrigin(0).setDisplaySize(T, T).setDepth(-9).setTint(0x55607a))
+        }
+        else if (tile === "bush") this.add.image(px, py, texKey.bush(h % 3)).setOrigin(0).setDisplaySize(T, T).setDepth(py + T)
         else if (tile === "tree")
-          this.add.image(px + T / 2, py + T, texKey.tree(h % 3)).setOrigin(0.5, 1).setDisplaySize(T, T * TREE_H).setDepth(py + T)
+          this.add.image(px + T / 2, py + T, texKey.tree(h % TREE_VARIANTS)).setOrigin(0.5, 1).setDisplaySize(T, T * TREE_H).setDepth(py + T)
+        else if (tile === "fence") this.addFence(x, y, h)
       }
     }
-    // За околицей: луг, дорога уходит от ворот на юг, редкие деревья по краям
+    // За околицей — темнее: мёртвый лес, рогатки против толпы, дорога от ворот на юг; в темноте иногда горят глаза
     const road = SORTIE_GATE.x + Math.floor(SORTIE_GATE.w / 2)
+    const outside = 0x6a7080
     for (let y = SETTLEMENT_H; y < SETTLEMENT_H + OUTSIDE_ROWS; y++) {
       for (let x = 0; x < SETTLEMENT_W; x++) {
         const h = hash(x, y)
-        this.add.image(x * T, y * T, texKey.grass(h % 3)).setOrigin(0).setDisplaySize(T, T).setDepth(-10)
-        if (x === road) this.add.image(x * T, y * T, texKey.path(h % 4)).setOrigin(0).setDisplaySize(T, T).setDepth(-9)
+        this.add.image(x * T, y * T, texKey.grass(h % GROUND_VARIANTS)).setOrigin(0).setDisplaySize(T, T).setDepth(-10).setTint(outside)
+        if (x === road) this.add.image(x * T, y * T, texKey.path(h % GROUND_VARIANTS)).setOrigin(0).setDisplaySize(T, T).setDepth(-9).setTint(outside)
+        else if (Math.abs(x - road) === 2 || (Math.abs(x - road) > 3 && h % 4 === 1)) {
+          this.add.image(x * T, y * T, texKey.spikes(h % 3)).setOrigin(0).setDisplaySize(T, T).setDepth(y * T + T * 0.6).setTint(0x9098a6)
+        }
         else if (Math.abs(x - road) > 3 && h % 3 === 0) {
+          // за оградой — чаще сухие деревья
           this.add
-            .image(x * T + T / 2, (y + 1) * T, texKey.tree(h % 3))
+            .image(x * T + T / 2, (y + 1) * T, texKey.tree(h % 2 ? TREE_VARIANTS - 1 : h % TREE_VARIANTS))
             .setOrigin(0.5, 1)
             .setDisplaySize(T, T * TREE_H)
             .setDepth((y + 1) * T)
+            .setTint(outside)
         }
       }
     }
+    for (const x of EYES_X) this.eyes.push(this.makeEyes(x, SETTLEMENT_H))
+    this.makeGlowTexture()
+    for (const p of TORCHES) this.torches.push(this.makeTorch(p))
     for (const def of PLOTS) {
       const bottom = (def.y + def.h) * T
       const lot = this.add
@@ -287,9 +386,10 @@ export class SettlementScene extends Phaser.Scene {
         .setDepth(bottom)
       const view: PlotView = { def, lot }
       if (def.building) {
-        const { over } = buildingArt(def.building, def)
+        const over = buildingOver(def.building, def)
+        const level = Math.max(1, this.opts.signs()[def.id]?.level ?? 1)
         view.building = this.add
-          .image(def.x * T, bottom, texKey.building(def.id))
+          .image(def.x * T, bottom, texKey.building(def.id, level))
           .setOrigin(0, 1)
           .setDisplaySize(def.w * T, (def.h + over) * T)
           .setDepth(bottom)
@@ -339,6 +439,71 @@ export class SettlementScene extends Phaser.Scene {
     this.updateCamera(0)
   }
 
+  /** Клетка частокола: по верхней и нижней стене — колья анфас, по бокам — ряд кольев вглубь. */
+  private addFence(x: number, y: number, h: number): void {
+    const bottom = (y + 1) * T
+    const side = y > 0 && y < SETTLEMENT_H - 1 ? (x === 0 ? "left" : x === SETTLEMENT_W - 1 ? "right" : undefined) : undefined
+    const key = side ? texKey.fenceSide(side, h % GROUND_VARIANTS) : texKey.fence(h % FENCE_VARIANTS)
+    this.add
+      .image(x * T + T / 2, bottom, key)
+      .setOrigin(0.5, 1)
+      .setDisplaySize(T, T * PALISADE_H)
+      .setDepth(bottom)
+  }
+
+  private makeTorch(p: Pos): TorchView {
+    const bottom = (p.y + 1) * T
+    const side = p.x === 0 ? 0.35 : p.x === SETTLEMENT_W - 1 ? -0.35 : 0
+    const x = (p.x + 0.5 + side) * T
+    // Факел чуть впереди своей стены; нижний — над ней, чтобы его не закрыли колья
+    this.add.image(x, bottom + 2, texKey.torch).setOrigin(0.5, 1).setDisplaySize(T, T * TORCH_H).setDepth(bottom + 2)
+    const glow = this.add
+      .image(x, bottom + 2 - T * TORCH_H * 0.86, texKey.glow)
+      .setDisplaySize(T * 3.2, T * 3.2)
+      .setTint(0xff9a3a)
+      .setAlpha(0.5)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(bottom + 3)
+    return { glow, phase: hash(p.x, p.y) % 100 }
+  }
+
+  /** Глаза в темноте за оградой: два тусклых зелёно-жёлтых огонька с ореолом. */
+  private makeEyes(x: number, y: number): EyesView {
+    const cx = x * T + T / 2
+    const cy = y * T + T * 0.45
+    const parts: Phaser.GameObjects.GameObject[] = []
+    for (const dx of [-5, 5]) {
+      parts.push(this.add.circle(dx, 0, 5, 0xb8ff6a, 0.25))
+      parts.push(this.add.ellipse(dx, 0, 4.5, 3, 0xd8ff9a, 1))
+    }
+    const img = this.add.container(cx, cy, parts).setDepth((y + 1) * T + 1).setAlpha(0)
+    return { img, next: 4 + (hash(x, y) % 20) }
+  }
+
+  private animateFx(dt: number): void {
+    this.fxT += dt
+    const t = this.fxT
+    for (const f of this.torches) {
+      const k = 0.5 + Math.sin(t * 9 + f.phase) * 0.06 + Math.sin(t * 23 + f.phase * 2) * 0.04
+      f.glow.setAlpha(k).setScale(((T * 3.2) / 128) * (0.96 + Math.sin(t * 6 + f.phase) * 0.04))
+    }
+    if (reducedMotion()) return
+    for (const e of this.eyes) {
+      if (t < e.next) continue
+      // загораются, моргают и гаснут; следующий раз — через 8–30 с
+      e.next = t + 8 + Math.random() * 22
+      e.img.setX(e.img.x + (Math.random() - 0.5) * T * 0.6)
+      this.tweens.chain({
+        targets: e.img,
+        tweens: [
+          { alpha: 0.9, duration: 700 },
+          { scaleY: 0.1, duration: 90, yoyo: true, delay: 1200 },
+          { alpha: 0, duration: 900, delay: 900 }
+        ]
+      })
+    }
+  }
+
   private makeNpc(def: NpcDef): NpcView {
     const w = T * NPC_W
     const h = (w * 140) / 120
@@ -364,7 +529,7 @@ export class SettlementScene extends Phaser.Scene {
     if (id === "gate") return GATE_RECT
     const v = this.plots.find(p => p.def.id === id) as PlotView
     const { def } = v
-    const over = def.building && v.building?.visible ? buildingArt(def.building, def).over : 0
+    const over = def.building && v.building?.visible ? buildingOver(def.building, def) : 0
     return { x: def.x, y: def.y - over, w: def.w, h: def.h + over }
   }
 
@@ -418,6 +583,13 @@ export class SettlementScene extends Phaser.Scene {
     const signs = this.opts.signs()
     for (const p of this.plots) {
       const built = !!signs[p.def.id]?.built
+      // Улучшили — здание меняет вид (текстура уровня догружается, пока висит прежняя)
+      const level = Math.min(BUILDING_MAX_LEVEL, Math.max(1, signs[p.def.id]?.level ?? 1))
+      const key = texKey.building(p.def.id, level)
+      if (p.building && p.building.texture.key !== key) {
+        if (this.textures.exists(key)) p.building.setTexture(key)
+        else void this.loadBuilding(p.def, level)
+      }
       p.building?.setVisible(built)
       p.lot.setVisible(!built)
       // Место, где можно строить, мягко подсвечено
@@ -606,6 +778,7 @@ export class SettlementScene extends Phaser.Scene {
     if (!this.ready || !this.hero) return
     const dt = Math.min(deltaMs, 50) / 1000
     this.animateWater(dt)
+    this.animateFx(dt)
     this.signT += dt
     if (this.signT > 0.5) {
       this.signT = 0
