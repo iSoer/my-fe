@@ -901,3 +901,11 @@ export function critterPartSvg(a: CritterArt, part: CritterPart): string {
   }
   return `<svg viewBox="${VIEW_BOX}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" overflow="visible"><g class="rig">${inner}</g></svg>`
 }
+
+/** Окно портрета (лицо с ушами) в координатах миниатюры: для окна разговора. */
+const PORTRAIT_BOX = "10 -8 100 100"
+
+/** Портрет: та же миниатюра, но кадр — голова крупно (квадрат). */
+export function critterPortraitSvg(a: CritterArt): string {
+  return critterSvg(a).replace(`viewBox="${VIEW_BOX}"`, `viewBox="${PORTRAIT_BOX}"`)
+}

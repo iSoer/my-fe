@@ -99,6 +99,9 @@ export interface SettlementSceneOptions {
   touch: boolean
   onNear: (id: PlaceId | undefined) => void
   onOpen: (id: PlaceId) => void
+  /** Заговорить с жителем: true — разговор открыт; false — диалоги выключены, тап ведёт к месту жителя. */
+  canTalk: (npcId: string) => boolean
+  onTalk: (npcId: string) => void
   /** Герой остановился — запомнить позицию в сейве. */
   onRest: (pos: Pos, facing: Facing) => void
 }
@@ -223,6 +226,8 @@ export class SettlementScene extends Phaser.Scene {
   private path: Pos[] = []
   /** Место, карточку которого открыть, когда герой дойдёт по тапу. */
   private openOnArrive: PlaceId | undefined
+  /** Житель, с которым заговорить, когда герой подойдёт. */
+  private talkOnArrive: NpcDef | undefined
   private near: PlaceId | undefined
   private prompt?: Phaser.GameObjects.Text
   private moving = false
@@ -703,6 +708,7 @@ export class SettlementScene extends Phaser.Scene {
   private startJoystick(at: { x: number, y: number }): void {
     this.path = []
     this.openOnArrive = undefined
+    this.talkOnArrive = undefined
     const base = this.add
       .circle(at.x, at.y, 46, 0xffffff, 0.18)
       .setStrokeStyle(2, 0xffffff, 0.5)
@@ -722,6 +728,7 @@ export class SettlementScene extends Phaser.Scene {
   /** Тап по земле — идти туда; по жителю, зданию или его вывеске — подойти и открыть карточку места. */
   private tapAt(p: Pos): void {
     const npc = this.active.find(n => Math.abs(n.pos.x - p.x) < 0.7 && p.y > n.pos.y - 1.3 && p.y < n.pos.y + 0.5)
+    if (npc && this.opts.canTalk(npc.id)) return this.talkTo(npc)
     if (npc) return this.walkTo(npc.place)
     const place = [...PLOTS.map(pl => pl.id), "gate"].find((id) => {
       const r = this.placeRect(id)
@@ -729,14 +736,35 @@ export class SettlementScene extends Phaser.Scene {
     })
     if (place) return this.walkTo(place)
     this.openOnArrive = undefined
+    this.talkOnArrive = undefined
     this.path = findPath(this.pos, p, this.active)
     this.showMarker(this.path[this.path.length - 1])
+  }
+
+  /** Подойти к жителю (ко входу в его место) и заговорить; рядом — сразу. */
+  private talkTo(npc: NpcDef): void {
+    this.openOnArrive = undefined
+    this.talkOnArrive = npc
+    if (this.closeTo(npc)) {
+      this.path = []
+      return
+    }
+    const front = placeFront(npc.place)
+    if (!front) return
+    this.path = [...findPath(this.pos, front, this.active), front]
+    this.showMarker(front)
+  }
+
+  /** Достаточно ли близко, чтобы говорить. */
+  private closeTo(npc: NpcDef): boolean {
+    return Math.hypot(npc.pos.x - this.pos.x, npc.pos.y - this.pos.y) < 2.4
   }
 
   /** Подойти к месту и открыть его карточку (тап по зданию, смоук-тесты). */
   walkTo(id: PlaceId): void {
     const front = placeFront(id)
     if (!front) return
+    this.talkOnArrive = undefined
     this.openOnArrive = id
     if (placeInReach(this.pos) === id) {
       this.path = []
@@ -753,6 +781,7 @@ export class SettlementScene extends Phaser.Scene {
     this.pos = { ...front }
     this.path = []
     this.openOnArrive = undefined
+    this.talkOnArrive = undefined
     this.hero?.setPosition(front.x * T, front.y * T).setDepth(front.y * T)
     this.view.snap = true
     this.updateNear()
@@ -793,6 +822,7 @@ export class SettlementScene extends Phaser.Scene {
       this.stopJoystick()
       this.path = []
       this.openOnArrive = undefined
+      this.talkOnArrive = undefined
       this.setMoving(false)
       this.animateHero(dt)
       this.updateCamera(dt)
@@ -810,6 +840,7 @@ export class SettlementScene extends Phaser.Scene {
     if (v.x !== 0 || v.y !== 0) {
       this.path = []
       this.openOnArrive = undefined
+      this.talkOnArrive = undefined
     }
     else if (this.joy) v = this.joy.vec
     else if (this.path.length > 0) v = this.followPath(dt)
@@ -834,9 +865,21 @@ export class SettlementScene extends Phaser.Scene {
     this.updateNear()
     this.updateCamera(dt)
 
+    if (this.talkOnArrive && this.path.length === 0 && !moved) {
+      const npc = this.talkOnArrive
+      this.talkOnArrive = undefined
+      if (this.closeTo(npc)) {
+        // Герой поворачивается к собеседнику
+        this.facing = facingOf(npc.pos.x - this.pos.x, npc.pos.y - this.pos.y, this.facing)
+        this.animateHero(0)
+        this.opts.onTalk(npc.id)
+        return
+      }
+    }
     if (this.openOnArrive && this.path.length === 0 && !moved) {
       const id = this.openOnArrive
       this.openOnArrive = undefined
+      this.talkOnArrive = undefined
       if (placeInReach(this.pos) === id) this.opts.onOpen(id)
     }
   }

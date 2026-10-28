@@ -9,6 +9,7 @@ import { critterLook } from "./look"
 
 export {
   critterSvg,
+  critterPortraitSvg,
   critterPartSvg,
   CRITTER_PARTS,
   CRITTER_PART_ANCHORS,
@@ -25,7 +26,7 @@ export { backdropSvg, backdropLayersSvg, BACKDROP, type BackdropLayers } from ".
 export { tileSvg, TILE_SIZE, TILE_FRAME_COUNT } from "./tile"
 export { svgToImage, svgDataUri, clearRasterCache } from "./raster"
 export { FUR_ART, EYE_ART, furArt, eyeArt, shade, hex } from "./palettes"
-export { heroSvg, heroArtKey, HERO_VIEW, HERO_ANCHOR, HERO_WALK_FRAMES, HERO_IDLE_FRAMES, type HeroArt, type HeroFacing, type HeroPose } from "./hero"
+export { heroSvg, heroPortraitSvg, heroArtKey, HERO_VIEW, HERO_ANCHOR, HERO_WALK_FRAMES, HERO_IDLE_FRAMES, type HeroArt, type HeroFacing, type HeroPose } from "./hero"
 
 export const WEAPON_HEX: Record<string, string> = {
   red: "#e63946",

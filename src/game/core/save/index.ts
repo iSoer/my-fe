@@ -232,6 +232,8 @@ const settingsSchema = z.object({
   dangerZoneDefault: z.boolean(),
   blood: z.enum(["sea", "pools"]),
   confirmAttack: z.boolean(),
+  // Сейвы до диалогов — разговоры включены
+  dialogues: z.boolean().default(true),
   // Сейвы до выбора языка — английский по умолчанию
   lang: z.enum(["en", "ru"]).default(DEFAULT_LANG)
 })

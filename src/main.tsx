@@ -6,6 +6,7 @@ import { setStorageNamespace } from '@game/platform/storage';
 import { $route, back, navigate } from '@game/state/router';
 import { $battle, flushPersist } from '@game/state/save';
 import { $pauseOpen } from '@game/ui/lib/pause';
+import { $dialogue, skipDialogue } from '@game/state/dialogue';
 import '@game/ui/styles.css';
 import { initTelegram, setBackButton, setClosingConfirmation, tgHaptic, userNamespace } from '@host/telegram';
 import { initPwa } from '@host/pwa';
@@ -59,7 +60,9 @@ function syncBackButton(): void {
   const route = $route.get();
   if (route.name === 'menu' || route.name === 'battleResult') setBackButton(false);
   else if (route.name === 'battle') setBackButton(true, () => $pauseOpen.set(!$pauseOpen.get()));
-  else if (route.name === 'village') setBackButton(true, () => navigate('/'));
+  // В поселении «Назад» сперва закрывает разговор с жителем
+  else if (route.name === 'village')
+    setBackButton(true, () => ($dialogue.get() ? skipDialogue() : navigate('/')));
   else setBackButton(true, () => back());
 }
 

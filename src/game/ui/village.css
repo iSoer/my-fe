@@ -350,3 +350,139 @@
     text-transform: uppercase;
   }
 }
+
+/* Разговор с жителем (визуальная новелла): плашка внизу, лицо говорящего сбоку */
+.pawfield .dlg-root {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 10px calc(12px + var(--tg-safe-bottom, 0px));
+  pointer-events: none;
+  animation: dlg-in 0.22s ease-out both;
+}
+.pawfield .dlg-root > * {
+  pointer-events: auto;
+}
+.pawfield .dlg-skip {
+  align-self: flex-end;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 18px;
+  background: rgba(13, 11, 16, 0.82);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pawfield .dlg-box {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 132px;
+  padding: 14px 14px 14px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  background: #f3e2c0;
+  color: #2a1d10;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  user-select: none;
+}
+/* Реплика героя: лицо справа */
+.pawfield .dlg-box.is-hero {
+  flex-direction: row-reverse;
+  background: #e4dccb;
+}
+.pawfield .dlg-face {
+  flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 40%, #6a5a48, #2a221c);
+}
+.pawfield .dlg-box.is-hero .dlg-face {
+  background: radial-gradient(circle at 50% 40%, #4a4f5e, #15161c);
+}
+.pawfield .dlg-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pawfield .dlg-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.pawfield .dlg-name {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 1px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #f3e2c0;
+  font-size: 14px;
+}
+.pawfield .dlg-text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+/* Ещё не напечатанное — невидимо, но место занимает: плашка не прыгает по высоте */
+.pawfield .dlg-rest {
+  visibility: hidden;
+}
+/* Номер реплики и стрелка «дальше» — в правом нижнем углу текста */
+.pawfield .dlg-more {
+  display: block;
+  margin-top: 4px;
+  color: rgba(42, 29, 16, 0.65);
+  text-align: right;
+}
+.pawfield .dlg-more i {
+  display: inline-block;
+  font-style: normal;
+  animation: dlg-bob 0.8s ease-in-out infinite;
+}
+/* Пока идёт разговор, нижняя панель мест спрятана под окном */
+.pawfield .st-root.is-talking .st-dock {
+  visibility: hidden;
+}
+@media (max-width: 380px) {
+  .pawfield .dlg-face {
+    width: 76px;
+    height: 76px;
+  }
+  .pawfield .dlg-text {
+    font-size: 15px;
+  }
+}
+@keyframes dlg-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes dlg-bob {
+  50% {
+    transform: translateY(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pawfield .dlg-root,
+  .pawfield .dlg-more i {
+    animation: none;
+  }
+}

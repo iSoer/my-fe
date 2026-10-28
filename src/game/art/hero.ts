@@ -149,3 +149,8 @@ export function heroArtKey(a: HeroArt = {}): string {
   const f = (((a.frame ?? 0) % n) + n) % n
   return `hero:${a.facing ?? "down"}:${pose}:${f}:${a.eyes === false ? 0 : 1}`
 }
+
+/** Портрет героя для окна разговора: капюшон крупно, анфас. */
+export function heroPortraitSvg(): string {
+  return heroSvg({ facing: "down" }).replace(`viewBox="0 0 ${HERO_VIEW.w} ${HERO_VIEW.h}" width="${HERO_VIEW.w}" height="${HERO_VIEW.h}"`, "viewBox=\"6 0 52 52\" width=\"52\" height=\"52\"")
+}

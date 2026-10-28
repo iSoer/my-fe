@@ -189,6 +189,17 @@ export function SettingsScreen() {
             </div>
           </div>
           <div className="setting">
+            <div className="row">
+              <span>{tr("Dialogues", "Диалоги")}</span>
+              <Switch on={s.dialogues} onChange={v => set({ dialogues: v })} />
+            </div>
+            <span className="muted small">
+              {s.dialogues
+                ? tr("Tap a villager to talk. Any conversation can be skipped.", "Тап по жителю — разговор. Любой разговор можно пропустить.")
+                : tr("Villagers stay silent: a tap opens their building right away.", "Жители молчат: тап сразу открывает их здание.")}
+            </span>
+          </div>
+          <div className="setting">
             <span>{tr("Blood", "Кровь")}</span>
             <Seg
               value={s.blood}

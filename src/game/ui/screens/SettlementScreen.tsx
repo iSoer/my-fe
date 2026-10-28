@@ -26,6 +26,8 @@ import { BottomSheet } from "../components/Sheet"
 import { ResourceBar } from "../components/ResourceBar"
 import { useToast } from "../components/Toast"
 import { BuildingPanel, GatePanel } from "../settlement/BuildingPanel"
+import { DialogueBox } from "../settlement/DialogueBox"
+import { $dialogue, canTalk, openDialogue, skipDialogue } from "@game/state/dialogue"
 import { tr } from "@game/i18n"
 import "../village.css"
 
@@ -45,6 +47,7 @@ export function SettlementScreen() {
   const save = useStore($save)
   const panel = useStore($settlementPanel)
   const near = useStore($settlementNear)
+  const talking = !!useStore($dialogue)
   const canvasRef = useRef<HTMLDivElement>(null)
   const topRef = useRef<HTMLDivElement>(null)
   const dockRef = useRef<HTMLElement>(null)
@@ -84,14 +87,19 @@ export function SettlementScreen() {
             const dock = dockRef.current?.getBoundingClientRect().top ?? box.bottom
             return { top: Math.max(0, top - box.top + 6), bottom: Math.max(0, box.bottom - dock + 6) }
           },
-          paused: () => !!$settlementPanel.get(),
+          paused: () => !!$settlementPanel.get() || !!$dialogue.get(),
           touch,
           onNear: setNearPlace,
           onOpen: (id) => {
             haptic("light")
             openPanel(id)
           },
-          onRest: setHeroSpot
+          onRest: setHeroSpot,
+          canTalk,
+          onTalk: (npcId) => {
+            closePanel()
+            if (openDialogue(npcId)) haptic("light")
+          }
         })
       })
       .catch((e: unknown) => console.error("settlement load failed", e))
@@ -100,6 +108,7 @@ export function SettlementScreen() {
       clearInterval(t)
       handle?.destroy()
       closePanel()
+      skipDialogue()
       setNearPlace(undefined)
     }
   }, [])
@@ -118,7 +127,7 @@ export function SettlementScreen() {
   }
 
   return (
-    <div className="st-root">
+    <div className={`st-root${talking ? " is-talking" : ""}`}>
       <div className="st-canvas" ref={canvasRef} role="region" aria-label={tr("Settlement map", "Карта поселения")} />
       <div className="st-hud">
         <div className="st-top" ref={topRef}>
@@ -158,6 +167,7 @@ export function SettlementScreen() {
           {panel === "gate" ? <GatePanel save={save} /> : panel ? <BuildingPanel plotId={panel} save={save} toast={toast} /> : null}
         </div>
       </BottomSheet>
+      <DialogueBox />
       {toastEl}
     </div>
   )

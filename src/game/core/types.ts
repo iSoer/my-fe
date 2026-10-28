@@ -346,6 +346,8 @@ export interface Settings {
   dangerZoneDefault: boolean
   blood: "sea" | "pools"
   confirmAttack: boolean
+  /** Разговоры с жителями (визуальная новелла): выключены — тап по жителю открывает его место, как раньше. */
+  dialogues: boolean
   /** Язык интерфейса. */
   lang: Lang
 }
@@ -361,6 +363,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dangerZoneDefault: false,
   blood: "sea",
   confirmAttack: true,
+  dialogues: true,
   lang: DEFAULT_LANG
 }
 
