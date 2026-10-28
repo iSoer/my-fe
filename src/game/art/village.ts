@@ -287,3 +287,78 @@ export function villageGateSvg(w: number): string {
     + `<rect x="${r1(W / 2 - signW / 2)}" y="${r1(beamY + 21)}" width="${r1(signW)}" height="24" rx="4" fill="#f3e2c0" stroke="#5a3b22" stroke-width="2.5" />`
     + `<path d="M${r1(W / 2 - 12)} ${r1(beamY + 26)} l24 14 M${r1(W / 2 + 12)} ${r1(beamY + 26)} l-24 14" stroke="#7a1f16" stroke-width="3" stroke-linecap="round" />`)
 }
+
+/** Высота спрайта полигона в клетках (над нижним краем участка поднимаются мишень и чучела). */
+export const TRAINING_H = 2.4
+
+/**
+ * Тренировочный полигон на `w` клеток: утоптанная площадка за низкой изгородью, два соломенных чучела,
+ * мишень на треноге, стойка с деревянным оружием и флажок. Низ спрайта — нижний край участка.
+ */
+export function villageTrainingSvg(w: number): string {
+  const W = w * VT
+  const H = TRAINING_H * VT
+  const yardTop = H - 74
+  const dummy = (x: number, tilt: number) => `<g transform="rotate(${tilt} ${r1(x)} ${r1(H - 10)})">`
+    + `<rect x="${r1(x - 3)}" y="${r1(H - 92)}" width="6" height="84" fill="#7a4e2d" />`
+    + `<rect x="${r1(x - 24)}" y="${r1(H - 74)}" width="48" height="6" rx="3" fill="#7a4e2d" />`
+    + `<ellipse cx="${r1(x)}" cy="${r1(H - 52)}" rx="15" ry="22" fill="#e3c27a" stroke="#a8843e" stroke-width="2" />`
+    + `<path d="M${r1(x - 13)} ${r1(H - 58)} h26 M${r1(x - 14)} ${r1(H - 46)} h28" stroke="#a8843e" stroke-width="2" />`
+    + `<circle cx="${r1(x)}" cy="${r1(H - 92)}" r="12" fill="#e9cf8e" stroke="#a8843e" stroke-width="2" />`
+    + `<path d="M${r1(x - 5)} ${r1(H - 95)} l3 3 m0 -3 l-3 3 M${r1(x + 2)} ${r1(H - 95)} l3 3 m0 -3 l-3 3" stroke="#5a3b22" stroke-width="1.6" />`
+    + `<path d="M${r1(x - 8)} ${r1(H - 102)} q8 -8 16 0" stroke="#c9a456" stroke-width="3" fill="none" />`
+    + "</g>"
+  const tx = W * 0.5
+  const target = `<path d="M${r1(tx - 18)} ${r1(H - 8)} L${r1(tx)} ${r1(H - 70)} L${r1(tx + 18)} ${r1(H - 8)} M${r1(tx)} ${r1(H - 70)} V${r1(H - 6)}" stroke="#6a4226" stroke-width="4" fill="none" />`
+    + `<circle cx="${r1(tx)}" cy="${r1(H - 86)}" r="26" fill="#f3f1f5" stroke="#5a3b22" stroke-width="3" />`
+    + `<circle cx="${r1(tx)}" cy="${r1(H - 86)}" r="19" fill="#e63946" />`
+    + `<circle cx="${r1(tx)}" cy="${r1(H - 86)}" r="12" fill="#f3f1f5" />`
+    + `<circle cx="${r1(tx)}" cy="${r1(H - 86)}" r="6" fill="#e63946" />`
+    + `<path d="M${r1(tx + 4)} ${r1(H - 88)} l22 -10" stroke="#5a3b22" stroke-width="2.4" />`
+    + `<path d="M${r1(tx + 24)} ${r1(H - 101)} l6 2 l-2 6" stroke="#f1f1f1" stroke-width="2" fill="none" />`
+  const rx = W - 58
+  const rack = `<rect x="${r1(rx)}" y="${r1(H - 64)}" width="44" height="6" fill="#7a4e2d" />`
+    + `<rect x="${r1(rx)}" y="${r1(H - 30)}" width="44" height="6" fill="#7a4e2d" />`
+    + `<path d="M${r1(rx + 2)} ${r1(H - 8)} V${r1(H - 70)} M${r1(rx + 42)} ${r1(H - 8)} V${r1(H - 70)}" stroke="#5a3b22" stroke-width="5" />`
+    + `<path d="M${r1(rx + 12)} ${r1(H - 26)} V${r1(H - 84)} M${r1(rx + 22)} ${r1(H - 26)} V${r1(H - 90)} M${r1(rx + 32)} ${r1(H - 26)} V${r1(H - 80)}" stroke="#b98652" stroke-width="4" stroke-linecap="round" />`
+    + `<path d="M${r1(rx + 6)} ${r1(H - 74)} h12 M${r1(rx + 16)} ${r1(H - 80)} h12 M${r1(rx + 26)} ${r1(H - 70)} h12" stroke="#7a4e2d" stroke-width="3" />`
+  let fence = ""
+  for (let x = 6; x <= W - 6; x += 22)
+    fence += `<rect x="${r1(x - 3)}" y="${r1(yardTop - 18)}" width="6" height="26" rx="2" fill="#8a5a33" />`
+  fence += `<path d="M4 ${r1(yardTop - 12)} H${r1(W - 4)} M4 ${r1(yardTop - 2)} H${r1(W - 4)}" stroke="#7a4e2d" stroke-width="3.4" />`
+  const flag = `<rect x="14" y="${r1(H - 130)}" width="4" height="124" fill="#5a3b22" />`
+    + "<path d=\"M18 " + r1(H - 128) + " h30 l-8 10 l8 10 h-30 Z\" fill=\"#e63946\" stroke=\"#7a1f16\" stroke-width=\"1.5\" />"
+  return svg(W, H, `<ellipse cx="${r1(W / 2 + 6)}" cy="${r1(H - 6)}" rx="${r1(W * 0.5)}" ry="12" fill="#000" opacity=".18" />`
+    + `<rect x="4" y="${r1(yardTop)}" width="${r1(W - 8)}" height="${r1(H - yardTop - 4)}" rx="18" fill="#c9a36b" />`
+    + `<rect x="4" y="${r1(yardTop)}" width="${r1(W - 8)}" height="${r1(H - yardTop - 4)}" rx="18" fill="#a8843e" opacity=".25" />`
+    + `<path d="M30 ${r1(H - 30)} q40 -10 80 0 M${r1(W - 120)} ${r1(H - 44)} q30 -8 60 0" stroke="#e0bf86" stroke-width="3" fill="none" opacity=".8" />`
+    + fence + flag + dummy(W * 0.2 + 18, -4) + dummy(W * 0.34 + 14, 5) + target + rack)
+}
+
+/** Высота спрайта пустого участка в клетках. */
+export const PLOT_H = 1.3
+
+/**
+ * Пустой участок под стройку на `w` клеток: вскопанная земля, колышки с бечёвкой, стопка досок и молоток.
+ * `reserved` — участок на будущее: без досок, колышки потемнее.
+ */
+export function villagePlotSvg(w: number, reserved = false): string {
+  const W = w * VT
+  const H = PLOT_H * VT
+  const top = 18
+  const stake = (x: number, y: number) => `<path d="M${r1(x - 3)} ${r1(y)} V${r1(y - 22)} l3 -6 l3 6 V${r1(y)} Z" fill="${reserved ? "#6a4226" : "#b98652"}" stroke="#5a3b22" stroke-width="1.4" />`
+  const corners: [number, number][] = [[14, H - 22], [W - 14, H - 22], [26, top + 22], [W - 26, top + 22]]
+  const rope = reserved
+    ? ""
+    : `<path d="M14 ${r1(H - 40)} L26 ${r1(top + 4)} L${r1(W - 26)} ${r1(top + 4)} L${r1(W - 14)} ${r1(H - 40)} Z" stroke="#f3e2c0" stroke-width="2" fill="none" stroke-dasharray="6 4" />`
+  const planks = reserved
+    ? ""
+    : `<rect x="${r1(W * 0.58)}" y="${r1(H - 40)}" width="60" height="9" rx="2" fill="#c8954f" stroke="#5a3b22" stroke-width="1.4" />`
+      + `<rect x="${r1(W * 0.58 + 6)}" y="${r1(H - 49)}" width="56" height="9" rx="2" fill="#d9a865" stroke="#5a3b22" stroke-width="1.4" />`
+      + `<rect x="${r1(W * 0.58 + 2)}" y="${r1(H - 58)}" width="50" height="9" rx="2" fill="#c8954f" stroke="#5a3b22" stroke-width="1.4" />`
+      + `<path d="M${r1(W * 0.3)} ${r1(H - 30)} l22 -16" stroke="#7a4e2d" stroke-width="4" stroke-linecap="round" />`
+      + `<rect x="${r1(W * 0.3 + 16)}" y="${r1(H - 56)}" width="16" height="9" rx="2" fill="#8f8a84" transform="rotate(-36 ${r1(W * 0.3 + 24)} ${r1(H - 51)})" />`
+  return svg(W, H, `<ellipse cx="${r1(W / 2)}" cy="${r1((H + top) / 2)}" rx="${r1(W / 2 - 4)}" ry="${r1((H - top) / 2 - 2)}" fill="${reserved ? "#7d6a4f" : "#a07b4c"}" />`
+    + `<ellipse cx="${r1(W / 2)}" cy="${r1((H + top) / 2)}" rx="${r1(W / 2 - 18)}" ry="${r1((H - top) / 2 - 10)}" fill="#000" opacity=".1" />`
+    + rope + corners.map(([x, y]) => stake(x, y)).join("") + planks)
+}

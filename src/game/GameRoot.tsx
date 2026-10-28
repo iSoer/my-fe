@@ -6,10 +6,18 @@ import { $battleUi, confirm, endTurn, tapTile } from "./state/battleUi"
 import { $boardLayout } from "./state/boardLayout"
 import { $save, initSave } from "./state/save"
 import { initSound } from "./state/sound"
-import { $villageUi, openNpc, villageControl } from "./state/village"
-import { NPCS, type NpcId } from "./content/village"
-import { spotNear } from "./core/village"
-import type { Pos } from "./core/types"
+import {
+  $settlementNear,
+  $settlementPanel,
+  buildAction,
+  collectAction,
+  openPanel,
+  reviveAction,
+  settlementControl,
+  tickSettlement,
+  trainAction,
+  upgradeAction
+} from "./state/settlement"
 import "./ui/styles.css"
 import "./ui/mobile.css"
 
@@ -29,15 +37,20 @@ export default function GameRoot() {
       layout: $boardLayout,
       // Действия игрока в бою — для смоук-тестов и проверки анимаций
       battle: { tapTile, confirm, endTurn },
-      // Деревня: телепорт героя (к NPC или в точку), подойти и заговорить, сразу открыть разговор
-      village: {
-        ui: $villageUi,
-        teleport: (to: NpcId | Pos) => {
-          const npc = typeof to === "string" ? NPCS.find(n => n.id === to) : undefined
-          villageControl()?.teleport(npc ? spotNear(npc) : (to as Pos))
-        },
-        walkTo: (id: NpcId) => villageControl()?.walkTo(id),
-        talk: (id: NpcId) => openNpc(id)
+      // Поселение: перенести героя к месту (`plot-store`, `gate`…) или подвести и открыть, сразу открыть карточку,
+      // строить, улучшать, тренировать, воскрешать
+      settlement: {
+        panel: $settlementPanel,
+        near: $settlementNear,
+        teleport: (id: string) => settlementControl()?.teleport(id),
+        walkTo: (id: string) => settlementControl()?.walkTo(id),
+        open: openPanel,
+        build: buildAction,
+        upgrade: upgradeAction,
+        train: trainAction,
+        collect: collectAction,
+        revive: reviveAction,
+        tick: tickSettlement
       }
     }
   }, [])

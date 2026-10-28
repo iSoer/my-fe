@@ -198,19 +198,17 @@ export const WEAPON_PRICES = {
   variant: { brave: 320, killer: 220, armorslayer: 200, cavslayer: 200 }
 } as const
 
-/** Лавка. */
+/** Лавка: пулы оружия на витрине; число позиций, скидки и смена ассортимента — `content/settlement` (STORE). */
 export const ITEMS = {
   /** Больше этого количества одного предмета в инвентаре не купить. */
   stackCap: 99,
-  /** Разновидностей оружия на витрине (Славы ≥ 150 — на одну больше). */
+  /** Разновидностей оружия в пуле витрины. */
   variantOffers: 2,
   /** Стальное оружие — с уровня ростера 10 (3 навыка), серебряное — с 30 (2 навыка). */
   steelFromLevel: 10,
   steelOffers: 3,
   silverFromLevel: 30,
-  silverOffers: 2,
-  /** Талисманов на витрине (Славы ≥ 150 — на один больше). */
-  talismanOffers: 4
+  silverOffers: 2
 }
 
 /**

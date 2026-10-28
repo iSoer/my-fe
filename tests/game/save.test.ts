@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createEmptySave, parseSave, serializeSave } from "@game/core/save"
+import { SAVE_VERSION, createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { generateRoster } from "@game/core/units"
 import { generateMap } from "@game/core/map/generate"
 import { createBattle } from "@game/core/battle/reducer"
@@ -46,7 +46,7 @@ describe("save", () => {
     const r = parseSave(JSON.stringify(raw))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.save.version).toBe(8)
+    expect(r.save.version).toBe(SAVE_VERSION)
     expect(r.save.army!.units.map(u => u.classId)).toEqual(["soldier", "healer", "mage", "gladiator"])
     expect(r.save.shelter.candidates[0]!.classId).toBe("hunter")
   })
@@ -62,8 +62,9 @@ describe("save", () => {
     const r = parseSave(JSON.stringify(raw))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.save.version).toBe(8)
+    expect(r.save.version).toBe(SAVE_VERSION)
     expect(r.save.inventory).toEqual({ sword_steel: 1, tal_fang: 2 })
-    expect(r.save.store).toEqual({ seed: 1, weapons: ["sword_iron"], talismans: ["tal_fang"], fresh: false })
+    expect(r.save.store).toMatchObject({ seed: 1, weapons: ["sword_iron"], talismans: ["tal_fang"], fresh: false })
+    expect(r.save.store).not.toHaveProperty("consumables")
   })
 })

@@ -6,15 +6,17 @@ import { aptitudesSchema, classIdSchema } from "@shared/api/schema/character/gen
 import { WEAPON_SKILLS } from "@shared/character/skills"
 import { isWeaponId } from "@game/content/weapons"
 import { EMPTY_STORE } from "../items"
-import { defaultVillage } from "../village"
+import { barracksLevelFor, defaultSettlement, emptyStore, storePeriod } from "../settlement"
+import { BUILDING_MAX_LEVEL } from "@game/content/settlement"
 import { DEFAULT_LANG, tr } from "@game/i18n"
 
 /**
  * v6: деревня-хаб (позиция героя), признак начатой игры, инвентарь армии, Лавка, талисман бойца, рюкзак вылазки;
  * оружие — предмет, а не навык за SP (v5 и v4 мигрируют). v7: без классов Commoner / Noble / Diviner.
- * v8: без предметов лечения и рюкзака вылазки.
+ * v8: без предметов лечения и рюкзака вылазки. v9: поселение со зданиями и уровнями вместо деревни с героем,
+ * тренировочный полигон, витрина Лавки по периодам, воскрешение на Кладбище; герой ходит по карте поселения.
  */
-export const SAVE_VERSION = 8
+export const SAVE_VERSION = 9
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -34,8 +36,6 @@ const partialStats = z.preprocess(
   })
 )
 const pos = z.object({ x: z.number().int(), y: z.number().int() })
-/** Позиция героя в деревне дробная: движение свободное. */
-const freePos = z.object({ x: z.number(), y: z.number() })
 const difficulty = z.enum(["easy", "normal", "hard", "nightmare"])
 const rarity = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)])
 
@@ -168,7 +168,8 @@ const memorialSchema = z.object({
   battleTurn: z.number().optional(),
   biomeId: z.string().optional(),
   epitaph: z.string(),
-  reason: z.enum(["killed", "released"])
+  reason: z.enum(["killed", "released"]),
+  revivedAt: z.number().optional()
 })
 
 const settingsSchema = z.object({
@@ -183,6 +184,27 @@ const settingsSchema = z.object({
   confirmAttack: z.boolean(),
   // Сейвы до выбора языка — английский по умолчанию
   lang: z.enum(["en", "ru"]).default(DEFAULT_LANG)
+})
+
+const buildingSchema = z.object({ level: z.number().int().min(1).max(BUILDING_MAX_LEVEL), builtAt: z.number() })
+
+const settlementSchema = z.object({
+  buildings: z.object({
+    barracks: buildingSchema.optional(),
+    training: buildingSchema.optional(),
+    store: buildingSchema.optional(),
+    graveyard: buildingSchema.optional()
+  }),
+  training: z.array(z.object({
+    unitId: z.string(),
+    since: z.number(),
+    lastTick: z.number(),
+    carryMs: z.number().min(0),
+    xp: z.number()
+  })),
+  sortiesTrained: z.array(z.string()),
+  lastReviveAt: z.number().optional(),
+  hero: z.object({ pos: z.object({ x: z.number(), y: z.number() }), facing: z.enum(["down", "up", "left", "right"]) }).optional()
 })
 
 const levelUpSchema = z.object({ unitId: z.string(), from: z.number(), to: z.number(), gains: partialStats })
@@ -224,9 +246,11 @@ export const saveSchema = z.object({
     seed: z.number(),
     weapons: z.array(z.string()),
     talismans: z.array(z.string()),
-    fresh: z.boolean()
+    fresh: z.boolean(),
+    period: z.number().int(),
+    salt: z.number()
   }),
-  village: z.object({ pos: freePos, facing: z.enum(["down", "up", "left", "right"]) }),
+  settlement: settlementSchema,
   memorial: z.array(memorialSchema),
   achievements: z.array(z.string()),
   settings: settingsSchema,
@@ -265,8 +289,8 @@ export function createEmptySave(now: number): SaveGame {
     },
     shelter: { candidates: [], seed: 0 },
     inventory: {},
-    store: { ...EMPTY_STORE },
-    village: defaultVillage(),
+    store: emptyStore(now & 0x7fffffff),
+    settlement: defaultSettlement(now),
     memorial: [],
     achievements: [],
     settings: { ...DEFAULT_SETTINGS },
@@ -333,7 +357,7 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
     data["profile"] = profile
     data["inventory"] = inventory
     data["store"] = { ...EMPTY_STORE }
-    data["village"] = defaultVillage()
+    data["village"] = { pos: { x: 5.5, y: 6.5 }, facing: "up" }
     data["version"] = 6
     return data
   },
@@ -381,6 +405,28 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
       data["store"] = next
     }
     data["version"] = 8
+    return data
+  },
+  // v8 → v9: деревня с героем стала поселением со зданиями. Казармы — наименьшего уровня, вмещающего весь ростер
+  // (никто не теряется); в начатой игре Лавка и Кладбище, которые уже были в деревне, построены на 1-м уровне,
+  // полигон — нет. Витрина Лавки сохраняется до конца текущего периода, позиция героя больше не нужна.
+  8: (old) => {
+    const data = { ...old }
+    const at = typeof data["updatedAt"] === "number" ? (data["updatedAt"] as number) : 0
+    const army = data["army"] as { units?: unknown[] } | undefined
+    const started = (data["profile"] as { startedAt?: number } | undefined)?.startedAt !== undefined
+    const settlement = defaultSettlement(at)
+    settlement.buildings.barracks = { level: barracksLevelFor(army?.units?.length ?? 0), builtAt: at }
+    if (started) {
+      settlement.buildings.store = { level: 1, builtAt: at }
+      settlement.buildings.graveyard = { level: 1, builtAt: at }
+    }
+    data["settlement"] = settlement
+    const store = (data["store"] ?? {}) as Record<string, unknown>
+    const seed = typeof store["seed"] === "number" ? (store["seed"] as number) : 0
+    data["store"] = { ...store, period: storePeriod(at), salt: seed & 0x7fffffff }
+    delete data["village"]
+    data["version"] = 9
     return data
   }
 }

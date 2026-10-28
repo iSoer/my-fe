@@ -102,3 +102,13 @@ export function statChanges(m: Partial<Stats>): string {
     })
     .join(", ")
 }
+
+/** Сколько осталось: «3 ч 12 мин», «12 мин», «45 с». */
+export function fmtDuration(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (h > 0) return tr(`${h}h ${m}m`, `${h} ч ${m} мин`)
+  if (m > 0) return tr(`${m}m`, `${m} мин`)
+  return tr(`${s}s`, `${s} с`)
+}

@@ -3,7 +3,6 @@ import type {
   Army,
   BattleResult,
   Inventory,
-  StoreStock,
   BattleState,
   BattleSummary,
   LevelUpSummary,
@@ -15,10 +14,9 @@ import type {
   Stats,
   UnitInstance
 } from "../types"
-import { BARRACKS_CAP, MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
+import { MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
 import { generateUnit, levelGains, unitClassName } from "../units"
 import { treatsMultiplier } from "../skills/engine"
-import { generateStore } from "../items"
 import { LOOT, PRICES, REWARDS, SHOP, XP, recruitRarityWeights } from "@game/content/balance"
 import { EPITAPHS } from "@game/content/epitaphs"
 import { personalityText } from "@game/content/personalities"
@@ -124,7 +122,6 @@ export interface BattleResolution {
   shelter: Shelter
   /** Инвентарь армии (снаряжение павших потеряно вместе с ними). */
   inventory: Inventory
-  store: StoreStock
   rewardChoice?: UnitInstance[]
 }
 
@@ -241,15 +238,15 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
   const mvp = Object.entries(xpGained).sort((a, b) => b[1] - a[1])[0]
   if (mvp) summary.mvpId = mvp[0]
 
-  // Витрина Казармы и Лавка обновляются после каждого боя; бесплатная награда — если ростер ещё жив
+  // Витрина набора в Казармах обновляется после каждого боя (Лавка — по времени, см. `core/settlement`);
+  // бесплатная награда — если ростер ещё жив
   const shelter: Shelter = generateShop(rng.int(0, 0x7fffffff), nextArmy, profile, now)
-  const store = generateStore(rng.int(0, 0x7fffffff), nextArmy, profile.glory)
   const inventory = save.inventory
   const rewardChoice = nextArmy
     ? generateRewardChoice(rng.int(0, 0x7fffffff), nextArmy, profile, result === "victory", now)
     : undefined
 
-  return { summary, army: nextArmy, profile, memorial: [...save.memorial, ...fallen], shelter, inventory, store, rewardChoice }
+  return { summary, army: nextArmy, profile, memorial: [...save.memorial, ...fallen], shelter, inventory, rewardChoice }
 }
 
 function statDiff(a: UnitInstance, b: UnitInstance): Partial<Stats> {
@@ -304,10 +301,6 @@ export function generateRewardChoice(
 ): UnitInstance[] {
   const weights = recruitRarityWeights(profile.maxRarity, victory)
   return candidates(seed, "reward", REWARDS.rewardChoices, rosterLevel(army), weights, now)
-}
-
-export function canRecruit(army: Army | undefined): boolean {
-  return !!army && army.units.length < BARRACKS_CAP
 }
 
 export function biomeName(id: string): string {

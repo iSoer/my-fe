@@ -36,8 +36,6 @@ export const MAP_H = 8
 export const MAX_LEVEL = CHARACTER_MAX_LEVEL
 /** В бой выходят до 4 бойцов ростера. */
 export const SQUAD_SIZE = 4
-/** Ростер (армия) — до 20 персонажей; пополняется наградами за бой и покупкой в магазине. */
-export const BARRACKS_CAP = 20
 
 export function posKey(p: Pos): string {
   return `${p.x},${p.y}`
@@ -226,6 +224,8 @@ export interface MemorialEntry {
   biomeId?: string
   epitaph: string
   reason: "killed" | "released"
+  /** Воскрешён на Кладбище: запись остаётся в истории, но воскресить по ней снова нельзя. */
+  revivedAt?: number
 }
 
 export interface Settings {
@@ -389,19 +389,60 @@ export type Inventory = Record<string, number>
 
 export type ItemCategory = "weapon" | "talisman"
 
-/** Ассортимент Лавки: обновляется после каждого боя, товаров не убывает. */
+/**
+ * Ассортимент Лавки: сменяется раз в период (`STORE.refreshHours`), товаров не убывает. Период — номер интервала
+ * от эпохи Unix, поэтому перезапуск игры не обновляет витрину раньше времени.
+ */
 export interface StoreStock {
   seed: number
   weapons: string[]
   talismans: string[]
-  /** Ассортимент обновился, а игрок ещё не заглядывал в Лавку («!» над торговцем). */
+  /** Ассортимент обновился, а игрок ещё не заглядывал в Лавку («!» над зданием). */
   fresh: boolean
+  /** Период, к которому относится витрина. */
+  period: number
+  /** Соль игры: зерно витрины периода — `salt` + `period`. */
+  salt: number
+}
+
+/* ---------- Поселение ---------- */
+
+export type BuildingId = "barracks" | "training" | "store" | "graveyard"
+
+/** Построенное здание: уровень 1…`BUILDING_MAX_LEVEL`. */
+export interface BuildingState {
+  level: number
+  builtAt: number
+}
+
+/** Боец на тренировочном полигоне: опыт капает со временем (от `lastTick`) и после каждой вылазки. */
+export interface TrainingSlot {
+  unitId: string
+  since: number
+  /** Время последнего начисления опыта. */
+  lastTick: number
+  /** Остаток времени (мс), который ещё не дал целой единицы опыта. */
+  carryMs: number
+  /** Опыта получено за эту тренировку. */
+  xp: number
+}
+
+export interface SettlementState {
+  /** Построенные здания; места под строительство заданы картой (`content/settlement`). */
+  buildings: Partial<Record<BuildingId, BuildingState>>
+  training: TrainingSlot[]
+  /** Бои, за которые полигон уже начислил опыт (последние несколько) — повторно за них не начисляется. */
+  sortiesTrained: string[]
+  /** Последнее успешное воскрешение на Кладбище. */
+  lastReviveAt?: number
+  /** Где стоит герой на карте поселения; нет — появляется на стартовой точке. */
+  hero?: HeroSpot
 }
 
 export type Facing = "down" | "up" | "left" | "right"
 
-/** Герой в деревне: позиция в клетках карты (дробная — движение свободное). */
-export interface VillageState {
+/** Герой в поселении: позиция в клетках карты (дробная — движение свободное). */
+export interface HeroSpot {
   pos: Pos
   facing: Facing
 }
@@ -452,7 +493,7 @@ export interface SaveGame {
   shelter: Shelter
   inventory: Inventory
   store: StoreStock
-  village: VillageState
+  settlement: SettlementState
   memorial: MemorialEntry[]
   achievements: string[]
   settings: Settings

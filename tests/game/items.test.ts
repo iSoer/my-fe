@@ -16,7 +16,8 @@ import { generateStore, itemPrice } from "@game/core/items"
 import { lootShare, resolveBattle } from "@game/core/progression"
 import { simulateCombat } from "@game/core/combat"
 import { attackOf, openClasses, weaponMt, weaponShortfall } from "@game/core/units"
-import { ITEMS, REWARDS } from "@game/content/balance"
+import { REWARDS } from "@game/content/balance"
+import { STORE } from "@game/content/settlement"
 import { weaponDef } from "@game/content/weapons"
 import type { SaveGame, UnitInstance } from "@game/core/types"
 import { makeBattle, makeUnit } from "./helpers"
@@ -25,6 +26,8 @@ function freshGame(treats = 2000): void {
   const save = createEmptySave(1)
   save.profile.treats = treats
   save.profile.startedAt = 1
+  // Лавка построена — витрина выкладывается вместе со стартовым ростером
+  save.settlement.buildings.store = { level: 1, builtAt: 1 }
   $save.set(save)
   ensureRoster()
 }
@@ -41,10 +44,19 @@ describe("Лавка", () => {
     expect(low.weapons.every(id => weaponDef(id).grade !== "wood")).toBe(true)
     expect(low.weapons.some(id => weaponDef(id).grade === "steel")).toBe(false)
     const veteran = { ...army, units: army.units.map(u => ({ ...u, level: 40 })) }
-    const high = generateStore(7, veteran, 150)
+    // Витрина с запасом вмещает весь пул ветерана
+    const high = generateStore(7, veteran, 150, 40)
     expect(high.weapons.some(id => weaponDef(id).grade === "steel")).toBe(true)
     expect(high.weapons.some(id => weaponDef(id).grade === "silver")).toBe(true)
-    expect(high.talismans.length).toBe(ITEMS.talismanOffers + 1)
+    // Позиций — по уровню Лавки, Слава ≥ 150 даёт ещё одну; каждая третья — талисман
+    const small = generateStore(7, army, 150, STORE.offers[0])
+    expect(small.weapons.length + small.talismans.length).toBe(STORE.offers[0] + 1)
+    expect(small.talismans.length).toBe(Math.floor((STORE.offers[0] + 1) / STORE.talismanEvery))
+    // Больше позиций при том же зерне — те же товары плюс новые
+    const big = generateStore(7, army, 0, STORE.offers[4])
+    const base = generateStore(7, army, 0, STORE.offers[0])
+    expect(big.weapons.slice(0, base.weapons.length)).toEqual(base.weapons)
+    expect(big.talismans.slice(0, base.talismans.length)).toEqual(base.talismans)
   })
 
   it("покупка списывает цену и кладёт в инвентарь; без денег и не из ассортимента — отказ", () => {
@@ -167,8 +179,6 @@ describe("награды за исход", () => {
     expect(lose.summary.rewards.lost).toBe(100 - lose.summary.rewards.treats)
     expect(flee.summary.rewards.treats).toBe(Math.round(100 * REWARDS.retreatLootShare))
     expect(lootShare("defeat")).toBeLessThan(lootShare("retreat"))
-    // Лавка обновлена
-    expect(lose.store.fresh).toBe(true)
   })
 })
 
@@ -184,7 +194,9 @@ describe("главный экран и сейв v6", () => {
     expect(s.profile.treats).toBe(0)
     expect(s.inventory).toEqual({})
     expect(s.army!.units.length).toBeGreaterThan(0)
-    expect(s.store.weapons.length).toBeGreaterThan(0)
+    // В новой игре построены только Казармы 1-го уровня: Лавки и её витрины ещё нет
+    expect(s.settlement.buildings).toEqual({ barracks: { level: 1, builtAt: expect.any(Number) } })
+    expect(s.store.weapons.length).toBe(0)
     expect(s.settings.animSpeed).toBe(2)
     expect(s.settings.blood).toBe("pools")
     expect(gameStarted(createEmptySave(1))).toBe(false)
