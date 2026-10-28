@@ -354,6 +354,65 @@ export const FISHER: AmbientNpcDef = {
 export const MUTTER_TIMING = { first: 3, gap: [7, 13], hold: 3.5, perChar: 0.045 } as const
 
 /**
+ * Сплетники: двое стоят где-нибудь на лужайке и перекидываются цитатами (`content/quotes.json`) в облачках.
+ * Время от времени переходят на другое место из `GOSSIP_SPOTS`. Пять тапов по одному — он взрывается (до следующего
+ * захода в поселение); без собеседника второй замолкает.
+ */
+export interface GossipDef {
+  id: string
+  name: string
+  species: Species
+  fur: number
+  eyes: number
+  accessory: number
+  /** Цвет облачка с его репликами. */
+  bubble: number
+}
+
+export const GOSSIPS: readonly [GossipDef, GossipDef] = [
+  {
+    id: "elman",
+    get name() { return tr("Glam Kitty Elman", "Гламурная Киса Эльман") },
+    species: "cat",
+    fur: 9,
+    eyes: 2,
+    accessory: 6,
+    bubble: 0xffd9e8
+  },
+  {
+    id: "vanya",
+    get name() { return tr("Ginger Dog Vanya", "Рыжий пёс Ваня") },
+    species: "dog",
+    fur: 0,
+    eyes: 3,
+    accessory: 7,
+    bubble: 0xffe6c8
+  }
+]
+
+/** Где сплетники могут стоять: левый (Киса) — в `pos`, правый (Ваня) — правее на `GOSSIP_GAP`, лицом друг к другу. */
+export const GOSSIP_SPOTS: readonly Pos[] = [
+  { x: 12.6, y: 7.6 },
+  { x: 2.5, y: 12.5 },
+  { x: 18.0, y: 8.5 },
+  { x: 21.5, y: 11.6 },
+  { x: 26.3, y: 6.6 },
+  { x: 12.4, y: 12.4 }
+]
+export const GOSSIP_GAP = 2
+
+/** Ритм болтовни (секунды): первая реплика, пауза между репликами, сколько висит облачко, переход на другое место. */
+export const GOSSIP_TIMING = {
+  first: 4,
+  gap: [0.8, 2.2],
+  hold: 3,
+  perChar: 0.05,
+  move: [70, 110],
+  /** Тапов до взрыва. */
+  taps: 5
+} as const
+
+/**
  * Дождь над поселением: время делится на окна по `cycleMs`, в доле `share` окон (выбор детерминирован номером окна)
  * идёт дождь. Чистая презентация — на игру не влияет.
  */

@@ -13,6 +13,7 @@ import {
 import { FISHER_MUTTERS } from "@game/content/dialogues"
 import {
   FISHER,
+  GOSSIPS,
   HERO_SPEED,
   MUTTER_TIMING,
   HERO_START,
@@ -61,6 +62,8 @@ import {
 import { ensureTexture } from "../svgTextures"
 import { ensureTextures } from "../textures"
 import { textStyle } from "../style"
+import { SpeechBubbles } from "./speech"
+import { Gossips } from "./gossips"
 import { stepFx, reducedMotion } from "../motionFx"
 import { sceneAlive } from "../fx"
 import { tr } from "@game/i18n"
@@ -141,21 +144,12 @@ interface NpcView {
   tween?: Phaser.Tweens.Tween
 }
 
-/** Облачко бубнежа: `box` — сама плашка (w × h без хвостика), сдвигается вбок, чтобы не вылезать за экран. */
-interface MutterBubble {
-  root: Phaser.GameObjects.Container
-  box: Phaser.GameObjects.Container
-  w: number
-  h: number
-}
-
 /** Рыбак у пруда: спрайт, удочка с поплавком и облачко бубнежа. */
 interface FisherView {
   img: Phaser.GameObjects.Image
   float: Phaser.GameObjects.Arc
   /** Точка над именем — под хвостик облачка (мировые пиксели). */
   head: Pos
-  bubble?: MutterBubble
   /** Через сколько секунд следующая реплика. */
   nextT: number
   /** Реплики вразнобой без повторов подряд: очередь перемешанных номеров и последняя показанная. */
@@ -251,6 +245,10 @@ export class SettlementScene extends Phaser.Scene {
   private hero?: Phaser.GameObjects.Image
   private npcs: NpcView[] = []
   private fisher?: FisherView
+  /** Облачки реплик рыбака и сплетников. */
+  private speech = new SpeechBubbles(this, () => this.view.zoom)
+  /** Киса Эльман и пёс Ваня: болтают цитатами, переходят с места на место, взрываются от тапов. */
+  private gossips?: Gossips
   /** Жители, которые сейчас стоят на карте (у построенных зданий): с ними сталкивается герой. */
   private active: NpcDef[] = []
   private plots: PlotView[] = []
@@ -350,6 +348,10 @@ export class SettlementScene extends Phaser.Scene {
     const f = FISHER
     const fisherSvg = critterSvg({ species: f.species, fur: furArt(f.fur), iris: eyeArt(f.eyes), pattern: 0, eyes: f.eyes, accessory: f.accessory, pose: "idle" })
     jobs.push(t(texKey.npc(f.id, "idle"), fisherSvg, T * NPC_W, (T * NPC_W * 140) / 120))
+    for (const g of GOSSIPS) {
+      const svg = critterSvg({ species: g.species, fur: furArt(g.fur), iris: eyeArt(g.eyes), pattern: 0, eyes: g.eyes, accessory: g.accessory, pose: "happy" })
+      jobs.push(t(texKey.npc(g.id, "idle"), svg, T * NPC_W, (T * NPC_W * 140) / 120))
+    }
     const heroH = T * HERO_H
     const heroW = (heroH * HERO_VIEW.w) / HERO_VIEW.h
     for (const facing of FACINGS) {
@@ -469,6 +471,16 @@ export class SettlementScene extends Phaser.Scene {
       .setDepth(gateBottom)
     for (const def of NPCS) this.npcs.push(this.makeNpc(def))
     this.fisher = this.makeFisher()
+    const npcW = T * NPC_W
+    this.gossips = new Gossips({
+      scene: this,
+      tile: T,
+      size: { w: npcW, h: (npcW * 140) / 120 },
+      texture: id => texKey.npc(id, "idle"),
+      speech: this.speech,
+      heroPos: () => this.pos,
+      paused: () => this.opts.paused()
+    })
     for (const p of PLOTS) this.signs.push(this.makeSign(p.id))
     this.signs.push(this.makeSign("gate"))
 
@@ -600,7 +612,6 @@ export class SettlementScene extends Phaser.Scene {
   private tickFisher(dt: number): void {
     const f = this.fisher
     if (!f) return
-    if (f.bubble) this.fitBubble(f.bubble)
     f.nextT -= dt
     if (f.nextT > 0) return
     if (this.opts.paused()) {
@@ -626,92 +637,8 @@ export class SettlementScene extends Phaser.Scene {
     const hold = MUTTER_TIMING.hold + text.length * MUTTER_TIMING.perChar
     const [lo, hi] = MUTTER_TIMING.gap
     f.nextT = hold + lo + Math.random() * (hi - lo)
-    this.showBubble(f, text, hold)
+    this.speech.show(FISHER.id, f.head, text, hold, { italic: true })
     if (!reducedMotion()) this.tweens.add({ targets: f.float, scaleX: 0.7, scaleY: 0.4, duration: 120, yoyo: true, repeat: 1 })
-  }
-
-  /**
-   * Облачко над рыбаком: экранного размера (не мельчает при отдалении камеры), хвостик вниз к голове.
-   * Новая реплика сменяет старую.
-   */
-  private showBubble(f: FisherView, text: string, hold: number): void {
-    f.bubble?.root.destroy()
-    const label = this.add
-      .text(0, 0, text, {
-        ...textStyle(13, "#2a1d10", false, 0),
-        fontStyle: "italic",
-        wordWrap: { width: 190, useAdvancedWrap: true },
-        lineSpacing: 2
-      })
-      .setOrigin(0.5, 1)
-      .setResolution(3)
-    const padX = 10
-    const padY = 7
-    const tail = 9
-    const w = label.width + padX * 2
-    const h = label.height + padY * 2
-    label.setPosition(0, -tail - padY)
-    const g = this.add.graphics()
-    g.fillStyle(0x000000, 0.35).fillRoundedRect(-w / 2 + 2, -tail - h + 3, w, h, 10)
-    g.fillStyle(0xf3e2c0, 1).fillRoundedRect(-w / 2, -tail - h, w, h, 10)
-    g.lineStyle(2.5, 0x2a1d10, 1).strokeRoundedRect(-w / 2, -tail - h, w, h, 10)
-    const tip = this.add.graphics()
-    tip.fillStyle(0xf3e2c0, 1).fillTriangle(-7, -tail - 1.5, 7, -tail - 1.5, 0, 0)
-    tip.lineStyle(2.5, 0x2a1d10, 1).lineBetween(-7, -tail, 0, 0).lineBetween(7, -tail, 0, 0)
-    const box = this.add.container(0, 0, [g, label])
-    const scale = 1 / this.view.zoom
-    const root = this.add.container(f.head.x, f.head.y - 2, [box, tip]).setDepth(9600).setScale(scale * 0.6).setAlpha(0)
-    const bubble = { root, box, w, h: h + tail }
-    f.bubble = bubble
-    this.fitBubble(bubble)
-    const still = reducedMotion()
-    this.tweens.add({ targets: root, alpha: 1, scale, duration: still ? 0 : 180, ease: "Back.easeOut" })
-    this.tweens.add({
-      targets: root,
-      alpha: 0,
-      delay: hold * 1000,
-      duration: 350,
-      onComplete: () => {
-        root.destroy()
-        if (f.bubble === bubble) f.bubble = undefined
-      }
-    })
-  }
-
-  /** Попал ли тап (клетки) в облачко рыбака — вместе с хвостиком. */
-  private hitBubble(p: Pos): boolean {
-    const b = this.fisher?.bubble
-    if (!b) return false
-    const k = 1 / this.view.zoom
-    const cx = b.root.x + b.box.x * k
-    const x = p.x * T
-    const y = p.y * T
-    return Math.abs(x - cx) <= (b.w / 2) * k && y <= b.root.y && y >= b.root.y - b.h * k
-  }
-
-  /** Убрать облачко по тапу: быстро гаснет; следующая реплика — в свой срок. */
-  private closeBubble(): void {
-    const f = this.fisher
-    const b = f?.bubble
-    if (!f || !b) return
-    f.bubble = undefined
-    this.tweens.killTweensOf(b.root)
-    this.tweens.add({ targets: b.root, alpha: 0, scale: b.root.scale * 0.85, duration: reducedMotion() ? 0 : 120, onComplete: () => b.root.destroy() })
-  }
-
-  /** Сдвинуть плашку облачка вбок, чтобы она целиком была на экране (хвостик не двигается, пока хватает места). */
-  private fitBubble(b: MutterBubble): void {
-    const view = this.cameras.main.worldView
-    const k = 1 / this.view.zoom
-    const gap = 8 * k
-    const half = (b.w / 2) * k
-    const x = b.root.x
-    let dx = 0
-    if (x - half < view.left + gap) dx = view.left + gap - (x - half)
-    else if (x + half > view.right - gap) dx = view.right - gap - (x + half)
-    // хвостик должен остаться под плашкой: сдвиг не больше полуширины без скругления
-    const max = half - 14 * k
-    b.box.setX(Phaser.Math.Clamp(dx, -max, max) / k)
   }
 
   private makeNpc(def: NpcDef): NpcView {
@@ -939,14 +866,15 @@ export class SettlementScene extends Phaser.Scene {
     this.joy = undefined
   }
 
-  /** Кто стоит на пути героя: жители у построенных зданий и рыбак. */
+  /** Кто стоит на пути героя: жители у построенных зданий, рыбак и сплетники. */
   private get blockers(): Blocker[] {
-    return [...this.active, FISHER]
+    return [...this.active, FISHER, ...(this.gossips?.blockers() ?? [])]
   }
 
   /** Тап по земле — идти туда; по жителю, зданию или его вывеске — подойти и открыть карточку места; по рыбаку — он бубнит. */
   private tapAt(p: Pos): void {
-    if (this.hitBubble(p)) return this.closeBubble()
+    if (this.speech.tap(p.x * T, p.y * T)) return
+    if (this.gossips?.tap(p)) return
     if (Math.abs(FISHER.pos.x - p.x) < 0.7 && p.y > FISHER.pos.y - 1.3 && p.y < FISHER.pos.y + 0.5) return this.mutter()
     const npc = this.active.find(n => Math.abs(n.pos.x - p.x) < 0.7 && p.y > n.pos.y - 1.3 && p.y < n.pos.y + 0.5)
     if (npc && this.opts.canTalk(npc.id)) return this.talkTo(npc)
@@ -1033,6 +961,8 @@ export class SettlementScene extends Phaser.Scene {
     this.animateWater(dt)
     this.animateFx(dt)
     this.tickFisher(dt)
+    this.gossips?.update(dt)
+    this.speech.update()
     this.signT += dt
     if (this.signT > 0.5) {
       this.signT = 0
