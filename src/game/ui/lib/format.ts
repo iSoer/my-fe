@@ -15,6 +15,11 @@ export const STAT_LABELS: Record<Stat, string> = {
   res: L.specialDefense
 }
 
+/** Проценты напитка из бара строкой: «+8% Атака · +6% Защита». */
+export function drinkEffects(pct: Partial<Record<Stat, number>>): string {
+  return STATS.filter(s => pct[s]).map(s => `+${pct[s]}% ${STAT_LABELS[s]}`).join(" · ")
+}
+
 /** Подпись стата, которым бьёт оружие бойца: Mag для магии, иначе Str. */
 export function atkLabel(unit: { weaponSkill: Parameters<typeof isMagicWeapon>[0] }): string {
   return isMagicWeapon(unit.weaponSkill) ? L.specialAttack : L.attack

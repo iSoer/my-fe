@@ -398,7 +398,7 @@ export interface HouseArt {
   roof: string
   wall: string
   /** Чей домик: у Казармы флаг и щит с мечами, у Лавки полосатый навес и бочки. Подпись — вывеской сцены. */
-  npc: "barracks" | "store"
+  npc: "barracks" | "store" | "tavern"
   /** Износ 0…1 (`buildingWear`): наклон, дыры в крыше, заколоченные окна, трещины. */
   wear: number
 }
@@ -481,7 +481,7 @@ function houseWindow(x: number, y: number, state: number, shutter: string): stri
  * Спрайт — ширина `w` клеток, высота `h + HOUSE_ROOF_OVER`, низ совпадает с нижним краем стен.
  */
 export function villageHouseSvg(a: HouseArt): string {
-  const rnd = noise(a.npc === "barracks" ? 7 : 13)
+  const rnd = noise(a.npc === "barracks" ? 7 : a.npc === "store" ? 13 : 23)
   const wear = Math.max(0.05, Math.min(1, a.wear))
   const W = a.w * VT
   const H = (a.h + HOUSE_ROOF_OVER) * VT
@@ -605,7 +605,32 @@ export function villageHouseSvg(a: HouseArt): string {
     for (let i = 0; i <= 5; i++) d += ` L${r1(x + w - (w / 5) * i)} ${r1(y + 16 + (i % 2 ? 6 : 0) + rnd() * 5)}`
     return `<path d="${d} Z" fill="${color}" />`
   }
-  const props = a.npc === "barracks"
+  // бар: вывеска с кружкой на кованом кронштейне, пирамида бочек, скамья и пустые бутылки
+  const tavern = () => {
+    const sx = W - 64
+    const sy = facadeTop - 26
+    let bottles = ""
+    for (let i = 0; i < 3; i++) {
+      const x = cx + doorW / 2 + 14 + i * 7
+      bottles += `<rect x="${r1(x)}" y="${r1(H - 18)}" width="5" height="12" rx="2" fill="${i === 1 ? "#3a5a3a" : "#5a3a2a"}" opacity=".9" />`
+        + `<rect x="${r1(x + 1.5)}" y="${r1(H - 22)}" width="2" height="5" fill="#2a2a2a" />`
+    }
+    const barrel = (x: number, y: number) => `<ellipse cx="${r1(x)}" cy="${r1(y)}" rx="12" ry="14" fill="${WOOD.mid}" stroke="${WOOD.grain}" stroke-width="2" />`
+      + `<path d="M${r1(x - 12)} ${r1(y - 6)} h24 M${r1(x - 12)} ${r1(y + 6)} h24" stroke="${IRON.dark}" stroke-width="2.4" />`
+      + `<circle cx="${r1(x)}" cy="${r1(y)}" r="2" fill="${WOOD.grain}" />`
+    return `<path d="M${r1(sx)} ${r1(sy - 8)} h44 M${r1(sx + 6)} ${r1(sy - 8)} l-8 12" stroke="${IRON.dark}" stroke-width="3" fill="none" />`
+      + `<path d="M${r1(sx + 10)} ${r1(sy - 8)} v6 M${r1(sx + 36)} ${r1(sy - 8)} v4" stroke="${IRON.dark}" stroke-width="1.5" />`
+      + `<g transform="rotate(${r1(wear * 8)} ${r1(sx + 23)} ${r1(sy - 6)})">`
+      + `<rect x="${r1(sx + 4)}" y="${r1(sy - 2)}" width="38" height="28" rx="3" fill="#b8a98a" stroke="${WOOD.dark}" stroke-width="2.5" />`
+      + `<rect x="${r1(sx + 14)}" y="${r1(sy + 5)}" width="14" height="16" rx="2" fill="${GLOW.warm}" stroke="${WOOD.grain}" stroke-width="1.6" />`
+      + `<path d="M${r1(sx + 28)} ${r1(sy + 8)} q6 0 6 5 q0 5 -6 5" stroke="${WOOD.grain}" stroke-width="2" fill="none" />`
+      + `<path d="M${r1(sx + 13)} ${r1(sy + 6)} q2 -5 8 -3 q5 -3 8 2" fill="#f3ead8" stroke="${WOOD.grain}" stroke-width="1" /></g>`
+      + barrel(22, H - 16) + barrel(46, H - 16) + barrel(34, H - 38)
+      + `<rect x="${r1(cx + doorW / 2 + 6)}" y="${r1(H - 26)}" width="34" height="5" fill="${WOOD.light}" stroke="${WOOD.grain}" stroke-width="1" />`
+      + `<path d="M${r1(cx + doorW / 2 + 9)} ${r1(H - 21)} v15 M${r1(cx + doorW / 2 + 37)} ${r1(H - 21)} v15" stroke="${WOOD.dark}" stroke-width="3" />`
+      + bottles
+  }
+  const props = a.npc === "tavern" ? tavern() : a.npc === "barracks"
     // рваный флаг на крыше, помятый щит с мечами над дверью, стойка с копьями
     ? `<rect x="${r1(W * 0.86)}" y="0" width="4" height="${r1(roofBase - 6)}" fill="${WOOD.dark}" />`
       + tatter(W * 0.86 + 4, 2, 28, "#7a2a26")

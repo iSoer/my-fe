@@ -22,13 +22,15 @@ import {
 } from "@game/core/settlement"
 import { displayName, unitClassName } from "@game/core/units"
 import { ensureRoster } from "@game/state/save"
-import { buildAction, closePanel, collectAction, trainAction, upgradeAction } from "@game/state/settlement"
+import { buildAction, closePanel, collectAction, orderDrinkAction, trainAction, upgradeAction } from "@game/state/settlement"
+import { canOrderDrink, drinkPct, drinksAt } from "@game/core/settlement/tavern"
+import { DRINKS, drinkDef } from "@game/content/tavern"
 import { navigate } from "@game/state/router"
 import { haptic } from "@game/platform/haptics"
 import { Button } from "../components/Button"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { UnitRow } from "../components/UnitRow"
-import { fmtDuration } from "../lib/format"
+import { drinkEffects, fmtDuration } from "../lib/format"
 import { plural, tr } from "@game/i18n"
 
 type Toast = (msg: string, error?: boolean) => void
@@ -292,6 +294,56 @@ function GraveyardSection({ save }: { save: SaveGame }) {
   )
 }
 
+function TavernSection({ save, toast }: { save: SaveGame, toast: Toast }) {
+  const level = buildingLevel(save, "tavern")
+  const menu = drinksAt(level)
+  const ordered = save.settlement.drink
+  const orderedDef = ordered && drinkDef(ordered.id)
+  const order = (id: string) => {
+    const r = orderDrinkAction(id)
+    if (!r.ok) return toast(r.error, true)
+    haptic("success")
+    toast(tr("Poured! It’ll kick in on the next sortie", "Налито! Подействует на следующей вылазке"))
+  }
+  return (
+    <div className="stack">
+      {orderedDef
+        ? (
+            <div className="card st-drink is-ordered">
+              <span className="st-drink-ico" aria-hidden="true">{orderedDef.icon}</span>
+              <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
+                <b>{tr(`For the next sortie: ${orderedDef.name}`, `На следующую вылазку: ${orderedDef.name}`)}</b>
+                <span className="small st-drink-fx">{drinkEffects(drinkPct(orderedDef, ordered.level))}</span>
+              </div>
+            </div>
+          )
+        : <p className="muted small">{tr("One mug per sortie. The whole squad drinks; the effect lasts the whole battle.", "Одна кружка на вылазку. Пьёт весь отряд, действует весь бой.")}</p>}
+      <div className="section-title">{tr("Menu", "Меню")}</div>
+      <div className="st-list">
+        {DRINKS.map((d) => {
+          const open = menu.includes(d)
+          const check = canOrderDrink(save, d.id)
+          return (
+            <div key={d.id} className={`card st-drink${open ? "" : " dim"}`}>
+              <span className="st-drink-ico" aria-hidden="true">{open ? d.icon : "🔒"}</span>
+              <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
+                <b className="st-ellipsis">{d.name}</b>
+                <span className="small st-drink-fx">{drinkEffects(drinkPct(d, Math.max(level, 1)))}</span>
+                <span className="muted small">{open ? d.desc : tr(`From bar level ${d.minLevel}`, `С ${d.minLevel}-го уровня бара`)}</span>
+              </div>
+              {open && (
+                <Button sm primary={check.ok} disabled={!check.ok} onClick={() => order(d.id)} title={check.ok ? undefined : check.error}>
+                  {`${d.price} 🦴`}
+                </Button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 /* ---------- Карточки ---------- */
 
 /** Шапка карточки; `level` не задан — у места нет уровней (ворота, резерв). */
@@ -339,6 +391,7 @@ export function BuildingPanel({ plotId, save, toast }: { plotId: string, save: S
     if (id === "barracks") section = <BarracksSection save={save} />
     else if (id === "training") section = <TrainingSection save={save} toast={toast} />
     else if (id === "store") section = <StoreSection save={save} />
+    else if (id === "tavern") section = <TavernSection save={save} toast={toast} />
     else section = <GraveyardSection save={save} />
   }
   return (

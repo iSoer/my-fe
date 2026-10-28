@@ -4,6 +4,7 @@ import { STATS, addStats, attackStatOf, emptyStats, manhattan } from "../types"
 import type { CombatCtx, CombatUnitView, StrikeInfo } from "../skills/types"
 import { counterAnyRange, negatesEffective, specialMaxCd, unitKit, wrathfulStaff } from "../skills/engine"
 import { visibleStats } from "../units"
+import { drinkBonus } from "../battle/drink"
 import { livingUnits, terrainAt } from "../battle/query"
 import { COMBAT, TERRAIN_BONUS } from "@game/content/balance"
 
@@ -54,8 +55,9 @@ function cloneBu(bu: BattleUnit): BattleUnit {
   }
 }
 
-function baseCombatStats(unit: UnitInstance, bu: BattleUnit): Stats {
-  let s = visibleStats(unit)
+function baseCombatStats(state: BattleState, unit: UnitInstance, bu: BattleUnit): Stats {
+  const base = visibleStats(unit)
+  let s = addStats(base, drinkBonus(state, bu.unitId, base))
   s = addStats(s, bu.bonuses)
   s = addStats(s, bu.penalties)
   return s
@@ -65,7 +67,7 @@ function makeView(state: BattleState, bu: BattleUnit, isInitiator: boolean): Com
   const unit = state.roster[bu.unitId]
   if (!unit) throw new Error(`no roster unit ${bu.unitId}`)
   const kit = unitKit(unit)
-  return { bu, unit, stats: baseCombatStats(unit, bu), weapon: kit.weapon, cls: kit.cls, hpStart: bu.hp, isInitiator }
+  return { bu, unit, stats: baseCombatStats(state, unit, bu), weapon: kit.weapon, cls: kit.cls, hpStart: bu.hp, isInitiator }
 }
 
 function applyCombatMods(state: BattleState, self: CombatUnitView, foe: CombatUnitView): void {

@@ -17,7 +17,7 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
  * v8: без предметов лечения и рюкзака вылазки. v9: поселение со зданиями и уровнями вместо деревни с героем,
  * тренировочный полигон, витрина Лавки по периодам, воскрешение на Кладбище; герой ходит по карте поселения.
  */
-export const SAVE_VERSION = 9
+export const SAVE_VERSION = 10
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -204,7 +204,8 @@ const battleSchema = z.object({
     pickups: z.array(pickupSchema).default([]),
     buffs: z.object({ team: z.array(buffKind), units: z.record(z.string(), z.array(buffKind)) }).default({ team: [], units: {} }),
     found: z.array(z.string()).default([])
-  }).optional()
+  }).optional(),
+  drink: z.object({ id: z.string(), pct: partialStats }).optional()
 })
 
 const memorialSchema = z.object({
@@ -242,7 +243,8 @@ const settlementSchema = z.object({
     barracks: buildingSchema.optional(),
     training: buildingSchema.optional(),
     store: buildingSchema.optional(),
-    graveyard: buildingSchema.optional()
+    graveyard: buildingSchema.optional(),
+    tavern: buildingSchema.optional()
   }),
   training: z.array(z.object({
     unitId: z.string(),
@@ -253,7 +255,8 @@ const settlementSchema = z.object({
   })),
   sortiesTrained: z.array(z.string()),
   lastReviveAt: z.number().optional(),
-  hero: z.object({ pos: z.object({ x: z.number(), y: z.number() }), facing: z.enum(["down", "up", "left", "right"]) }).optional()
+  hero: z.object({ pos: z.object({ x: z.number(), y: z.number() }), facing: z.enum(["down", "up", "left", "right"]) }).optional(),
+  drink: z.object({ id: z.string(), level: z.number().int().min(1).max(BUILDING_MAX_LEVEL) }).optional()
 })
 
 const levelUpSchema = z.object({ unitId: z.string(), from: z.number(), to: z.number(), gains: partialStats })
@@ -479,7 +482,10 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
     delete data["village"]
     data["version"] = 9
     return data
-  }
+  },
+  // v9 → v10: на пустыре встал бар (здание `tavern`), в поселении — заказанная кружка, в бою — выпитый напиток.
+  // Всё новое необязательно: старый сейв читается как есть, бара в нём просто ещё нет.
+  9: (old) => ({ ...old, version: 10 })
 }
 
 /** Первая версия сейва, которую ещё можно прочитать. */

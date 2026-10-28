@@ -1,5 +1,6 @@
 import type { BuildingId, Pos, Species } from "@game/core/types"
 import { tr } from "@game/i18n"
+import { TAVERN } from "./tavern"
 
 // Поселение: здания, их уровни и места на карте. Логика — `core/settlement`, движение героя — `core/settlement/walk`,
 // сцена — `scene/settlement`, экран — `ui/screens/SettlementScreen`.
@@ -35,6 +36,9 @@ export const STORE = {
   /** Каждая третья позиция витрины — талисман (если талисманов хватает). */
   talismanEvery: 3
 }
+
+/** Бар: сколько сортов в меню (сами напитки и их сила — `content/tavern`). */
+export const TAVERN_MENU = [3, 5, 7, 9, 10] as const
 
 /** Кладбище: с этого уровня открывается воскрешение (одно за игровой день). */
 export const GRAVEYARD = {
@@ -122,6 +126,18 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
       label: tr("Resurrection", "Воскрешение"),
       value: level >= GRAVEYARD.reviveLevel ? tr("1 per day", "1 в день") : tr(`from level ${GRAVEYARD.reviveLevel}`, `с ${GRAVEYARD.reviveLevel}-го уровня`)
     }]
+  },
+  tavern: {
+    id: "tavern",
+    icon: "🍺",
+    get name() { return tr("The Last Stand Bar", "Бар «Последний рубеж»") },
+    get short() { return tr("Bar", "Бар") },
+    get desc() { return tr("A mug before the sortie: the squad gets a boost to some stats for one sortie. Higher levels pour stronger and offer more brews.", "Кружка перед вылазкой: отряд получает прибавку к статам на одну вылазку. С уровнем наливают крепче и сортов больше.") },
+    cost: [150, 250, 500, 900, 1600],
+    stats: level => [
+      { label: tr("Brews on the menu", "Сортов в меню"), value: String(atLevel(TAVERN_MENU, level)) },
+      { label: tr("Drink strength", "Крепость напитков"), value: `×${atLevel(TAVERN.power, level)}` }
+    ]
   }
 }
 
@@ -136,7 +152,7 @@ export function buildingDef(id: BuildingId): BuildingDef {
 /**
  * Поселение — Phaser-локация сверху (`scene/settlement`), по которой ходит герой. Карта в три экрана шириной: экран —
  * `SCREEN_W` клеток, камера вписывает его в ширину телефона и идёт за героем вбок. Первый экран — Казармы и Лавка,
- * второй — полигон, резервный участок и ворота на вылазку, третий — роща и Кладбище.
+ * второй — полигон, бар и ворота на вылазку, третий — роща и Кладбище.
  * Поселение — деревня выживших за частоколом: снаружи бродят зомби, внутрь — только через ворота.
  * Легенда: `F` частокол, `T` дерево, `#` участок под здание, `D` вход на участок, `G` ворота на выход из поселения, `~` пруд,
  * `b` куст, `g` ограда Кладбища — непроходимо; `.` трава, `=` тропинка, `*` цветы — проходимо.
@@ -204,7 +220,7 @@ export const PLOTS: readonly PlotDef[] = [
   { id: "plot-barracks", building: "barracks", x: 1, y: 2, w: 4, h: 2, front: frontOf(1, 2, 4, 2) },
   { id: "plot-store", building: "store", x: 6, y: 2, w: 4, h: 2, front: frontOf(6, 2, 4, 2) },
   { id: "plot-training", building: "training", x: 12, y: 2, w: 5, h: 2, front: frontOf(12, 2, 5, 2) },
-  { id: "plot-reserve", x: 18, y: 2, w: 4, h: 2, front: frontOf(18, 2, 4, 2) },
+  { id: "plot-tavern", building: "tavern", x: 18, y: 2, w: 4, h: 2, front: frontOf(18, 2, 4, 2) },
   // Кладбище огорожено со всех сторон: подходят снизу, по тропинке вдоль ограды
   { id: "plot-graveyard", building: "graveyard", x: 25, y: 7, w: 4, h: 3, front: { x: 27, y: 10.5 } }
 ]
@@ -282,6 +298,17 @@ export const NPCS: readonly NpcDef[] = [
     fur: 2,
     eyes: 1,
     accessory: 0
+  },
+  {
+    id: "barkeep",
+    place: "plot-tavern",
+    building: "tavern",
+    get name() { return tr("Barkeep Hops", "Трактирщица Хмель") },
+    species: "mouse",
+    pos: { x: 21.9, y: 4.6 },
+    fur: 3,
+    eyes: 2,
+    accessory: 4
   },
   {
     id: "scout",

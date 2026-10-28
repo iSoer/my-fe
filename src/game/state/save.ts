@@ -1,3 +1,4 @@
+import { drinkForBattle } from "@game/core/settlement/tavern"
 import { atom, computed } from "nanostores"
 import type {
   Army,
@@ -620,7 +621,8 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
     map: pb.map,
     squad,
     seed: createRng(pb.seed).fork("battle").seed,
-    now: Date.now()
+    now: Date.now(),
+    drink: drinkForBattle(s.settlement.drink)
   })
   updateSave((st) => {
     const next: SaveGame = {
@@ -629,6 +631,12 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
       army: st.army ? { ...st.army, squadIds: squad.map(u => u.id) } : st.army
     }
     delete next.pendingBattle
+    // Кружка из бара выпита: она на одну вылазку
+    if (next.settlement.drink) {
+      const settlement = { ...next.settlement }
+      delete settlement.drink
+      next.settlement = settlement
+    }
     return next
   })
   return { ok: true, events }

@@ -170,6 +170,7 @@ function buildingOver(id: BuildingId, p: PlotDef): number {
   switch (id) {
     case "barracks":
     case "store":
+    case "tavern":
       return HOUSE_ROOF_OVER
     case "training":
       return TRAINING_H - p.h
@@ -190,6 +191,8 @@ function buildingSvg(id: BuildingId, p: PlotDef, level: number): string {
       return villageTrainingSvg(p.w, wear)
     case "graveyard":
       return villageGraveyardSvg(p.w, p.h, wear)
+    case "tavern":
+      return villageHouseSvg({ w: p.w, h: p.h, roof: "#4a3a52", wall: "#7a6448", npc: "tavern", wear })
   }
 }
 

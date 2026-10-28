@@ -29,7 +29,7 @@ import { SETTLEMENT_RAIN } from "@game/content/settlement"
 
 const ALL_BUILT = (): SaveGame => {
   const save = createEmptySave(1)
-  for (const id of ["barracks", "training", "store", "graveyard"] as const) save.settlement.buildings[id] = { level: 1, builtAt: 1 }
+  for (const id of ["barracks", "training", "store", "graveyard", "tavern"] as const) save.settlement.buildings[id] = { level: 1, builtAt: 1 }
   return save
 }
 
@@ -71,11 +71,12 @@ describe("поселение: карта", () => {
     }
   })
 
-  it("на каждом экране есть места: Казармы и Лавка, полигон и ворота, Кладбище", () => {
+  it("на каждом экране есть места: Казармы и Лавка, полигон, бар и ворота, Кладбище", () => {
     const screen = (x: number) => Math.floor(x / SCREEN_W)
     expect(screen(PLOTS.find(p => p.building === "barracks")!.x)).toBe(0)
     expect(screen(PLOTS.find(p => p.building === "store")!.x)).toBe(0)
     expect(screen(PLOTS.find(p => p.building === "training")!.x)).toBe(1)
+    expect(screen(PLOTS.find(p => p.building === "tavern")!.x)).toBe(1)
     expect(screen(SORTIE_GATE.x)).toBe(1)
     expect(screen(PLOTS.find(p => p.building === "graveyard")!.x)).toBe(2)
   })
@@ -144,7 +145,8 @@ describe("поселение: вывески", () => {
     expect(signs["plot-training"]?.built).toBe(false)
     expect(signs["plot-training"]?.sub).toContain("🦴")
     expect(signs["plot-training"]?.status).toBe("free")
-    expect(signs["plot-reserve"]?.status).toBe("locked")
+    expect(signs["plot-tavern"]?.status).toBe("free")
+    expect(signs["plot-tavern"]?.level).toBe(0)
     expect(signs["gate"]?.built).toBe(true)
   })
 })

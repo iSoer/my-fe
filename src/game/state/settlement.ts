@@ -1,3 +1,4 @@
+import { orderDrink } from "@game/core/settlement/tavern"
 import { atom } from "nanostores"
 import type { BuildingId, Facing, LevelUpSummary, Pos, SaveGame, UnitInstance } from "@game/core/types"
 import { SQUAD_SIZE } from "@game/core/types"
@@ -41,6 +42,11 @@ export function buildAction(id: BuildingId, now = Date.now()): ActionResult {
 
 export function upgradeAction(id: BuildingId, now = Date.now()): ActionResult {
   return commit(upgrade($save.get(), id, now))
+}
+
+/** Заказать кружку в баре на следующую вылазку. */
+export function orderDrinkAction(drinkId: string): ActionResult {
+  return commit(orderDrink($save.get(), drinkId))
 }
 
 export function trainAction(unitId: string, now = Date.now()): ActionResult {
@@ -131,6 +137,7 @@ export function placeAlerts(save: SaveGame, now = Date.now()): Record<Settlement
     training: false,
     store: !!save.settlement.buildings.store && save.store.fresh,
     graveyard: rs.unlocked && rs.readyToday && revivable(save).length > 0,
+    tavern: false,
     gate: !!save.battle && !save.battle.result
   }
 }

@@ -270,3 +270,16 @@
   font-size: 26px;
   line-height: 1;
 }
+
+/* Кружка из бара на вылазку — строка над выбором режима */
+.drink-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+}
+.drink-note > span:first-child {
+  font-size: 24px;
+  line-height: 1;
+}

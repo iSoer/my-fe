@@ -102,12 +102,12 @@ describe("поселение: начальное состояние и мест�
       expect(generateRoster({ seed: glory + 1, glory, maxRarity: 5 }).length).toBeLessThanOrEqual(BARRACKS.capacity[0])
   })
 
-  it("состояния мест: занято, можно строить, свободно (нет денег), недоступно (резерв)", () => {
+  it("состояния мест: занято, можно строить, свободно (нет денег)", () => {
     setTreats(0)
     const st = plotStatuses(s())
     expect(st["plot-barracks"]).toBe("occupied")
     expect(st["plot-training"]).toBe("free")
-    expect(st["plot-reserve"]).toBe("locked")
+    expect(st["plot-tavern"]).toBe("free")
     setTreats(100_000)
     expect(plotStatuses(s())["plot-training"]).toBe("available")
   })

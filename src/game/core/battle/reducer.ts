@@ -1,5 +1,6 @@
 import type {
   BattleAction,
+  BattleDrink,
   BattleEvent,
   BattleState,
   BattleUnit,
@@ -18,6 +19,7 @@ import { moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../m
 import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
+import { drinkBonus, drinkBonusOf } from "./drink"
 import { lootFor } from "../progression"
 import { BUFF, difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
 import { BUFFS } from "@game/content/expedition"
@@ -32,6 +34,8 @@ export interface CreateBattleOptions {
   squad: UnitInstance[]
   seed: number
   now: number
+  /** Напиток из бара, выпитый перед вылазкой. */
+  drink?: BattleDrink
 }
 
 function makeBattleUnit(
@@ -81,11 +85,19 @@ export function createBattle(opts: CreateBattleOptions): ReduceResult {
       if (t === "wall_breakable") state.walls[posKey({ x, y })] = 2
     })
   )
+  if (opts.drink) state.drink = { id: opts.drink.id, pct: { ...opts.drink.pct } }
   opts.squad.forEach((u, i) => {
     const spawn = opts.map.playerSpawns[i]
     if (!spawn) return
     state.roster[u.id] = u
-    state.units[u.id] = makeBattleUnit(u, "player", spawn, "advance", 1)
+    const bu = makeBattleUnit(u, "player", spawn, "advance", 1)
+    // Напиток из бара прибавляет и здоровья: бой начинается с полным, увеличенным запасом
+    if (opts.drink) {
+      const extra = drinkBonusOf(opts.drink.pct, visibleStats(u)).hp ?? 0
+      bu.maxHp += extra
+      bu.hp += extra
+    }
+    state.units[u.id] = bu
   })
   for (const e of opts.map.enemies) {
     state.roster[e.unit.id] = e.unit
@@ -670,8 +682,9 @@ export function unitStatsInBattle(state: BattleState, unitId: string): Stats | u
   const bu = state.units[unitId]
   if (!unit || !bu) return undefined
   const base = visibleStats(unit)
+  const drink = drinkBonus(state, unitId, base)
   const out: Stats = { ...base }
-  for (const s of STATS) out[s] = Math.max(0, base[s] + (bu.bonuses[s] ?? 0) + (bu.penalties[s] ?? 0))
+  for (const s of STATS) out[s] = Math.max(0, base[s] + (drink[s] ?? 0) + (bu.bonuses[s] ?? 0) + (bu.penalties[s] ?? 0))
   return out
 }
 

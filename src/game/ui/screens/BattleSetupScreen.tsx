@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
 import { useStore } from "@nanostores/react"
-import type { BattleMode, Difficulty } from "@game/core/types"
+import type { BattleMode, Difficulty, SaveGame } from "@game/core/types"
+import { drinkForBattle } from "@game/core/settlement/tavern"
+import { drinkDef } from "@game/content/tavern"
+import { drinkEffects } from "../lib/format"
 import { DIFFICULTIES, EXPEDITION } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
 import {
@@ -132,6 +135,22 @@ const MODES: { id: BattleMode, icon: string, name: () => string, desc: () => str
   }
 ]
 
+/** Кружка из бара на эту вылазку: что выпьет отряд перед боем. */
+function DrinkNote({ save }: { save: SaveGame }) {
+  const drink = drinkForBattle(save.settlement.drink)
+  const def = drink && drinkDef(drink.id)
+  if (!drink || !def) return null
+  return (
+    <div className="card drink-note">
+      <span aria-hidden="true">{def.icon}</span>
+      <span className="small">
+        <b>{tr(`Before the fight: ${def.name}`, `Перед боем: ${def.name}`)}</b>
+        {` · ${drinkEffects(drink.pct)}`}
+      </span>
+    </div>
+  )
+}
+
 /** Вылазка, шаг 1 из 3: режим и сложность. Тап по открытой сложности ведёт к выбору вражеской армии. */
 export function BattleSetupScreen() {
   const save = useStore($save)
@@ -147,6 +166,7 @@ export function BattleSetupScreen() {
     <div className="screen">
       <TopBar title={tr("Sortie · 1/3", "Вылазка · 1/3")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
       <div className="screen-body">
+        <DrinkNote save={save} />
         <div className="section-title">{tr("Mode", "Режим")}</div>
         <div className="mode-pick" role="radiogroup" aria-label={tr("Mode", "Режим")}>
           {MODES.map(m => (

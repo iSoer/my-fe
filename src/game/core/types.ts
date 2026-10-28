@@ -389,6 +389,8 @@ export interface BattleState {
   startedAt: number
   /** Вылазка в чащу: где ключи, какие сундуки открыты. */
   expedition?: ExpeditionState
+  /** Напиток из бара: прибавка к статам отряда игрока на весь бой. */
+  drink?: BattleDrink
 }
 
 export type Effect
@@ -529,7 +531,7 @@ export interface StoreStock {
 
 /* ---------- Поселение ---------- */
 
-export type BuildingId = "barracks" | "training" | "store" | "graveyard"
+export type BuildingId = "barracks" | "training" | "store" | "graveyard" | "tavern"
 
 /** Построенное здание: уровень 1…`BUILDING_MAX_LEVEL`. */
 export interface BuildingState {
@@ -559,6 +561,20 @@ export interface SettlementState {
   lastReviveAt?: number
   /** Где стоит герой на карте поселения; нет — появляется на стартовой точке. */
   hero?: HeroSpot
+  /** Кружка из бара, заказанная на следующую вылазку: выпивается при её начале. */
+  drink?: OrderedDrink
+}
+
+/** Заказанный напиток: сорт и уровень бара на момент заказа (от него сила). */
+export interface OrderedDrink {
+  id: string
+  level: number
+}
+
+/** Напиток, выпитый перед боем: прибавка к статам бойцов игрока в процентах (снимок — от правок контента не зависит). */
+export interface BattleDrink {
+  id: string
+  pct: Partial<Stats>
 }
 
 export type Facing = "down" | "up" | "left" | "right"
