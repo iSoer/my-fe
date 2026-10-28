@@ -10,12 +10,13 @@ import type {
   Profile,
   SaveGame,
   Rarity,
+  WeaponSkill,
   Shelter,
   Stats,
   UnitInstance
 } from "../types"
 import { MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
-import { generateUnit, levelGains, unitClassName } from "../units"
+import { generateUnit, levelGains, loadoutsAt, unitClassName } from "../units"
 import { treatsMultiplier } from "../skills/engine"
 import { LOOT, PRICES, REWARDS, SHOP, XP, recruitRarityWeights } from "@game/content/balance"
 import { EPITAPHS } from "@game/content/epitaphs"
@@ -210,7 +211,7 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
     wins
   }
 
-  const nextArmy: Army | undefined = armyFell
+  let nextArmy: Army | undefined = armyFell
     ? undefined
     : {
         ...army,
@@ -219,6 +220,9 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
         battles: army.battles + 1,
         wins: army.wins + (result === "victory" ? 1 : 0)
       }
+  // Выжило меньше, чем нужно на отряд, — недостающие приходят сами, под нехватку ролей (`reinforceArmy`)
+  const recruits = nextArmy ? reinforcements(rng.int(0, 0x7fffffff), nextArmy, profile, now) : []
+  if (nextArmy && recruits.length > 0) nextArmy = withRecruits(nextArmy, recruits)
 
   const summary: BattleSummary = {
     result,
@@ -235,6 +239,7 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
     armyFell
   }
   if (state.timeUp) summary.timeUp = true
+  if (recruits.length > 0) summary.recruits = recruits
   const mvp = Object.entries(xpGained).sort((a, b) => b[1] - a[1])[0]
   if (mvp) summary.mvpId = mvp[0]
 
@@ -271,6 +276,64 @@ function findKiller(state: BattleState, unitId: string): string | undefined {
 
 /* ---------- Ростер, магазин, награда ---------- */
 
+const MELEE_SKILLS: readonly WeaponSkill[] = ["sword", "spear", "axe", "gauntlet"]
+const TRIANGLE: readonly WeaponSkill[] = ["sword", "spear", "axe"]
+
+/**
+ * Какое оружие нужнее отряду из `units` следующим бойцом — по гарантиям состава, как у стартового ростера:
+ * сначала ближник (по возможности недостающего цвета треугольника), потом лекарь, дальник, второй ближник,
+ * недостающие цвета; если всё есть — любое.
+ */
+export function neededWeapons(units: readonly Pick<UnitInstance, "weaponSkill">[]): WeaponSkill[] {
+  const skills = units.map(u => u.weaponSkill)
+  const melee = skills.filter(s => MELEE_SKILLS.includes(s)).length
+  const missingColors = TRIANGLE.filter(c => !skills.includes(c))
+  const meleeNeed = missingColors.length > 0 ? missingColors : [...MELEE_SKILLS]
+  if (melee < 1) return meleeNeed
+  if (!skills.includes("whiteMagic")) return ["whiteMagic"]
+  if (!skills.some(s => s === "bow" || s === "blackMagic")) return ["bow", "blackMagic"]
+  if (melee < 2) return meleeNeed
+  if (missingColors.length > 0) return missingColors
+  return ["sword", "spear", "axe", "gauntlet", "bow", "blackMagic", "whiteMagic"]
+}
+
+/**
+ * Бесплатное пополнение: если в армии меньше бойцов, чем мест в отряде (`SQUAD_SIZE`), недостающие приходят сами —
+ * игра не застревает, когда бойцы пали, а Вкусняшек на набор нет. Каждый следующий закрывает главную нехватку
+ * ролей (`neededWeapons`); звезда — из открытых, уровень — по ростеру этой звезды, статы — по пресету класса.
+ * Армию, павшую целиком, это не касается: для неё есть новый стартовый ростер.
+ */
+export function reinforcements(seed: number, army: Army, profile: Pick<Profile, "maxRarity">, now: number): UnitInstance[] {
+  const rng = createRng(seed).fork("reinforce")
+  const weights = recruitRarityWeights(profile.maxRarity)
+  const out: UnitInstance[] = []
+  while (army.units.length + out.length < SQUAD_SIZE) {
+    const need = neededWeapons([...army.units, ...out])
+    const rarity = rng.weighted(([1, 2, 3, 4, 5] as Rarity[]).map(r => ({ item: r, w: weights[r] })))
+    const level = Math.max(1, recruitLevel(army, rarity))
+    const all = loadoutsAt(level)
+    const fit = all.filter(l => need.includes(l.weaponSkill))
+    const loadout = rng.weighted((fit.length > 0 ? fit : all).map(l => ({ item: l, w: l.weight })))
+    out.push(generateUnit({
+      seed: rng.int(0, 0x7fffffff),
+      level,
+      rarity,
+      classId: loadout.classId,
+      weaponSkill: loadout.weaponSkill,
+      preset: true,
+      now
+    }))
+  }
+  return out
+}
+
+/** Новобранцы — в ростер и сразу в отряд (пока в нём есть места). */
+export function withRecruits(army: Army, recruits: readonly UnitInstance[]): Army {
+  const squadIds = [...army.squadIds]
+  for (const u of recruits) if (squadIds.length < SQUAD_SIZE) squadIds.push(u.id)
+  return { ...army, units: [...army.units, ...recruits], squadIds }
+}
+
 /** Уровень, под который подбираются враги, награды и витрина: средний уровень сильнейших бойцов отряда ростера. */
 export function rosterLevel(army: Pick<Army, "units"> | undefined): number {
   if (!army || army.units.length === 0) return 1
@@ -288,14 +351,19 @@ export function recruitLevel(army: Pick<Army, "units"> | undefined, rarity: Rari
   return rosterLevel(army ? { units: army.units.filter(u => u.rarity >= rarity) } : undefined)
 }
 
-/** Кандидаты набора: сначала звезда (по весам открытых), потом уровень около уровня ростера этой звезды. */
+/**
+ * Кандидаты набора: сначала звезда (по весам открытых), потом уровень около уровня ростера этой звезды, класс
+ * открытый на этом уровне; статы — по пресету класса, владение оружием — по классу и уровню (`presetSkillXp`).
+ */
 function candidates(seed: number, label: string, count: number, army: Pick<Army, "units"> | undefined, weights: Record<Rarity, number>, now: number) {
   const rng = createRng(seed).fork(label)
   return Array.from({ length: count }, () => {
     const unitSeed = rng.int(0, 0x7fffffff)
     const rarity = rng.weighted(([1, 2, 3, 4, 5] as Rarity[]).map(r => ({ item: r, w: weights[r] })))
     const level = Math.max(1, recruitLevel(army, rarity) + rng.int(-2, 1))
-    return generateUnit({ seed: unitSeed, level, rarity, now })
+    // Класс — из тех, что открыты на уровне (божественные не выпадают: их ранг S только своими руками)
+    const loadout = rng.weighted(loadoutsAt(level).map(l => ({ item: l, w: l.weight })))
+    return generateUnit({ seed: unitSeed, level, rarity, classId: loadout.classId, weaponSkill: loadout.weaponSkill, preset: true, now })
   })
 }
 

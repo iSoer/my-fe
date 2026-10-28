@@ -26,8 +26,9 @@ import { factionDef } from "@game/content/factions"
 import { generateCharacter, validateCharacterRequest } from "@/server/character-model/generate"
 import { loadCharacterModel } from "@/server/character-model/model"
 import { levelOneStats, type StatValues } from "@shared/character/leveling"
-import { CHARACTER_CLASSES, CLASS_TIERS, availableClasses, canTakeClass, isUniqueClass } from "@shared/character/classes"
-import { rankAtLevel, rankIndex, ranksAtLevel, type Rank, type WeaponGrade, type WeaponSkill } from "@shared/character/skills"
+import { CHARACTER_CLASSES, CLASS_TIERS, isUniqueClass } from "@shared/character/classes"
+import { rankIndex, type Rank, type WeaponGrade, type WeaponSkill } from "@shared/character/skills"
+import { canTakeClassWith, classPresetStats, classesOpenTo, presetSkillXp, skillRank, unitRanks } from "./proficiency"
 
 /* ---------- Статы: модель персонажа → бой ---------- */
 
@@ -186,9 +187,9 @@ export function levelGains(unit: UnitInstance, from: number, to: number): Partia
   return gains
 }
 
-/** Ранг оружейного навыка бойца на его уровне. */
+/** Ранг оружейного навыка бойца — по опыту владения этим оружием (`core/units/proficiency`). */
 export function weaponRank(unit: UnitInstance): Rank {
-  return rankAtLevel(unit.aptitudes[unit.weaponSkill], unit.level)
+  return skillRank(unit, unit.weaponSkill)
 }
 
 export function rankMt(rank: Rank): number {
@@ -261,19 +262,19 @@ export { unitClass }
 
 /* ---------- Классы FW: открытые, смена класса ---------- */
 
-/** Классы, открытые бойцу на его уровне (ярус + ранги навыков). */
+/** Классы, открытые бойцу: ярус — по уровню, ранги навыков — по опыту владения. */
 export function openClasses(unit: UnitInstance): string[] {
-  return availableClasses(unit.aptitudes, unit.level).map(c => c.id)
+  return classesOpenTo(unit).map(c => c.id)
 }
 
 export function canTakeClassNow(unit: UnitInstance, classId: string): boolean {
-  return canTakeClass(fwClass(classId), ranksAtLevel(unit.aptitudes, unit.level), unit.level)
+  return canTakeClassWith(unit, fwClass(classId))
 }
 
 /** Есть ли открытый класс выше текущего яруса — повод заглянуть в карточку бойца. */
 export function hasClassUpgrade(unit: UnitInstance): boolean {
   const tier = CLASS_TIERS.indexOf(fwClass(unit.classId).tier)
-  return availableClasses(unit.aptitudes, unit.level).some(c => CLASS_TIERS.indexOf(c.tier) > tier)
+  return classesOpenTo(unit).some(c => CLASS_TIERS.indexOf(c.tier) > tier)
 }
 
 /** Божественный класс в армии может быть только у одного бойца, как в FW. */
@@ -281,16 +282,16 @@ export function isUniqueClassId(classId: string): boolean {
   return isUniqueClass(fwClass(classId))
 }
 
-/** Навык оружия: `prefer`, если класс им сражается, иначе лучший по рангу на уровне (при равенстве — `pick`). */
+/** Навык оружия: `prefer`, если класс им сражается, иначе лучший по рангу (при равенстве — `pick`). */
 function bestWeapon(
   classId: string,
-  unit: Pick<UnitInstance, "aptitudes" | "level">,
+  unit: Pick<UnitInstance, "skillXp">,
   pick: (skills: WeaponSkill[]) => WeaponSkill,
   prefer?: WeaponSkill
 ): WeaponSkill {
   const weapons = classWeapons(classId)
   if (prefer && weapons.includes(prefer)) return prefer
-  const ranks = ranksAtLevel(unit.aptitudes, unit.level)
+  const ranks = unitRanks(unit)
   const top = Math.max(...weapons.map(w => rankIndex(ranks[w])))
   return pick(weapons.filter(w => rankIndex(ranks[w]) === top))
 }
@@ -477,6 +478,8 @@ export interface GenerateUnitOptions {
   isEnemy?: boolean
   factionId?: string
   isBoss?: boolean
+  /** Боец для игрока: статы — по пресету класса (`classPresetStats`), а не случайные модели. */
+  preset?: boolean
   now?: number
 }
 
@@ -538,7 +541,11 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
   const request = opts.classId ? { rarity, level, class: opts.classId } : { rarity, level }
   const character = generateCharacter(loadCharacterModel(), request, r.character.int(0, 0x7fffffff))
   const classId = character.class
-  const weaponSkill = bestWeapon(classId, character, best => r.weapon.pick(best), opts.weaponSkill)
+  // Владение навыками — как у бойца, всю жизнь воевавшего в этом классе до своего уровня (не выше A+)
+  const skillXp = presetSkillXp(classId, character.aptitudes, level)
+  const weaponSkill = bestWeapon(classId, { skillXp }, best => r.weapon.pick(best), opts.weaponSkill)
+  // Бойцы игрока — по пресету статов своего класса, враги — со статами модели
+  const stats = opts.preset ? classPresetStats(classId, rarity, opts.seed) : { baseStats: character.baseStats, maxStats: character.maxStats }
   const cls = unitClass({ classId, weaponSkill })
 
   // Навыки
@@ -603,8 +610,9 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
     xp: 0,
     sp: 0,
     aptitudes: character.aptitudes,
-    baseStats: character.baseStats,
-    maxStats: character.maxStats,
+    skillXp,
+    baseStats: stats.baseStats,
+    maxStats: stats.maxStats,
     archetype: character.archetype,
     weaponTier: 0,
     skills,
@@ -705,7 +713,7 @@ export function generateRoster(opts: RosterOptions): UnitInstance[] {
     for (let i = 0; i < size; i++) {
       const seed = rng.int(0, 0x7fffffff)
       const classId = STARTER_CLASSES[i] ?? rng.pick(STARTER_CLASSES)
-      units.push(generateUnit({ seed, level: startLevel, rarityWeights, classId, now: opts.now }))
+      units.push(generateUnit({ seed, level: startLevel, rarityWeights, classId, preset: true, now: opts.now }))
     }
     if (guaranteeTop && !units.some(u => u.rarity === maxRarity)) {
       const idx = rng.int(0, units.length - 1)
@@ -716,6 +724,7 @@ export function generateRoster(opts: RosterOptions): UnitInstance[] {
         rarity: maxRarity,
         classId: old.classId,
         weaponSkill: old.weaponSkill,
+        preset: true,
         now: opts.now
       })
     }
@@ -742,6 +751,7 @@ export function generateRoster(opts: RosterOptions): UnitInstance[] {
       weaponSkill,
       rarityWeights,
       species: i % 2 === 0 ? "cat" : "dog",
+      preset: true,
       now: opts.now
     })
   )

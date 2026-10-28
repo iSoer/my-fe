@@ -2888,6 +2888,14 @@ p {
   left: 5px;
   font-size: 12px;
 }
+/* Навык быстро растёт в текущем классе (склонность ×3 и выше) */
+.mastery-fast {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  color: var(--ok-text, #2f7a1f);
+  font-size: 11px;
+}
 .mastery-cell.talent {
   border-color: var(--gold);
 }

@@ -3,7 +3,8 @@ import type { SaveGame } from "../types"
 import { DEFAULT_SETTINGS, MAX_LEVEL } from "../types"
 import { ARCHETYPES, statsSchema as modelStatsSchema } from "@shared/character/stats"
 import { aptitudesSchema, classIdSchema } from "@shared/api/schema/character/generated"
-import { WEAPON_SKILLS } from "@shared/character/skills"
+import { SKILLS, WEAPON_SKILLS, rankAtLevel } from "@shared/character/skills"
+import { xpOfRank } from "../units/proficiency"
 import { isWeaponId } from "@game/content/weapons"
 import { EMPTY_STORE } from "../items"
 import { barracksLevelFor, defaultSettlement, emptyStore, storePeriod } from "../settlement"
@@ -39,7 +40,22 @@ const pos = z.object({ x: z.number().int(), y: z.number().int() })
 const difficulty = z.enum(["easy", "normal", "hard", "nightmare"])
 const rarity = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)])
 
-const unitSchema = z.object({
+/**
+ * Бойцы без опыта навыков (сейвы до владения от использования): опыт = порог ранга, который был у них на их уровне
+ * по прежней формуле (склонность × уровень), — ранги и открытые классы не меняются, дальше растут от боёв.
+ */
+function withSkillXp(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || "skillXp" in raw) return raw
+  const u = raw as { aptitudes?: Record<string, "weak" | "normal" | "talent">, level?: number }
+  if (!u.aptitudes || typeof u.level !== "number") return raw
+  const aptitudes = u.aptitudes
+  const level = u.level
+  return { ...u, skillXp: Object.fromEntries(SKILLS.map(skill => [skill, xpOfRank(rankAtLevel(aptitudes[skill] ?? "normal", level))])) }
+}
+
+const skillXpSchema = z.object(Object.fromEntries(SKILLS.map(skill => [skill, z.number().min(0)])) as Record<(typeof SKILLS)[number], z.ZodNumber>)
+
+const unitSchema = z.preprocess(withSkillXp, z.object({
   id: z.string(),
   seed: z.number(),
   name: z.string(),
@@ -55,6 +71,7 @@ const unitSchema = z.object({
   xp: z.number(),
   sp: z.number(),
   aptitudes: aptitudesSchema,
+  skillXp: skillXpSchema,
   baseStats: modelStatsSchema,
   maxStats: modelStatsSchema,
   archetype: z.enum(ARCHETYPES),
@@ -89,7 +106,7 @@ const unitSchema = z.object({
   isEnemy: z.boolean().optional(),
   isBoss: z.boolean().optional(),
   factionId: z.string().optional()
-})
+}))
 
 const armySchema = z.object({
   id: z.string(),
@@ -225,7 +242,8 @@ const summarySchema = z.object({
   mvpId: z.string().optional(),
   survivors: z.array(unitSchema),
   armyFell: z.boolean(),
-  timeUp: z.boolean().optional()
+  timeUp: z.boolean().optional(),
+  recruits: z.array(unitSchema).optional()
 })
 
 export const saveSchema = z.object({

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
+import { xpOfRank } from "@game/core/units/proficiency"
 import {
   $save,
   buyItemAction,
@@ -113,7 +114,8 @@ describe("снаряжение", () => {
     expect(weaponShortfall(iron)).toBe(0)
     expect(weaponShortfall(silver)).toBeGreaterThan(0)
     expect(weaponMt(silver)).toBeLessThan(weaponDef("sword_silver").mt)
-    const master = { ...silver, aptitudes: { ...silver.aptitudes, sword: "talent" as const }, level: 60 }
+    // Ранг — от опыта владения мечом, а не от уровня: набил опыт до S — серебро без штрафа
+    const master = { ...silver, skillXp: { ...silver.skillXp, sword: xpOfRank("S") } }
     expect(weaponShortfall(master)).toBe(0)
     expect(weaponMt(master)).toBeGreaterThan(weaponDef("sword_silver").mt)
   })

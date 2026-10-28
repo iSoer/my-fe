@@ -1,3 +1,4 @@
+import { xpOfRank } from "@game/core/units/proficiency"
 import { describe, expect, it } from "vitest"
 import fc from "fast-check"
 import {
@@ -25,7 +26,6 @@ import { isMagicWeapon } from "@game/content/weapons"
 import { ROSTER } from "@game/content/balance"
 import { budgetRangeOf, loadCharacterModel } from "@/server/character-model/model"
 import { levelOneStats, totalOfStats } from "@shared/character/leveling"
-import { aptitudesOf } from "@shared/character/skills"
 
 describe("generateUnit", () => {
   it("детерминирован по seed", () => {
@@ -128,14 +128,12 @@ describe("generateUnit", () => {
     const gains = levelGains(u, 1, MAX_LEVEL)
     expect(Object.values(gains).reduce((a, b) => a + (b ?? 0), 0)).toBe(STATS.reduce((a, s) => a + (s80[s] - s1[s]), 0))
   })
-  it("ранг оружия добавляет Mt: талант к 55-му уровню — S, +3", () => {
-    const u = {
-      ...generateUnit({ seed: 4242, level: 55, classId: "gladiator", weaponSkill: "sword" }),
-      weaponSkill: "sword" as const,
-      aptitudes: aptitudesOf(["sword"])
-    }
-    const lowRank = { ...u, level: 1 }
-    expect(weaponMt(u) - weaponMt(lowRank)).toBe(3)
+  it("ранг оружия добавляет Mt: от E до S — +3, уровень сам по себе ранг не меняет", () => {
+    const base = { ...generateUnit({ seed: 4242, level: 55, classId: "gladiator", weaponSkill: "sword" }), weaponSkill: "sword" as const }
+    const master = { ...base, skillXp: { ...base.skillXp, sword: xpOfRank("S") } }
+    const novice = { ...base, skillXp: { ...base.skillXp, sword: 0 } }
+    expect(weaponMt(master) - weaponMt(novice)).toBe(3)
+    expect(weaponMt({ ...master, level: 1 })).toBe(weaponMt(master))
   })
   it("у каждого класса есть изучаемые навыки", () => {
     for (const id of CLASS_IDS) {

@@ -19,7 +19,9 @@ import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
 import { lootFor } from "../progression"
-import { BATTLE, difficultyDef, SP, XP } from "@game/content/balance"
+import { BATTLE, difficultyDef, SKILL_XP, SP, XP } from "@game/content/balance"
+import { gainSkillXp } from "../units/proficiency"
+import { MOVEMENT_SKILLS, type Skill } from "@shared/character/skills"
 import { MAX_LEVEL } from "../types"
 import { tr } from "@game/i18n"
 
@@ -212,7 +214,24 @@ export function xpForHeal(healed: number): number {
   return Math.min(XP.healMax, XP.heal + Math.round(healed * XP.healPerHp))
 }
 
-function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"]): void {
+/**
+ * Опыт навыков бойца игрока от использования (`SKILL_XP`): множители класса и склонности — в `gainSkillXp`.
+ * Новый ранг — событие `rankUp`. Враги после боя не сохраняются, им не начисляется.
+ */
+function grantSkillXp(state: BattleState, unitId: string, gains: Partial<Record<Skill, number>>, events: BattleEvent[]): void {
+  const bu = state.units[unitId]
+  const unit = state.roster[unitId]
+  if (!bu || !unit || bu.side !== "player") return
+  const r = gainSkillXp(unit, gains)
+  state.roster[unitId] = r.unit
+  for (const up of r.rankUps) events.push({ type: "rankUp", unitId, skill: up.skill, rank: up.rank })
+}
+
+/** Каждое действие тренирует передвижение: свой тип класса — быстрее (×3), остальные понемногу. */
+const MOVE_TRAINING: Partial<Record<Skill, number>> = Object.fromEntries(MOVEMENT_SKILLS.map(s => [s, SKILL_XP.move]))
+
+function finishAction(state: BattleState, bu: BattleUnit, newStance?: BattleUnit["stance"], events?: BattleEvent[]): void {
+  if (events && bu.alive) grantSkillXp(state, bu.unitId, MOVE_TRAINING, events)
   bu.acted = true
   delete bu.turnStart
   bu.penalties = {}
@@ -365,7 +384,7 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
     case "wait": {
       const bu = validateActor(state, action.unitId)
       moveUnit(state, bu, action.to, events)
-      finishAction(state, bu, action.newStance)
+      finishAction(state, bu, action.newStance, events)
       events.push({ type: "waited", unitId: bu.unitId })
       break
     }
@@ -376,7 +395,7 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       if (!wallsFrom(state, bu, bu.pos).some(p => posKey(p) === key)) throw new Error(tr("wall out of reach", "стена недоступна"))
       state.walls[key] = Math.max(0, (state.walls[key] ?? 0) - 1)
       events.push({ type: "wallHit", unitId: bu.unitId, pos: action.wall, hpAfter: state.walls[key] ?? 0 })
-      finishAction(state, bu, action.newStance)
+      finishAction(state, bu, action.newStance, events)
       break
     }
     case "assist": {
@@ -420,12 +439,15 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
         targetHpAfter: target.hp,
         unitHpAfter: bu.hp
       })
-      finishAction(state, bu, action.newStance)
+      finishAction(state, bu, action.newStance, events)
       // Лечение — по вылеченному (с лечением всех союзников спецприёмом), танец и Ободрение — фиксированно
       const kind = plan.assist.kind
       const healed = kind === "heal" || kind === "sacrifice" || kind === "reciprocal" ? plan.heal + healedAll : 0
       const xp = healed > 0 ? xpForHeal(healed) : kind === "refresh" ? XP.dance : kind === "rally" ? XP.rally : XP.assist
       grantXp(state, bu.unitId, xp, SP.assist, events)
+      // Лечение посохом тренирует белую магию
+      const healer = state.roster[bu.unitId]
+      if (healed > 0 && healer?.weaponSkill === "whiteMagic") grantSkillXp(state, bu.unitId, { whiteMagic: SKILL_XP.heal }, events)
       break
     }
     case "attack": {
@@ -435,7 +457,7 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       if (!target || !target.alive || target.side === bu.side) throw new Error(tr("target unavailable", "цель недоступна"))
       if (!targetsFrom(state, bu, bu.pos).some(t => t.unitId === target.unitId)) throw new Error(tr("target out of range", "цель вне дальности"))
       resolveCombat(state, bu, target, events)
-      finishAction(state, bu, action.newStance ?? (bu.side === "enemy" ? "advance" : undefined))
+      finishAction(state, bu, action.newStance ?? (bu.side === "enemy" ? "advance" : undefined), events)
       break
     }
   }
@@ -503,13 +525,19 @@ function resolveCombat(state: BattleState, bu: BattleUnit, target: BattleUnit, e
   const aStruck = outcome.strikes.some(s => s.attackerId === bu.unitId)
   const dStruck = outcome.strikes.some(s => s.attackerId === target.unitId)
   const result = (killed: boolean, dealt: number): CombatXpResult => (killed ? "kill" : dealt > 0 ? "hit" : "none")
+  // Владение оружием в лапах растёт от каждой схватки: удар, добивание сверху, без урона — понемногу
+  const weaponXp = (res: CombatXpResult) => (res === "kill" ? SKILL_XP.hit + SKILL_XP.kill : res === "hit" ? SKILL_XP.hit : SKILL_XP.none)
   if (!aDied) {
-    const xp = xpForCombat(aUnit.level, dUnit.level, result(dDied, dealtByA), !!dUnit.isBoss)
+    const res = result(dDied, dealtByA)
+    const xp = xpForCombat(aUnit.level, dUnit.level, res, !!dUnit.isBoss)
     grantXp(state, bu.unitId, xp, dDied ? SP.kill : aStruck ? SP.combat : 0, events)
+    grantSkillXp(state, bu.unitId, { [aUnit.weaponSkill]: weaponXp(res) }, events)
   }
   if (!dDied) {
-    const xp = xpForCombat(dUnit.level, aUnit.level, result(aDied, dealtByD), !!aUnit.isBoss)
+    const res = result(aDied, dealtByD)
+    const xp = xpForCombat(dUnit.level, aUnit.level, res, !!aUnit.isBoss)
     grantXp(state, target.unitId, xp, aDied ? SP.kill : dStruck ? SP.combat : 0, events)
+    if (dStruck) grantSkillXp(state, target.unitId, { [dUnit.weaponSkill]: weaponXp(res) }, events)
   }
 }
 

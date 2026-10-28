@@ -5,7 +5,8 @@ import { itemCount, itemInfo, storeOffers } from "@game/core/items"
 import { buildingLevel, nextStoreRefresh, storeDiscount, storePrice } from "@game/core/settlement"
 import { tickSettlement } from "@game/state/settlement"
 import { weaponDef } from "@game/content/weapons"
-import { SKILL_LABELS, rankAtLevel, rankIndex } from "@shared/character/skills"
+import { SKILL_LABELS, rankIndex } from "@shared/character/skills"
+import { skillRank } from "@game/core/units/proficiency"
 import { $save, buyItemAction, markStoreSeen } from "@game/state/save"
 import { navigate } from "@game/state/router"
 import { haptic } from "@game/platform/haptics"
@@ -37,7 +38,7 @@ const TABS: { id: ItemCategory, readonly label: string, readonly hint: string }[
 /** Кто в ростере владеет оружием без штрафа (ранг навыка ≥ требуемого). */
 function wielders(units: UnitInstance[], weaponId: string): number {
   const w = weaponDef(weaponId)
-  return units.filter(u => rankIndex(rankAtLevel(u.aptitudes[w.kind], u.level)) >= rankIndex(w.requiredRank)).length
+  return units.filter(u => rankIndex(skillRank(u, w.kind)) >= rankIndex(w.requiredRank)).length
 }
 
 /**

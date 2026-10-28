@@ -227,6 +227,7 @@ function StatTile({ icon, value, label }: { icon: string, value: number | string
 function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: string, mvp?: UnitInstance, profile: SaveGame["profile"] }) {
   const next = delaySequence(200)
   const fellDelay = lb.armyFell ? next() : 0
+  const recruitsDelay = lb.recruits?.length ? next() : 0
   const rewardsDelay = next()
   const statsDelay = next()
   const mvpDelay = next()
@@ -281,6 +282,27 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
               "Никого не осталось. Слава начислена; Сержант Барбос в Казарме выдаст новый стартовый ростер."
             )}
           </div>
+        </div>
+      )}
+
+      {lb.recruits && lb.recruits.length > 0 && (
+        <div className="card stack pop-in" style={{ animationDelay: `${recruitsDelay}ms` }}>
+          <div className="section-title">{tr("Reinforcements", "Подкрепление")}</div>
+          <p className="small muted" style={{ margin: 0 }}>
+            {tr(
+              "Too few fighters were left for a squad — recruits joined the Barracks for free, filling the roles the squad lacks.",
+              "Бойцов осталось меньше, чем мест в отряде, — в Казармы бесплатно пришли новобранцы на роли, которых не хватало."
+            )}
+          </p>
+          {lb.recruits.map(u => (
+            <div key={u.id} className="row" style={{ gap: 10 }}>
+              <UnitAvatar unit={u} size="md" animated={false} />
+              <div className="stack grow" style={{ gap: 2, minWidth: 0 }}>
+                <b>{displayName(u)}</b>
+                <span className="small muted">{`${"★".repeat(u.rarity)} · ${unitClassName(u)} · ${tr("Lv.", "Ур.")} ${u.level}`}</span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -55,6 +55,8 @@ import { generateMap } from "@game/core/map/generate"
 import { applyAction, createBattle } from "@game/core/battle/reducer"
 import {
   generateShop,
+  reinforcements,
+  withRecruits,
   memorialEntry,
   resolveBattle,
   rosterLevel,
@@ -154,13 +156,19 @@ export function initSave(): void {
 
 /**
  * Выдать стартовый ростер, если армии нет (новая игра или все пали): персонажи модели с гарантиями ролей,
- * первые 4 — в отряде. Заодно заполняет пустую витрину магазина.
+ * первые 4 — в отряде. Если армия есть, но бойцов в ней меньше, чем мест в отряде, — недостающие приходят сами
+ * под нехватку ролей (`reinforcements`), так выручаются и сейвы, застрявшие до этого правила. Заодно заполняет
+ * пустую витрину магазина.
  */
 export function ensureRoster(): void {
   ensureStore()
   const s = $save.get()
   if (s.army && s.army.units.length > 0) {
-    if (s.shelter.candidates.length === 0)
+    if (s.army.units.length < SQUAD_SIZE) {
+      const recruits = reinforcements(randomSeed(), s.army, s.profile, Date.now())
+      if (recruits.length > 0) updateSave(st => (st.army ? { ...st, army: withRecruits(st.army, recruits) } : st))
+    }
+    if ($save.get().shelter.candidates.length === 0)
       updateSave(st => ({ ...st, shelter: generateShop(randomSeed(), st.army, st.profile, Date.now()) }))
     return
   }

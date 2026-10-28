@@ -2,7 +2,7 @@
 import type { Archetype } from "@shared/character/stats"
 import { MAX_LEVEL as CHARACTER_MAX_LEVEL, type StatValues } from "@shared/character/leveling"
 import type { Movement } from "@shared/character/classes"
-import type { Aptitudes, WeaponSkill } from "@shared/character/skills"
+import type { Aptitudes, Rank, Skill, WeaponSkill } from "@shared/character/skills"
 import { DEFAULT_LANG, type Lang } from "@game/i18n"
 
 export type { WeaponSkill }
@@ -121,6 +121,11 @@ export interface UnitInstance {
   sp: number
   /** Модель персонажа: склонности к навыкам и собственные статы на 1-м и 80-м уровне (шкала модели). */
   aptitudes: Aptitudes
+  /**
+   * Опыт владения каждым навыком (оружие и передвижение): растёт от использования в бою, ранг — по порогам
+   * `SKILL_XP.ranks` (`core/units/proficiency`). От уровня не зависит и переживает перерождение.
+   */
+  skillXp: Record<Skill, number>
   baseStats: StatValues
   maxStats: StatValues
   archetype: Archetype
@@ -358,6 +363,8 @@ export type BattleEvent
     | { type: "loot", unitId: string, pos: Pos, amount: number }
     | { type: "xp", unitId: string, amount: number, sp: number }
     | { type: "levelUp", unitId: string, level: number, gains: Partial<Stats> }
+    /** Навык (оружие или передвижение) бойца вырос до нового ранга от использования. */
+    | { type: "rankUp", unitId: string, skill: Skill, rank: Rank }
     | { type: "waited", unitId: string }
     | { type: "phaseChanged", phase: Side, turn: number }
     | { type: "reinforcements", unitIds: string[] }
@@ -495,6 +502,8 @@ export interface BattleSummary {
   armyFell: boolean
   /** Отступление по лимиту ходов, а не по решению игрока. */
   timeUp?: boolean
+  /** Бойцов осталось меньше, чем мест в отряде, — недостающие пришли сами (`reinforcements`). */
+  recruits?: UnitInstance[]
 }
 
 export interface SaveGame {

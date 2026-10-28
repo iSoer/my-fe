@@ -1,23 +1,20 @@
 import { useStore } from "@nanostores/react"
 import type { UnitInstance, UnitSkills } from "@game/core/types"
-import { MAX_LEVEL } from "@game/core/types"
-import { learnableNow, rankMt, skillCost, slotOf, unitWeapon, weaponMt, weaponRank, weaponShortfall } from "@game/core/units"
+import { learnableNow, rankMt, skillCost, slotOf, unitClassName, unitWeapon, weaponMt, weaponRank, weaponShortfall } from "@game/core/units"
+import { classAffinity, rankProgress, skillRank, skillRate } from "@game/core/units/proficiency"
 import { itemCount } from "@game/core/items"
 import { WEAPONS } from "@game/content/weapons"
 import { TALISMANS, talismanDef } from "@game/content/items"
 import { skillInfo } from "@game/content/index"
-import { COMBAT } from "@game/content/balance"
+import { APTITUDE_RATE, COMBAT } from "@game/content/balance"
 import { ringSvg, weaponIconSvg } from "@game/art/gear"
 import {
-  APTITUDE_CURVES,
   MOVEMENT_SKILLS,
   RANKS,
   SKILL_LABELS,
   WEAPON_GRADE_LABELS,
   WEAPON_SKILLS,
-  rankAtLevel,
   rankIndex,
-  type Rank,
   type Skill,
   type WeaponSkill
 } from "@shared/character/skills"
@@ -35,16 +32,8 @@ const skillIcon = (s: WeaponSkill): string => weaponIconSvg(s, "iron")
 
 const MOVE_ICON: Record<(typeof MOVEMENT_SKILLS)[number], string> = { riding: "🐎", flying: "🪽", heavyArmor: "🛡️" }
 
-/** Следующий ранг навыка и уровень, на котором он придёт (нет — навык уже на потолке склонности). */
-function nextRank(unit: UnitInstance, skill: Skill): { rank: Rank, level: number } | undefined {
-  const aptitude = unit.aptitudes[skill]
-  const now = rankAtLevel(aptitude, unit.level)
-  for (let level = unit.level + 1; level <= MAX_LEVEL; level++) {
-    const rank = rankAtLevel(aptitude, level)
-    if (rank !== now) return { rank, level }
-  }
-  return undefined
-}
+/** «×4.5» — скорость роста навыка: склонность класса × личная склонность. */
+const rateText = (rate: number): string => `×${Number.isInteger(rate) ? rate : rate.toFixed(1)}`
 
 /* ---------- Владение оружием ---------- */
 
@@ -57,12 +46,14 @@ function mtSteps(): string {
 export function MasteryGrid({ unit, onPick }: { unit: UnitInstance, onPick: (s: Skill) => void }) {
   const cell = (s: Skill, icon: React.ReactNode) => {
     const aptitude = unit.aptitudes[s]
-    const rank = rankAtLevel(aptitude, unit.level)
+    const rank = skillRank(unit, s)
+    const fast = skillRate(unit, s) >= 3
     return (
       <button key={s} type="button" className={`mastery-cell ${aptitude} ${s === unit.weaponSkill ? "current" : ""}`} onClick={() => onPick(s)}>
         {aptitude !== "normal" && <span className="mastery-mark">{aptitude === "talent" ? "★" : "▼"}</span>}
         {icon}
         <b className="mastery-rank">{rank}</b>
+        {fast && <span className="mastery-fast" title={tr("Grows fast in this class", "Быстро растёт в этом классе")}>▲</span>}
         <span className="mastery-name">{SKILL_LABELS[s]}</span>
       </button>
     )
@@ -89,15 +80,19 @@ export function MasteryGrid({ unit, onPick }: { unit: UnitInstance, onPick: (s: 
 export function MasterySheet({ unit, skill, onClose }: { unit: UnitInstance, skill: Skill | null, onClose: () => void }) {
   if (!skill) return <BottomSheet open={false} onClose={onClose}>{null}</BottomSheet>
   const aptitude = unit.aptitudes[skill]
-  const rank = rankAtLevel(aptitude, unit.level)
-  const next = nextRank(unit, skill)
-  const cap = APTITUDE_CURVES[aptitude]
+  const progress = rankProgress(unit, skill)
+  const rank = progress.rank
   const isWeapon = (WEAPON_SKILLS as readonly string[]).includes(skill)
-  const capText = aptitude === "talent"
-    ? tr(`★ Talent: grows fast, reaches ${cap.end} by Lv. ${cap.endLevel}.`, `★ Талант: растёт быстро, ${cap.end} к ${cap.endLevel} ур.`)
-    : aptitude === "weak"
-      ? tr(`▼ Weakness: grows slowly, no higher than ${cap.end}.`, `▼ Слабость: растёт медленно, не выше ${cap.end}.`)
-      : tr(`Grows steadily up to ${cap.end} by Lv. ${cap.endLevel}.`, `Растёт ровно, до ${cap.end} к ${cap.endLevel} ур.`)
+  const classRate = classAffinity(unit.classId, skill)
+  const personal = APTITUDE_RATE[aptitude]
+  const rateLine = [
+    tr(`Class ${unitClassName(unit)} ${rateText(classRate)}`, `Класс ${unitClassName(unit)} ${rateText(classRate)}`),
+    ...(aptitude === "talent" ? [tr(`★ talent ${rateText(personal)}`, `★ талант ${rateText(personal)}`)] : []),
+    ...(aptitude === "weak" ? [tr(`▼ weakness ${rateText(personal)}`, `▼ слабость ${rateText(personal)}`)] : [])
+  ].join(" · ")
+  const howText = isWeapon
+    ? tr("Grows by fighting with this weapon: every clash, more for a hit and a finishing blow; staves also by healing.", "Растёт от боёв этим оружием: каждая схватка, больше — за удар и добивание; посох — ещё и от лечения.")
+    : tr("Grows a little with every action in battle, faster in a class that uses it.", "Понемногу растёт от каждого действия в бою, быстрее — в классе, который им пользуется.")
   const grades = isWeapon ? WEAPONS.filter(w => w.kind === skill && w.variant === "basic") : []
   const held = skill === unit.weaponSkill
   return (
@@ -143,14 +138,21 @@ export function MasterySheet({ unit, skill, onClose }: { unit: UnitInstance, ski
                 )}
               </p>
             )}
+        {progress.next
+          ? (
+              <div className="stack" style={{ gap: 4 }}>
+                <div className="row between small">
+                  <span>{tr(`To ${progress.next}`, `До ${progress.next}`)}</span>
+                  <b>{`${Math.floor(progress.have)}/${progress.need}`}</b>
+                </div>
+                <div className="bar"><div style={{ width: `${Math.min(100, (progress.have / Math.max(1, progress.need)) * 100)}%` }} /></div>
+              </div>
+            )
+          : <p className="small gold" style={{ margin: 0 }}>{tr("★ Highest rank reached.", "★ Достигнут высший ранг.")}</p>}
         <div className="chip-row">
-          <span className="chip">{capText}</span>
+          <span className="chip">{`${tr("Growth", "Рост")} ${rateText(classRate * personal)}: ${rateLine}`}</span>
         </div>
-        <p className="small" style={{ margin: 0 }}>
-          {next
-            ? tr(`Next rank: ${next.rank} at Lv. ${next.level}.`, `Следующий ранг: ${next.rank} на ${next.level} ур.`)
-            : tr("This is the ceiling for this fighter.", "Это потолок для этого бойца.")}
-        </p>
+        <p className="muted small" style={{ margin: 0 }}>{howText}</p>
       </div>
     </BottomSheet>
   )

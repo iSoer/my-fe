@@ -34,6 +34,7 @@ import {
 } from "./motionFx"
 import type { UnitView } from "./UnitView"
 import { tr } from "@game/i18n"
+import { SKILL_LABELS } from "@shared/character/skills"
 
 /** Проигрывает события боя на сцене карты (и в кинематике). Логики игры не содержит. */
 export class GamePresenter implements Presenter {
@@ -204,6 +205,15 @@ export class GamePresenter implements Presenter {
       }
       case "xp":
         return
+      case "rankUp": {
+        // Оружие или передвижение выросло от использования: подпись над бойцом
+        const view = map.units.get(ev.unitId)
+        if (view) {
+          floatText(map, view.x, view.y - map.tile * 0.55, `${SKILL_LABELS[ev.skill]} ${ev.rank}!`, "#8ecae6", sp, { size: map.tile * 0.26 })
+          return wait(map, 380 / sp)
+        }
+        return
+      }
       case "waited":
         return wait(map, 60 / sp)
       case "battleEnded": {
