@@ -2,10 +2,10 @@ import type { BattleState, MoveType, Pos, TerrainId } from "@game/core/types"
 import { posKey } from "@game/core/types"
 import { terrainAt } from "@game/core/battle/query"
 import { moveCost } from "@game/core/map/pathing"
-import { MOVEMENT_LABELS } from "@shared/character/classes"
 import { CHARACTER_STAT_LABELS as L } from "@shared/character/leveling"
 import { COMBAT, TERRAIN_BONUS } from "./balance"
 import { biomeDef } from "./biomes"
+import { moveTypeLabel } from "./classes"
 import { tr } from "@game/i18n"
 import { BUFFS, CHEST_MARK } from "./expedition"
 
@@ -56,7 +56,7 @@ function moveText(terrain: TerrainId): string {
   const ok = MOVE_TYPES.filter(m => moveCost(terrain, m) !== null)
   if (ok.length === MOVE_TYPES.length) return tr("Anyone can walk here", "Проходима для всех")
   if (ok.length === 0) return tr("Impassable", "Непроходима")
-  return tr(`Only: ${ok.map(m => MOVEMENT_LABELS[m]).join(", ")}`, `Только: ${ok.map(m => MOVEMENT_LABELS[m]).join(", ")}`)
+  return tr(`Only: ${ok.map(m => moveTypeLabel(m)).join(", ")}`, `Только: ${ok.map(m => moveTypeLabel(m)).join(", ")}`)
 }
 
 /** Всё о клетке поля: название в биоме, проходимость, бонус стоящему и особенности (HP хлипкого препятствия). */

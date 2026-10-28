@@ -247,7 +247,7 @@
   }
   .class-terrain-name {
     color: var(--muted-paper);
-    font-size: 10px;
+    font-size: 11px;
   }
   .class-terrain b {
     font-size: 12px;

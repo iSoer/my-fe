@@ -458,12 +458,43 @@
   font-size: 18px;
   line-height: 1;
 }
+/* Подпись кнопки — до двух строк, а не «ЗАВЕРШИТЬ …» на узком телефоне */
 .bf-bar-label {
-  font-size: 10.5px;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 11px;
+  line-height: 1.05;
+  text-align: center;
   overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 100%;
+}
+@media (max-width: 400px) {
+  .bf-bar-bottom {
+    gap: 5px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .bf-bar-btn {
+    letter-spacing: 0;
+  }
+  /* Большое поле: у зума, меню и опасности — одни знаки (≡ ⚠ − +), место отдаём «Завершить ход» */
+  .bf-bar-zoom .bf-bar-label,
+  .bf-bar-bottom.has-zoom .bf-bar-btn:not(.bf-bar-end) .bf-bar-label {
+    display: none;
+  }
+  .bf-bar-bottom.has-zoom .bf-bar-btn:not(.bf-bar-end) .bf-bar-ico {
+    font-size: 22px;
+  }
+  .bf-bar-end .bf-bar-label {
+    font-size: 12px;
+  }
+  .bf-bar-zoom .bf-bar-ico {
+    font-size: 22px;
+  }
+  .bf-bar-bottom.has-zoom {
+    grid-template-columns: 0.8fr 0.8fr 1.3fr 2fr;
+  }
 }
 /* Зона опасности включена */
 .bf-bar-btn.on::before {
@@ -548,7 +579,7 @@
 .bf-unit-hide {
   align-self: flex-end;
   margin-top: -2px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -701,7 +732,7 @@
   color: var(--bf-muted);
   font-weight: 800;
   text-transform: uppercase;
-  font-size: 10px;
+  font-size: 11px;
 }
 .bf-stats > span::before {
   content: '';
@@ -719,7 +750,7 @@
 /* Временно изменённые статы: значение цветом и величина изменения рядом */
 .bf-stats small {
   margin-left: 2px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
 }
 .bf-stats > .bf-stat-down::before {
@@ -769,7 +800,7 @@
   line-height: 1;
 }
 .bf-tile-kind {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -918,7 +949,7 @@
 }
 .bf-tag {
   padding: 2px 8px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 900;
   font-style: italic;
   text-transform: uppercase;

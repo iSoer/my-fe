@@ -45,11 +45,19 @@ export function classMoveType(classId: string): MoveType {
   return movementOf(fwClass(classId))
 }
 
-/** Как модель показывает передвижение класса: животное (`MOUNT_LABELS`), иначе тип движения (`MOVEMENT_LABELS`). */
+/** Подпись типа движения на языке интерфейса (`MOVEMENT_LABELS` модели — английские). */
+export function moveTypeLabel(m: MoveType): string {
+  const ru: Record<MoveType, string> = { infantry: "Пехота", cavalry: "Кавалерия", flier: "Летун", armored: "Латник" }
+  return tr(MOVEMENT_LABELS[m], ru[m])
+}
+
+/** Как показывается передвижение класса: животное (`MOUNT_LABELS`), иначе тип движения — на языке интерфейса. */
 export function movementLabel(classId: string): string {
   const fw = fwClass(classId)
   const mount = mountOf(fw)
-  return mount ? MOUNT_LABELS[mount] : MOVEMENT_LABELS[movementOf(fw)]
+  if (!mount) return moveTypeLabel(movementOf(fw))
+  const ru: Record<typeof mount, string> = { horse: "Конь", pegasus: "Пегас", dragon: "Дракон" }
+  return tr(MOUNT_LABELS[mount], ru[mount])
 }
 
 const CLASS_CACHE = new Map<string, ClassDef>()

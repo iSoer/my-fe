@@ -6,7 +6,8 @@
   --paper: #ffffff;
   --paper-2: #f3f1f5;
   --paper-3: #e9e6ec;
-  --red: #e63946;
+  /* Белый текст на красном — не ниже 4.5:1 */
+  --red: #dc3341;
   --red-deep: #b91c2c;
   --red-hot: #ff2d4a;
   --grey: #8e8a94;
@@ -27,11 +28,13 @@
   --accent: var(--red);
   --accent-deep: var(--red-deep);
   --accent-2: var(--red-deep);
-  --accent-grad: linear-gradient(135deg, #ff4b5c 0%, #e63946 60%, #c81e2e 100%);
+  --accent-grad: linear-gradient(135deg, #e23d4c 0%, #d0293a 60%, #b51b2b 100%);
   --teal: #7ad3c2;
   --teal-text: #1f7f6d;
   --gold: #ffd166;
   --gold-text: #8a5f0a;
+  /* Звёзды редкости на белом: золото темнее, чтобы читалось */
+  --star-paper: #a8740a;
   --purple: #b79cff;
   --purple-text: #5f3fc2;
   --blue: #8fc9ff;
@@ -186,7 +189,21 @@ p {
 }
 
 .muted {
-  color: var(--muted-ink);
+  color: var(--muted);
+}
+/* Светлые поверхности: приглушённый текст и звёзды — тёмные варианты (контраст на белом), внутри тёмных — светлые */
+.card,
+.paper,
+.sheet,
+.modal-box,
+.team-card,
+.mode-card,
+.diff-card {
+  --muted: var(--muted-paper);
+}
+.card.ink,
+.ink {
+  --muted: var(--muted-ink);
 }
 .small {
   font-size: 12px;
@@ -340,8 +357,9 @@ p {
 /* ---------- Верхняя панель ---------- */
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 8px 12px;
   min-height: 54px;
   background: var(--ink);
@@ -362,7 +380,8 @@ p {
   pointer-events: none;
 }
 .topbar h2 {
-  flex: 1;
+  flex: 1 1 96px;
+  min-width: 0;
   font-size: 19px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -668,7 +687,7 @@ p {
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
 }
 .stat .label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted-ink);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -696,7 +715,7 @@ p {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 4px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted-paper);
   text-align: center;
   text-transform: uppercase;
@@ -777,6 +796,9 @@ p {
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 }
 .card.selected .badge {
@@ -795,8 +817,11 @@ p {
   font-size: 12px;
   text-shadow: 1px 1px 0 var(--ink);
 }
-.card .stars {
-  color: #e0a92c;
+.card .stars,
+.sheet .stars,
+.modal-box .stars,
+.team-card .stars {
+  color: var(--star-paper);
   text-shadow: none;
 }
 .chip {
@@ -1106,9 +1131,15 @@ p {
 }
 .unit-row .side {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
+}
+/* Узкий экран: чипы класса и оружия не вылезают под кнопку справа */
+.unit-row .sub > * {
+  max-width: 100%;
+  min-width: 0;
 }
 .unit-row .lvl {
   font-weight: 900;
@@ -1722,7 +1753,7 @@ p {
   min-width: 0;
 }
 .slot .slot-name {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted-paper);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1840,7 +1871,7 @@ p {
   line-height: 1.1;
 }
 .btn-stack .caption {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   opacity: 0.7;
 }
@@ -1865,7 +1896,8 @@ p {
 }
 .mini-stats {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -2075,7 +2107,7 @@ p {
   font-size: 28px;
   font-weight: 900;
   line-height: 1;
-  color: var(--diff-color);
+  color: var(--text-paper);
 }
 .diff-card .diff-body {
   flex: 1;
@@ -2848,7 +2880,7 @@ p {
 .mastery-name {
   max-width: 100%;
   color: var(--muted-ink);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.1;
   text-align: center;
   text-transform: uppercase;
@@ -2893,7 +2925,8 @@ p {
   position: absolute;
   top: 3px;
   right: 5px;
-  color: var(--ok-text, #2f7a1f);
+  /* На тёмной плитке — яркий зелёный (на красной плитке оружия в лапах — белый, ниже) */
+  color: #7ddf64;
   font-size: 11px;
 }
 .mastery-cell.talent {
@@ -2912,6 +2945,9 @@ p {
 /* Оружие в лапах — красная подложка */
 .mastery-cell.current {
   background: var(--red-deep);
+}
+.mastery-cell.current .mastery-fast {
+  color: var(--paper);
 }
 .mastery-cell.current .mastery-name {
   color: var(--paper);
@@ -2982,7 +3018,7 @@ p {
 }
 .gear-slot {
   color: var(--muted-paper);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3058,10 +3094,11 @@ p {
   grid-column: span 3;
 }
 .skill-tile--special {
-  --slot: #e85d04;
+  /* Цвета плашек слотов — тёмные, чтобы белая подпись читалась (≥ 4.5:1) */
+  --slot: #b84a03;
 }
 .skill-tile--assist {
-  --slot: #2a9d8f;
+  --slot: #1d7066;
 }
 .skill-tile--a {
   --slot: #c0392b;
@@ -3080,7 +3117,7 @@ p {
   padding: 3px 6px;
   background: var(--slot);
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -3106,13 +3143,13 @@ p {
 .skill-tile-hint {
   padding: 0 6px;
   color: var(--muted-paper);
-  font-size: 10px;
+  font-size: 11px;
 }
 .skill-tile-learn,
 .skill-tile-more {
   margin: 2px 6px 0;
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
 }
 .skill-tile-learn {
@@ -3362,7 +3399,7 @@ p {
   font-size: 22px;
 }
 .res-tile-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -3451,7 +3488,7 @@ p {
   animation: pop-in 0.4s var(--ease-back) both;
 }
 .res-gain small {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   color: var(--muted-ink);
@@ -3472,4 +3509,43 @@ p {
 }
 .res-gain.up {
   background: rgba(154, 214, 107, 0.18);
+}
+
+/* Узкие телефоны: счётчики в шапке компактнее — заголовок экрана не обрезается; не влезло — переносятся под него */
+@media (max-width: 430px) {
+  .pawfield .topbar .resources {
+    gap: 6px;
+    margin-left: auto;
+    font-size: 12px;
+  }
+  .pawfield .topbar .resources .res {
+    padding: 3px 8px 3px 7px;
+  }
+  .pawfield .topbar h2 {
+    font-size: 17px;
+  }
+}
+/* Ползунки настроек — удобная для пальца высота */
+.pawfield .setting input[type="range"] {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--red);
+}
+
+/* Узкий экран: строка бойца с кнопкой справа (награда, набор) — кнопка с уровнем уходит под информацию,
+   иначе имя и статы сжимаются в столбик */
+@media (max-width: 374px) {
+  .pawfield .unit-row:has(.side .btn) {
+    flex-wrap: wrap;
+  }
+  .pawfield .unit-row:has(.side .btn) .info {
+    flex-basis: calc(100% - 80px);
+  }
+  .pawfield .unit-row:has(.side .btn) .side {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    gap: 10px;
+  }
 }

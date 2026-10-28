@@ -130,11 +130,11 @@
   }
   .st-dock-hint {
     color: #8a5f0a;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
   }
   .st-dock-btn.is-main {
-    background: var(--accent-grad);
+    background: var(--red);
     color: #fff;
   }
   .st-dock-btn.is-main .st-dock-name {
@@ -160,10 +160,35 @@
       border-width: 2px;
     }
     .st-dock-name {
-      font-size: 10px;
+      font-size: 11px;
     }
     .st-dock-btn.is-main .st-dock-name {
       font-size: 12px;
+    }
+  }
+  /* Самые узкие телефоны (320–360): полные названия вместо «Казар…» — плотнее и без капса у «Вылазки» */
+  @media (max-width: 360px) {
+    .st-dock {
+      /* Ширина кнопок — по подписи (остаток поровну): «Лавке» хватает меньше, «Кладбищу» нужно больше */
+      display: flex;
+      gap: 3px;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+    .st-dock-btn {
+      flex: 1 1 auto;
+    }
+    /* «построить» не помещается — непостроенное и так видно по серой иконке */
+    .st-dock-hint {
+      display: none;
+    }
+    .st-dock-name {
+      letter-spacing: -0.03em;
+      font-weight: 700;
+    }
+    .st-dock-btn.is-main .st-dock-name {
+      font-size: 11px;
+      text-transform: none;
     }
   }
   @keyframes st-guide {
@@ -279,6 +304,8 @@
     text-decoration: line-through;
   }
   .squad-toggle {
+    min-height: 32px;
+    padding: 4px 10px;
     cursor: pointer;
     border: none;
     font: inherit;
@@ -286,7 +313,7 @@
 
   .bf-loot-risk {
     margin-left: 4px;
-    font-size: 9px;
+    font-size: 11px;
     opacity: 0.8;
     text-transform: uppercase;
   }

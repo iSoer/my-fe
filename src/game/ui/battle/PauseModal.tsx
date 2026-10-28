@@ -24,11 +24,14 @@ export function PauseModal({ battle }: { battle: BattleState }) {
             <span className="bf-chip">{difficultyName(battle.difficulty)}</span>
             <span className="bf-chip">{biome.name}</span>
             <span className="bf-chip">
-              {tr("turn", "ход")}
-              {battle.turn}
+              {`${tr("turn", "ход")} ${battle.turn}`}
             </span>
             <span className="bf-chip">
-              {battle.map.objective === "killBoss" ? tr("goal: kill the Leader", "цель: убить вожака") : tr("goal: wipe them all", "цель: уничтожить всех")}
+              {battle.map.objective === "killBoss"
+                ? tr("goal: kill the Leader", "цель: убить вожака")
+                : battle.map.objective === "extract"
+                  ? tr("goal: open a chest and leave by an exit", "цель: открыть сундук и уйти через выход")
+                  : tr("goal: wipe them all", "цель: уничтожить всех")}
             </span>
           </div>
           <div className="setting">
