@@ -6,6 +6,7 @@ import { biomeDef } from "@game/content/biomes"
 import { haptic } from "@game/platform/haptics"
 import { setFastForward, type BattleUiState } from "@game/state/battleUi"
 import { tr } from "@game/i18n"
+import { BUFFS } from "@game/content/expedition"
 
 /** Верхняя полоса HUD над полем: фаза, счётчик действовавших, добыча, биом и ускорение хода врага. */
 export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState }) {
@@ -17,6 +18,8 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
   const limit = turnLimitOf(battle.map)
   const chests = battle.map.expedition?.chests.length ?? 0
   const opened = battle.expedition?.opened.length ?? 0
+  // Бонусы всего отряда (личные — значками над бойцами)
+  const teamBuffs = (battle.expedition?.buffs.team ?? []).map(b => BUFFS[b].icon).join("")
   const keys = battle.expedition
     ? Object.values(battle.expedition.keys).filter(k => k.unitId && battle.units[k.unitId]?.side === "player").length
     : 0
@@ -55,6 +58,7 @@ export function TopHud({ battle, ui }: { battle: BattleState, ui: BattleUiState 
         >
           {`📦 ${opened}/${chests}`}
           {keys > 0 ? ` · 🗝 ${keys}` : ""}
+          {teamBuffs ? ` · ${teamBuffs}` : ""}
           {opened > 0 ? ` · ${tr("→ exit", "→ к выходу")}` : ""}
         </span>
       )}

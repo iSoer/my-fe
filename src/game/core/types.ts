@@ -186,20 +186,42 @@ export interface EnemyPlacement {
   leash?: number
 }
 
+/** Что лежит в сундуке: Вкусняшки, оружие или талисман (видно только клеймо категории на крышке). */
+export type ChestKind = "treats" | "weapon" | "talisman"
+
 /** Сундук вылазки в чащу: где стоит, что внутри, у какого стража ключ. */
 export interface ExpeditionChest {
   id: string
   pos: Pos
-  /** Вкусняшки внутри: при открытии идут в добычу вылазки. */
+  kind: ChestKind
+  /** Вкусняшки внутри (сундук с Вкусняшками): при открытии идут в добычу вылазки. */
   treats: number
+  /** Оружие или талисман внутри: достаётся армии, если отряд уйдёт через выход. */
+  itemId?: string
   /** Враг, у которого ключ от этого сундука. */
   keyHolderId: string
 }
 
+/** Бонус до конца вылазки: выпадает из усиленного врага-одиночки, действует с момента, как его подобрали. */
+export type BuffKind = "fury" | "swift" | "aegis" | "regen" | "fortune"
+
+/** Что лежит на клетке: сердечко (полное здоровье подобравшему) или бонус. */
+export type PickupKind = "heart" | BuffKind
+
+export interface Pickup {
+  id: string
+  pos: Pos
+  kind: PickupKind
+}
+
 export interface ExpeditionDef {
   chests: ExpeditionChest[]
-  /** Клетка выхода в углу карты: боец на ней уводит отряд с добычей (если открыт хоть один сундук). */
-  exit: Pos
+  /** Выходы в углах карты (три, кроме угла старта): боец на любом уводит отряд с добычей, если открыт хоть один сундук. */
+  exits: Pos[]
+  /** Сердечки на карте с начала вылазки. */
+  pickups: Pickup[]
+  /** Усиленные враги-одиночки и бонус, который остаётся на месте их гибели. */
+  elites: { unitId: string, buff: BuffKind }[]
 }
 
 /** Где ключ от сундука: у бойца или на земле. */
@@ -208,10 +230,15 @@ export interface KeySpot {
   pos?: Pos
 }
 
-/** Ход вылазки: ключи и открытые сундуки. */
+/** Ход вылазки: ключи, открытые сундуки, что лежит на земле, действующие бонусы и найденные предметы. */
 export interface ExpeditionState {
   keys: Record<string, KeySpot>
   opened: string[]
+  pickups: Pickup[]
+  /** Бонусы всему отряду и личные (по id бойца). */
+  buffs: { team: BuffKind[], units: Record<string, BuffKind[]> }
+  /** Оружие и талисманы из сундуков: армия получит их, если отряд уйдёт через выход. */
+  found: string[]
 }
 
 export interface ReinforcementWave {
@@ -438,7 +465,11 @@ export type BattleEvent
     /** Вылазка в чащу: ключ перешёл к бойцу (убил носителя или подобрал с земли) или упал на землю. */
     | { type: "keyTaken", chestId: string, unitId: string, pos: Pos }
     | { type: "keyDropped", chestId: string, pos: Pos }
-    | { type: "chestOpened", chestId: string, unitId: string, pos: Pos, treats: number }
+    | { type: "chestOpened", chestId: string, unitId: string, pos: Pos, treats: number, itemId?: string }
+    /** Боец подобрал сердечко (`healed` — сколько HP вернулось) или бонус. */
+    | { type: "pickup", unitId: string, pos: Pos, kind: PickupKind, healed?: number }
+    /** Усиленный одиночка пал — на его клетке остался бонус. */
+    | { type: "pickupDropped", pos: Pos, kind: PickupKind }
     | { type: "extracted", unitId: string, pos: Pos }
 
 export interface ReduceResult {
@@ -575,6 +606,8 @@ export interface BattleSummary {
   timeUp?: boolean
   /** Бойцов осталось меньше, чем мест в отряде, — недостающие пришли сами (`reinforcements`). */
   recruits?: UnitInstance[]
+  /** Вылазка в чащу: оружие и талисманы из сундуков, унесённые через выход. */
+  found?: string[]
 }
 
 export interface SaveGame {

@@ -40,3 +40,11 @@ export function keySvg(): string {
     + "<rect x=\"51\" y=\"34\" width=\"4\" height=\"6\" fill=\"#e0b54a\" stroke=\"#6b4c10\" stroke-width=\"1.2\" />"
     + "<path d=\"M14 27 a7 7 0 0 1 8 -4\" stroke=\"#fff6d0\" stroke-width=\"2\" fill=\"none\" /></g>")
 }
+
+/** Сердечко на клетке: глянцевое красное, с бликом и тёмной обводкой (подпрыгивает и бьётся на поле). */
+export function heartSvg(): string {
+  return svg("<path d=\"M32 54 C 12 40, 6 28, 10 19 C 14 10, 26 9, 32 18 C 38 9, 50 10, 54 19 C 58 28, 52 40, 32 54 Z\" fill=\"#e63950\" stroke=\"#7a1424\" stroke-width=\"2.5\" stroke-linejoin=\"round\" />"
+    + "<path d=\"M32 50 C 16 39, 11 29, 14 21 C 17 15, 25 14, 30 21\" fill=\"none\" stroke=\"#ff8fa0\" stroke-width=\"2\" opacity=\".6\" />"
+    + "<ellipse cx=\"21\" cy=\"20\" rx=\"5\" ry=\"3.2\" transform=\"rotate(-35 21 20)\" fill=\"#fff\" opacity=\".75\" />"
+    + "<circle cx=\"26\" cy=\"27\" r=\"1.6\" fill=\"#fff\" opacity=\".55\" />")
+}

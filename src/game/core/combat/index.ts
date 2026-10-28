@@ -1,4 +1,5 @@
 import type { BattleState, BattleUnit, Effect, Pos, Stats, Strike, Triangle, UnitInstance } from "../types"
+import { buffDamageMult } from "../battle/buffs"
 import { STATS, addStats, attackStatOf, emptyStats, manhattan } from "../types"
 import type { CombatCtx, CombatUnitView, StrikeInfo } from "../skills/types"
 import { counterAnyRange, negatesEffective, specialMaxCd, unitKit, wrathfulStaff } from "../skills/engine"
@@ -244,6 +245,9 @@ export function simulateCombat(
       const r = h.damageReduction?.(ctxDef, info) ?? 0
       if (r > 0) dmg = Math.floor(dmg * (1 - r))
     }
+    // Бонусы вылазки в чащу: «ярость» атакующего, «оберег» защитника (вне вылазки — ×1)
+    const buffMult = buffDamageMult(state, atk.bu.unitId, def.bu.unitId)
+    if (buffMult !== 1) dmg = Math.floor(dmg * buffMult)
     // Любой удар ранит хотя бы на COMBAT.minDamage — бойцы, не пробивающие друг друга, не затягивают бой навсегда;
     // обнулить урон может только неуязвимость (пассивки)
     dmg = Math.max(COMBAT.minDamage, dmg)

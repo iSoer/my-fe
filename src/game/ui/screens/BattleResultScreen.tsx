@@ -5,6 +5,7 @@ import type { SaveGame, UnitInstance } from "@game/core/types"
 import { MAX_LEVEL, attackStatOf } from "@game/core/types"
 import { isMagicWeapon } from "@game/content/weapons"
 import { displayName, unitClassName, visibleStats } from "@game/core/units"
+import { itemInfo } from "@game/core/items"
 import { biomeDef } from "@game/content/biomes"
 import { BATTLE, XP } from "@game/content/balance"
 import { $save } from "@game/state/save"
@@ -282,6 +283,25 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
               "Никого не осталось. Слава начислена; Сержант Барбос в Казарме выдаст новый стартовый ростер."
             )}
           </div>
+        </div>
+      )}
+
+      {lb.found && lb.found.length > 0 && (
+        <div className="card stack pop-in" style={{ animationDelay: `${recruitsDelay}ms` }}>
+          <div className="section-title">{tr("Found in chests", "Найдено в сундуках")}</div>
+          <p className="small muted" style={{ margin: 0 }}>{tr("The squad carried these out — they are in the Army inventory.", "Отряд вынес это из чащи — всё уже в инвентаре армии.")}</p>
+          {lb.found.map((id, i) => {
+            const it = itemInfo(id)
+            return (
+              <div key={`${id}:${i}`} className="row" style={{ gap: 10 }}>
+                <span style={{ fontSize: 24 }} aria-hidden="true">{it.icon}</span>
+                <div className="stack grow" style={{ gap: 2, minWidth: 0 }}>
+                  <b>{it.name}</b>
+                  <span className="small muted">{it.desc}</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 

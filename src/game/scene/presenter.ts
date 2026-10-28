@@ -35,6 +35,8 @@ import {
 import type { UnitView } from "./UnitView"
 import { tr } from "@game/i18n"
 import { SKILL_LABELS } from "@shared/character/skills"
+import { BUFFS, pickupIcon } from "@game/content/expedition"
+import { itemInfo } from "@game/core/items"
 
 /** Проигрывает события боя на сцене карты (и в кинематике). Логики игры не содержит. */
 export class GamePresenter implements Presenter {
@@ -151,8 +153,28 @@ export class GamePresenter implements Presenter {
         const c = map.center(ev.pos)
         sfx("loot")
         haptic("success")
-        floatText(map, c.x, c.y - map.tile * 0.5, `+${ev.treats} 🦴`, "#ffd166", sp, { size: map.tile * 0.36, rise: 46, duration: 1200 })
-        return wait(map, 420 / sp)
+        // Что было внутри — видно только сейчас: Вкусняшки или предмет (он достанется армии при уходе через выход)
+        const text = ev.itemId ? `${itemInfo(ev.itemId).icon} ${itemInfo(ev.itemId).name}` : `+${ev.treats} 🦴`
+        floatText(map, c.x, c.y - map.tile * 0.5, text, "#ffd166", sp, { size: map.tile * (ev.itemId ? 0.28 : 0.36), rise: 46, duration: 1400 })
+        return wait(map, 480 / sp)
+      }
+      case "pickup": {
+        map.refreshExpedition(after)
+        const view = map.units.get(ev.unitId)
+        const c = view ? { x: view.x, y: view.y } : map.center(ev.pos)
+        haptic("success")
+        sfx(ev.kind === "heart" ? "heal" : "levelUp")
+        const text = ev.kind === "heart" ? `❤️ +${ev.healed ?? 0} HP` : `${BUFFS[ev.kind].icon} ${BUFFS[ev.kind].name}`
+        floatText(map, c.x, c.y - map.tile * 0.55, text, ev.kind === "heart" ? "#ff8fa3" : "#ffd166", sp, { size: map.tile * 0.28, rise: 40, duration: 1300 })
+        if (ev.kind !== "heart" && BUFFS[ev.kind].scope === "team")
+          return banner(map, `${BUFFS[ev.kind].icon} ${BUFFS[ev.kind].desc}`, 0xffd166, sp, 600)
+        return wait(map, 380 / sp)
+      }
+      case "pickupDropped": {
+        map.refreshExpedition(after)
+        const c = map.center(ev.pos)
+        floatText(map, c.x, c.y - map.tile * 0.4, `${pickupIcon(ev.kind)} ${tr("Bonus!", "Бонус!")}`, "#ffd166", sp, { size: map.tile * 0.26 })
+        return wait(map, 260 / sp)
       }
       case "extracted":
         haptic("success")

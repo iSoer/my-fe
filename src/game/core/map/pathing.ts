@@ -2,6 +2,7 @@ import type { BattleState, BattleUnit, BoardSize, MoveType, Pos, Side, TerrainId
 import { MAP_H, MAP_W, inMap, manhattan, mapSize, posKey } from "../types"
 import { livingUnits, otherSide, terrainAt, unitAt } from "../battle/query"
 import { hasPassThrough, moveRange } from "../skills/engine"
+import { buffMoveBonus } from "../battle/buffs"
 import { unitClass } from "@game/content/classes"
 import { weaponDef } from "@game/content/weapons"
 
@@ -61,7 +62,7 @@ export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?
   const unit = state.roster[bu.unitId]
   if (!unit) return new Map()
   const cls = unitClass(unit)
-  const budget = budgetOverride ?? moveRange(unit)
+  const budget = budgetOverride ?? moveRange(unit) + buffMoveBonus(state, bu.unitId)
   const pass = hasPassThrough(unit)
   const start = fromOverride ?? moveOrigin(bu)
   const result: ReachMap = new Map()

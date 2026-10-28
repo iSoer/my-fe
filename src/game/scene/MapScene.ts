@@ -17,7 +17,8 @@ import {
 } from "@game/state/battleUi"
 import { $boardInsets, $boardZoom, publishBoardLayout, resetBoardZoom, zoomBoard } from "@game/state/boardLayout"
 import { computeLayout, computeWorldLayout, pixelToGrid, tileCenter, tileOrigin, type BoardLayout } from "./layout"
-import { chestSvg, keySvg } from "@game/art/expedition"
+import { chestSvg, heartSvg, keySvg } from "@game/art/expedition"
+import { BUFFS, CHEST_MARK, pickupIcon } from "@game/content/expedition"
 import { ensureTextures, TEX } from "./textures"
 import { HL, TERRAIN_GLYPH, textStyle } from "./style"
 import type { BattleResult } from "@game/core/types"
@@ -57,6 +58,7 @@ const EXPEDITION_GLOOM = 0x9aa595
 const CHEST_TEX = "exp_chest"
 const CHEST_OPEN_TEX = "exp_chest_open"
 const KEY_TEX = "exp_key"
+const HEART_TEX = "exp_heart"
 
 export const MAP_SCENE_KEY = "Map"
 
@@ -302,7 +304,8 @@ export class MapScene extends Phaser.Scene {
       jobs.push(
         ensureTexture(this, CHEST_TEX, chestSvg(false), 128, 128),
         ensureTexture(this, CHEST_OPEN_TEX, chestSvg(true), 128, 128),
-        ensureTexture(this, KEY_TEX, keySvg(), 128, 128)
+        ensureTexture(this, KEY_TEX, keySvg(), 128, 128),
+        ensureTexture(this, HEART_TEX, heartSvg(), 128, 128)
       )
     }
     for (const bu of Object.values(st.units)) {
@@ -1232,30 +1235,42 @@ export class MapScene extends Phaser.Scene {
       return
     }
     const holders = new Set(Object.values(exp.keys).map(k => k.unitId).filter((id): id is string => !!id))
-    for (const v of this.units.values()) if (v.scene) v.setKey(holders.has(v.unitId), KEY_TEX)
-    const sig = `${this.layout.tile}|${exp.opened.join(",")}|${JSON.stringify(exp.keys)}`
+    const eliteBuff = new Map(def.elites.map(e => [e.unitId, e.buff]))
+    for (const v of this.units.values()) {
+      if (!v.scene) continue
+      v.setKey(holders.has(v.unitId), KEY_TEX)
+      // Одиночка — значок бонуса, который останется после него; боец игрока — его личные бонусы
+      const drop = eliteBuff.get(v.unitId)
+      v.setMark(drop ? BUFFS[drop].icon : (exp.buffs.units[v.unitId] ?? []).map(b => BUFFS[b].icon).join(""))
+    }
+    const sig = `${this.layout.tile}|${exp.opened.join(",")}|${JSON.stringify(exp.keys)}|${exp.pickups.map(p => p.id).join(",")}`
     if (sig === this.expSig) return
     this.expSig = sig
     for (const t of this.expTweens) t.stop()
     this.expTweens = []
     this.expLayer.removeAll(true)
     const t = this.tile
-    // Выход: светящаяся клетка в углу и табличка; пока не открыт ни один сундук — приглушён
+    // Выходы: светящиеся клетки в углах с табличкой; пока не открыт ни один сундук — приглушены
     const ready = exp.opened.length > 0
-    const e = this.center(def.exit)
-    const glow = this.add.graphics()
-    glow.fillStyle(ready ? 0x7dffb0 : 0xbfe8cf, ready ? 0.42 : 0.22)
-    glow.fillRoundedRect(e.x - t / 2 + 3, e.y - t / 2 + 3, t - 6, t - 6, t * 0.18)
-    glow.lineStyle(Math.max(2, t * 0.06), ready ? 0x7dffb0 : 0xe8fff0, 0.95)
-    glow.strokeRoundedRect(e.x - t / 2 + 3, e.y - t / 2 + 3, t - 6, t - 6, t * 0.18)
-    const arrow = this.add.text(e.x, e.y, "⇱", textStyle(t * 0.5, "#ffffff", true, 3)).setOrigin(0.5)
-    if (def.exit.x > 0) arrow.setFlipX(true)
-    if (def.exit.y > 0) arrow.setFlipY(true)
-    const label = this.add
-      .text(e.x, e.y - t * 0.62, tr("EXIT", "ВЫХОД"), textStyle(Math.max(10, t * 0.22), ready ? "#7dffb0" : "#e8fff0", true, 3))
-      .setOrigin(0.5)
-    this.expLayer.add([glow, arrow, label])
-    this.expTweens.push(this.tweens.add({ targets: glow, alpha: 0.45, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }))
+    for (const exitPos of def.exits) {
+      const e = this.center(exitPos)
+      const glow = this.add.graphics()
+      glow.fillStyle(ready ? 0x7dffb0 : 0xbfe8cf, ready ? 0.42 : 0.22)
+      glow.fillRoundedRect(e.x - t / 2 + 3, e.y - t / 2 + 3, t - 6, t - 6, t * 0.18)
+      glow.lineStyle(Math.max(2, t * 0.06), ready ? 0x7dffb0 : 0xe8fff0, 0.95)
+      glow.strokeRoundedRect(e.x - t / 2 + 3, e.y - t / 2 + 3, t - 6, t - 6, t * 0.18)
+      // Стрелка смотрит в свой угол
+      const arrow = this.add.text(e.x, e.y, "⇱", textStyle(t * 0.5, "#ffffff", true, 3)).setOrigin(0.5)
+      if (exitPos.x > 0) arrow.setFlipX(true)
+      if (exitPos.y > 0) arrow.setFlipY(true)
+      // Табличка — внутрь поля: у верхнего края под клеткой, у нижнего — над ней
+      const labelY = exitPos.y === 0 ? e.y + t * 0.62 : e.y - t * 0.62
+      const label = this.add
+        .text(e.x, labelY, tr("EXIT", "ВЫХОД"), textStyle(Math.max(10, t * 0.22), ready ? "#7dffb0" : "#e8fff0", true, 3))
+        .setOrigin(0.5)
+      this.expLayer.add([glow, arrow, label])
+      this.expTweens.push(this.tweens.add({ targets: glow, alpha: 0.45, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }))
+    }
     for (const chest of def.chests) {
       const c = this.center(chest.pos)
       const opened = exp.opened.includes(chest.id)
@@ -1275,6 +1290,33 @@ export class MapScene extends Phaser.Scene {
       const img = this.add.image(c.x, c.y + t * 0.04, tex).setDisplaySize(t * 0.92, t * 0.92)
       if (opened) img.setAlpha(0.85)
       this.expLayer.add(img)
+      // Клеймо на крышке: намёк на то, что внутри (Вкусняшки, оружие, украшение) — без самого предмета
+      if (!opened) {
+        const badge = this.add.circle(c.x + t * 0.3, c.y - t * 0.28, t * 0.17, 0x1a120a, 0.85).setStrokeStyle(2, 0xe0b54a)
+        const mark = this.add.text(c.x + t * 0.3, c.y - t * 0.28, CHEST_MARK[chest.kind], textStyle(Math.max(9, t * 0.2), "#ffffff", false, 0)).setOrigin(0.5)
+        this.expLayer.add([badge, mark])
+      }
+    }
+    // Сердечки и бонусы на земле: медленно парят и мягко пульсируют в ореоле; у каждого своя фаза, чтобы не мигали
+    // хором. Сердечко — векторная картинка (эмодзи-текст дрожит при движении на доли пикселя)
+    for (const p of exp.pickups) {
+      const c = this.center(p.pos)
+      const phase = (Math.abs(p.pos.x * 73 + p.pos.y * 151) % 1000) / 1000
+      const halo = this.add.circle(c.x, c.y + t * 0.08, t * 0.3, p.kind === "heart" ? 0xff6b8a : 0xffd166, 0.26)
+      const heart = p.kind === "heart" && hasTexture(this, HEART_TEX)
+      const icon = heart
+        ? this.add.image(c.x, c.y, HEART_TEX).setDisplaySize(t * 0.5, t * 0.5)
+        : this.add.text(c.x, c.y, pickupIcon(p.kind), textStyle(Math.max(12, t * 0.42), "#ffffff", false, 0)).setOrigin(0.5).setResolution(2)
+      this.expLayer.add([halo, icon])
+      const base = icon.scale
+      this.expTweens.push(
+        // Парение: медленно и невысоко
+        this.tweens.add({ targets: icon, y: c.y - t * 0.07, duration: 1500, delay: phase * 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }),
+        // Сердцебиение: лёгкое «тук» с мягким возвратом
+        this.tweens.add({ targets: icon, scale: base * 1.08, duration: 420, delay: phase * 900, yoyo: true, hold: 60, repeatDelay: 700, repeat: -1, ease: "Sine.easeInOut" }),
+        // Ореол дышит в такт парению
+        this.tweens.add({ targets: halo, scale: 1.12, alpha: 0.14, duration: 1500, delay: phase * 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+      )
     }
     // Ключи на земле подпрыгивают и светятся
     for (const spot of Object.values(exp.keys)) {

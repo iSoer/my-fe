@@ -7,6 +7,11 @@ import { decideAction } from "@game/core/ai"
 import { isPassable, tilesAtDistance, reachableTiles } from "@game/core/map/pathing"
 import { EXPEDITION, turnLimitOf } from "@game/content/balance"
 import { decorMask } from "@game/core/map/layouts"
+import { itemCategory, itemPrice } from "@game/core/items"
+import { buffDamageMult, buffLootMult, hasBuff } from "@game/core/battle/buffs"
+import { simulateCombat } from "@game/core/combat"
+import { resolveBattle } from "@game/core/progression"
+import { createEmptySave } from "@game/core/save"
 import { MAP_H, MAP_W, manhattan, mapSize, posKey, type BattleState, type Difficulty, type MapDef, type Pos } from "@game/core/types"
 import { makeUnit, plainTiles } from "./helpers"
 
@@ -44,12 +49,16 @@ describe("вылазка в чащу: карта", () => {
         const exp = m.expedition!
         // Выход — в углу карты, старт — в другом
         const { w, h } = mapSize(m)
-        expect([0, w - 1]).toContain(exp.exit.x)
-        expect([0, h - 1]).toContain(exp.exit.y)
-        expect(manhattan(exp.exit, m.playerSpawns[0]!)).toBeGreaterThan(10)
+        // Три выхода — в углах (кроме угла старта), далеко от старта
+        expect(exp.exits.length).toBe(3)
+        for (const e of exp.exits) {
+          expect([0, w - 1]).toContain(e.x)
+          expect([0, h - 1]).toContain(e.y)
+          expect(manhattan(e, m.playerSpawns[0]!)).toBeGreaterThan(10)
+        }
         expect(exp.chests.length).toBe(EXPEDITION.chests[difficulty])
         const reach = bfs(m, m.playerSpawns[0]!)
-        expect(reach.has(posKey(exp.exit))).toBe(true)
+        for (const e of exp.exits) expect(reach.has(posKey(e))).toBe(true)
         for (const c of exp.chests) {
           expect(reach.has(posKey(c.pos))).toBe(true)
           const guards = m.enemies.filter(e => e.post && e.post.x === c.pos.x && e.post.y === c.pos.y)
@@ -63,7 +72,9 @@ describe("вылазка в чащу: карта", () => {
             expect(g.leash).toBe(EXPEDITION.leash)
             expect(reach.has(posKey(g.pos))).toBe(true)
           }
-          expect(c.treats).toBeGreaterThan(0)
+          // Сундук с Вкусняшками — с Вкусняшками, с предметом — с предметом
+          if (c.kind === "treats") expect(c.treats).toBeGreaterThan(0)
+          else expect(c.itemId).toBeDefined()
         }
         // Тропинки есть и идут по проходимым клеткам
         const paths = Object.entries(m.decor ?? {}).filter(([, d]) => d === "path")
@@ -79,12 +90,43 @@ describe("вылазка в чащу: карта", () => {
     )
   })
 
+  it("три выхода: два из них стережёт по одному врагу на коротком поводке, третий свободен (property)", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 0x7fffffff }), fc.constantFrom(...DIFFS), (seed, difficulty) => {
+        const m = generateExpedition({ seed, difficulty, team: 1, squadSize: 4 })
+        const guards = m.expedition!.exits.map(e => m.enemies.filter(g => g.post?.x === e.x && g.post?.y === e.y))
+        expect(guards.filter(g => g.length === 1).length).toBe(EXPEDITION.exitGuards)
+        expect(guards.filter(g => g.length === 0).length).toBe(3 - EXPEDITION.exitGuards)
+        for (const [g] of guards.filter(x => x.length === 1)) {
+          expect(g!.leash).toBe(EXPEDITION.exitGuardLeash)
+          expect(manhattan(g!.pos, g!.post!)).toBeLessThanOrEqual(3)
+          // Обычный страж, не вожак-одиночка с бонусом
+          expect(g!.unit.isBoss).toBeFalsy()
+          expect(m.expedition!.elites.some(el => el.unitId === g!.unit.id)).toBe(false)
+        }
+      }),
+      { numRuns: 30 }
+    )
+  })
+
+  it("уйти можно через любой выход", () => {
+    const { state, player, chest } = miniExpedition({ guardPos: { x: 5, y: 0 } })
+    for (const exitPos of [{ x: 0, y: 7 }, { x: 5, y: 7 }]) {
+      const s: BattleState = structuredClone(state)
+      s.map.expedition!.exits = [{ x: 0, y: 7 }, { x: 5, y: 7 }]
+      s.expedition!.opened = [chest.id]
+      s.units[player.id]!.pos = { x: exitPos.x, y: 6 }
+      const r = applyAction(s, { type: "wait", unitId: player.id, to: exitPos })
+      expect(r.state.result).toBe("victory")
+    }
+  })
+
   it("как в Dota: три дороги от старта к выходу, ручей с мостами, по одним дорогам и тропам можно дойти до любого лагеря", () => {
     for (const seed of [1, 2, 3, 42, 777]) {
       const m = generateExpedition({ seed, difficulty: "normal", team: 1, squadSize: 4 })
       const { w, h } = mapSize(m)
       const exp = m.expedition!
-      expect(exp.exit).toEqual({ x: w - 1, y: 0 })
+      expect(exp.exits).toEqual([{ x: w - 1, y: 0 }, { x: 0, y: 0 }, { x: w - 1, y: h - 1 }])
       const decor = m.decor ?? {}
       const cells = Object.entries(decor).map(([k, d]) => ({ x: Number(k.split(",")[0]), y: Number(k.split(",")[1]), d }))
       // Ручей и мосты через него
@@ -107,10 +149,10 @@ describe("вылазка в чащу: карта", () => {
           q.push({ ...n, d: decor[posKey(n)]! })
         }
       }
-      expect(seen.has(posKey(exp.exit))).toBe(true)
+      for (const e of exp.exits) expect(seen.has(posKey(e)), `seed ${seed}: выход ${posKey(e)}`).toBe(true)
       for (const c of exp.chests) expect(seen.has(posKey(c.pos)), `seed ${seed}: сундук ${posKey(c.pos)}`).toBe(true)
       // Лагеря — не на дорогах, а в лесу в стороне; сундук тем богаче, чем больше стражей
-      const bySize = exp.chests.map(c => ({ c, n: m.enemies.filter(e => e.post?.x === c.pos.x && e.post?.y === c.pos.y).length }))
+      const bySize = exp.chests.filter(c => c.kind === "treats").map(c => ({ c, n: m.enemies.filter(e => e.post?.x === c.pos.x && e.post?.y === c.pos.y).length }))
       const small = bySize.filter(x => x.n === 2).map(x => x.c.treats)
       const big = bySize.filter(x => x.n === 4).map(x => x.c.treats)
       if (small.length && big.length) expect(Math.min(...big)).toBeGreaterThan(Math.max(...small))
@@ -161,7 +203,7 @@ describe("вылазка в чащу: карта", () => {
 function miniExpedition(opts: { guardHp?: number, guardPos?: Pos, playerPos?: Pos, leash?: number } = {}) {
   const player = makeUnit({ classId: "infantry_sword", pos: opts.playerPos ?? { x: 2, y: 4 }, baseStats: { hp: 40, str: 30, spd: 20, def: 10, res: 10 } }, false)
   const guard = makeUnit({ classId: "infantry_axe", pos: opts.guardPos ?? { x: 2, y: 3 }, baseStats: { hp: opts.guardHp ?? 1, str: 1, spd: 1, def: 0, res: 0 } }, true)
-  const chest = { id: "chest_0", pos: { x: 2, y: 1 }, treats: 77, keyHolderId: guard.id }
+  const chest = { id: "chest_0", pos: { x: 2, y: 1 }, kind: "treats" as const, treats: 77, keyHolderId: guard.id }
   const map: MapDef = {
     seed: 1,
     biomeId: "deep_forest",
@@ -169,7 +211,7 @@ function miniExpedition(opts: { guardHp?: number, guardPos?: Pos, playerPos?: Po
     difficulty: "normal",
     objective: "extract",
     mode: "expedition",
-    expedition: { chests: [chest], exit: { x: 5, y: 7 } },
+    expedition: { chests: [chest], exits: [{ x: 5, y: 7 }], pickups: [], elites: [] },
     tiles: plainTiles(),
     playerSpawns: [opts.playerPos ?? { x: 2, y: 4 }],
     enemies: [{ unit: guard, pos: opts.guardPos ?? { x: 2, y: 3 }, stance: "hold", post: chest.pos, leash: opts.leash ?? 3 }],
@@ -278,5 +320,123 @@ describe("вылазка в чащу: ключ, сундук, выход", () =>
     const act = decideAction(t, near.guard.id)
     const to = (act as { to: Pos }).to
     expect(manhattan(to, near.chest.pos)).toBeLessThanOrEqual(2)
+  })
+})
+
+describe("вылазка в чащу: награды, сердечки и бонусы", () => {
+  it("в сундуках — Вкусняшки, оружие или украшения; чем выше сложность, тем дороже находка", () => {
+    const kinds = new Set<string>()
+    const price = (d: Difficulty) => {
+      const prices: number[] = []
+      for (let seed = 1; seed < 40; seed++) {
+        const m = generateExpedition({ seed, difficulty: d, team: 0, squadSize: 4 })
+        for (const c of m.expedition!.chests) {
+          kinds.add(c.kind)
+          if (c.kind === "treats") expect(c.treats).toBeGreaterThan(0)
+          else {
+            expect(c.itemId).toBeDefined()
+            expect(itemCategory(c.itemId!)).toBe(c.kind === "weapon" ? "weapon" : "talisman")
+            prices.push(itemPrice(c.itemId!))
+          }
+        }
+      }
+      return prices.reduce((a, b) => a + b, 0) / Math.max(1, prices.length)
+    }
+    const easy = price("easy")
+    const nightmare = price("nightmare")
+    expect([...kinds].sort()).toEqual(["talisman", "treats", "weapon"])
+    expect(nightmare).toBeGreaterThan(easy * 1.3)
+  })
+
+  it("сердечки — на тропах; одиночки — вожаки уровнем выше команды, у каждого свой бонус", () => {
+    for (const d of DIFFS) {
+      const m = generateExpedition({ seed: 31, difficulty: d, team: 1, squadSize: 4 })
+      const exp = m.expedition!
+      expect(exp.pickups.filter(p => p.kind === "heart").length).toBe(EXPEDITION.hearts)
+      for (const p of exp.pickups) expect(m.decor?.[posKey(p.pos)]).toBe("path")
+      expect(exp.elites.length).toBe(EXPEDITION.elites[d])
+      expect(new Set(exp.elites.map(e => e.buff)).size).toBe(exp.elites.length)
+      for (const e of exp.elites) {
+        const placed = m.enemies.find(x => x.unit.id === e.unitId)!
+        expect(placed.unit.isBoss).toBe(true)
+        expect(placed.leash).toBe(EXPEDITION.eliteLeash)
+        // Одиночка — не в лагере
+        for (const c of exp.chests) expect(manhattan(placed.pos, c.pos)).toBeGreaterThanOrEqual(6)
+      }
+    }
+  })
+
+  it("сердечко: встал — здоровье полностью; одиночка пал — на его клетке бонус, подобрал — действует", () => {
+    const { state, player, guard } = miniExpedition({ guardPos: { x: 2, y: 3 } })
+    const s: BattleState = structuredClone(state)
+    s.map.expedition!.elites = [{ unitId: guard.id, buff: "fury" }]
+    s.expedition!.pickups = [{ id: "heart_0", pos: { x: 3, y: 4 }, kind: "heart" }]
+    s.units[player.id]!.hp = 5
+    const healed = applyAction(s, { type: "move", unitId: player.id, to: { x: 3, y: 4 } })
+    expect(healed.state.units[player.id]!.hp).toBe(healed.state.units[player.id]!.maxHp)
+    expect(healed.state.expedition!.pickups).toEqual([])
+    // Убить одиночку — бонус на его клетке
+    const s2: BattleState = structuredClone(healed.state)
+    const r = applyAction(s2, { type: "attack", unitId: player.id, to: { x: 2, y: 4 }, targetId: guard.id })
+    expect(r.state.units[guard.id]!.alive).toBe(false)
+    expect(r.state.expedition!.pickups).toEqual([{ id: `buff_${guard.id}`, pos: { x: 2, y: 3 }, kind: "fury" }])
+    expect(r.events.some(e => e.type === "pickupDropped")).toBe(true)
+    const s3: BattleState = structuredClone(r.state)
+    s3.units[player.id]!.acted = false
+    delete s3.units[player.id]!.turnStart
+    const got = applyAction(s3, { type: "move", unitId: player.id, to: { x: 2, y: 3 } })
+    expect(got.state.expedition!.buffs.units[player.id]).toEqual(["fury"])
+    expect(hasBuff(got.state, player.id, "fury")).toBe(true)
+  })
+
+  it("бонусы работают: ярость +20 % урона, оберег −20 %, ветер +2 хода, живица лечит отряд, удача — больше добычи", () => {
+    const { state, player, guard } = miniExpedition({ guardHp: 200, guardPos: { x: 2, y: 3 } })
+    const plain = simulateCombat(state, player.id, guard.id, { x: 2, y: 4 })
+    const dealt = (st: BattleState) => {
+      const out = simulateCombat(st, player.id, guard.id, { x: 2, y: 4 })
+      return out.defender.hpBefore - out.defender.hpAfter
+    }
+    const base = plain.defender.hpBefore - plain.defender.hpAfter
+    const fury: BattleState = structuredClone(state)
+    fury.expedition!.buffs.units[player.id] = ["fury"]
+    expect(dealt(fury)).toBeGreaterThan(base)
+    expect(buffDamageMult(fury, player.id, guard.id)).toBeCloseTo(1.2)
+    const aegis: BattleState = structuredClone(state)
+    aegis.expedition!.buffs.units[player.id] = ["aegis"]
+    expect(buffDamageMult(aegis, guard.id, player.id)).toBeCloseTo(0.8)
+    // Ветер — всему отряду
+    const swift: BattleState = structuredClone(state)
+    swift.expedition!.buffs.team = ["swift"]
+    const bu = state.units[player.id]!
+    expect(reachableTiles(swift, swift.units[player.id]!).size).toBeGreaterThan(reachableTiles(state, bu).size)
+    // Живица — в начале хода игрока
+    const regen: BattleState = structuredClone(state)
+    regen.expedition!.buffs.team = ["regen"]
+    regen.phase = "enemy"
+    regen.units[player.id]!.hp = 1
+    regen.units[guard.id]!.acted = true
+    const next = applyAction(regen, { type: "endPhase" })
+    expect(next.state.phase).toBe("player")
+    expect(next.state.units[player.id]!.hp).toBeGreaterThan(1)
+    // Удача
+    const lucky: BattleState = structuredClone(state)
+    lucky.expedition!.buffs.team = ["fortune"]
+    expect(buffLootMult(lucky)).toBe(1.5)
+    expect(buffLootMult(state)).toBe(1)
+  })
+
+  it("находки из сундуков достаются армии, только если отряд ушёл через выход", () => {
+    const { state } = miniExpedition()
+    const save = createEmptySave(1)
+    save.army = { id: "a", units: Object.values(state.roster).filter(u => !u.isEnemy), squadIds: [], createdAt: 1, battles: 0, wins: 0 }
+    const won: BattleState = structuredClone(state)
+    won.expedition!.found = ["tal_bell"]
+    won.result = "victory"
+    const res = resolveBattle(save, won, 10)
+    expect(res.inventory["tal_bell"]).toBe(1)
+    expect(res.summary.found).toEqual(["tal_bell"])
+    const lost: BattleState = structuredClone(won)
+    lost.result = "retreat"
+    expect(resolveBattle(save, lost, 10).inventory["tal_bell"]).toBeUndefined()
   })
 })

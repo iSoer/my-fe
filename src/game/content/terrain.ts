@@ -7,6 +7,7 @@ import { CHARACTER_STAT_LABELS as L } from "@shared/character/leveling"
 import { COMBAT, TERRAIN_BONUS } from "./balance"
 import { biomeDef } from "./biomes"
 import { tr } from "@game/i18n"
+import { BUFFS, CHEST_MARK } from "./expedition"
 
 const MOVE_TYPES: readonly MoveType[] = ["infantry", "armored", "cavalry", "flier"]
 
@@ -73,12 +74,22 @@ export function terrainInfo(state: BattleState, pos: Pos): TerrainInfo {
   // Вылазка в чащу: сундук и выход — особые клетки
   const exp = state.map.expedition
   const chest = exp?.chests.find(c => c.pos.x === pos.x && c.pos.y === pos.y)
-  const exit = !!exp && exp.exit.x === pos.x && exp.exit.y === pos.y
+  const exit = !!exp && exp.exits.some(e => e.x === pos.x && e.y === pos.y)
   if (chest) {
     const opened = !!state.expedition?.opened.includes(chest.id)
     notes.unshift(opened
       ? tr("Opened — the loot is in your bag. Now head for the EXIT.", "Открыт — добыча у отряда. Теперь к ВЫХОДУ.")
-      : tr(`Locked. The key is on one of its guards; the fighter who takes it just steps onto the chest to open it. Inside: ${chest.treats} 🦴.`, `Заперт. Ключ — у одного из стражей; бойцу с ключом достаточно встать на сундук — он откроется сразу. Внутри: ${chest.treats} 🦴.`))
+      : tr(
+          `Locked. The key is on one of its guards; the fighter who takes it just steps onto the chest to open it. What’s inside is unknown — only the brand on the lid (${CHEST_MARK[chest.kind]}) hints at it.`,
+          `Заперт. Ключ — у одного из стражей; бойцу с ключом достаточно встать на сундук — он откроется сразу. Что внутри — не видно, намекает лишь клеймо на крышке (${CHEST_MARK[chest.kind]}).`
+        ))
+  }
+  // Сердечко или бонус на земле
+  const pickup = state.expedition?.pickups.find(p => p.pos.x === pos.x && p.pos.y === pos.y)
+  if (pickup) {
+    notes.unshift(pickup.kind === "heart"
+      ? tr("❤️ Heart: the fighter who steps here is fully healed.", "❤️ Сердечко: встал на клетку — здоровье восстановится полностью.")
+      : tr(`${BUFFS[pickup.kind].icon} ${BUFFS[pickup.kind].name}: ${BUFFS[pickup.kind].desc} until the end of the sortie. Step here to pick it up.`, `${BUFFS[pickup.kind].icon} ${BUFFS[pickup.kind].name}: ${BUFFS[pickup.kind].desc} до конца вылазки. Встаньте на клетку, чтобы подобрать.`))
   }
   if (exit)
     notes.unshift(tr("Step here after opening a chest — the whole squad leaves with all the loot.", "Встаньте сюда после того, как откроете сундук, — отряд уйдёт со всей добычей."))

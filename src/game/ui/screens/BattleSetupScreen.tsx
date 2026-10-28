@@ -105,10 +105,8 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
           {offer.reinforcements > 0 ? tr(` (${offer.reinforcements} as reinforcements)`, ` (из них ${offer.reinforcements} — подкрепление)`) : ""}
         </span>
         <span className="team-reward">
-          {offer.map.expedition
-            ? `🦴 ${offer.treats + offer.map.expedition.chests.reduce((a, c) => a + c.treats, 0)} · ✦ ${offer.glory}`
-            : `🦴 ${offer.treats} · ✦ ${offer.glory}`}
-          <small>{offer.map.expedition ? tr(" chests + escape + loot", " сундуки + уход + добыча") : tr(" for victory + loot", " за победу + добыча")}</small>
+          {`🦴 ${offer.treats} · ✦ ${offer.glory}`}
+          <small>{offer.map.expedition ? tr(" for escaping + chests + loot", " за уход + сундуки + добыча") : tr(" for victory + loot", " за победу + добыча")}</small>
         </span>
         <span className={`team-xp ${xp.cls}`}>{xp.text}</span>
       </div>

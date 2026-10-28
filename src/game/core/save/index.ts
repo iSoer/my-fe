@@ -118,6 +118,8 @@ const armySchema = z.object({
 })
 
 const terrain = z.enum(["plain", "forest", "mountain", "water", "wall", "wall_breakable", "cover"])
+const buffKind = z.enum(["fury", "swift", "aegis", "regen", "fortune"])
+const pickupSchema = z.object({ id: z.string(), pos, kind: z.union([z.literal("heart"), buffKind]) })
 const stance = z.enum(["hold", "advance", "guard"])
 
 const mapSchema = z.object({
@@ -127,10 +129,22 @@ const mapSchema = z.object({
   difficulty,
   objective: z.enum(["rout", "killBoss", "extract"]),
   mode: z.enum(["skirmish", "expedition"]).optional(),
-  expedition: z.object({
-    chests: z.array(z.object({ id: z.string(), pos, treats: z.number(), keyHolderId: z.string() })),
-    exit: pos
-  }).optional(),
+  // Карты с одним выходом (до трёх выходов) — список из одного
+  expedition: z.preprocess(raw => (raw && typeof raw === "object" && "exit" in raw && !("exits" in raw)
+    ? { ...(raw as Record<string, unknown>), exits: [(raw as { exit: unknown }).exit] }
+    : raw), z.object({
+    chests: z.array(z.object({
+      id: z.string(),
+      pos,
+      kind: z.enum(["treats", "weapon", "talisman"]).default("treats"),
+      treats: z.number(),
+      itemId: z.string().optional(),
+      keyHolderId: z.string()
+    })),
+    exits: z.array(pos),
+    pickups: z.array(pickupSchema).default([]),
+    elites: z.array(z.object({ unitId: z.string(), buff: buffKind })).default([])
+  })).optional(),
   layout: z.enum(["glade", "forestEdge", "riverBridge", "crossroads", "pass", "lake", "fort", "ruins"]).optional(),
   decor: z.record(z.string(), z.enum(["path", "bridge"])).optional(),
   tiles: z.array(z.array(terrain)),
@@ -186,7 +200,10 @@ const battleSchema = z.object({
   startedAt: z.number(),
   expedition: z.object({
     keys: z.record(z.string(), z.object({ unitId: z.string().optional(), pos: pos.optional() })),
-    opened: z.array(z.string())
+    opened: z.array(z.string()),
+    pickups: z.array(pickupSchema).default([]),
+    buffs: z.object({ team: z.array(buffKind), units: z.record(z.string(), z.array(buffKind)) }).default({ team: [], units: {} }),
+    found: z.array(z.string()).default([])
   }).optional()
 })
 
@@ -256,7 +273,8 @@ const summarySchema = z.object({
   survivors: z.array(unitSchema),
   armyFell: z.boolean(),
   timeUp: z.boolean().optional(),
-  recruits: z.array(unitSchema).optional()
+  recruits: z.array(unitSchema).optional(),
+  found: z.array(z.string()).optional()
 })
 
 export const saveSchema = z.object({

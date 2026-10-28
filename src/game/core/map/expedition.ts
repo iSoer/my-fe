@@ -1,15 +1,17 @@
 import type { Rng } from "../rng"
 import { createRng } from "../rng"
-import type { BoardSize, Difficulty, EnemyPlacement, ExpeditionChest, MapDecor, MapDef, Pos, TerrainId } from "../types"
+import type { BoardSize, BuffKind, ChestKind, Difficulty, EnemyPlacement, ExpeditionChest, MapDecor, MapDef, Pickup, Pos, TerrainId } from "../types"
 import { MAX_LEVEL, clamp, inMap, manhattan, posKey } from "../types"
 import { isPassable } from "./pathing"
 import { makeEnemy, pickEnemyLoadout, type EnemyRoles } from "./generate"
 import { biomeDef } from "@game/content/biomes"
 import { EXPEDITION, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
-import { weaponRange } from "@game/content/weapons"
+import { WEAPONS, weaponRange } from "@game/content/weapons"
+import { TALISMANS } from "@game/content/items"
+import { BUFF_KINDS } from "@game/content/expedition"
 
 // Вылазка в мрачную чащу — карта «как в Dota»: квадратное поле `EXPEDITION.w`×`EXPEDITION.h`, старт в левом нижнем
-// углу, выход в правом верхнем. Их связывают три дороги: верхняя (вдоль левого и верхнего края), нижняя (вдоль
+// углу, три выхода — в остальных углах (два из них стерегут одиночные стражи). Их связывают три дороги: верхняя (вдоль левого и верхнего края), нижняя (вдоль
 // нижнего и правого) и извилистая средняя по диагонали. Поперёк средней течёт ручей (из левого верхнего угла в правый
 // нижний) с мостами там, где его пересекают дороги, и парой бродов. В лесу между дорогами стоят лагеря стражей с
 // сундуками; к каждому ведёт тропа от ближайшей дороги, часть лагерей соединена тропами между собой — получается сеть
@@ -211,7 +213,8 @@ function reach(g: Grid, size: BoardSize, from: Pos): Set<string> {
  */
 function river(g: Grid, size: BoardSize, rng: Rng): void {
   let off = 0
-  for (let t = 0; t < size.w; t++) {
+  // До углов ручей не доходит: там выходы
+  for (let t = 4; t < size.w - 5; t++) {
     if (t % 4 === 0) off = clamp(off + rng.int(-1, 1), -2, 2)
     const y = t + off
     for (const p of [{ x: t, y }, { x: t + 1, y }]) if (inMap(size, p)) set(g, p, "water")
@@ -219,7 +222,7 @@ function river(g: Grid, size: BoardSize, rng: Rng): void {
 }
 
 /** Точки лагерей: в лесу между дорогами (не ближе 2 клеток к тропам и ручью), далеко от старта и друг от друга. */
-function pickCamps(g: Grid, size: BoardSize, rng: Rng, count: number, start: Pos, exit: Pos, decor: Map<string, MapDecor>): Pos[] {
+function pickCamps(g: Grid, size: BoardSize, rng: Rng, count: number, start: Pos, exits: Pos[], decor: Map<string, MapDecor>): Pos[] {
   const trail = [...decor.keys()].map((k) => {
     const [x, y] = k.split(",").map(Number)
     return { x: x ?? 0, y: y ?? 0 }
@@ -230,7 +233,7 @@ function pickCamps(g: Grid, size: BoardSize, rng: Rng, count: number, start: Pos
     const camps: Pos[] = []
     for (let tries = 0; tries < 600 && camps.length < count; tries++) {
       const p = { x: rng.int(3, size.w - 4), y: rng.int(3, size.h - 4) }
-      if (manhattan(p, start) < 10 - relax || manhattan(p, exit) < 7 - relax) continue
+      if (manhattan(p, start) < 10 - relax || exits.some(e => manhattan(p, e) < 7 - relax)) continue
       if (camps.some(c => manhattan(c, p) < 9 - relax * 2)) continue
       if (nearest(p, trail) < 3 - Math.min(relax, 1) || nearest(p, water) < 3) continue
       camps.push(p)
@@ -251,8 +254,35 @@ function guardSpots(g: Grid, size: BoardSize, rng: Rng, chest: Pos, count: numbe
 
 const isMelee = (skill: Parameters<typeof weaponRange>[0]): boolean => weaponRange(skill) === 1
 
+/**
+ * Предмет для сундука: оружие или талисман из ценового коридора сложности (`EXPEDITION.itemBand`) — чем выше
+ * сложность, тем дороже и сильнее находка. Деревянного оружия в сундуках не бывает.
+ */
+export function chestItem(rng: Rng, kind: Exclude<ChestKind, "treats">, difficulty: Difficulty): string {
+  const pool = (kind === "weapon" ? WEAPONS.filter(w => w.price > 0) : TALISMANS)
+    .map(i => ({ id: i.id, price: i.price }))
+    .sort((a, b) => a.price - b.price || (a.id < b.id ? -1 : 1))
+  const [lo, hi] = EXPEDITION.itemBand[difficulty]
+  const from = Math.min(pool.length - 1, Math.floor(pool.length * lo))
+  const to = Math.max(from + 1, Math.ceil(pool.length * hi))
+  return (rng.pick(pool.slice(from, to)) as { id: string }).id
+}
+
+/** Клетки подальше от всего, что уже стоит на карте. */
+function spread(cands: Pos[], count: number, gap: number, avoid: Pos[], avoidGap: number): Pos[] {
+  const out: Pos[] = []
+  for (const p of cands) {
+    if (out.length >= count) break
+    if (avoid.some(a => manhattan(a, p) < avoidGap) || out.some(o => manhattan(o, p) < gap)) continue
+    out.push(p)
+  }
+  return out
+}
+
 /** Земля, дороги и лагеря одной попытки; null — не сложилось. */
-function terrainAttempt(size: BoardSize, rng: Rng, start: Pos, exit: Pos, campCount: number, spawns: Pos[]): { g: Grid, decor: Map<string, MapDecor>, camps: Pos[] } | null {
+function terrainAttempt(size: BoardSize, rng: Rng, start: Pos, exits: Pos[], campCount: number, spawns: Pos[]): { g: Grid, decor: Map<string, MapDecor>, camps: Pos[] } | null {
+  // Главный выход — в конце всех трёх дорог, остальные — в соседних углах
+  const exit = exits[0] as Pos
   const g = thickets(size, rng)
   const decor = new Map<string, MapDecor>()
   river(g, size, rng.fork("river"))
@@ -271,7 +301,7 @@ function terrainAttempt(size: BoardSize, rng: Rng, start: Pos, exit: Pos, campCo
     if (get(g, p) !== "water") set(g, p, "wall")
   }
   // Поляны старта и выхода
-  for (const p of [...diamond(size, start, 3), ...diamond(size, exit, 3)]) if (get(g, p) !== "water") set(g, p, "plain")
+  for (const p of [...diamond(size, start, 3), ...exits.flatMap(e => diamond(size, e, 3))]) if (get(g, p) !== "water") set(g, p, "plain")
   // Три дороги, как линии в Dota: по краям и извилистая средняя по диагонали
   const m = { w: size.w - 1, h: size.h - 1 }
   const j = () => rng.int(-1, 1)
@@ -288,6 +318,14 @@ function terrainAttempt(size: BoardSize, rng: Rng, start: Pos, exit: Pos, campCo
   }
   mid.push(exit)
   for (const lane of [mid, top, bottom]) if (!road(g, size, rng, lane, decor)) return null
+  // Боковые выходы: короткая тропа от угла к ближайшей дороге
+  for (const e of exits.slice(1)) {
+    const trail = [...decor.keys()].map((k) => {
+      const [x, y] = k.split(",").map(Number)
+      return { x: x ?? 0, y: y ?? 0 }
+    }).sort((a, b) => manhattan(a, e) - manhattan(b, e))[0]
+    if (!trail || !carve(g, size, rng, e, trail, decor)) return null
+  }
   // Пара бродов через ручей подальше от мостов: срезка через лес
   const water = rng.shuffle(cellsOf(size).filter(p => get(g, p) === "water"))
   let fords = 0
@@ -299,7 +337,7 @@ function terrainAttempt(size: BoardSize, rng: Rng, start: Pos, exit: Pos, campCo
     fords++
   }
   // Лагеря в лесу и тропы к ним: от ближайшей точки дорог, часть лагерей — ещё и друг к другу
-  const camps = pickCamps(g, size, rng.fork("camps"), campCount, start, exit, decor)
+  const camps = pickCamps(g, size, rng.fork("camps"), campCount, start, exits, decor)
   if (camps.length < campCount) return null
   for (const c of camps) for (const p of diamond(size, c, 2)) if (get(g, p) !== "water") set(g, p, "plain")
   for (const c of camps) {
@@ -321,10 +359,10 @@ function terrainAttempt(size: BoardSize, rng: Rng, start: Pos, exit: Pos, campCo
     for (const p of spots.slice(0, rng.int(1, 2))) set(g, p, rng.chance(0.7) ? "cover" : "wall_breakable")
   }
   for (const p of spawns) set(g, p, "plain")
-  set(g, exit, "plain")
+  for (const e of exits) set(g, e, "plain")
   // Связность: от старта достижимы выход и каждый сундук
   const seen = reach(g, size, start)
-  if (!seen.has(posKey(exit)) || !camps.every(c => seen.has(posKey(c)))) return null
+  if (!exits.every(e => seen.has(posKey(e))) || !camps.every(c => seen.has(posKey(c)))) return null
   return { g, decor, camps }
 }
 
@@ -339,7 +377,8 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
 
   // Старт — левый нижний угол, выход — правый верхний («древний» в конце всех трёх дорог)
   const start = { x: 2, y: size.h - 3 }
-  const exit = { x: size.w - 1, y: 0 }
+  // Три выхода — во всех углах, кроме старта; главный (в конце всех дорог) — правый верхний
+  const exits: Pos[] = [{ x: size.w - 1, y: 0 }, { x: 0, y: 0 }, { x: size.w - 1, y: size.h - 1 }]
   const spawnOrder: Pos[] = [
     { x: 1, y: size.h - 2 }, { x: 2, y: size.h - 2 }, { x: 1, y: size.h - 3 },
     { x: 2, y: size.h - 3 }, { x: 3, y: size.h - 2 }, { x: 3, y: size.h - 3 }
@@ -348,14 +387,14 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
 
   let built: { g: Grid, decor: Map<string, MapDecor>, camps: Pos[] } | null = null
   for (let attempt = 0; attempt < 30 && !built; attempt++)
-    built = terrainAttempt(size, root.fork(`terrain:${attempt}`), start, exit, campCount, playerSpawns)
+    built = terrainAttempt(size, root.fork(`terrain:${attempt}`), start, exits, campCount, playerSpawns)
   if (!built) {
     // Крайний случай: ровная поляна без препятствий и ручья, дороги и лагеря на ней
     const rng = root.fork("fallback")
     const g: Grid = Array.from({ length: size.h }, () => Array.from({ length: size.w }, (): TerrainId => "plain"))
     const decor = new Map<string, MapDecor>()
-    carve(g, size, rng, start, exit, decor)
-    const camps = pickCamps(g, size, rng, campCount, start, exit, decor)
+    for (const e of exits) carve(g, size, rng, start, e, decor)
+    const camps = pickCamps(g, size, rng, campCount, start, exits, decor)
     for (const c of camps) carve(g, size, rng, c, start, decor)
     built = { g, decor, camps }
   }
@@ -385,10 +424,49 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
       enemies.push({ unit, pos: at, stance: "hold", post: { ...pos }, leash: EXPEDITION.leash })
     }
     if (ids.length === 0) return
-    const spread = 1 + (erng.next() * 2 - 1) * EXPEDITION.chestSpread
-    const treats = Math.round(baseTreats * EXPEDITION.chestShare * (ids.length / 3) * spread)
-    chests.push({ id: `chest_${i}`, pos: { ...pos }, treats, keyHolderId: erng.pick(ids) })
+    // Что внутри: Вкусняшки (чем больше стражей — тем больше) или предмет качества сложности
+    const kind = erng.weighted((Object.entries(EXPEDITION.chestKinds) as [ChestKind, number][]).map(([item, w]) => ({ item, w })))
+    const jitter = 1 + (erng.next() * 2 - 1) * EXPEDITION.chestSpread
+    const treats = kind === "treats" ? Math.round(baseTreats * EXPEDITION.chestShare * (ids.length / 3) * jitter) : 0
+    const chest: ExpeditionChest = { id: `chest_${i}`, pos: { ...pos }, kind, treats, keyHolderId: erng.pick(ids) }
+    if (kind !== "treats") chest.itemId = chestItem(erng, kind, opts.difficulty)
+    chests.push(chest)
   })
+
+  // Усиленные одиночки: в лесу, вдали от старта, выхода, лагерей и друг от друга; у каждого свой бонус
+  const prng = root.fork("pickups")
+  const open = (p: Pos) => !blocked(get(tiles, p)) && !taken.has(posKey(p))
+  const wild = prng.shuffle(cellsOf(size).filter(p => open(p) && manhattan(p, start) >= 9 && exits.every(e => manhattan(p, e) >= 5)))
+  const elitePos = spread(wild, EXPEDITION.elites[opts.difficulty], 7, camps, 6)
+  const buffs = prng.shuffle(BUFF_KINDS)
+  const elites: { unitId: string, buff: BuffKind }[] = []
+  elitePos.forEach((at, i) => {
+    const level = clamp(maxLevel + EXPEDITION.eliteLevelBonus, 1, MAX_LEVEL)
+    const loadout = pickEnemyLoadout(prng, level, { melee: 0, ranged: 0, healer: 1, dancer: 1, heavy: 0 }, opts.difficulty)
+    const unit = makeEnemy(prng, level, diff.rarity, biome.factionId, loadout, opts.difficulty, true, opts.now)
+    taken.add(posKey(at))
+    enemies.push({ unit, pos: at, stance: "hold", post: { ...at }, leash: EXPEDITION.eliteLeash })
+    elites.push({ unitId: unit.id, buff: buffs[i % buffs.length] as BuffKind })
+  })
+  // Сердечки — на тропах и дорогах, подальше от старта и друг от друга
+  const trails = prng.shuffle(Object.keys(Object.fromEntries(decor)).map((k) => {
+    const [x, y] = k.split(",").map(Number)
+    return { x: x ?? 0, y: y ?? 0 }
+  }).filter(p => open(p) && manhattan(p, start) >= 7 && exits.every(e => manhattan(p, e) >= 2)))
+  const pickups: Pickup[] = spread(trails, EXPEDITION.hearts, 6, [...camps, ...elitePos], 3)
+    .map((pos, i) => ({ id: `heart_${i}`, pos, kind: "heart" as const }))
+
+  // Стражи выходов: два случайных выхода из трёх стережёт по одному врагу, третий свободен
+  const grng = root.fork("exit-guards")
+  for (const e of grng.shuffle(exits).slice(0, EXPEDITION.exitGuards)) {
+    const at = guardSpots(tiles, size, grng, e, 1, taken)[0]
+    if (!at) continue
+    const level = clamp(grng.int(minLevel, maxLevel), 1, MAX_LEVEL)
+    const loadout = pickEnemyLoadout(grng, level, { melee: 0, ranged: 1, healer: 1, dancer: 1, heavy: 0 }, opts.difficulty)
+    const unit = makeEnemy(grng, level, diff.rarity, biome.factionId, loadout, opts.difficulty, false, opts.now)
+    taken.add(posKey(at))
+    enemies.push({ unit, pos: at, stance: "hold", post: { ...e }, leash: EXPEDITION.exitGuardLeash })
+  }
 
   return {
     seed: opts.seed,
@@ -397,7 +475,7 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
     difficulty: opts.difficulty,
     objective: "extract",
     mode: "expedition",
-    expedition: { chests, exit },
+    expedition: { chests, exits, pickups, elites },
     decor: Object.fromEntries(decor),
     tiles,
     playerSpawns,

@@ -17,6 +17,7 @@ import type {
 } from "../types"
 import { MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
 import { generateUnit, levelGains, loadoutsAt, unitClassName } from "../units"
+import { addItem } from "../items"
 import { treatsMultiplier } from "../skills/engine"
 import { LOOT, PRICES, REWARDS, SHOP, XP, recruitRarityWeights } from "@game/content/balance"
 import { EPITAPHS } from "@game/content/epitaphs"
@@ -246,7 +247,11 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
   // Витрина набора в Казармах обновляется после каждого боя (Лавка — по времени, см. `core/settlement`);
   // бесплатная награда — если ростер ещё жив
   const shelter: Shelter = generateShop(rng.int(0, 0x7fffffff), nextArmy, profile, now)
-  const inventory = save.inventory
+  // Вылазка в чащу: оружие и талисманы из сундуков достаются армии, только если отряд ушёл через выход (победа)
+  const found = result === "victory" ? state.expedition?.found ?? [] : []
+  let inventory = save.inventory
+  for (const id of found) inventory = addItem(inventory, id)
+  if (found.length > 0) summary.found = [...found]
   const rewardChoice = nextArmy
     ? generateRewardChoice(rng.int(0, 0x7fffffff), nextArmy, profile, result === "victory", now)
     : undefined
