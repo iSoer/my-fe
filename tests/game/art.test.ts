@@ -345,6 +345,11 @@ describe("арт: враги-зомби", () => {
     expect(zombieFur(f).fur).not.toBe(f.fur)
     for (const pose of POSES) wellFormed(unitSvg(enemy, { pose }))
     for (const part of CRITTER_PARTS) wellFormed(unitPartSvg(enemy, part))
-    expect(unitSvg({ ...enemy, isBoss: true })).toContain("eef4d6")
+    // издалека враг отличим: красные светящиеся зрачки, оскал и рваная одежда — у своего бойца ничего этого нет
+    const boss = unitSvg({ ...enemy, isBoss: true })
+    for (const mark of ["#e01b24", "#3a1a22", "class=\"rags\""]) {
+      expect(boss).toContain(mark)
+      expect(unitSvg(u)).not.toContain(mark)
+    }
   })
 })
