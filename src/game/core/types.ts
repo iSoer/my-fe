@@ -21,7 +21,11 @@ export type Difficulty = "easy" | "normal" | "hard" | "nightmare"
 export type TerrainId = "plain" | "forest" | "mountain" | "water" | "wall" | "wall_breakable" | "cover"
 export type SkillSlot = "weapon" | "assist" | "special" | "a" | "b" | "c"
 export type Stance = "hold" | "advance" | "guard"
-export type ObjectiveKind = "rout" | "killBoss"
+/** Цель боя: перебить всех, убить вожака или (вылазка в чащу) вскрыть сундук и уйти через выход. */
+export type ObjectiveKind = "rout" | "killBoss" | "extract"
+
+/** Режим вылазки: обычная схватка на поле 6×8 или вылазка в мрачную чащу на поле втрое больше. */
+export type BattleMode = "skirmish" | "expedition"
 export type BattleResult = "victory" | "defeat" | "retreat"
 
 export interface Pos {
@@ -46,6 +50,22 @@ export function samePos(a: Pos, b: Pos): boolean {
 export function manhattan(a: Pos, b: Pos): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 }
+/** Размер поля карты: обычный бой — `MAP_W`×`MAP_H`, вылазка в чащу — больше (см. `MapDef.mode`). */
+export interface BoardSize {
+  w: number
+  h: number
+}
+
+export function mapSize(map: { tiles: unknown[][] }): BoardSize {
+  return { w: map.tiles[0]?.length ?? MAP_W, h: map.tiles.length || MAP_H }
+}
+
+/** Клетка внутри поля конкретной карты. */
+export function inMap(size: BoardSize, p: Pos): boolean {
+  return p.x >= 0 && p.y >= 0 && p.x < size.w && p.y < size.h
+}
+
+/** Клетка внутри обычного поля 6×8 (генератор схваток и всё, что не знает карты). */
 export function inBounds(p: Pos): boolean {
   return p.x >= 0 && p.y >= 0 && p.x < MAP_W && p.y < MAP_H
 }
@@ -161,6 +181,37 @@ export interface EnemyPlacement {
   unit: UnitInstance
   pos: Pos
   stance: Stance
+  /** Страж сундука: стоит у поста и не преследует игрока дальше `leash` клеток от него. */
+  post?: Pos
+  leash?: number
+}
+
+/** Сундук вылазки в чащу: где стоит, что внутри, у какого стража ключ. */
+export interface ExpeditionChest {
+  id: string
+  pos: Pos
+  /** Вкусняшки внутри: при открытии идут в добычу вылазки. */
+  treats: number
+  /** Враг, у которого ключ от этого сундука. */
+  keyHolderId: string
+}
+
+export interface ExpeditionDef {
+  chests: ExpeditionChest[]
+  /** Клетка выхода в углу карты: боец на ней уводит отряд с добычей (если открыт хоть один сундук). */
+  exit: Pos
+}
+
+/** Где ключ от сундука: у бойца или на земле. */
+export interface KeySpot {
+  unitId?: string
+  pos?: Pos
+}
+
+/** Ход вылазки: ключи и открытые сундуки. */
+export interface ExpeditionState {
+  keys: Record<string, KeySpot>
+  opened: string[]
 }
 
 export interface ReinforcementWave {
@@ -185,6 +236,10 @@ export interface MapDef {
   objective: ObjectiveKind
   /** Шаблон раскладки (в старых сейвах нет). */
   layout?: MapLayout
+  /** Режим: нет — обычная схватка. */
+  mode?: BattleMode
+  /** Сундуки и выход вылазки в чащу. */
+  expedition?: ExpeditionDef
   /** Оформление клеток по `posKey`: тропинки и мосты. */
   decor?: Record<string, MapDecor>
   tiles: TerrainId[][]
@@ -215,6 +270,9 @@ export interface BattleUnit {
    * можно сколько угодно раз, но дальность хода всегда считается от неё.
    */
   turnStart?: Pos
+  /** Страж сундука: пост и поводок (`EnemyPlacement`). */
+  post?: Pos
+  leash?: number
 }
 
 export interface Decal {
@@ -253,6 +311,11 @@ export interface Settings {
   animSpeed: 1 | 2
   cinematic: "always" | "mine" | "never"
   autoEndTurn: boolean
+  /**
+   * Подтверждение «Завершить ход», если не все бойцы действовали: двойным нажатием (по умолчанию: первое меняет
+   * надпись, второе в течение 2 с завершает ход), окном с вопросом или без подтверждения.
+   */
+  endTurnConfirm: "modal" | "none" | "double"
   dangerZoneDefault: boolean
   blood: "sea" | "pools"
   confirmAttack: boolean
@@ -267,6 +330,7 @@ export const DEFAULT_SETTINGS: Settings = {
   animSpeed: 1,
   cinematic: "always",
   autoEndTurn: false,
+  endTurnConfirm: "double",
   dangerZoneDefault: false,
   blood: "sea",
   confirmAttack: true,
@@ -296,6 +360,8 @@ export interface BattleState {
   /** Порядок хода врагов в текущей фазе (null = не рассчитан). */
   enemyQueue: string[] | null
   startedAt: number
+  /** Вылазка в чащу: где ключи, какие сундуки открыты. */
+  expedition?: ExpeditionState
 }
 
 export type Effect
@@ -369,6 +435,11 @@ export type BattleEvent
     | { type: "phaseChanged", phase: Side, turn: number }
     | { type: "reinforcements", unitIds: string[] }
     | { type: "battleEnded", result: BattleResult }
+    /** Вылазка в чащу: ключ перешёл к бойцу (убил носителя или подобрал с земли) или упал на землю. */
+    | { type: "keyTaken", chestId: string, unitId: string, pos: Pos }
+    | { type: "keyDropped", chestId: string, pos: Pos }
+    | { type: "chestOpened", chestId: string, unitId: string, pos: Pos, treats: number }
+    | { type: "extracted", unitId: string, pos: Pos }
 
 export interface ReduceResult {
   state: BattleState

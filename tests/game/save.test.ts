@@ -68,3 +68,18 @@ describe("save", () => {
     expect(r.save.store).not.toHaveProperty("consumables")
   })
 })
+
+describe("настройка кнопки «Завершить ход»", () => {
+  it("по умолчанию — двойное нажатие; старый сейв без настройки читается так же; выбранный режим сохраняется", () => {
+    const save = createEmptySave(1)
+    expect(save.settings.endTurnConfirm).toBe("double")
+    const legacy = JSON.parse(serializeSave(save)) as { settings: Record<string, unknown> }
+    delete legacy.settings["endTurnConfirm"]
+    const r = parseSave(JSON.stringify(legacy))
+    expect(r.ok && r.save.settings.endTurnConfirm).toBe("double")
+    for (const mode of ["none", "modal"] as const) {
+      const back = parseSave(serializeSave({ ...save, settings: { ...save.settings, endTurnConfirm: mode } }))
+      expect(back.ok && back.save.settings.endTurnConfirm).toBe(mode)
+    }
+  })
+})

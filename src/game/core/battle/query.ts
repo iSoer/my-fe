@@ -1,5 +1,5 @@
-import type { BattleState, BattleUnit, Pos, Side, TerrainId } from "../types"
-import { inBounds, manhattan, posKey } from "../types"
+import type { BattleState, BattleUnit, BoardSize, Pos, Side, TerrainId } from "../types"
+import { MAP_H, MAP_W, inMap, manhattan, mapSize, posKey } from "../types"
 
 export function unitAt(state: BattleState, pos: Pos): BattleUnit | undefined {
   for (const u of Object.values(state.units)) {
@@ -35,13 +35,13 @@ export function unitsWithinOf(
 }
 
 export function terrainAt(state: BattleState, pos: Pos): TerrainId {
-  if (!inBounds(pos)) return "wall"
+  if (!inMap(mapSize(state.map), pos)) return "wall"
   const t = state.map.tiles[pos.y]?.[pos.x] ?? "wall"
   if (t === "wall_breakable" && (state.walls[posKey(pos)] ?? 0) <= 0) return "plain"
   return t
 }
 
-export function neighbors(pos: Pos): Pos[] {
+export function neighbors(pos: Pos, size: BoardSize = { w: MAP_W, h: MAP_H }): Pos[] {
   const out: Pos[] = []
   const cands = [
     { x: pos.x + 1, y: pos.y },
@@ -49,7 +49,7 @@ export function neighbors(pos: Pos): Pos[] {
     { x: pos.x, y: pos.y + 1 },
     { x: pos.x, y: pos.y - 1 }
   ]
-  for (const c of cands) if (inBounds(c)) out.push(c)
+  for (const c of cands) if (inMap(size, c)) out.push(c)
   return out
 }
 

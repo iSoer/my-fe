@@ -7,7 +7,7 @@ import { planAssist } from "../battle/assist"
 import { distanceField, reachableTiles, targetsFrom, threatCounts, threatTiles, type ReachMap } from "../map/pathing"
 import { simulateCombat } from "../combat"
 import { attackOf, visibleStats } from "../units"
-import { difficultyDef } from "@game/content/balance"
+import { EXPEDITION, difficultyDef } from "@game/content/balance"
 import { DANCER_CLASS, unitClass } from "@game/content/classes"
 
 /** Лекарь (White Magic) или танцор (Dancer): держатся позади и ценны как цель. */
@@ -144,11 +144,14 @@ function nearestPlayerDistance(state: BattleState, pos: Pos): number {
   return players.length === 0 ? 99 : Math.min(...players.map(p => manhattan(p.pos, pos)))
 }
 
-/** Нужно ли стоящему/охраняющему врагу перейти в наступление. */
+/**
+ * Нужно ли стоящему/охраняющему врагу перейти в наступление. Страж сундука (`post`) не просыпается по таймеру
+ * хода — только когда игрок подошёл (`EXPEDITION.alertRadius`), рядом «шум боя» или игрок в его зоне атаки.
+ */
 function shouldWake(state: BattleState, bu: BattleUnit): boolean {
   const diff = difficultyDef(state.difficulty).ai
-  if (state.turn >= diff.wakeTurn) return true
-  if (nearestPlayerDistance(state, bu.pos) <= diff.alertRadius) return true
+  if (!bu.post && state.turn >= diff.wakeTurn) return true
+  if (nearestPlayerDistance(state, bu.pos) <= (bu.post ? EXPEDITION.alertRadius : diff.alertRadius)) return true
   if (alarmNearby(state, bu, 3)) return true
   const zone = threatTiles(state, bu)
   return livingUnits(state, "player").some(p => zone.has(posKey(p.pos)))
@@ -179,12 +182,13 @@ function advanceMove(
   bu: BattleUnit,
   reach: ReachMap,
   threat: Map<string, number>,
-  keepDistance: boolean
+  keepDistance: boolean,
+  targets: BattleUnit[] = livingUnits(state, "player")
 ): Pos {
   const diff = difficultyDef(state.difficulty).ai
   const unit = state.roster[bu.unitId]
   const moveType = unit ? unitClass(unit).moveType : "infantry"
-  const players = livingUnits(state, "player")
+  const players = targets
   if (players.length === 0) return bu.pos
   const field = distanceField(
     state,
@@ -218,6 +222,14 @@ function advanceMove(
   return best?.pos ?? bu.pos
 }
 
+/** Страж на поводке: только клетки не дальше `leash` от поста (и та, где он стоит). */
+function leashed(bu: BattleUnit, reach: ReachMap): ReachMap {
+  const post = bu.post
+  if (!post) return reach
+  const leash = bu.leash ?? EXPEDITION.leash
+  return new Map([...reach].filter(([, n]) => manhattan(n.pos, post) <= leash || (n.pos.x === bu.pos.x && n.pos.y === bu.pos.y)))
+}
+
 /** Решение для одного врага. Чистая детерминированная функция. */
 export function decideAction(state: BattleState, unitId: string): BattleAction {
   const bu = state.units[unitId]
@@ -225,7 +237,8 @@ export function decideAction(state: BattleState, unitId: string): BattleAction {
   if (!bu || !unit || !bu.alive) return { type: "endPhase" }
   const healer = unit.weaponSkill === "whiteMagic"
   const dancer = unit.classId === DANCER_CLASS
-  const reach = reachableTiles(state, bu)
+  // Страж сундука не уходит от поста дальше поводка: ни шагом, ни ради удара
+  const reach = leashed(bu, reachableTiles(state, bu))
   const threat = threatCounts(state, "player")
 
   // Стойки: стоящие просыпаются от близости игрока, «шума боя» или по таймеру хода
@@ -255,6 +268,19 @@ export function decideAction(state: BattleState, unitId: string): BattleAction {
   const atk = evaluateAttacks(state, bu, reach, threat)
   if (atk && atk.score >= 0) return atk.action
 
+  // Страж: преследует только тех, кого можно достать, не покидая поводка; иначе — назад к сундуку и снова на пост
+  let chase = livingUnits(state, "player")
+  if (bu.post) {
+    const post = bu.post
+    const range = weaponDef(unit.skills.weapon).range
+    chase = chase.filter(p => manhattan(p.pos, post) <= (bu.leash ?? EXPEDITION.leash) + range)
+    if (chase.length === 0) {
+      const back = [...reach.values()].filter(n => n.canStop).sort((a, b) => manhattan(a.pos, post) - manhattan(b.pos, post))[0]
+      const to = back?.pos ?? bu.pos
+      return { type: "wait", unitId, to, newStance: manhattan(to, post) <= 2 ? "hold" : "advance" }
+    }
+  }
+
   // Раненый без шанса убить — отступает подлечиться (кроме Легко)
   const diff = difficultyDef(state.difficulty).ai
   if (diff.retreatHp > 0 && hpPct(bu) < diff.retreatHp) {
@@ -262,6 +288,6 @@ export function decideAction(state: BattleState, unitId: string): BattleAction {
     return { type: "wait", unitId, to, newStance: "advance" }
   }
 
-  const to = advanceMove(state, bu, reach, threat, isSupport(unit))
+  const to = advanceMove(state, bu, reach, threat, isSupport(unit), chase)
   return { type: "wait", unitId, to, newStance: "advance" }
 }

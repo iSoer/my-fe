@@ -1,6 +1,7 @@
 import { atom, computed } from "nanostores"
 import type {
   Army,
+  BattleMode,
   MapDef,
   Rarity,
   BattleAction,
@@ -52,6 +53,7 @@ import { isTalismanId } from "@game/content/items"
 import { HERO_RETURN } from "@game/content/settlement"
 import { ENEMY_TEAMS, ITEMS, REWARDS } from "@game/content/balance"
 import { generateMap } from "@game/core/map/generate"
+import { generateExpedition } from "@game/core/map/expedition"
 import { applyAction, createBattle } from "@game/core/battle/reducer"
 import {
   generateShop,
@@ -547,21 +549,26 @@ export function ensureSortieSeed(): number {
   return seed
 }
 
+/** Режим, выбранный на первом шаге вылазки: обычная схватка или вылазка в мрачную чащу. */
+export const $sortieMode = atom<BattleMode>("skirmish")
+
 /**
  * Четыре вражеские команды на сложности: уровни — окна диапазона сложности (`teamLevels`), не уровень армии;
- * биом у каждой случайный из всех. Детерминированы по `sortieSeed`: переключение сложности туда-обратно
- * не перебрасывает врагов.
+ * биом у каждой случайный из всех (в чаще — мрачный лес). Детерминированы по `sortieSeed`: переключение
+ * сложности и режима туда-обратно не перебрасывает врагов.
  */
-export function enemyTeams(difficulty: Difficulty): EnemyTeamOffer[] {
+export function enemyTeams(difficulty: Difficulty, mode: BattleMode = "skirmish"): EnemyTeamOffer[] {
   const s = $save.get()
   const sortie = s.sortieSeed ?? ensureSortieSeed()
   const armyLevel = rosterLevel(s.army)
-  const key = `${sortie}:${difficulty}:${armyLevel}`
+  const key = `${sortie}:${difficulty}:${mode}:${armyLevel}`
   const cached = offerCache.get(key)
   if (cached) return cached
   const offers = Array.from({ length: ENEMY_TEAMS }, (_, team): EnemyTeamOffer => {
-    const seed = createRng(sortie).fork(`${difficulty}:${team}`).int(0, 0x7fffffff)
-    const map = generateMap({ seed, biomeId: "random", difficulty, team, squadSize: SQUAD_SIZE, now: Date.now() })
+    const seed = createRng(sortie).fork(`${difficulty}:${team}${mode === "expedition" ? ":expedition" : ""}`).int(0, 0x7fffffff)
+    const map = mode === "expedition"
+      ? generateExpedition({ seed, difficulty, team, squadSize: SQUAD_SIZE, now: Date.now() })
+      : generateMap({ seed, biomeId: "random", difficulty, team, squadSize: SQUAD_SIZE, now: Date.now() })
     const units = [...map.enemies.map(e => e.unit), ...map.reinforcements.flatMap(w => w.units.map(u => u.unit))]
     const lv = units.map(u => u.level)
     const levels: [number, number] = [Math.min(...lv), Math.max(...lv)]
@@ -586,13 +593,13 @@ export function enemyTeams(difficulty: Difficulty): EnemyTeamOffer[] {
  * Разведка: выбранная вражеская команда на сложности становится боем; отряд выбирается на следующем шаге.
  * Карта та же, что в предложении команды (тот же seed и случайный биом).
  */
-export function scoutBattle(difficulty: Difficulty, team = 0): { ok: boolean, error?: string } {
+export function scoutBattle(difficulty: Difficulty, team = 0, mode: BattleMode = "skirmish"): { ok: boolean, error?: string } {
   const s = $save.get()
   if (!s.army) return { ok: false, error: tr("No army", "нет армии") }
   if (!difficultyUnlocked(s, difficulty)) return { ok: false, error: tr("Difficulty locked", "Сложность закрыта") }
   const pb = s.pendingBattle
-  if (pb && pb.difficulty === difficulty && pb.team === team) return { ok: true }
-  const offer = enemyTeams(difficulty)[team]
+  if (pb && pb.difficulty === difficulty && pb.team === team && (pb.map.mode ?? "skirmish") === mode) return { ok: true }
+  const offer = enemyTeams(difficulty, mode)[team]
   if (!offer) return { ok: false, error: tr("No such enemy army", "Нет такой армии врагов") }
   updateSave(st => ({ ...st, pendingBattle: { seed: offer.seed, difficulty, biomeId: offer.map.biomeId, team, map: offer.map } }))
   return { ok: true }

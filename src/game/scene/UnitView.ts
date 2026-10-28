@@ -99,6 +99,9 @@ export class UnitView extends Phaser.GameObjects.Container {
   private hitTweens: Phaser.Tweens.Tween[] = []
   private lowHp = false
   private hpFlash: Phaser.GameObjects.Graphics | null = null
+  /** Вылазка в чащу: ключ от сундука у этого бойца — значок над головой. */
+  private keyIcon: Phaser.GameObjects.Image | null = null
+  private keyTween: Phaser.Tweens.Tween | null = null
 
   constructor(scene: Phaser.Scene, unit: UnitInstance, side: Side, opts: UnitViewOptions) {
     super(scene, 0, 0)
@@ -339,8 +342,26 @@ export class UnitView extends Phaser.GameObjects.Container {
     }
   }
 
+  /** Показать или убрать значок ключа над бойцом (текстура `key` должна быть загружена сценой). */
+  setKey(on: boolean, texture: string): void {
+    if (!on) {
+      this.keyTween?.stop()
+      this.keyTween = null
+      this.keyIcon?.destroy()
+      this.keyIcon = null
+      return
+    }
+    if (this.keyIcon || !this.scene || !this.scene.textures.exists(texture)) return
+    this.keyIcon = this.scene.add.image(-this.size * 0.34, -this.size * 0.5, texture).setDisplaySize(this.size * 0.42, this.size * 0.42)
+    this.add(this.keyIcon)
+    this.keyTween = this.scene.tweens.add({ targets: this.keyIcon, y: -this.size * 0.58, duration: 650, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+  }
+
   resize(size: number): void {
     this.size = size
+    if (this.keyIcon) {
+      this.keyIcon.setDisplaySize(size * 0.42, size * 0.42).setPosition(-size * 0.34, -size * 0.5)
+    }
     const feetY = size * 0.36
     const k = this.lifted ? 0.7 : 1
     this.shadow.setDisplaySize(size * 0.7 * k, size * 0.25 * k)

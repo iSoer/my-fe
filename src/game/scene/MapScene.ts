@@ -1,6 +1,6 @@
 import Phaser from "phaser"
 import type { BattleState, Pos, TerrainId } from "@game/core/types"
-import { MAP_H, MAP_W, inBounds, posKey } from "@game/core/types"
+import { inMap, mapSize, posKey } from "@game/core/types"
 import { terrainAt, unitAt } from "@game/core/battle/query"
 import { biomeDef } from "@game/content/biomes"
 import { $save } from "@game/state/save"
@@ -15,8 +15,9 @@ import {
   tapTile,
   type BattleUiState
 } from "@game/state/battleUi"
-import { $boardInsets, publishBoardLayout } from "@game/state/boardLayout"
-import { computeLayout, pixelToGrid, tileCenter, tileOrigin, type BoardLayout } from "./layout"
+import { $boardInsets, $boardZoom, publishBoardLayout, resetBoardZoom, zoomBoard } from "@game/state/boardLayout"
+import { computeLayout, computeWorldLayout, pixelToGrid, tileCenter, tileOrigin, type BoardLayout } from "./layout"
+import { chestSvg, keySvg } from "@game/art/expedition"
 import { ensureTextures, TEX } from "./textures"
 import { HL, TERRAIN_GLYPH, textStyle } from "./style"
 import type { BattleResult } from "@game/core/types"
@@ -25,6 +26,7 @@ import { actorFlash, bloodBurst, bloodDecal, confettiRain, debrisBurst, sceneAli
 import { haptic } from "@game/platform/haptics"
 import { sfx } from "@game/platform/audio"
 import {
+  ensureTexture,
   ensureUnitTextures,
   hasTexture,
   tileFrameCount,
@@ -49,6 +51,12 @@ import { isTallTerrain, waterFillsTile } from "@game/art/tile"
 import { bridgeVertical, decorMask } from "@game/core/map/layouts"
 import { clearGoreStains } from "./gore"
 import { tr } from "@game/i18n"
+
+/** Сумрак мрачной чащи: тинт всех клеток большого поля. */
+const EXPEDITION_GLOOM = 0x9aa595
+const CHEST_TEX = "exp_chest"
+const CHEST_OPEN_TEX = "exp_chest_open"
+const KEY_TEX = "exp_key"
 
 export const MAP_SCENE_KEY = "Map"
 
@@ -164,6 +172,21 @@ export class MapScene extends Phaser.Scene {
   private displacedId: string | null = null
   private placementTween: Phaser.Tweens.Tween | null = null
 
+  /* ---- Большое поле (вылазка в чащу): камера, зум, перетаскивание карты ---- */
+  /** Поле больше экрана: камера двигается и масштабируется, клетки — в мировых координатах. */
+  private worldMode = false
+  /** Бой, для которого камера уже поставлена на старт отряда. */
+  private camBattleId = ""
+  /** Палец/мышь тянет карту: откуда начали и где была камера. */
+  private pan: { x: number, y: number, sx: number, sy: number, moved: boolean } | null = null
+  private unsubZoom: (() => void) | null = null
+  /** Положение камеры до наезда кинематики — к нему она возвращается. */
+  private savedView: { x: number, y: number, zoom: number } | null = null
+  /** Сундуки, ключи на земле и выход вылазки. */
+  private expLayer!: Phaser.GameObjects.Container
+  private expSig = ""
+  private expTweens: Phaser.Tweens.Tween[] = []
+
   constructor() {
     super(MAP_SCENE_KEY)
     this.ready = new Promise((r) => {
@@ -183,6 +206,7 @@ export class MapScene extends Phaser.Scene {
     this.pathG = this.add.graphics().setDepth(3)
     this.targetG = this.add.graphics().setDepth(11)
     this.dangerLayer = this.add.container(0, 0).setDepth(1.8)
+    this.expLayer = this.add.container(0, 0).setDepth(1.6)
     // Пульс подсветки клеток, бегущая штриховка опасности, следы лап на пути, пена у берега
     this.events.on(Phaser.Scenes.Events.UPDATE, this.tickEnv, this)
     // Пульс зоны опасности: графика рисуется в полную силу, а её alpha качается 0.55 ↔ 1.
@@ -218,6 +242,11 @@ export class MapScene extends Phaser.Scene {
       this.pendingSync = true
     })
     this.unsubUi = $battleUi.subscribe(ui => this.drawHighlights(ui))
+    this.unsubZoom = $boardZoom.subscribe(z => this.applyZoom(z))
+    // Колесо мыши — зум большого поля
+    this.input.on("wheel", (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+      if (this.worldMode && dy !== 0) zoomBoard(dy > 0 ? -1 : 1)
+    })
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => this.onPointerDown(p))
     this.input.on("pointermove", (p: Phaser.Input.Pointer) => this.onPointerMove(p))
@@ -269,6 +298,13 @@ export class MapScene extends Phaser.Scene {
   private preloadArt(st: BattleState | undefined): Promise<unknown> {
     if (!st) return Promise.resolve()
     const jobs: Promise<unknown>[] = [ensureEnvTileTextures(this, st.map.biomeId)]
+    if (st.map.expedition) {
+      jobs.push(
+        ensureTexture(this, CHEST_TEX, chestSvg(false), 128, 128),
+        ensureTexture(this, CHEST_OPEN_TEX, chestSvg(true), 128, 128),
+        ensureTexture(this, KEY_TEX, keySvg(), 128, 128)
+      )
+    }
     for (const bu of Object.values(st.units)) {
       if (!bu.alive) continue
       const unit = st.roster[bu.unitId]
@@ -292,6 +328,11 @@ export class MapScene extends Phaser.Scene {
     }
     this.unsubInsets?.()
     this.unsubInsets = null
+    this.unsubZoom?.()
+    this.unsubZoom = null
+    resetBoardZoom()
+    for (const t of this.expTweens) t.stop()
+    this.expTweens = []
     setPressed(null)
     this.unsubSave?.()
     this.unsubUi?.()
@@ -356,15 +397,26 @@ export class MapScene extends Phaser.Scene {
     return !!st && !st.result && st.phase === "player" && !ui.busy && !this.playing
   }
 
+  /** Мировая точка под экранной (камера большого поля сдвинута и масштабирована; на обычном поле они совпадают). */
+  private worldAt(x: number, y: number): { x: number, y: number } {
+    const w = this.cameras.main.getWorldPoint(x, y)
+    return { x: w.x, y: w.y }
+  }
+
   private onPointerDown(p: Phaser.Input.Pointer): void {
     this.armed = null
-    if (this.drag || !this.canDragNow()) return
+    this.pan = null
+    if (this.drag) return
     const st = $save.get().battle
-    if (!st) return
-    const pos = pixelToGrid(this.layout, p.x, p.y)
-    if (!pos) return
-    const occ = unitAt(st, pos)
-    if (!occ || occ.side !== "player" || occ.acted || !occ.alive) return
+    const pos = st ? pixelToGrid(this.layout, p.worldX, p.worldY) : null
+    const occ = st && pos ? unitAt(st, pos) : undefined
+    const ownUnit = !!occ && occ.side === "player" && !occ.acted && occ.alive && this.canDragNow()
+    // Большое поле: тянуть можно за любую клетку, кроме своего бойца, который ещё не ходил (его тянут на клетку)
+    if (this.worldMode && !ownUnit) {
+      const cam = this.cameras.main
+      this.pan = { x: p.x, y: p.y, sx: cam.scrollX, sy: cam.scrollY, moved: false }
+    }
+    if (!st || !pos || !occ || !ownUnit) return
     this.armed = { unitId: occ.unitId, x: p.x, y: p.y }
     // Боец зажат: DOM скрывает меню и перестаёт перехватывать курсор.
     setPressed(occ.unitId)
@@ -372,6 +424,16 @@ export class MapScene extends Phaser.Scene {
 
   private onPointerMove(p: Phaser.Input.Pointer): void {
     if (!p.isDown) return
+    if (this.pan) {
+      const dx = p.x - this.pan.x
+      const dy = p.y - this.pan.y
+      if (!this.pan.moved && Math.hypot(dx, dy) <= MapScene.DRAG_THRESHOLD) return
+      this.pan.moved = true
+      const cam = this.cameras.main
+      this.stopCameraPan()
+      cam.setScroll(this.pan.sx - dx / cam.zoom, this.pan.sy - dy / cam.zoom)
+      return
+    }
     if (!this.drag && this.armed) {
       const d = Math.hypot(p.x - this.armed.x, p.y - this.armed.y)
       if (d <= MapScene.DRAG_THRESHOLD) return
@@ -400,8 +462,8 @@ export class MapScene extends Phaser.Scene {
     const drag = this.drag
     if (!drag || !drag.view.scene) return
     const lift = p.wasTouch ? this.tile * 0.55 : 0
-    drag.view.setPosition(p.x, p.y - lift)
-    const tile = pixelToGrid(this.layout, p.x, p.y)
+    drag.view.setPosition(p.worldX, p.worldY - lift)
+    const tile = pixelToGrid(this.layout, p.worldX, p.worldY)
     const key = tile ? posKey(tile) : ""
     if (key !== drag.hoverKey) {
       drag.hoverKey = key
@@ -411,18 +473,21 @@ export class MapScene extends Phaser.Scene {
 
   private onPointerUp(p: Phaser.Input.Pointer, outside = false): void {
     setPressed(null)
+    const panned = !!this.pan?.moved
+    this.pan = null
     if (this.drag) {
-      const tile = outside ? null : pixelToGrid(this.layout, p.x, p.y)
+      const tile = outside ? null : pixelToGrid(this.layout, p.worldX, p.worldY)
       void this.finishDrag(tile)
       this.armed = null
       return
     }
     this.armed = null
-    if (outside || $battleUi.get().busy) return
+    if (panned || outside || $battleUi.get().busy) return
     const dx = p.upX - p.downX
     const dy = p.upY - p.downY
     if (Math.hypot(dx, dy) > MapScene.TAP_SLOP) return
-    const pos = pixelToGrid(this.layout, p.upX, p.upY)
+    const up = this.worldAt(p.upX, p.upY)
+    const pos = pixelToGrid(this.layout, up.x, up.y)
     if (pos) tapTile(pos)
   }
 
@@ -567,8 +632,23 @@ export class MapScene extends Phaser.Scene {
   }
 
   private relayout(): void {
-    this.layout = computeLayout(this.scale.width, this.scale.height, $boardInsets.get())
-    const key = `${this.layout.tile}:${this.layout.ox}:${this.layout.oy}`
+    const st = $save.get().battle
+    const insets = $boardInsets.get()
+    let screen: BoardLayout
+    if (st?.map.mode === "expedition") {
+      // Большое поле: клетка как в обычном бою, поле в мировых координатах, по нему ходит камера
+      const l = computeWorldLayout(this.scale.width, this.scale.height, insets, mapSize(st.map))
+      this.layout = l.world
+      screen = l.screen
+      this.worldMode = true
+    }
+    else {
+      this.layout = computeLayout(this.scale.width, this.scale.height, insets)
+      screen = this.layout
+      this.worldMode = false
+    }
+    this.setupCamera(st)
+    const key = `${this.layout.tile}:${this.layout.ox}:${this.layout.oy}:${this.layout.cols}x${this.layout.rows}`
     if (key !== this.lastLayoutKey) {
       this.lastLayoutKey = key
       this.lastMapRef = null
@@ -577,13 +657,110 @@ export class MapScene extends Phaser.Scene {
       this.targetSig = ""
       for (const v of this.units.values()) v.resize(this.layout.tile)
     }
+    // DOM-накладкам — раскладка экрана (на большом поле — как у обычного): панель сведений не меняет высоту
     publishBoardLayout({
-      tile: this.layout.tile,
-      ox: this.layout.ox,
-      oy: this.layout.oy,
+      tile: screen.tile,
+      ox: screen.ox,
+      oy: screen.oy,
       width: this.scale.width,
       height: this.scale.height
     })
+  }
+
+  /* ---------- Камера большого поля ---------- */
+
+  /**
+   * Обычное поле — камера на месте, без зума. Большое — границы: поле плюс место под шапку и панель кнопок, чтобы
+   * крайние ряды можно было вывести из-под накладок; при входе в бой камера встаёт на отряд.
+   */
+  private setupCamera(st: BattleState | undefined): void {
+    const cam = this.cameras.main
+    if (!this.worldMode || !st) {
+      cam.removeBounds()
+      cam.setScroll(0, 0)
+      cam.setZoom(1)
+      return
+    }
+    cam.setZoom($boardZoom.get())
+    this.updateBounds($boardZoom.get())
+    if (this.camBattleId !== st.id) {
+      this.camBattleId = st.id
+      const players = Object.values(st.units).filter(u => u.side === "player" && u.alive)
+      const at = players[0]?.pos ?? { x: 0, y: this.layout.rows - 1 }
+      const c = this.center(at)
+      cam.centerOn(c.x, c.y)
+    }
+  }
+
+  /**
+   * Границы камеры: поле плюс место под шапку и панель кнопок. Если при этом зуме вид больше поля, границы
+   * расширяются вокруг его центра — отдалённая карта стоит посередине экрана, а не прижата к углу.
+   */
+  private updateBounds(zoom: number): void {
+    const cam = this.cameras.main
+    const { top, bottom } = $boardInsets.get()
+    const t = this.layout.tile
+    const x0 = -t
+    const y0 = -top - t
+    const w0 = this.layout.cols * t + t * 2
+    const h0 = this.layout.rows * t + top + bottom + t * 2
+    const w = Math.max(w0, this.scale.width / zoom)
+    const h = Math.max(h0, this.scale.height / zoom)
+    cam.setBounds(x0 + w0 / 2 - w / 2, y0 + h0 / 2 - h / 2, w, h)
+  }
+
+  private applyZoom(z: number): void {
+    if (!sceneAlive(this) || !this.worldMode) return
+    this.updateBounds(z)
+    this.cameras.main.zoomTo(z, 160, "Sine.easeOut", true)
+  }
+
+  private stopCameraPan(): void {
+    const cam = this.cameras.main
+    // Идущий плавный наезд не должен перебивать руку игрока
+    if (cam.panEffect.isRunning) cam.panEffect.reset()
+  }
+
+  /**
+   * Показать клетку (ход врага на большом поле): если она вне спокойной середины экрана, камера плавно наезжает.
+   * На обычном поле — ничего не делает.
+   */
+  focusOn(pos: Pos, ms = 260): Promise<void> {
+    if (!this.worldMode || !sceneAlive(this)) return Promise.resolve()
+    const cam = this.cameras.main
+    const c = this.center(pos)
+    const { top, bottom } = $boardInsets.get()
+    const v = cam.worldView
+    const mx = this.tile * 1.2
+    const inside = c.x > v.x + mx && c.x < v.right - mx && c.y > v.y + (top / cam.zoom) + mx && c.y < v.bottom - (bottom / cam.zoom) - mx
+    if (inside) return Promise.resolve()
+    return new Promise((resolve) => {
+      // Клетка встаёт в середину свободной части экрана (между шапкой и панелью кнопок)
+      const y = c.y - (top - bottom) / 2 / cam.zoom
+      cam.pan(c.x, y, ms, "Sine.easeInOut", true, (_c: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+        if (progress >= 1) resolve()
+      })
+    })
+  }
+
+  /** Запомнить вид перед наездом кинематики. */
+  saveView(): void {
+    const cam = this.cameras.main
+    this.savedView = { x: cam.midPoint.x, y: cam.midPoint.y, zoom: cam.zoom }
+  }
+
+  /** Вернуть камеру после кинематики: на обычном поле — центр экрана без зума, на большом — прежний вид. */
+  restoreView(ms: number): void {
+    const cam = this.cameras.main
+    const saved = this.savedView
+    this.savedView = null
+    if (this.worldMode && saved) {
+      cam.zoomTo(saved.zoom, ms)
+      cam.pan(saved.x, saved.y, ms)
+      return
+    }
+    cam.zoomTo(1, ms)
+    cam.pan(this.scale.width / 2, this.scale.height / 2, ms)
   }
 
   /* ---------- Публичные помощники для Presenter ---------- */
@@ -635,6 +812,8 @@ export class MapScene extends Phaser.Scene {
         this.units.delete(id)
       }
     }
+    // Сундуки, ключи и выход — когда виды бойцов уже есть (значок ключа над носителем)
+    this.syncExpedition(st)
     // Если юнит стоит на клетке предпросмотра — вернуть его туда после снапа к состоянию.
     if (!this.playing) this.applyPreviewPlacement($battleUi.get(), true)
   }
@@ -748,9 +927,11 @@ export class MapScene extends Phaser.Scene {
   /** Финальная заставка боя поверх поля. Остаётся на экране до ухода со сцены. */
   async showEnd(result: BattleResult, speed = 1): Promise<void> {
     if (!sceneAlive(this)) return
+    // Заставка — в экранных координатах; камера большого поля возвращается к обычному масштабу
+    if (this.worldMode) this.cameras.main.zoomTo(1, 200 / speed)
     const w = this.scale.width
     const h = this.scale.height
-    const veil = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x000000, 0).setDepth(60)
+    const veil = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x000000, 0).setDepth(60).setScrollFactor(0)
     this.endOverlay.push(veil)
     this.tweens.add({ targets: veil, fillAlpha: 0.55, duration: 200 / speed })
     const text = result === "victory" ? tr("VICTORY", "ПОБЕДА") : result === "defeat" ? tr("DEFEAT", "ПОРАЖЕНИЕ") : tr("RETREAT", "ОТСТУПЛЕНИЕ")
@@ -761,7 +942,7 @@ export class MapScene extends Phaser.Scene {
     const cy = h * 0.42
     const bandH = size * 1.9
     const skew = bandH * 0.4
-    const band = this.add.graphics().setDepth(61.5).setAlpha(0)
+    const band = this.add.graphics().setDepth(61.5).setScrollFactor(0).setAlpha(0)
     band.fillStyle(0x0d0b10, 0.96)
     band.fillPoints(
       [
@@ -789,20 +970,20 @@ export class MapScene extends Phaser.Scene {
     const shadow = this.add
       .text(w / 2 + 4, cy + 4, text, { ...style, color: result === "defeat" ? "#7a0012" : "#e63946" })
       .setOrigin(0.5)
-      .setDepth(61.8)
+      .setDepth(61.8).setScrollFactor(0)
       .setScale(2.4)
       .setAlpha(0)
       .setAngle(-4)
     const label = this.add
       .text(w / 2, cy, text, style)
       .setOrigin(0.5)
-      .setDepth(62)
+      .setDepth(62).setScrollFactor(0)
       .setScale(2.4)
       .setAlpha(0)
       .setAngle(-4)
     this.endOverlay.push(shadow, label)
     if (result === "defeat") {
-      const vignette = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x7a0012, 0).setDepth(61)
+      const vignette = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x7a0012, 0).setDepth(61).setScrollFactor(0)
       this.endOverlay.push(vignette)
       this.tweens.add({ targets: vignette, fillAlpha: 0.28, duration: 900 / speed, ease: "Sine.easeIn" })
     }
@@ -816,7 +997,7 @@ export class MapScene extends Phaser.Scene {
         const x = w * (0.1 + i * 0.2)
         this.endOverlay.push(
           bloodDecal(this, x, h * (0.3 + ((i * 37) % 50) / 100), this.tile * 1.4, "splat", i + 3)
-            .setDepth(60.5)
+            .setDepth(60.5).setScrollFactor(0)
             .setAlpha(0.55)
         )
       }
@@ -875,15 +1056,16 @@ export class MapScene extends Phaser.Scene {
     const flyAnchors: { x: number, y: number }[] = []
     const waterSpots: { x: number, y: number }[] = []
     const plainSpots: { x: number, y: number }[] = []
-    const tallAt = (p: Pos): boolean => inBounds(p) && isTallTerrain(terrainAt(st, p))
+    const size = mapSize(st.map)
+    const tallAt = (p: Pos): boolean => inMap(size, p) && isTallTerrain(terrainAt(st, p))
     const decor = st.map.decor
     // Под мостом течёт вода: для берегов клетка моста — тоже вода (пена у его краёв не рисуется)
-    const waterAt = (p: Pos): boolean => !inBounds(p) || terrainAt(st, p) === "water" || decor?.[posKey(p)] === "bridge"
+    const waterAt = (p: Pos): boolean => !inMap(size, p) || terrainAt(st, p) === "water" || decor?.[posKey(p)] === "bridge"
     const shoreKey = edgeKey(biome.id, "shore", 0)
     const shadeKey = edgeKey(biome.id, "shade")
     const rubbleKey = edgeKey(biome.id, "rubble")
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
+    for (let y = 0; y < size.h; y++) {
+      for (let x = 0; x < size.w; x++) {
         const pos = { x, y }
         const terrain: TerrainId = terrainAt(st, pos)
         const o = tileOrigin(l, pos)
@@ -899,7 +1081,8 @@ export class MapScene extends Phaser.Scene {
         if (terrain === "plain") plainSpots.push(c)
         if (hasArt) {
           // Кусты (и ели зимнего парка) качаются от основания: якорь внизу по центру.
-          const sway = terrain === "forest" || (terrain === "mountain" && st.map.biomeId === "winter_park")
+          // На большом поле сотни кустов: не качаем их, чтобы не грузить слабые телефоны
+          const sway = !this.worldMode && (terrain === "forest" || (terrain === "mountain" && st.map.biomeId === "winter_park"))
           const img = sway
             ? this.add
                 .image(o.x + l.tile / 2, o.y + l.tile, texKey)
@@ -913,7 +1096,7 @@ export class MapScene extends Phaser.Scene {
           if (frames > 1) this.animTiles.push({ img, terrain: look, frames, phase, frame: 0, variant })
           // Тропинка — автотайл по соседям, мост — поперёк воды
           const overlay = cellDecor === "path"
-            ? pathKey(biome.id, decorMask(decor, pos))
+            ? pathKey(biome.id, decorMask(decor, pos, size))
             : cellDecor === "bridge" ? bridgeKey(biome.id, bridgeVertical(st.map.tiles, pos)) : undefined
           if (overlay && hasTexture(this, overlay))
             this.tileLayer.add(this.add.image(o.x, o.y, overlay).setOrigin(0, 0).setDisplaySize(l.tile, l.tile))
@@ -993,20 +1176,27 @@ export class MapScene extends Phaser.Scene {
     }
     // Рамка поля: тёмный контур и светлый внутренний кант
     g.lineStyle(Math.max(3, l.tile * 0.06), 0x000000, 0.35)
-    g.strokeRect(l.ox - 1, l.oy - 1, l.tile * MAP_W + 2, l.tile * MAP_H + 2)
+    g.strokeRect(l.ox - 1, l.oy - 1, l.tile * size.w + 2, l.tile * size.h + 2)
     g.lineStyle(2, 0xffffff, 0.18)
-    g.strokeRect(l.ox + 1, l.oy + 1, l.tile * MAP_W - 2, l.tile * MAP_H - 2)
+    g.strokeRect(l.ox + 1, l.oy + 1, l.tile * size.w - 2, l.tile * size.h - 2)
+    // Мрачная чаща: всё поле приглушено в сумеречный зелёно-серый
+    if (st.map.mode === "expedition")
+      for (const o of this.tileLayer.list) if (o instanceof Phaser.GameObjects.Image) o.setTint(EXPEDITION_GLOOM)
     this.groundBg?.destroy()
     this.groundBg = null
     const groundTex = groundKey(st.map.biomeId)
     if (hasTexture(this, groundTex)) {
-      const w = this.scale.width
-      const h = this.scale.height
+      // Большое поле: земля вокруг — по всему миру камеры, а не по экрану
+      const pad = this.worldMode ? Math.max(this.scale.width, this.scale.height) : 0
+      const gx = -pad
+      const gy = -pad
+      const w = this.worldMode ? l.tile * size.w + pad * 2 : this.scale.width
+      const h = this.worldMode ? l.tile * size.h + pad * 2 : this.scale.height
       this.groundBg = this.add
-        .tileSprite(0, 0, w, h, groundTex)
+        .tileSprite(gx, gy, w, h, groundTex)
         .setOrigin(0, 0)
         .setTileScale(l.tile / 128, l.tile / 128)
-        .setTilePosition(-l.ox * (128 / l.tile), -l.oy * (128 / l.tile))
+        .setTilePosition((gx - l.ox) * (128 / l.tile), (gy - l.oy) * (128 / l.tile))
         // Светлые биомы (снег, лёд, песок) затемняем мягче, иначе земля вокруг поля становится серой
         .setTint(["winter_park", "glacier", "desert"].includes(st.map.biomeId) ? 0xc9d2dc : 0x9a9a9a)
         .setAlpha(0.9)
@@ -1015,7 +1205,86 @@ export class MapScene extends Phaser.Scene {
     this.startTileAnimations()
     this.ensureWeather(st, flyAnchors)
     this.ambient?.destroy()
-    this.ambient = new AmbientLayer(this, { biomeId: biome.id, layout: l, seed, water: waterSpots, plain: plainSpots })
+    this.ambient = null
+    // Атмосфера (тени облаков, лучи, виньетка) рассчитана на поле в экран; на большом поле её заменяет сумрак
+    if (!this.worldMode)
+      this.ambient = new AmbientLayer(this, { biomeId: biome.id, layout: l, seed, water: waterSpots, plain: plainSpots })
+    this.expSig = ""
+    this.syncExpedition(st)
+  }
+
+  /* ---------- Вылазка в чащу: сундуки, ключи, выход ---------- */
+
+  /** Обновить сундуки, ключи и значки ключей по состоянию (презентер — посреди проигрывания событий). */
+  refreshExpedition(st: BattleState): void {
+    if (sceneAlive(this)) this.syncExpedition(st)
+  }
+
+  /**
+   * Сундуки (закрытые и открытые), ключи на земле и подсвеченный выход в углу; значок ключа над его носителем.
+   * Перерисовывается, только когда меняются ключи или открытые сундуки.
+   */
+  private syncExpedition(st: BattleState): void {
+    const def = st.map.expedition
+    const exp = st.expedition
+    if (!def || !exp) {
+      if (this.expLayer.length > 0) this.expLayer.removeAll(true)
+      return
+    }
+    const holders = new Set(Object.values(exp.keys).map(k => k.unitId).filter((id): id is string => !!id))
+    for (const v of this.units.values()) if (v.scene) v.setKey(holders.has(v.unitId), KEY_TEX)
+    const sig = `${this.layout.tile}|${exp.opened.join(",")}|${JSON.stringify(exp.keys)}`
+    if (sig === this.expSig) return
+    this.expSig = sig
+    for (const t of this.expTweens) t.stop()
+    this.expTweens = []
+    this.expLayer.removeAll(true)
+    const t = this.tile
+    // Выход: светящаяся клетка в углу и табличка; пока не открыт ни один сундук — приглушён
+    const ready = exp.opened.length > 0
+    const e = this.center(def.exit)
+    const glow = this.add.graphics()
+    glow.fillStyle(ready ? 0x7dffb0 : 0xbfe8cf, ready ? 0.42 : 0.22)
+    glow.fillRoundedRect(e.x - t / 2 + 3, e.y - t / 2 + 3, t - 6, t - 6, t * 0.18)
+    glow.lineStyle(Math.max(2, t * 0.06), ready ? 0x7dffb0 : 0xe8fff0, 0.95)
+    glow.strokeRoundedRect(e.x - t / 2 + 3, e.y - t / 2 + 3, t - 6, t - 6, t * 0.18)
+    const arrow = this.add.text(e.x, e.y, "⇱", textStyle(t * 0.5, "#ffffff", true, 3)).setOrigin(0.5)
+    if (def.exit.x > 0) arrow.setFlipX(true)
+    if (def.exit.y > 0) arrow.setFlipY(true)
+    const label = this.add
+      .text(e.x, e.y - t * 0.62, tr("EXIT", "ВЫХОД"), textStyle(Math.max(10, t * 0.22), ready ? "#7dffb0" : "#e8fff0", true, 3))
+      .setOrigin(0.5)
+    this.expLayer.add([glow, arrow, label])
+    this.expTweens.push(this.tweens.add({ targets: glow, alpha: 0.45, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }))
+    for (const chest of def.chests) {
+      const c = this.center(chest.pos)
+      const opened = exp.opened.includes(chest.id)
+      const tex = opened ? CHEST_OPEN_TEX : CHEST_TEX
+      if (!hasTexture(this, tex)) continue
+      // Ключ от сундука уже у бойца — сундук подсвечен: «встань сюда»
+      const holder = exp.keys[chest.id]?.unitId
+      if (!opened && holder && st.units[holder]?.side === "player") {
+        const ring = this.add.graphics()
+        ring.lineStyle(Math.max(3, t * 0.08), 0xffd166, 1)
+        ring.strokeCircle(c.x, c.y, t * 0.46)
+        ring.fillStyle(0xffd166, 0.18)
+        ring.fillCircle(c.x, c.y, t * 0.46)
+        this.expLayer.add(ring)
+        this.expTweens.push(this.tweens.add({ targets: ring, alpha: 0.35, duration: 550, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }))
+      }
+      const img = this.add.image(c.x, c.y + t * 0.04, tex).setDisplaySize(t * 0.92, t * 0.92)
+      if (opened) img.setAlpha(0.85)
+      this.expLayer.add(img)
+    }
+    // Ключи на земле подпрыгивают и светятся
+    for (const spot of Object.values(exp.keys)) {
+      if (!spot.pos || !hasTexture(this, KEY_TEX)) continue
+      const c = this.center(spot.pos)
+      const halo = this.add.circle(c.x, c.y, t * 0.32, 0xffe08a, 0.35)
+      const key = this.add.image(c.x, c.y - t * 0.05, KEY_TEX).setDisplaySize(t * 0.6, t * 0.6)
+      this.expLayer.add([halo, key])
+      this.expTweens.push(this.tweens.add({ targets: key, y: c.y - t * 0.18, duration: 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }))
+    }
   }
 
   /* ---------- Живые тайлы ---------- */
@@ -1083,8 +1352,9 @@ export class MapScene extends Phaser.Scene {
       depth: 4,
       maxParticles: 40,
       windDir: st.map.seed % 2 === 0 ? 1 : -1,
-      anchors,
-      anchorRadius: this.layout.tile * 0.7
+      anchors: this.worldMode ? [] : anchors,
+      anchorRadius: this.layout.tile * 0.7,
+      fixed: this.worldMode
     })
     this.weatherBiome = biome.id
   }

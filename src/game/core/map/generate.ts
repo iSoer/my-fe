@@ -124,12 +124,12 @@ function validate(g: Grid, playerSpawns: Pos[], enemySpawns: Pos[], maxBlocked: 
   return true
 }
 
-type EnemyRoles = { melee: number, ranged: number, healer: number, dancer: number, heavy: number }
+export type EnemyRoles = { melee: number, ranged: number, healer: number, dancer: number, heavy: number }
 
 const isMelee = (skill: WeaponSkill): boolean => weaponRange(skill) === 1
 
 /** Комплект врага (класс FW + оружие) из доступных модели на его уровне, с поправками на роли отряда. */
-function pickEnemyLoadout(rng: Rng, level: number, roles: EnemyRoles, difficulty: Difficulty): Loadout {
+export function pickEnemyLoadout(rng: Rng, level: number, roles: EnemyRoles, difficulty: Difficulty): Loadout {
   const pool = loadoutsAt(level).filter(l => l.classId !== DANCER_CLASS || roles.dancer === 0)
   const weightOf = (l: Loadout): number => {
     let w = l.weight
@@ -149,7 +149,7 @@ function pickEnemyLoadout(rng: Rng, level: number, roles: EnemyRoles, difficulty
   return rng.weighted(pool.map(l => ({ item: l, w: weightOf(l) })))
 }
 
-function makeEnemy(
+export function makeEnemy(
   rng: Rng,
   level: number,
   rarityRange: [Rarity, Rarity],

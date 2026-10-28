@@ -240,3 +240,33 @@
   background: #e3f6ec;
   color: var(--ok-text);
 }
+
+/* Вылазка, шаг 1: выбор режима (схватка или мрачная чаща) */
+.pawfield .mode-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.pawfield .mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border: 3px solid transparent;
+  background: var(--paper);
+  color: var(--text-paper);
+  box-shadow: 5px 5px 0 var(--ink-3);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.pawfield .mode-card.selected {
+  border-color: var(--red);
+  box-shadow: 5px 5px 0 var(--red);
+}
+.pawfield .mode-ico {
+  font-size: 26px;
+  line-height: 1;
+}

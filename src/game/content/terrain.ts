@@ -70,10 +70,22 @@ export function terrainInfo(state: BattleState, pos: Pos): TerrainInfo {
   if (!bonus && terrain === "plain") notes.push(tr("No effects", "Без эффектов"))
   // Мост — та же проходимая земля, но игрок видит под ним воду
   const bridge = terrain === "plain" && state.map.decor?.[posKey(pos)] === "bridge"
+  // Вылазка в чащу: сундук и выход — особые клетки
+  const exp = state.map.expedition
+  const chest = exp?.chests.find(c => c.pos.x === pos.x && c.pos.y === pos.y)
+  const exit = !!exp && exp.exit.x === pos.x && exp.exit.y === pos.y
+  if (chest) {
+    const opened = !!state.expedition?.opened.includes(chest.id)
+    notes.unshift(opened
+      ? tr("Opened — the loot is in your bag. Now head for the EXIT.", "Открыт — добыча у отряда. Теперь к ВЫХОДУ.")
+      : tr(`Locked. The key is on one of its guards; the fighter who takes it just steps onto the chest to open it. Inside: ${chest.treats} 🦴.`, `Заперт. Ключ — у одного из стражей; бойцу с ключом достаточно встать на сундук — он откроется сразу. Внутри: ${chest.treats} 🦴.`))
+  }
+  if (exit)
+    notes.unshift(tr("Step here after opening a chest — the whole squad leaves with all the loot.", "Встаньте сюда после того, как откроете сундук, — отряд уйдёт со всей добычей."))
   return {
     terrain,
-    icon: bridge ? "🌉" : ICON[terrain],
-    name: bridge ? tr("Bridge", "Мост") : biomeDef(state.map.biomeId).terrainNames[terrain],
+    icon: chest ? "📦" : exit ? "⇱" : bridge ? "🌉" : ICON[terrain],
+    name: chest ? tr("Chest", "Сундук") : exit ? tr("Exit", "Выход") : bridge ? tr("Bridge", "Мост") : biomeDef(state.map.biomeId).terrainNames[terrain],
     move: moveText(terrain),
     bonus,
     notes

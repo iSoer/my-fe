@@ -125,12 +125,17 @@ const mapSchema = z.object({
   biomeId: z.string(),
   factionId: z.string(),
   difficulty,
-  objective: z.enum(["rout", "killBoss"]),
+  objective: z.enum(["rout", "killBoss", "extract"]),
+  mode: z.enum(["skirmish", "expedition"]).optional(),
+  expedition: z.object({
+    chests: z.array(z.object({ id: z.string(), pos, treats: z.number(), keyHolderId: z.string() })),
+    exit: pos
+  }).optional(),
   layout: z.enum(["glade", "forestEdge", "riverBridge", "crossroads", "pass", "lake", "fort", "ruins"]).optional(),
   decor: z.record(z.string(), z.enum(["path", "bridge"])).optional(),
   tiles: z.array(z.array(terrain)),
   playerSpawns: z.array(pos),
-  enemies: z.array(z.object({ unit: unitSchema, pos, stance })),
+  enemies: z.array(z.object({ unit: unitSchema, pos, stance, post: pos.optional(), leash: z.number().optional() })),
   reinforcements: z.array(z.object({ turn: z.number(), units: z.array(z.object({ unit: unitSchema, pos })) })),
   rewards: z.object({ treats: z.number(), glory: z.number() })
 })
@@ -149,7 +154,9 @@ const battleUnitSchema = z.object({
   stance,
   flags: z.record(z.string(), z.number()),
   spawnedTurn: z.number(),
-  turnStart: pos.optional()
+  turnStart: pos.optional(),
+  post: pos.optional(),
+  leash: z.number().optional()
 })
 
 const battleSchema = z.object({
@@ -176,7 +183,11 @@ const battleSchema = z.object({
   }),
   spawnedWaves: z.array(z.number()),
   enemyQueue: z.array(z.string()).nullable(),
-  startedAt: z.number()
+  startedAt: z.number(),
+  expedition: z.object({
+    keys: z.record(z.string(), z.object({ unitId: z.string().optional(), pos: pos.optional() })),
+    opened: z.array(z.string())
+  }).optional()
 })
 
 const memorialSchema = z.object({
@@ -198,6 +209,8 @@ const settingsSchema = z.object({
   animSpeed: z.union([z.literal(1), z.literal(2)]),
   cinematic: z.enum(["always", "mine", "never"]),
   autoEndTurn: z.boolean(),
+  // Сейвы без этой настройки — двойное нажатие, как в новой игре
+  endTurnConfirm: z.enum(["modal", "none", "double"]).default("double"),
   dangerZoneDefault: z.boolean(),
   blood: z.enum(["sea", "pools"]),
   confirmAttack: z.boolean(),

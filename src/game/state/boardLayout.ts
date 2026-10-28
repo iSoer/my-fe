@@ -46,3 +46,28 @@ export function setBoardInsets(insets: BoardInsets): void {
   if (cur.top === insets.top && cur.bottom === insets.bottom) return
   $boardInsets.set(insets)
 }
+
+/* ---------- Зум большого поля (вылазка в чащу) ---------- */
+
+/** Ступени зума камеры: меньше 1 — видно больше карты, больше 1 — крупнее. */
+export const ZOOM_LEVELS = [0.25, 0.35, 0.5, 0.7, 1, 1.25, 1.5] as const
+
+export const $boardZoom = atom<number>(1)
+
+/** Шаг зума кнопками и колесом мыши: `dir` > 0 — крупнее. */
+export function zoomBoard(dir: 1 | -1): void {
+  const cur = $boardZoom.get()
+  const i = ZOOM_LEVELS.findIndex(z => Math.abs(z - cur) < 1e-6)
+  const base = ZOOM_LEVELS.indexOf(1)
+  const next = ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, (i < 0 ? base : i) + dir))] ?? 1
+  if (next !== cur) $boardZoom.set(next)
+}
+
+export function canZoom(dir: 1 | -1): boolean {
+  const cur = $boardZoom.get()
+  return dir > 0 ? cur < ZOOM_LEVELS[ZOOM_LEVELS.length - 1]! - 1e-6 : cur > ZOOM_LEVELS[0] + 1e-6
+}
+
+export function resetBoardZoom(): void {
+  if ($boardZoom.get() !== 1) $boardZoom.set(1)
+}

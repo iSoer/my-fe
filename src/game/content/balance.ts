@@ -396,9 +396,34 @@ export const HEALING = {
   magShare: 1
 }
 
+/**
+ * Вылазка в мрачную чащу: квадратное поле площадью в две прежние карты чащи. Как в Dota: от старта (левый нижний
+ * угол) к выходу (правый верхний) идут три дороги — верхняя, средняя и нижняя, поперёк средней — ручей с мостами;
+ * в лесу между дорогами — лагеря стражей с сундуками, к ним ведут тропы. Лагерь — `group` врагов (у одного ключ);
+ * стражи не уходят от сундука дальше `leash` клеток и просыпаются, когда игрок подходит на `alertRadius`.
+ * В сундуке — доля `chestShare` награды команды на трёх стражей (больше стражей — богаче сундук, ±`chestSpread`).
+ */
+export const EXPEDITION = {
+  w: 30,
+  h: 30,
+  chests: { easy: 4, normal: 5, hard: 6, nightmare: 6 } as Record<"easy" | "normal" | "hard" | "nightmare", number>,
+  group: { easy: [2, 3], normal: [2, 4], hard: [3, 4], nightmare: [3, 4] } as Record<"easy" | "normal" | "hard" | "nightmare", [number, number]>,
+  leash: 5,
+  alertRadius: 4,
+  chestShare: 0.6,
+  chestSpread: 0.15,
+  turnLimit: 200
+}
+
+
 /** Бой длится не дольше `turnLimit` ходов: после фазы врага последнего хода отряд отступает (живые бойцы целы, часть добычи). */
 export const BATTLE = {
   turnLimit: 20
+}
+
+/** Лимит ходов боя: в чаще поле больше — и ходов больше (`EXPEDITION.turnLimit`). */
+export function turnLimitOf(map: { mode?: string }): number {
+  return map.mode === "expedition" ? EXPEDITION.turnLimit : BATTLE.turnLimit
 }
 
 export const COMBAT = {

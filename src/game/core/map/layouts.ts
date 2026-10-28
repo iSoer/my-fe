@@ -1,6 +1,6 @@
 import type { Rng } from "../rng"
-import type { MapDecor, MapLayout, Pos, TerrainId } from "../types"
-import { MAP_H, MAP_W, inBounds, posKey } from "../types"
+import type { BoardSize, MapDecor, MapLayout, Pos, TerrainId } from "../types"
+import { MAP_H, MAP_W, inBounds, inMap, posKey } from "../types"
 import { TERRAIN_SHARE } from "@game/content/balance"
 
 // Раскладки поля: вместо россыпи случайных клякс карта строится по узнаваемому шаблону (опушка, переправа,
@@ -413,14 +413,14 @@ export const MASK = { n: 1, e: 2, s: 4, w: 8 } as const
  * Маска тропинки для автотайла (0…15): с какими сторонами клетка соединена — с соседней тропинкой, мостом или
  * краем поля. Конец тропинки у края поля уходит за край (дорога не обрывается у рамки).
  */
-export function decorMask(decor: Readonly<Record<string, MapDecor>> | undefined, p: Pos): number {
+export function decorMask(decor: Readonly<Record<string, MapDecor>> | undefined, p: Pos, size: BoardSize = { w: MAP_W, h: MAP_H }): number {
   if (!decor) return 0
   const bits = [MASK.n, MASK.e, MASK.s, MASK.w]
   let mask = 0
   let links = 0
   N4.forEach((o, i) => {
     const q = add(p, o)
-    if (inBounds(q) && decor[posKey(q)]) {
+    if (inMap(size, q) && decor[posKey(q)]) {
       mask |= bits[i] ?? 0
       links++
     }
@@ -429,9 +429,9 @@ export function decorMask(decor: Readonly<Record<string, MapDecor>> | undefined,
     // Тупик у рамки: продолжить за край (верх и низ важнее — тропинки идут вдоль поля)
     const exits: [boolean, number][] = [
       [p.y === 0, MASK.n],
-      [p.y === MAP_H - 1, MASK.s],
+      [p.y === size.h - 1, MASK.s],
       [p.x === 0, MASK.w],
-      [p.x === MAP_W - 1, MASK.e]
+      [p.x === size.w - 1, MASK.e]
     ]
     const exit = exits.find(([on, bit]) => on && !(mask & bit))
     if (exit) mask |= exit[1]
@@ -441,6 +441,6 @@ export function decorMask(decor: Readonly<Record<string, MapDecor>> | undefined,
 
 /** Мост лежит вдоль оси «север–юг», если вода слева или справа от него, иначе — «запад–восток». */
 export function bridgeVertical(tiles: TerrainId[][], p: Pos): boolean {
-  const water = (q: Pos) => inBounds(q) && tiles[q.y]?.[q.x] === "water"
+  const water = (q: Pos) => tiles[q.y]?.[q.x] === "water"
   return water({ x: p.x - 1, y: p.y }) || water({ x: p.x + 1, y: p.y })
 }

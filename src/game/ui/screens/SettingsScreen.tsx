@@ -158,6 +158,25 @@ export function SettingsScreen() {
             </div>
           </div>
           <div className="setting">
+            <span>{tr("“End turn” button", "Кнопка «Завершить ход»")}</span>
+            <Seg
+              value={s.endTurnConfirm}
+              options={[
+                { v: "modal" as const, label: tr("Ask", "С вопросом") },
+                { v: "none" as const, label: tr("Instant", "Сразу") },
+                { v: "double" as const, label: tr("Double tap", "Двойное") }
+              ]}
+              onChange={v => set({ endTurnConfirm: v })}
+            />
+            <span className="muted small">
+              {s.endTurnConfirm === "modal"
+                ? tr("If someone hasn’t acted, a confirmation window appears.", "Если кто-то не действовал, появится окно подтверждения.")
+                : s.endTurnConfirm === "none"
+                  ? tr("A tap always ends the turn at once.", "Нажатие всегда сразу завершает ход.")
+                  : tr("If someone hasn’t acted, the first tap asks to tap again; the second within 2 s ends the turn.", "Если кто-то не действовал, первое нажатие просит нажать ещё раз; второе в течение 2 с завершает ход.")}
+            </span>
+          </div>
+          <div className="setting">
             <div className="row">
               <span>{tr("Danger zone by default", "Зона опасности по умолчанию")}</span>
               <Switch on={s.dangerZoneDefault} onChange={v => set({ dangerZoneDefault: v })} />

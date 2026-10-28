@@ -406,6 +406,22 @@
   pointer-events: auto;
   z-index: 5;
 }
+/* Большое поле (вылазка в чащу): ещё блок зума из двух кнопок */
+.bf-bar-bottom.has-zoom {
+  grid-template-columns: 1fr 1fr 1.6fr 1.8fr;
+}
+.bf-bar-zoom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  min-width: 0;
+}
+.bf-bar-zoom .bf-bar-btn:disabled {
+  opacity: 0.4;
+}
+.bf-chip.bf-goal.ready::before {
+  background: #7dffb0;
+}
 .bf-bar-btn {
   position: relative;
   isolation: isolate;
@@ -469,6 +485,14 @@
 }
 .bf-bar-end.pulse::before {
   animation: bf-hard-pulse 1.2s ease-in-out infinite;
+}
+/* Двойное нажатие: первое «взводит» кнопку — жёлтая, с подсказкой «Ещё раз» */
+.bf-bar-end.armed {
+  color: var(--bf-ink);
+}
+.bf-bar-end.armed::before {
+  background: #ffd166;
+  animation: bf-hard-pulse 0.5s ease-in-out infinite;
 }
 .bf-bar-btn:disabled {
   opacity: 0.45;

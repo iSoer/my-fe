@@ -11,7 +11,7 @@ import type {
   Stats,
   UnitInstance
 } from "../types"
-import { MAP_H, MAP_W, STATS, manhattan, posKey, samePos } from "../types"
+import { STATS, inMap, manhattan, mapSize, posKey, samePos } from "../types"
 import { livingUnits, otherSide, unitAt } from "./query"
 import { planAssist } from "./assist"
 import { moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
@@ -19,7 +19,7 @@ import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
 import { lootFor } from "../progression"
-import { BATTLE, difficultyDef, SKILL_XP, SP, XP } from "@game/content/balance"
+import { difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
 import { gainSkillXp } from "../units/proficiency"
 import { MOVEMENT_SKILLS, type Skill } from "@shared/character/skills"
 import { MAX_LEVEL } from "../types"
@@ -87,8 +87,14 @@ export function createBattle(opts: CreateBattleOptions): ReduceResult {
   })
   for (const e of opts.map.enemies) {
     state.roster[e.unit.id] = e.unit
-    state.units[e.unit.id] = makeBattleUnit(e.unit, "enemy", e.pos, e.stance, 1)
+    const bu = makeBattleUnit(e.unit, "enemy", e.pos, e.stance, 1)
+    if (e.post) bu.post = { ...e.post }
+    if (e.leash !== undefined) bu.leash = e.leash
+    state.units[e.unit.id] = bu
   }
+  // Вылазка в чащу: ключ от каждого сундука — у одного из его стражей
+  if (opts.map.expedition)
+    state.expedition = { keys: Object.fromEntries(opts.map.expedition.chests.map(c => [c.id, { unitId: c.keyHolderId }])), opened: [] }
   const events: BattleEvent[] = []
   startPhase(state, "player", events)
   return { state, events }
@@ -136,11 +142,76 @@ function applyEffects(state: BattleState, effects: Effect[], events: BattleEvent
   }
 }
 
+/**
+ * Павший с ключом: ключ забирает убивший его боец игрока, иначе (убит врагом, эффектом, пал сам боец игрока)
+ * ключ падает на клетку павшего — его подберёт тот, кто на неё встанет.
+ */
+function passKeys(state: BattleState, u: BattleUnit, killerId: string | undefined, events: BattleEvent[]): void {
+  const exp = state.expedition
+  if (!exp) return
+  const killer = killerId ? state.units[killerId] : undefined
+  const taker = killer && killer.alive && killer.side === "player" && u.side === "enemy" ? killer : undefined
+  for (const [chestId, spot] of Object.entries(exp.keys)) {
+    if (spot.unitId !== u.unitId) continue
+    if (taker) {
+      exp.keys[chestId] = { unitId: taker.unitId }
+      events.push({ type: "keyTaken", chestId, unitId: taker.unitId, pos: { ...u.pos } })
+    }
+    else {
+      exp.keys[chestId] = { pos: { ...u.pos } }
+      events.push({ type: "keyDropped", chestId, pos: { ...u.pos } })
+    }
+  }
+}
+
+/**
+ * Боец игрока встал на клетку в чаще (любой шаг, в том числе перестановка в пределах хода): подобрал ключ, что
+ * лежит на ней, и сразу открыл сундук, если стоит на нём с ключом от него, — содержимое идёт в добычу вылазки.
+ * Отдельного действия не нужно, ход бойца не тратится.
+ */
+function expeditionStepOn(state: BattleState, unitId: string, events: BattleEvent[]): void {
+  const exp = state.expedition
+  const def = state.map.expedition
+  const bu = state.units[unitId]
+  if (!exp || !def || !bu || !bu.alive || bu.side !== "player" || state.result) return
+  for (const [chestId, spot] of Object.entries(exp.keys)) {
+    if (spot.pos && samePos(spot.pos, bu.pos)) {
+      exp.keys[chestId] = { unitId }
+      events.push({ type: "keyTaken", chestId, unitId, pos: { ...bu.pos } })
+    }
+  }
+  for (const chest of def.chests) {
+    if (exp.opened.includes(chest.id) || exp.keys[chest.id]?.unitId !== unitId || !samePos(chest.pos, bu.pos)) continue
+    exp.opened.push(chest.id)
+    delete exp.keys[chest.id]
+    state.stats.loot += chest.treats
+    events.push({ type: "chestOpened", chestId: chest.id, unitId, pos: { ...chest.pos }, treats: chest.treats })
+  }
+}
+
+/**
+ * Действие бойца игрока в чаще завершено: всё, что даёт клетка (`expeditionStepOn`), а встал на выход, когда открыт
+ * хоть один сундук, — отряд уходит с добычей (победа). Выход — только по завершённому действию, не от перестановки.
+ */
+function expeditionStep(state: BattleState, unitId: string, events: BattleEvent[]): void {
+  expeditionStepOn(state, unitId, events)
+  const exp = state.expedition
+  const def = state.map.expedition
+  const bu = state.units[unitId]
+  if (!exp || !def || !bu || !bu.alive || bu.side !== "player" || state.result) return
+  if (exp.opened.length > 0 && samePos(bu.pos, def.exit)) {
+    events.push({ type: "extracted", unitId, pos: { ...bu.pos } })
+    state.result = "victory"
+    events.push({ type: "battleEnded", result: "victory" })
+  }
+}
+
 function killUnit(state: BattleState, u: BattleUnit, killerId: string | undefined, events: BattleEvent[]): void {
   if (!u.alive) return
   u.alive = false
   u.hp = 0
   u.acted = true
+  passKeys(state, u, killerId, events)
   state.decals.push({ pos: { ...u.pos }, kind: "pool" })
   if (u.side === "player") state.stats.deaths.push(u.unitId)
   if (killerId && state.units[killerId]?.side === "player") {
@@ -246,6 +317,8 @@ function checkEnd(state: BattleState, events: BattleEvent[]): boolean {
     events.push({ type: "battleEnded", result: "defeat" })
     return true
   }
+  // Вылазка в чащу: перебить всех мало — победа только уходом с добычей через выход (`expeditionStep`)
+  if (state.map.objective === "extract") return false
   const enemies = livingUnits(state, "enemy")
   const allWavesSpawned = state.map.reinforcements.every(w => state.spawnedWaves.includes(w.turn))
   if (state.map.objective === "killBoss") {
@@ -279,7 +352,7 @@ function spawnReinforcements(state: BattleState, events: BattleEvent[]): void {
           { x: pos.x, y: pos.y + 1 }
         ].find(
           p =>
-            p.x >= 0 && p.x < 6 && p.y >= 0 && p.y < 8 && !unitAt(state, p) && state.map.tiles[p.y]?.[p.x] === "plain"
+            inMap(mapSize(state.map), p) && !unitAt(state, p) && state.map.tiles[p.y]?.[p.x] === "plain"
         )
         if (!alt) continue
         pos = alt
@@ -318,7 +391,7 @@ function endPhase(state: BattleState, events: BattleEvent[]): void {
     delete u.turnStart
   }
   if (side === "player") startPhase(state, "enemy", events)
-  else if (state.turn >= BATTLE.turnLimit) {
+  else if (state.turn >= turnLimitOf(state.map)) {
     // Лимит ходов: отряд отступает — живые бойцы возвращаются, добыча — как при отступлении
     state.result = "retreat"
     state.timeUp = true
@@ -344,7 +417,7 @@ function moveUnit(state: BattleState, bu: BattleUnit, to: Pos, events: BattleEve
   let path = pathTo(reach, to)
   if (!samePos(bu.pos, origin)) {
     // Уже переставлен: идём от текущей клетки (с запасом хода — дорогу назад бюджет не ограничивает)
-    const here = reachableTiles(state, bu, bu.pos, MAP_W * MAP_H)
+    const here = reachableTiles(state, bu, bu.pos, mapSize(state.map).w * mapSize(state.map).h)
     path = here.has(posKey(to)) ? pathTo(here, to) : [{ ...bu.pos }, { ...to }]
   }
   bu.pos = { ...to }
@@ -462,6 +535,9 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
     }
   }
 
+  if (action.type === "move") expeditionStepOn(state, action.unitId, events)
+  else if (action.type === "wait" || action.type === "attack" || action.type === "assist" || action.type === "attackWall")
+    expeditionStep(state, action.unitId, events)
   checkEnd(state, events)
   return { state, events }
 }
