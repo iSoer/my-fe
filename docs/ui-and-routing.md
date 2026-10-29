@@ -1,0 +1,117 @@
+# UI и маршрутизация
+
+Интерфейс — React 19 поверх nanostores. Маршрут берётся из `location.hash` (хеш-роутер [state/router.ts](../src/game/state/router.ts)), экран выбирает [ui/App.tsx](../src/game/ui/App.tsx). Бой управляется отдельной машиной состояний [state/battleUi.ts](../src/game/state/battleUi.ts). Для консоли и смоук-тестов есть отладочный объект `window.__pf`.
+
+## Маршруты
+
+Тип `Route` и функции `parseRoute(hash)`, `routePath(route)`, `navigate(path, replace?)`, `go(route, replace?)`, `back()`, `initRouter()`.
+
+| Хеш                                              | `Route.name`   | Экран ([ui/screens](../src/game/ui/screens))              |
+| ------------------------------------------------ | -------------- | --------------------------------------------------------- |
+| `#/` (пусто)                                     | `menu`         | `MenuScreen`                                              |
+| `#/village`                                      | `village`      | `SettlementScreen` (Phaser-поселение, ленивый чанк)       |
+| `#/store`                                        | `store`        | `StoreScreen`                                             |
+| `#/army`                                         | `army`         | `ArmyScreen`                                              |
+| `#/army/create`                                  | `armyCreate`   | `ArmyScreen`                                              |
+| `#/army/recruit`                                 | `recruit`      | `ArmyScreen`                                              |
+| `#/army/<unitId>`                                | `unit`         | `UnitScreen unitId`                                       |
+| `#/battle/setup`                                 | `battleSetup`  | `BattleSetupScreen` (шаг 1: режим и сложность)            |
+| `#/battle/enemy/<easy\|normal\|hard\|nightmare>` | `battleEnemy`  | `EnemyTeamScreen difficulty` (из `BattleSetupScreen.tsx`) |
+| `#/battle/squad`                                 | `battleSquad`  | `SquadScreen`                                             |
+| `#/battle`                                       | `battle`       | `BattleScreen` (Phaser-бой, ленивый чанк)                 |
+| `#/battle/result`                                | `battleResult` | `BattleResultScreen`                                      |
+| `#/memorial`                                     | `memorial`     | `MemorialScreen` (Кладбище)                               |
+| `#/settings`                                     | `settings`     | `SettingsScreen`                                          |
+| всё прочее                                       | `notFound`     | `MenuScreen` (маршрут остаётся `notFound`)                |
+
+Как устроено:
+
+- Контейнер `.route` в `Router` получает `key = "<lang>:<routeKey>"`. Смена маршрута или языка пересоздаёт экран и проигрывает CSS-переход.
+- Пока `$saveStatus !== "ready"` или игрок не тапнул заставку, показывается `Splash`. Тост `$saveError` сообщает, что сейв повреждён.
+- `back()` идёт по истории, если счётчик `depth` (переходы `navigate` без `replace`) больше нуля, иначе делает `navigate("/", true)`. Системная кнопка «назад» браузера `depth` не уменьшает.
+- `parentRoute()` экспортируется, но нигде не используется.
+- Кнопка «Назад» Telegram настраивается в `syncBackButton()` ([main.tsx](../src/main.tsx)):
+  - `menu` и `battleResult` — кнопка скрыта;
+  - `battle` — переключает паузу `$pauseOpen`;
+  - `village` — закрывает диалог (`skipDialogue`) или ведёт в меню;
+  - остальные маршруты — `back()`.
+
+## Сторы
+
+| Стор                                                                                                                                           | Файл                                                     | Что хранит                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------- |
+| `$save`, `$saveStatus`, `$saveError`                                                                                                           | [state/save.ts](../src/game/state/save.ts)               | Весь сейв, состояние загрузки, ошибка разбора |
+| `$profile`, `$army`, `$battle`, `$settings`, `$shelter`, `$memorial`, `$lastBattle`, `$pendingBattle`, `$rewardChoice`, `$inventory`, `$store` | state/save.ts                                            | `computed` от `$save`                         |
+| `$sortieMode`                                                                                                                                  | state/save.ts                                            | Режим вылазки `skirmish`/`expedition`         |
+| `$route`                                                                                                                                       | [state/router.ts](../src/game/state/router.ts)           | Текущий `Route`                               |
+| `$battleUi`                                                                                                                                    | [state/battleUi.ts](../src/game/state/battleUi.ts)       | Состояние управления в бою                    |
+| `$dialogue`                                                                                                                                    | [state/dialogue.ts](../src/game/state/dialogue.ts)       | Идущий разговор с жителем                     |
+| `$boardLayout`, `$boardInsets`, `$boardZoom`                                                                                                   | [state/boardLayout.ts](../src/game/state/boardLayout.ts) | Геометрия поля боя                            |
+| `$settlementPanel`, `$settlementNear`                                                                                                          | [state/settlement.ts](../src/game/state/settlement.ts)   | Открытая карточка места, место рядом с героем |
+| `$pauseOpen`                                                                                                                                   | [ui/lib/pause.ts](../src/game/ui/lib/pause.ts)           | Открыта ли пауза боя                          |
+| `$lang`                                                                                                                                        | [i18n](../src/game/i18n/index.ts)                        | Язык, зеркало `settings.lang`                 |
+| `$updateReady`, `$offlineReady`, `$installPrompt`, `$isStandalone`, `$online`                                                                  | [host/pwa.ts](../src/host/pwa.ts)                        | Состояние PWA (хост)                          |
+
+[state/sound.ts](../src/game/state/sound.ts) (`initSound`) подписывает звук на `$settings` (громкость) и `$route` (тема музыки) и озвучивает нажатия кнопок.
+
+## Машина состояний боя (`battleUi`)
+
+`UiMode`: `idle`, `unitSelected`, `forecast`, `assistPreview`, `wallPreview`, `enemyInfo`, `tileInfo`, `busy`, `ended`.
+
+```
+idle ──тап по своему бойцу──▶ unitSelected ──тап по клетке──▶ moveTo (dispatch move) ──▶ unitSelected
+                                │ тап по врагу / союзнику / хлипкой стене
+                                ▼
+                 forecast / assistPreview / wallPreview ──повторный тап или confirm()──▶ commit()
+                                │ cancel()                                             │
+                                ▼                                                      ▼
+                           unitSelected                          busy (playEvents) ──▶ afterAction
+idle ──тап по врагу──▶ enemyInfo     idle ──тап по пустой клетке──▶ tileInfo
+afterAction: result → ended (+ onEnded) | idle (+ refreshDanger, autoEndTurn → endTurn)
+endTurn(): dispatch endPhase → playEvents → runEnemyPhase(): цикл nextEnemyAction → dispatch → playEvents
+```
+
+- Перетаскивание: `setPressed`, `beginDrag`, `dragHover`, `endDrag`, `cancelDrag`.
+- Зона опасности: `toggleDanger`, `refreshDanger`. Ускорение: `setFastForward`.
+- Presenter регистрируется через `setPresenter`. Колбэк конца боя — `setOnBattleEnded`: `BattleScreen` вызывает `finishBattle()` и переходит на `/battle/result`.
+- `enterBattleScreen()` сбрасывает UI. Если загрузился бой в фазе врага, она возобновляется.
+- `runEnemyPhase` ограничен предохранителем `100 + units * 3` итераций. Упавшее действие ИИ заменяется на `wait` или `endPhase`.
+
+## `window.__pf`
+
+Создаётся в `useEffect` [GameRoot.tsx](../src/game/GameRoot.tsx). Он доступен и в продакшене: игра одиночная, секретов в нём нет.
+
+| Путь                                                                        | Значение                                                                                                      |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `save`                                                                      | `$save` (`get`/`set`)                                                                                         |
+| `ui`                                                                        | `$battleUi`                                                                                                   |
+| `layout`                                                                    | `$boardLayout`                                                                                                |
+| `battle.tapTile(pos)`, `battle.confirm()`, `battle.endTurn()`               | Действия игрока в бою                                                                                         |
+| `settlement.panel`, `settlement.near`                                       | `$settlementPanel`, `$settlementNear`                                                                         |
+| `settlement.teleport(id)`, `settlement.walkTo(id)`                          | Через `settlementControl()` сцены поселения                                                                   |
+| `settlement.open`, `build`, `upgrade`, `train`, `collect`, `revive`, `tick` | `openPanel`, `buildAction`, `upgradeAction`, `trainAction`, `collectAction`, `reviveAction`, `tickSettlement` |
+
+Им пользуются [tools/smoke.mjs](../tools/smoke.mjs), [smoke-telegram.mjs](../tools/smoke-telegram.mjs) и [smoke-pwa.mjs](../tools/smoke-pwa.mjs). Если переименовываете действие, обновите и `__pf`, и смоуки.
+
+## Как добавить маршрут или экран (рецепт)
+
+1. В [state/router.ts](../src/game/state/router.ts):
+   - добавьте вариант в union `Route`;
+   - разберите хеш в `parseRoute`, до финального `notFound`;
+   - добавьте `case` в `routePath`. Switch исчерпывающий, без него не пройдёт typecheck;
+   - при необходимости добавьте `case` в `parentRoute`.
+2. Создайте экран `src/game/ui/screens/<Name>Screen.tsx` (тексты через `tr()`).
+3. В [ui/App.tsx](../src/game/ui/App.tsx) импортируйте экран и добавьте `case` в `Screen`. Если у маршрута есть параметр, учтите его в `routeKey`, чтобы экран пересоздавался при смене параметра.
+4. Ведите на экран через `navigate("/path")` или `go({ name })`.
+5. Кнопка «Назад» Telegram: если поведение отличается от `back()` (скрыть, закрыть оверлей), добавьте ветку в `syncBackButton` в [src/main.tsx](../src/main.tsx). Если экран — это бой или итоги, проверьте ещё `NO_RELOAD_ROUTES` в [host/PwaBanners.tsx](../src/host/PwaBanners.tsx) и музыку в [state/sound.ts](../src/game/state/sound.ts).
+6. Если смоуки будут управлять экраном напрямую, добавьте действия в `window.__pf` ([GameRoot.tsx](../src/game/GameRoot.tsx)).
+7. Тест разбора в [tests/game/router.test.ts](../tests/game/router.test.ts): `parseRoute(routePath(r))` возвращает `r`, неверный параметр даёт не этот экран.
+8. Повторите изменения в next-instapok: `src/game` синхронизируемый.
+9. `pnpm typecheck && pnpm test && pnpm lint`. При желании — `pnpm smoke` и `pnpm smoke:tg`.
+
+## Где менять
+
+- Маршруты: [state/router.ts](../src/game/state/router.ts), [ui/App.tsx](../src/game/ui/App.tsx).
+- Кнопка «Назад» и подтверждение закрытия Telegram: `syncBackButton` и подписка на `$battle` в [main.tsx](../src/main.tsx).
+- Управление боем: [state/battleUi.ts](../src/game/state/battleUi.ts). Тесты — [tests/game/battleUi.test.ts](../tests/game/battleUi.test.ts).
+- Отладочный API: [GameRoot.tsx](../src/game/GameRoot.tsx).

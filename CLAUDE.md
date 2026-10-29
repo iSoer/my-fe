@@ -37,6 +37,12 @@ pnpm smoke:pwa           # offline PWA check (starts its own preview)
 
 The art gallery lives at `pnpm dev`, then http://localhost:5173/tools/gallery/index.html.
 
+## Docs and skills
+
+- `docs/` holds the project documentation in Russian, one file per topic; the index is `docs/README.md`. Read the relevant file before working on a subsystem.
+- Project skills in `.claude/skills/`: `add-character`, `add-small-map`, `add-big-map`, `add-building` (recipes for content), and `update-docs`. After any significant change to behavior or structure described in `docs/`, follow `update-docs` and update the affected documents before finishing.
+- `docs/game.md` is overwritten by `pnpm sync:game`; don't create or edit it here.
+
 ## Game code vs. platform code
 
 The game itself is developed in the sibling project `next-instapok`, where it is the `/game` route. `tools/sync-game.mjs` copies it here and **deletes any extra files** in the folders it writes to:
@@ -48,6 +54,7 @@ The game itself is developed in the sibling project `next-instapok`, where it is
 | `src/server/**` (what the game uses) | `src/model/`  | `@/server/*` |
 | `tests/unit/game/**`              | `tests/game/`| —            |
 
+- As of 2026-10-29, my-fe is **ahead** of next-instapok: dozens of game files exist only here, and `SAVE_VERSION` is 11 here vs. 6 there. Running `pnpm sync:game` now would wipe that work and reset players' saves, so never run it unless the user explicitly asks.
 - `src/game`, `src/shared`, `src/model`, and `tests/game` belong to the sync. Changes made here are lost on the next `pnpm sync:game` unless they are also made in next-instapok. Check with the user which repo is the source of truth before making large edits there.
 - These folders use next-instapok's style (double quotes, no semicolons) and are listed in `.prettierignore`, so never reformat them. The platform code (`src/host`, `src/main.tsx`, `tools`, configs) uses Prettier: single quotes, semicolons, width 110.
 - Only the platform lives in this repo: `src/host` (Telegram WebApp, CloudStorage sync, PWA banners, save-conflict screen), `src/main.tsx` (boot), and `src/sw.ts` (Service Worker).
