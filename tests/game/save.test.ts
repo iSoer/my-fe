@@ -85,6 +85,21 @@ describe("настройка кнопки «Завершить ход»", () => 
   })
 })
 
+describe("настройка качества графики", () => {
+  it("по умолчанию — «авто»; старый сейв без настройки читается так же; выбранный режим сохраняется", () => {
+    const save = createEmptySave(1)
+    expect(save.settings.graphics).toBe("auto")
+    const legacy = JSON.parse(serializeSave(save)) as { settings: Record<string, unknown> }
+    delete legacy.settings["graphics"]
+    const r = parseSave(JSON.stringify(legacy))
+    expect(r.ok && r.save.settings.graphics).toBe("auto")
+    for (const mode of ["crisp", "eco"] as const) {
+      const back = parseSave(serializeSave({ ...save, settings: { ...save.settings, graphics: mode } }))
+      expect(back.ok && back.save.settings.graphics).toBe(mode)
+    }
+  })
+})
+
 /** Сейв в формате v4: ростер-армия ещё с «пленником» и счётчиками наёма, без Лавки, поселения и сюжета. */
 function legacyV4(): Record<string, unknown> {
   const s = createEmptySave(1000)

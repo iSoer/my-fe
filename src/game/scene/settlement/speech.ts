@@ -2,6 +2,7 @@ import Phaser from "phaser"
 import type { Pos } from "@game/core/types"
 import { textStyle } from "../style"
 import { reducedMotion } from "../motionFx"
+import { textRes } from "../renderScale"
 
 // Облачка реплик над жителями поселения (рыбак, сплетники): экранного размера — не мельчают при отдалении камеры,
 // плашка прижимается внутрь экрана, хвостик остаётся над головой говорящего. Тап по облачку закрывает его.
@@ -47,12 +48,12 @@ export class SpeechBubbles {
         lineSpacing: 2
       })
       .setOrigin(0.5, 0)
-      .setResolution(3)
+      .setResolution(textRes(3))
     const caption = style.caption
       ? s.add
           .text(0, 0, `— ${style.caption}`, { ...textStyle(10, "#6d5a48", false, 0), fontStyle: "italic", wordWrap: { width: 190, useAdvancedWrap: true } })
           .setOrigin(0.5, 0)
-          .setResolution(3)
+          .setResolution(textRes(3))
       : undefined
     const padX = 10
     const padY = 7

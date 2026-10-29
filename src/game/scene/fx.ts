@@ -2,6 +2,7 @@ import Phaser from "phaser"
 import { TEX } from "./textures"
 import { FONT, textStyle } from "./style"
 import { GORE_TEX, ensureGoreTextures, goreBurst, goreDecal, goreEnabled } from "./gore"
+import { pinToScreen, viewH, viewW } from "./hidpi"
 
 /** Сцена пригодна для твинов/таймеров: создаётся или работает. */
 export function sceneAlive(scene: Phaser.Scene): boolean {
@@ -195,14 +196,14 @@ export async function banner(
   opts: BannerOptions = {}
 ): Promise<void> {
   if (!sceneAlive(scene)) return
-  const w = scene.scale.width
-  const h = scene.scale.height
+  const w = viewW(scene)
+  const h = viewH(scene)
   const bandH = Math.min(72, h * 0.12)
   const skew = bandH * 0.45
   const cy = h / 2
   // Плашка в духе Persona: чернильный параллелограмм с цветной кромкой и белой тонкой полосой.
   // Экранные координаты: на большом поле камера сдвинута — плашка не должна уезжать
-  const band = scene.add.graphics().setDepth(30).setScrollFactor(0)
+  const band = pinToScreen(scene.add.graphics().setDepth(30))
   const bw = w + skew * 2
   band.fillStyle(0x0d0b10, 0.96)
   band.fillPoints(
@@ -237,7 +238,7 @@ export async function banner(
   band.setPosition(-bw - w / 2, cy)
   const upper = text.toUpperCase()
   const fontSize = Math.round(bandH * 0.4)
-  const shadow = scene.add
+  const shadow = pinToScreen(scene.add
     .text(-w / 2 + 3, cy + 3, upper, {
       fontFamily: FONT,
       fontSize: `${fontSize}px`,
@@ -245,9 +246,8 @@ export async function banner(
       fontStyle: "bold italic"
     })
     .setOrigin(0.5)
-    .setDepth(31)
-    .setScrollFactor(0)
-  const label = scene.add
+    .setDepth(31))
+  const label = pinToScreen(scene.add
     .text(-w / 2, cy, upper, {
       fontFamily: FONT,
       fontSize: `${fontSize}px`,
@@ -255,14 +255,12 @@ export async function banner(
       fontStyle: "bold italic"
     })
     .setOrigin(0.5)
-    .setDepth(31)
-    .setScrollFactor(0)
+    .setDepth(31))
   let slash: Phaser.GameObjects.Rectangle | null = null
   if (opts.slash) {
-    slash = scene.add
+    slash = pinToScreen(scene.add
       .rectangle(-w, cy, w * 0.3, bandH * 2.8, 0xffffff, 0.18)
-      .setDepth(29)
-      .setScrollFactor(0)
+      .setDepth(29))
       .setAngle(-18)
     scene.tweens.add({ targets: slash, x: w * 2, duration: (220 + hold * 0.5) / speed, ease: "Cubic.easeOut" })
   }
@@ -272,7 +270,7 @@ export async function banner(
     const sy = cy - bandH * 0.42 + (i / 8) * bandH * 0.84
     const len = w * (0.15 + ((i * 37) % 10) / 25)
     const r = scene.add.rectangle(-len, sy, len, 1 + (i % 3), i % 4 === 0 ? color : 0xffffff, 0.25 + (i % 3) * 0.12)
-    r.setDepth(30.5).setOrigin(0, 0.5).setScrollFactor(0)
+    pinToScreen(r.setDepth(30.5).setOrigin(0, 0.5))
     streaks.push(r)
     scene.tweens.add({
       targets: r,
@@ -495,7 +493,7 @@ export function actorFlash(scene: Phaser.Scene, x: number, y: number, size: numb
 /** Конфетти сверху (победа). Не блокирует. */
 export function confettiRain(scene: Phaser.Scene, count: number, speed: number): void {
   if (!sceneAlive(scene)) return
-  const w = scene.scale.width
+  const w = viewW(scene)
   const emitter = scene.add.particles(0, -10, TEX.square, {
     x: { min: 0, max: w },
     speedY: { min: 120, max: 260 },
@@ -509,7 +507,7 @@ export function confettiRain(scene: Phaser.Scene, count: number, speed: number):
     emitting: false,
     quantity: count
   })
-  emitter.setDepth(61).setScrollFactor(0)
+  pinToScreen(emitter.setDepth(61))
   emitter.explode(count)
   scene.time.delayedCall(2500 / speed + 100, () => emitter.destroy())
 }

@@ -6,6 +6,7 @@ import { unitClass } from "@game/content/classes"
 import { weaponDef } from "@game/content/weapons"
 import { TEX } from "./textures"
 import { MOVE_GLYPH, WEAPON_COLOR_HEX, hexCss, hpColor, textStyle } from "./style"
+import { textRes } from "./renderScale"
 import { ensureUnitTexture, ensureUnitTextures, hasTexture, unitTexKey } from "./svgTextures"
 import { dustPuff, tween } from "./fx"
 import { MTEX, ensureMotionTextures, reducedMotion } from "./motionFx"
@@ -126,7 +127,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.rig = scene.add.container(0, 0)
     this.add([this.shadow, this.rig])
 
-    const idleKey = unitTexKey(unit, "idle", "map")
+    const idleKey = unitTexKey(scene, unit, "idle", "map")
     if (hasTexture(scene, idleKey)) this.attachSprite(idleKey)
     else {
       this.disc = scene.add.image(0, 0, TEX.disc).setTint(this.furColor)
@@ -141,7 +142,7 @@ export class UnitView extends Phaser.GameObjects.Container {
       this.rig.add([this.disc, this.emoji])
       void ensureUnitTextures(scene, unit, "map").then(() => {
         if (!this.scene || this.sprite) return
-        this.attachSprite(unitTexKey(unit, this.pose, "map"))
+        this.attachSprite(unitTexKey(scene, unit, this.pose, "map"))
         this.resize(this.size)
       })
     }
@@ -159,8 +160,8 @@ export class UnitView extends Phaser.GameObjects.Container {
       backgroundColor: bg,
       padding: { x: 3, y: 1 }
     })
-    this.debuffTag = scene.add.text(0, 0, "", tagStyle("#7b2cbf")).setOrigin(0, 0.5).setResolution(2).setVisible(false)
-    this.buffTag = scene.add.text(0, 0, "", tagStyle("#2d8a4e")).setOrigin(0, 0.5).setResolution(2).setVisible(false)
+    this.debuffTag = scene.add.text(0, 0, "", tagStyle("#7b2cbf")).setOrigin(0, 0.5).setResolution(textRes(2)).setVisible(false)
+    this.buffTag = scene.add.text(0, 0, "", tagStyle("#2d8a4e")).setOrigin(0, 0.5).setResolution(textRes(2)).setVisible(false)
     this.add([this.moveGlyph, this.hpBar, this.hpText, this.cdBadge, this.debuffTag, this.buffTag])
     scene.add.existing(this)
     this.resize(opts.size)
@@ -780,7 +781,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     if (this.dead && pose !== "dead") return
     this.pose = pose
     if (!this.sprite) return
-    const key = unitTexKey(this.unit, pose, "map")
+    const key = unitTexKey(this.scene, this.unit, pose, "map")
     if (hasTexture(this.scene, key)) {
       this.sprite.setTexture(key)
       this.resize(this.size)
@@ -791,6 +792,11 @@ export class UnitView extends Phaser.GameObjects.Container {
       this.sprite.setTexture(k)
       this.resize(this.size)
     })
+  }
+
+  /** Перепривязать текущую позу к текстуре нынешней ступени растра (сменился размер клетки или экрана). */
+  retexture(): void {
+    if (this.sprite) this.setPose(this.pose)
   }
 
   /** Анимация бега: чередование idle/run. */

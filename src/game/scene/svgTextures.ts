@@ -12,14 +12,25 @@ import {
   type Pose
 } from "@game/art/index"
 
-/** Размеры растеризации миниатюр (пропорция VIEW 120:140). */
-export const UNIT_TEX_SIZE = {
-  map: { w: 128, h: 149 },
-  cine: { w: 300, h: 350 }
-} as const
-export type UnitTexSize = keyof typeof UNIT_TEX_SIZE
+import {
+  BACKDROP_SCALE_CAP,
+  TILE_TEX_BUCKETS,
+  UNIT_TEX_BUCKETS,
+  unitTexHeight,
+  unitTexPx,
+  tileTexPx,
+  type UnitTexKind
+} from "./renderScale"
+import { renderScaleOf } from "./hidpi"
 
-export const TILE_TEX_PX = 128
+/**
+ * Вид миниатюры: `map` — на поле, `cine` — в кинематике. Размер растра — ступень из `UNIT_TEX_BUCKETS` под экранный
+ * размер × плотность рендера; ступень выбирает сцена (`setUnitTexSize`) и хранит менеджер текстур игры.
+ */
+export type UnitTexSize = UnitTexKind
+
+/** Прежний (базовый) размер тайла; фактический — `tileTexSize(scene)`. */
+export const TILE_TEX_PX = TILE_TEX_BUCKETS[0]
 export const MAP_POSES: readonly Pose[] = ["idle", "run", "hurt", "dead", "carried", "blink"]
 export const CINE_POSES: readonly Pose[] = ["idle", "run", "hurt", "dead", "happy", "blink"]
 export const TERRAINS: readonly TerrainId[] = [
@@ -79,10 +90,59 @@ export function ensureTexture(scene: Phaser.Scene, key: string, svg: string, w: 
   return p
 }
 
+/* ---------- Размеры растра на игру ---------- */
+
+interface TexSizes {
+  map: number
+  cine: number
+  tile: number
+}
+
+const sizesByTm = new WeakMap<Phaser.Textures.TextureManager, TexSizes>()
+
+function sizesOf(scene: Phaser.Scene): TexSizes {
+  const tm = texturesOf(scene)
+  const def: TexSizes = { map: UNIT_TEX_BUCKETS.map[0], cine: UNIT_TEX_BUCKETS.cine[0], tile: TILE_TEX_BUCKETS[0] }
+  if (!tm) return def
+  let s = sizesByTm.get(tm)
+  if (!s) {
+    s = def
+    sizesByTm.set(tm, s)
+  }
+  return s
+}
+
+/**
+ * Выбрать ступень растра миниатюр по высоте фигуры на экране (CSS px). Возвращает true, если ступень сменилась:
+ * новые позы растеризуются в новом размере, уже показанные спрайты сцена может перепривязать сама.
+ */
+export function setUnitTexSize(scene: Phaser.Scene, size: UnitTexSize, cssHeight: number): boolean {
+  const h = unitTexHeight(size, cssHeight, renderScaleOf(scene))
+  const s = sizesOf(scene)
+  if (s[size] === h) return false
+  s[size] = h
+  return true
+}
+
+/** Текущая ступень высоты растра миниатюры. */
+export function unitTexHeightOf(scene: Phaser.Scene, size: UnitTexSize): number {
+  return sizesOf(scene)[size]
+}
+
+/** Выбрать сторону растра тайлов по размеру клетки (CSS px). Текстуры тайлов растеризуются один раз на игру. */
+export function setTileTexSize(scene: Phaser.Scene, cssTile: number): void {
+  sizesOf(scene).tile = tileTexPx(cssTile, renderScaleOf(scene))
+}
+
+export function tileTexSize(scene: Phaser.Scene): number {
+  return sizesOf(scene).tile
+}
+
 /* ---------- Юниты ---------- */
 
-export function unitTexKey(unit: UnitInstance, pose: Pose, size: UnitTexSize): string {
-  return `u:${unitArtKey(unit, pose)}:${size}`
+/** Ключ текстуры позы: в нём вид (`map`/`cine`) и ступень высоты, например `u:…:map192`. */
+export function unitTexKey(scene: Phaser.Scene, unit: UnitInstance, pose: Pose, size: UnitTexSize): string {
+  return `u:${unitArtKey(unit, pose)}:${size}${unitTexHeightOf(scene, size)}`
 }
 
 export function ensureUnitTexture(
@@ -91,9 +151,9 @@ export function ensureUnitTexture(
   pose: Pose,
   size: UnitTexSize
 ): Promise<string> {
-  const key = unitTexKey(unit, pose, size)
+  const key = unitTexKey(scene, unit, pose, size)
   if (hasTexture(scene, key)) return Promise.resolve(key)
-  const px = UNIT_TEX_SIZE[size]
+  const px = unitTexPx(unitTexHeightOf(scene, size))
   return ensureTexture(scene, key, unitSvg(unit, { pose }), px.w, px.h)
 }
 
@@ -108,8 +168,8 @@ export function ensureUnitTextures(
 
 /* ---------- Части тела (разлёт при гибели) ---------- */
 
-export function unitPartTexKey(unit: UnitInstance, part: CritterPart, size: UnitTexSize): string {
-  return `up:${unitArtKey(unit, "dead")}:${part}:${size}`
+export function unitPartTexKey(scene: Phaser.Scene, unit: UnitInstance, part: CritterPart, size: UnitTexSize): string {
+  return `up:${unitArtKey(unit, "dead")}:${part}:${size}${unitTexHeightOf(scene, size)}`
 }
 
 /** Текстуры частей тела в том же viewBox, что и целая миниатюра: накладываются на спрайт 1:1. */
@@ -118,11 +178,11 @@ export function ensureUnitPartTextures(
   unit: UnitInstance,
   size: UnitTexSize
 ): Promise<Record<CritterPart, string>> {
-  const px = UNIT_TEX_SIZE[size]
+  const px = unitTexPx(unitTexHeightOf(scene, size))
   const out = {} as Record<CritterPart, string>
   return Promise.all(
     CRITTER_PARTS.map(async (part) => {
-      const key = unitPartTexKey(unit, part, size)
+      const key = unitPartTexKey(scene, unit, part, size)
       out[part] = hasTexture(scene, key) ? key : await ensureTexture(scene, key, unitPartSvg(unit, part), px.w, px.h)
     })
   ).then(() => out)
@@ -147,6 +207,13 @@ export function backdropTexKey(
   return `bd:${biomeId}:${terrain}:${side}:${w}x${h}`
 }
 
+/** Размер растра фона кинематика для вида `w × h` CSS px (плотность — не выше `BACKDROP_SCALE_CAP`). */
+export function backdropPx(scene: Phaser.Scene, w: number, h: number): { w: number, h: number } {
+  const k = Math.min(BACKDROP_SCALE_CAP, renderScaleOf(scene))
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) }
+}
+
+/** Фон кинематика; `w × h` — размер на экране в CSS px, ключ — по размеру растра (`backdropPx`). */
 export function ensureBackdropTexture(
   scene: Phaser.Scene,
   biomeId: string,
@@ -155,8 +222,7 @@ export function ensureBackdropTexture(
   w: number,
   h: number
 ): Promise<string> {
-  const pw = Math.max(1, Math.round(w))
-  const ph = Math.max(1, Math.round(h))
+  const { w: pw, h: ph } = backdropPx(scene, w, h)
   return ensureTexture(
     scene,
     backdropTexKey(biomeId, terrain, side, pw, ph),

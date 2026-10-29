@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import type { TerrainId } from "@game/core/types"
 import { TILE_FRAME_COUNT, TILE_VARIANTS, bridgeSvg, groundSvg, pathSvg, tileEdgeSvg, tileSvg, type TileEdgeKind } from "@game/art/tile"
-import { ensureTexture, hasTexture, TERRAINS, TILE_TEX_PX } from "./svgTextures"
+import { ensureTexture, hasTexture, TERRAINS, tileTexSize } from "./svgTextures"
 import { sceneAlive } from "./fx"
 
 /**
@@ -62,6 +62,8 @@ export function tileVariantAt(terrain: TerrainId, x: number, y: number, seed: nu
 
 /** Все кадры и варианты тайлов биома, накладки краёв, тропинки и мосты (≈ 45 растеризаций на биом, один раз). */
 export function ensureEnvTileTextures(scene: Phaser.Scene, biomeId: string): Promise<string[]> {
+  // Сторона растра — ступень под клетку на экране × плотность рендера (`setTileTexSize`), прежде всегда 128
+  const px = tileTexSize(scene)
   const jobs: Promise<string>[] = []
   for (const t of TERRAINS) {
     const frames = TILE_FRAME_COUNT[t] ?? 1
@@ -69,18 +71,18 @@ export function ensureEnvTileTextures(scene: Phaser.Scene, biomeId: string): Pro
     for (let v = 0; v < variants; v++) {
       for (let f = 0; f < frames; f++) {
         jobs.push(
-          ensureTexture(scene, envTileKey(biomeId, t, f, v), tileSvg(biomeId, t, f, v), TILE_TEX_PX, TILE_TEX_PX)
+          ensureTexture(scene, envTileKey(biomeId, t, f, v), tileSvg(biomeId, t, f, v), px, px)
         )
       }
     }
   }
   for (let f = 0; f < SHORE_FRAMES; f++)
-    jobs.push(ensureTexture(scene, edgeKey(biomeId, "shore", f), tileEdgeSvg(biomeId, "shore", f), 128, 128))
-  jobs.push(ensureTexture(scene, edgeKey(biomeId, "shade"), tileEdgeSvg(biomeId, "shade"), 64, 64))
-  jobs.push(ensureTexture(scene, edgeKey(biomeId, "rubble"), tileEdgeSvg(biomeId, "rubble"), 128, 128))
-  jobs.push(ensureTexture(scene, groundKey(biomeId), groundSvg(biomeId), 128, 128))
-  for (let mask = 0; mask < 16; mask++) jobs.push(ensureTexture(scene, pathKey(biomeId, mask), pathSvg(biomeId, mask), 128, 128))
-  for (const v of [true, false]) jobs.push(ensureTexture(scene, bridgeKey(biomeId, v), bridgeSvg(biomeId, v), 128, 128))
+    jobs.push(ensureTexture(scene, edgeKey(biomeId, "shore", f), tileEdgeSvg(biomeId, "shore", f), px, px))
+  jobs.push(ensureTexture(scene, edgeKey(biomeId, "shade"), tileEdgeSvg(biomeId, "shade"), px / 2, px / 2))
+  jobs.push(ensureTexture(scene, edgeKey(biomeId, "rubble"), tileEdgeSvg(biomeId, "rubble"), px, px))
+  jobs.push(ensureTexture(scene, groundKey(biomeId), groundSvg(biomeId), px, px))
+  for (let mask = 0; mask < 16; mask++) jobs.push(ensureTexture(scene, pathKey(biomeId, mask), pathSvg(biomeId, mask), px, px))
+  for (const v of [true, false]) jobs.push(ensureTexture(scene, bridgeKey(biomeId, v), bridgeSvg(biomeId, v), px, px))
   return Promise.all(jobs)
 }
 

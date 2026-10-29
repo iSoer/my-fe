@@ -28,9 +28,10 @@ pnpm test:coverage
   - `TestUnitSpec` (`classId` вида `infantry_sword`, `armored_spear`, `flier_bow`, `dancer_sword`; `pos`, `baseStats` в шкале FEH и т.п.);
   - подбор статов модели под нужные боевые (`pinnedModelStats` через `MODEL_SCALE`);
   - сборка `BattleState` через `createBattle`.
-- Сейв: [save.test.ts](../tests/game/save.test.ts). Проверяются round-trip, битый JSON, миграции 6→7 и 7→8, настройка `endTurnConfirm`. Миграция 10→11 — в [dialogue.test.ts](../tests/game/dialogue.test.ts).
+- Сейв: [save.test.ts](../tests/game/save.test.ts). Проверяются round-trip, битый JSON, миграции 6→7 и 7→8, настройки `endTurnConfirm` и `graphics`. Миграция 10→11 — в [dialogue.test.ts](../tests/game/dialogue.test.ts).
 - Роутер: [router.test.ts](../tests/game/router.test.ts) (шаги вылазки, неизвестная сложность).
 - i18n: [i18n.test.ts](../tests/game/i18n.test.ts) (`tr`, `plural`, `lang` по умолчанию в старом сейве).
+- Плотность рендера Phaser: [renderScale.test.ts](../tests/game/renderScale.test.ts) (`pickRenderScale` по настройке, DPR и памяти; ступени растра миниатюр, тайлов и поселения; разрешение текста).
 - Управление боем: [battleUi.test.ts](../tests/game/battleUi.test.ts) (выбор, хлипкие стены, перетаскивание, справка о клетке, союзники).
 - PWA: [tests/host/pwa.spec.ts](../tests/host/pwa.spec.ts) (`isIosDevice`, `installModeFor`, `shouldCheckUpdate`).
 - Остальное (бой, ИИ, карты, юниты, поселение, кровь, варианты смерти) покрывают параллельные документы по ядру.

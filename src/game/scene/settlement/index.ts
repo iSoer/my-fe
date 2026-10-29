@@ -5,6 +5,7 @@ import { WeatherLayer } from "../weather"
 import { reducedMotion } from "../motionFx"
 import { SettlementScene, type SettlementSceneOptions } from "./SettlementScene"
 import { RainLayer } from "./rain"
+import { createHiDpiGame, initHiDpiScene } from "../hidpi"
 
 /** Палые листья в сухую погоду: бурые и пожухлые — деревня выживших, а не сад. */
 const DRY_WEATHER = { kind: "leaves", colors: [0x6b5a3a, 0x8a6a3a, 0x4f4a2c], density: 6 } as const
@@ -26,6 +27,8 @@ class SettlementFxScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Слой экранный: камера всегда в покое (базовый зум плотности рендера), и после ресайза тоже
+    initHiDpiScene(this, { keepAtRest: true })
     const still = reducedMotion()
     if (!still) new WeatherLayer(this, { ...DRY_WEATHER, colors: [...DRY_WEATHER.colors] }, { depth: 1, maxParticles: 12, densityMul: 0.7 })
     this.rain = new RainLayer(this, { depth: 2, still })
@@ -46,18 +49,17 @@ class SettlementFxScene extends Phaser.Scene {
 /** Монтирует Phaser-игру поселения в контейнер (отдельный чанк, как бой). */
 export function mountSettlementGame(parent: HTMLElement, opts: SettlementSceneOptions): SettlementGameHandle {
   const scene = new SettlementScene(opts)
-  const game = new Phaser.Game({
+  // Буфер канваса — CSS-размер × плотность рендера (настройка «Качество графики»), см. `createHiDpiGame`
+  const game = createHiDpiGame(parent, {
     type: Phaser.AUTO,
-    parent,
     transparent: false,
     backgroundColor: "#141a12",
-    scale: { mode: Phaser.Scale.RESIZE, parent, width: "100%", height: "100%", autoRound: true },
     render: { pixelArt: false, antialias: true, roundPixels: false },
     input: { activePointers: 1 },
     scene: [scene, SettlementFxScene],
     audio: { noAudio: true },
     banner: false
-  } as Phaser.Types.Core.GameConfig)
+  })
   setSettlementControl({ teleport: id => scene.teleport(id), walkTo: id => scene.walkTo(id) })
   return {
     destroy() {

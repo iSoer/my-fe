@@ -212,6 +212,25 @@ export function SettingsScreen() {
               onChange={v => set({ blood: v })}
             />
           </div>
+          <div className="setting">
+            <span>{tr("Graphics quality", "Качество графики")}</span>
+            <Seg
+              value={s.graphics}
+              options={[
+                { v: "auto" as const, label: tr("Auto", "Авто") },
+                { v: "crisp" as const, label: tr("Crisp", "Чёткое") },
+                { v: "eco" as const, label: tr("Saver", "Экономное") }
+              ]}
+              onChange={v => set({ graphics: v })}
+            />
+            <span className="muted small">
+              {s.graphics === "crisp"
+                ? tr("Full screen sharpness (up to 3×). Uses more battery and memory.", "Полная чёткость экрана (до 3×). Тратит больше батареи и памяти.")
+                : s.graphics === "eco"
+                  ? tr("Lowest resolution: saves battery, but the picture is softer on sharp screens.", "Низкое разрешение: бережёт батарею, но на чётких экранах картинка мягче.")
+                  : tr("Sharp picture up to 2×, lighter on weak devices. Balance of sharpness and battery.", "Чёткая картинка до 2×, легче на слабых устройствах. Баланс чёткости и батареи.")}
+            </span>
+          </div>
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "120ms" }}>

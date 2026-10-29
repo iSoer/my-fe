@@ -5,7 +5,7 @@
 - Сцена читает `$save.battle` и `$battleUi`, раскладывает поле через `computeLayout` или `computeWorldLayout`
   ([scene/layout.ts](../src/game/scene/layout.ts)) и публикует экранную раскладку в `$boardLayout`
   ([state/boardLayout.ts](../src/game/state/boardLayout.ts)). По ней DOM-накладки HUD совмещаются с клетками.
-- Тайлы — это SVG из `art/tile.ts`, растеризованные в текстуры 128×128 (`ensureEnvTileTextures`).
+- Тайлы — это SVG из `art/tile.ts`, растеризованные в квадратные текстуры (`ensureEnvTileTextures`): сторона — ступень 128/192/256 под клетку на экране × плотность рендера.
 - Своей логики у сцены нет. События боя проигрывает `GamePresenter` ([scene/presenter.ts](../src/game/scene/presenter.ts)).
 
 ## Раскладка и масштаб
@@ -83,18 +83,40 @@
 - 16 тропинок и 2 моста;
 - для чащи — `chestSvg`, `keySvg`, `heartSvg`.
 
-Тайлы растеризуются из SVG 64×64 (`TILE_SIZE`) в 128×128 (`TILE_TEX_PX`).
+Тайлы растеризуются из SVG 64×64 (`TILE_SIZE`) в квадрат `tileTexSize(scene)`. Сторону выбирает `relayout` через
+`setTileTexSize(scene, tile)`: `tileTexPx(tile, плотность)` — наименьшая из `TILE_TEX_BUCKETS = [128, 192, 256]`, не
+меньшая `tile × плотность × 1.25` (`TEX_HEADROOM`, запас под наезд камеры). При плотности 1 это прежние 128. Тень
+(`shade`) — вдвое меньше, сундук, ключ и сердечко чащи — того же размера. Ключи тайлов размер не содержат: тайлы
+растеризуются один раз на игру, а `groundBg` берёт период узора из ширины готовой текстуры.
+
+Миниатюры бойцов: `relayout` вызывает `setUnitTexSize(scene, "map", tile × 1.05)` (высота фигуры в `UnitView`). Если
+ступень сменилась (другой размер экрана), каждый `UnitView.retexture()` перепривязывает текущую позу.
+
+## Плотность рендера и ввод
+
+Канвас рисуется в `CSS × плотность` пикселях (`createHiDpiGame`, подробно — в
+[rendering-and-fx.md](./rendering-and-fx.md#чёткость-на-экранах-с-высокой-плотностью)), а сцена живёт в CSS-единицах:
+
+- раскладка считается от `viewW(this)`/`viewH(this)`, `$boardLayout` и `$boardInsets` — в CSS px, как и раньше;
+- на обычном поле камера в покое (`restCamera`: зум = плотность, мир (0, 0) — в левом верхнем углу); зум большого поля
+  `$boardZoom` и наезд перед кинематиком (1.15) задаются относительно базы (`setCssZoom`, `camZoom`), в `focusOn` и
+  границах камеры — `cssZoom`;
+- `p.worldX/worldY` и `getWorldPoint` Phaser пересчитывает сам; `p.x/p.y`, `downX/upX` — в пикселях буфера, поэтому
+  пороги `DRAG_THRESHOLD`/`TAP_SLOP` умножаются на плотность, а сдвиг камеры при перетаскивании (`dx / cam.zoom`)
+  остаётся верным без поправок;
+- заставка конца боя закреплена на экране `pinToScreen`.
 
 ## Фон кинематика
 
 `CinematicScene.drawBackdrop` берёт `backdropLayersSvg(biomeId, terrain, side)` из
 [art/backdrop.ts](../src/game/art/backdrop.ts). Это 3 слоя для параллакса (`far`, `mid`, `near`) размером
 200×300, где `HORIZON = 156`, `FEET = 186`. Предмет переднего плана выбирает `prop(ctx)` по местности под
-бойцом: кусты, валун, лужа, стена, укрытие. `backdropTexKey` = `bd:<biome>:<terrain>:<side>:<w>x<h>`.
+бойцом: кусты, валун, лужа, стена, укрытие. `backdropTexKey` = `bd:<biome>:<terrain>:<side>:<w>x<h>`, где `w×h` — размер растра `backdropPx`: экранный размер × плотность рендера, но не больше `BACKDROP_SCALE_CAP = 1.5` (фон мягкий, а растр на весь экран дорог).
 
 ## Где менять
 
 - Размер клетки и отступы: `LAYOUT_BIAS`, значения по умолчанию в `computeLayout` и `$boardInsets`.
+- Ступени растра тайлов и миниатюр, запас под зум: [scene/renderScale.ts](../src/game/scene/renderScale.ts) (`TILE_TEX_BUCKETS`, `UNIT_TEX_BUCKETS`, `TEX_HEADROOM`).
 - Зум большого поля: `ZOOM_LEVELS` в [state/boardLayout.ts](../src/game/state/boardLayout.ts).
 - Новая накладка поверх клетки: ключ в [scene/env.ts](../src/game/scene/env.ts) (`*Key`), растеризация в
   `ensureEnvTileTextures`, SVG в [art/tile.ts](../src/game/art/tile.ts), вывод в `MapScene.drawTiles`.

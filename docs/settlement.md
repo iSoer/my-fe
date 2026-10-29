@@ -219,16 +219,16 @@ FFFFFFFFFFFFFFFGGGFFFFFFFFFFFFFFF
 
 ## Рендеринг сцены
 
-[scene/settlement/index.ts](../src/game/scene/settlement/index.ts) создаёт отдельный `Phaser.Game`: `Scale.RESIZE`, `activePointers: 1`, `noAudio`. В нём две сцены:
+[scene/settlement/index.ts](../src/game/scene/settlement/index.ts) создаёт отдельный `Phaser.Game` через `createHiDpiGame` (буфер канваса — CSS-размер × плотность рендера, см. [rendering-and-fx.md](./rendering-and-fx.md#чёткость-на-экранах-с-высокой-плотностью)), `activePointers: 1`, `noAudio`. В нём две сцены:
 
 - `SettlementScene` — мир;
-- `SettlementFxScene` (`settlement-fx`) — погода в экранных координатах: палые листья (`WeatherLayer`), дождь и виньетка (`RainLayer`). Сила дождя `rainAt(Date.now())` перечитывается раз в секунду.
+- `SettlementFxScene` (`settlement-fx`) — погода в экранных координатах: палые листья (`WeatherLayer`), дождь и виньетка (`RainLayer`). Сила дождя `rainAt(Date.now())` перечитывается раз в секунду. Камера слоя всегда в покое (`initHiDpiScene(this, { keepAtRest: true })`), размеры — `viewW`/`viewH` в CSS px.
 
 Phaser грузится лениво: `SettlementScreen` вызывает `import("@game/scene/settlement/index")`.
 
 Устройство `SettlementScene`:
 
-- Сначала `loadTextures` растеризует все SVG через `ensureTexture`: клетка `T = 48` мировых пикселей, текстуры вдвое крупнее (`RES = 2`). Затем `build()` собирает мир.
+- Сначала `loadTextures` растеризует все SVG через `ensureTexture`: клетка `T = 48` мировых (CSS) пикселей, текстуры крупнее в `res` раз: `settlementRes(плотность, зум вида)` — 2 при плотности 1 (как раньше), до 3 на плотных экранах. Затем `build()` собирает мир. Зум вида `view.zoom` (0.55–1.6) задан в CSS-единицах, у камеры он умножен на плотность (`setCssZoom`); джойстик закреплён на экране `pinToScreen`, координаты указателя делятся на плотность.
   - Земля: на каждой клетке травяная подложка и, при нужде, тропинка, сорняки или вода. Вариант выбирается хэшем координат: 4 фактуры земли, 5 вариантов частокола, 4 дерева, 3 куста.
   - Под воротами рисуется ряд «за околицей» (`OUTSIDE_ROWS = 1`), а в нём горящие глаза (`EYES_X`).
   - 8 факелов (`TORCHES`) с аддитивным мерцающим свечением.

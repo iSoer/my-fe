@@ -16,6 +16,7 @@ import { WEAPON_COLOR_HEX } from "./style"
 import { weaponDef } from "@game/content/weapons"
 import { hitGore, bloodTrail, screenBloodSplat } from "./gore"
 import { unitTexKey } from "./svgTextures"
+import { camZoom } from "./hidpi"
 import {
   afterImages,
   bigNumber,
@@ -444,7 +445,7 @@ export class GamePresenter implements Presenter {
     if (strike.special) {
       haptic("heavy")
       sfx("special")
-      const portrait = atkUnit ? unitTexKey(atkUnit, "happy", "map") : undefined
+      const portrait = atkUnit ? unitTexKey(map, atkUnit, "happy", "map") : undefined
       await specialCutIn(map, specialDef(strike.special).name, trailColor, atk.side === "player", sp, portrait)
       if (!atk.scene || !def.scene) return
     }
@@ -579,7 +580,7 @@ export class GamePresenter implements Presenter {
       const c = map.center(ev.defenderPos)
       map.cameras.main.pan(c.x, c.y, 150 / sp, "Sine.easeInOut")
       map.cameras.main.zoomTo(
-        1.15,
+        camZoom(map, 1.15),
         150 / sp,
         "Sine.easeInOut",
         false,

@@ -350,7 +350,14 @@ export interface Settings {
   dialogues: boolean
   /** Язык интерфейса. */
   lang: Lang
+  /**
+   * Качество графики Phaser-сцен: «auto» — плотность пикселей экрана, но не больше 2 (1.5 на слабых устройствах),
+   * «crisp» — до 3, «eco» — 1 (как раньше: канвас в CSS-пикселях, бережёт батарею).
+   */
+  graphics: GraphicsQuality
 }
+
+export type GraphicsQuality = "auto" | "crisp" | "eco"
 
 export const DEFAULT_SETTINGS: Settings = {
   music: 60,
@@ -364,7 +371,8 @@ export const DEFAULT_SETTINGS: Settings = {
   blood: "sea",
   confirmAttack: true,
   dialogues: true,
-  lang: DEFAULT_LANG
+  lang: DEFAULT_LANG,
+  graphics: "auto"
 }
 
 /* ---------- Бой: состояние, действия, события ---------- */

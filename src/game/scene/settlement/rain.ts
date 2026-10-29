@@ -1,4 +1,5 @@
 import Phaser from "phaser"
+import { viewH, viewW } from "../hidpi"
 
 /**
  * Дождь и сумрак поселения поверх мира, в экранных координатах (сцена погоды не двигается с камерой): косые струи,
@@ -77,7 +78,8 @@ export class RainLayer {
     this.scene = scene
     this.still = opts.still
     ensureRainTextures(scene)
-    const { width, height } = scene.scale
+    const width = viewW(scene)
+    const height = viewH(scene)
     this.wash = scene.add.rectangle(0, 0, width, height, 0x141c2a, 0).setOrigin(0).setDepth(opts.depth)
     if (!this.still) {
       for (let i = 0; i < DROPS; i++) {
@@ -107,7 +109,8 @@ export class RainLayer {
     const lv = this.level
     this.wash.setFillStyle(0x141c2a, 0.26 * lv)
     if (this.still) return
-    const { width, height } = this.scene.scale
+    const width = viewW(this.scene)
+    const height = viewH(this.scene)
     const active = Math.round(DROPS * lv)
     for (let i = 0; i < this.drops.length; i++) {
       const d = this.drops[i] as Drop
@@ -152,7 +155,8 @@ export class RainLayer {
 
   /** Струя заново: сверху экрана (или в случайном месте — при первом появлении, чтобы дождь не шёл стеной). */
   private respawn(d: Drop, anywhere: boolean): void {
-    const { width, height } = this.scene.scale
+    const width = viewW(this.scene)
+    const height = viewH(this.scene)
     d.vy = 900 + Math.random() * 450
     const y = anywhere ? Math.random() * height : -30 - Math.random() * 60
     d.img.setPosition(Math.random() * (width + height * -WIND), y)
@@ -160,7 +164,8 @@ export class RainLayer {
   }
 
   private layout(): void {
-    const { width, height } = this.scene.scale
+    const width = viewW(this.scene)
+    const height = viewH(this.scene)
     this.wash.setSize(width, height)
     this.flash.setSize(width, height)
     this.vignette.setDisplaySize(width, height)

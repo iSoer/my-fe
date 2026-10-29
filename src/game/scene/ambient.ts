@@ -2,6 +2,7 @@ import Phaser from "phaser"
 import type { BoardLayout } from "./layout"
 import { ENV, ensureEnvTextures } from "./env"
 import { TEX } from "./textures"
+import { viewH, viewW } from "./hidpi"
 
 /**
  * Атмосфера поля боя по биому: тени облаков ползут по полю, лучи света, лампы и светлячки,
@@ -184,8 +185,8 @@ export class AmbientLayer {
     const l = opts.layout
     const bw = l.tile * 6
     const bh = l.tile * 8
-    const w = scene.scale.width
-    const h = scene.scale.height
+    const w = viewW(scene)
+    const h = viewH(scene)
     let s = opts.seed >>> 0
     const rnd = (): number => {
       s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x9e3779b9) >>> 0

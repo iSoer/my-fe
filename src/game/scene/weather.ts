@@ -1,6 +1,7 @@
 import Phaser from "phaser"
 import type { WeatherDef, WeatherKind } from "@game/content/biomes"
 import { TEX } from "./textures"
+import { pinToScreen, viewH, viewW } from "./hidpi"
 
 /**
  * Погодный слой: пул частиц над тайлами и под юнитами. Снег, листья, песок, лепестки, мухи,
@@ -129,7 +130,8 @@ export class WeatherLayer {
     const tex = KIND_TEX[this.kind]
     for (let i = 0; i < this.maxCount; i++) {
       const img = scene.add.image(0, 0, tex).setDepth(this.depth).setVisible(false)
-      if (opts.fixed) img.setScrollFactor(0)
+      // Экранные координаты (большое поле): камера ездит, частицы — нет
+      if (opts.fixed) pinToScreen(img)
       // Угольки и пылинки светятся
       if (this.kind === "embers" || this.kind === "motes") img.setBlendMode(Phaser.BlendModes.ADD)
       const p: Particle = {
@@ -172,11 +174,11 @@ export class WeatherLayer {
   }
 
   private get w(): number {
-    return this.scene.scale.width
+    return viewW(this.scene)
   }
 
   private get h(): number {
-    return this.scene.scale.height
+    return viewH(this.scene)
   }
 
   private tint(p: Particle): void {

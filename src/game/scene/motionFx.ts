@@ -4,6 +4,7 @@ import { weaponDef } from "@game/content/weapons"
 import { FONT, textStyle } from "./style"
 import { sceneAlive, tween, wait } from "./fx"
 import type { HitGoreOptions } from "./gore"
+import { pinToScreen, viewH, viewW } from "./hidpi"
 
 /**
  * Эффекты движения и действий (только презентация): следы шагов по местности, следы оружия, снаряды,
@@ -120,7 +121,8 @@ export function shakeMul(): number {
 /** Тряска камеры в пикселях (с учётом reduced motion). */
 export function shakeCam(scene: Phaser.Scene, ms: number, px: number): void {
   if (!sceneAlive(scene)) return
-  const amp = (px * shakeMul()) / Math.max(1, scene.scale.width)
+  // Сила тряски — доля ширины вида в CSS px (поправку на плотность рендера делает `initHiDpiScene`)
+  const amp = (px * shakeMul()) / Math.max(1, viewW(scene))
   if (amp > 0) scene.cameras.main.shake(ms, amp)
 }
 
@@ -1025,18 +1027,16 @@ export async function specialCutIn(
 ): Promise<void> {
   if (!sceneAlive(scene)) return
   ensureMotionTextures(scene)
-  const w = scene.scale.width
-  const h = scene.scale.height
+  const w = viewW(scene)
+  const h = viewH(scene)
   // Экранные координаты: объекты не двигаются вместе с камерой карты
-  const dim = scene.add
+  const dim = pinToScreen(scene.add
     .rectangle(w / 2, h / 2, w * 3, h * 3, 0x000000, 0)
-    .setDepth(40)
-    .setScrollFactor(0)
+    .setDepth(40))
   const bandH = Math.min(h * 0.2, 150)
-  const band = scene.add
+  const band = pinToScreen(scene.add
     .container(fromLeft ? -w : w * 2, h * 0.42)
-    .setDepth(41)
-    .setScrollFactor(0)
+    .setDepth(41))
   const g = scene.add.graphics()
   const skew = bandH * 0.4
   g.fillStyle(0x0d0b10, 0.95)
@@ -1086,10 +1086,9 @@ export async function specialCutIn(
     })
     .setOrigin(0.5)
   band.add(label)
-  const flash = scene.add
+  const flash = pinToScreen(scene.add
     .rectangle(w / 2, h / 2, w, h, 0xffffff, 0)
-    .setDepth(43)
-    .setScrollFactor(0)
+    .setDepth(43))
   speedLines(scene, w / 2, h * 0.42, w, bandH * 1.6, fromLeft ? 1 : -1, speed, 14, 42)
   scene.tweens.add({ targets: dim, fillAlpha: 0.55, duration: 120 / speed })
   await tween(scene, { targets: band, x: w / 2, duration: 170 / speed, ease: "Cubic.easeOut" })

@@ -2,6 +2,7 @@ import Phaser from "phaser"
 import { $settings } from "@game/state/save"
 import { reducedMotion } from "@game/ui/lib/animate"
 import { blobOutline, goreRng } from "./goreShape"
+import { pinToScreen, viewH, viewW } from "./hidpi"
 
 /*
  * Кровь в стиле «cute & gory»: ярко-алые стилизованные брызги, капли по баллистике, кляксы и лужи на земле,
@@ -607,11 +608,10 @@ export function screenBloodSplat(scene: Phaser.Scene, intensity: number, speed: 
   lastScreenSplat.set(scene, now)
   ensureGoreTextures(scene)
   const k = Math.max(0, Math.min(1, intensity))
-  const cam = scene.cameras.main
-  const w = cam.width
-  const h = cam.height
+  const w = viewW(scene)
+  const h = viewH(scene)
   // Красный виньет по краям — всегда, это не «тряска»
-  const vig = scene.add.image(w / 2, h / 2, GORE_TEX.vignette).setScrollFactor(0).setDepth(95).setAlpha(0)
+  const vig = pinToScreen(scene.add.image(w / 2, h / 2, GORE_TEX.vignette).setDepth(95)).setAlpha(0)
   vig.setDisplaySize(w, h)
   scene.tweens.add({
     targets: vig,
@@ -636,10 +636,9 @@ export function screenBloodSplat(scene: Phaser.Scene, intensity: number, speed: 
     const x = w * (cx + (rnd() - 0.5) * 0.08)
     const y = h * (cy + (rnd() - 0.5) * 0.06)
     const s = Math.min(w, h) * (0.22 + rnd() * 0.12) * (0.75 + k * 0.4)
-    const img = scene.add
+    const img = pinToScreen(scene.add
       .image(x, y, GORE_TEX.screen(i + Math.round(rnd() * 3)))
-      .setScrollFactor(0)
-      .setDepth(96)
+      .setDepth(96))
       .setRotation((rnd() - 0.5) * 0.5)
     img.setDisplaySize(s, s * 1.25)
     const sx = img.scaleX

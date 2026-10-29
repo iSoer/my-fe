@@ -3,6 +3,7 @@ import { setPresenter } from "@game/state/battleUi"
 import { MapScene } from "./MapScene"
 import { CinematicScene } from "./CinematicScene"
 import { GamePresenter } from "./presenter"
+import { createHiDpiGame } from "./hidpi"
 
 export interface BattleGameHandle {
   destroy(): void
@@ -10,25 +11,18 @@ export interface BattleGameHandle {
 
 /** Монтирует Phaser-игру боя в контейнер и регистрирует Presenter для контроллера боя. */
 export function mountBattleGame(parent: HTMLElement): BattleGameHandle {
-  // Phaser 3 рендерит в CSS-пикселях; DPR не форсируем ради производительности WebView.
-  const game = new Phaser.Game({
+  // Буфер канваса — CSS-размер × плотность рендера (настройка «Качество графики»: авто до 2, чёткое до 3,
+  // экономное 1); сцены живут в CSS-единицах, см. `createHiDpiGame`
+  const game = createHiDpiGame(parent, {
     type: Phaser.AUTO,
-    parent,
     transparent: false,
     backgroundColor: "#0b0b10",
-    scale: {
-      mode: Phaser.Scale.RESIZE,
-      parent,
-      width: "100%",
-      height: "100%",
-      autoRound: true
-    },
     render: { pixelArt: false, antialias: true, roundPixels: false },
     input: { activePointers: 1 },
     scene: [MapScene, CinematicScene],
     audio: { noAudio: true },
     banner: false
-  } as Phaser.Types.Core.GameConfig)
+  })
   const presenter = new GamePresenter(game)
   setPresenter(presenter)
   return {

@@ -237,7 +237,9 @@ const settingsSchema = z.object({
   // Сейвы до диалогов — разговоры включены
   dialogues: z.boolean().default(true),
   // Сейвы до выбора языка — английский по умолчанию
-  lang: z.enum(["en", "ru"]).default(DEFAULT_LANG)
+  lang: z.enum(["en", "ru"]).default(DEFAULT_LANG),
+  // Сейвы до настройки качества графики — «авто»
+  graphics: z.enum(["auto", "crisp", "eco"]).default("auto")
 })
 
 const buildingSchema = z.object({ level: z.number().int().min(1).max(BUILDING_MAX_LEVEL), builtAt: z.number() })

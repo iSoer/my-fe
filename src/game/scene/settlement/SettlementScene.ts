@@ -57,6 +57,8 @@ import {
   villageWeedsSvg
 } from "@game/art/village"
 import { ensureTexture } from "../svgTextures"
+import { initHiDpiScene, pinToScreen, renderScaleOf, setCssZoom, viewH as cssViewH, viewW as cssViewW } from "../hidpi"
+import { settlementRes, textRes } from "../renderScale"
 import { ensureTextures } from "../textures"
 import { textStyle } from "../style"
 import { SpeechBubbles } from "./speech"
@@ -67,9 +69,11 @@ import { tr } from "@game/i18n"
 
 export const SETTLEMENT_SCENE_KEY = "settlement"
 
-/** Клетка поселения на экране (мировые пиксели); текстуры растеризуются вдвое крупнее ради чёткости. */
+/**
+ * Клетка поселения в мировых (CSS) пикселях. Текстуры растеризуются крупнее ради чёткости: множитель `res` —
+ * 2, а при высокой плотности рендера — до 3 (`settlementRes`).
+ */
 const T = 48
-const RES = 2
 /** Сколько раз пробовать растеризовать текстуру уровня здания, прежде чем оставить прежнюю. */
 const BUILDING_RETRIES = 3
 const FACINGS: readonly Facing[] = ["down", "up", "left", "right"]
@@ -270,7 +274,10 @@ export class SettlementScene extends Phaser.Scene {
   private down?: { x: number, y: number, id: number }
   private marker?: Phaser.GameObjects.Arc
   /** Камера: масштаб, вписана ли карта по высоте и куда она сейчас смотрит (мировые пиксели). */
+  /** `zoom` — в CSS-единицах; у камеры он умножен на плотность рендера (`setCssZoom`). */
   private view = { zoom: 1, fitsH: true, x: 0, y: 0, snap: true }
+  /** Множитель растра SVG относительно мировых пикселей. */
+  private res = 2
 
   constructor(opts: SettlementSceneOptions) {
     super({ key: SETTLEMENT_SCENE_KEY })
@@ -280,6 +287,7 @@ export class SettlementScene extends Phaser.Scene {
   }
 
   create(): void {
+    initHiDpiScene(this)
     this.cameras.main.setBackgroundColor("#141a12")
     // Общие текстуры частиц (пыль шагов и т. п.)
     ensureTextures(this)
@@ -293,7 +301,9 @@ export class SettlementScene extends Phaser.Scene {
   /* ---------- Текстуры ---------- */
 
   private loadTextures(): Promise<unknown> {
-    const t = (key: string, svg: string, w: number, h: number) => ensureTexture(this, key, svg, w * RES, h * RES)
+    this.res = settlementRes(renderScaleOf(this), this.fitZoom().zoom)
+    const res = this.res
+    const t = (key: string, svg: string, w: number, h: number) => ensureTexture(this, key, svg, w * res, h * res)
     const jobs: Promise<string>[] = []
     for (let v = 0; v < GROUND_VARIANTS; v++) {
       jobs.push(t(texKey.grass(v), villageGrassSvg(v), T, T))
@@ -361,7 +371,7 @@ export class SettlementScene extends Phaser.Scene {
   /** Текстура здания на уровне `level` (растеризуется один раз). */
   private loadBuilding(p: PlotDef, level: number): Promise<string> {
     const id = p.building as BuildingId
-    return ensureTexture(this, texKey.building(p.id, level), villageBuildingSvg(id, p.w, p.h, level), p.w * T * RES, (p.h + buildingOver(id, p)) * T * RES)
+    return ensureTexture(this, texKey.building(p.id, level), villageBuildingSvg(id, p.w, p.h, level), p.w * T * this.res, (p.h + buildingOver(id, p)) * T * this.res)
   }
 
   /** Догрузка текстуры уровня: не чаще одной попытки за раз и не больше BUILDING_RETRIES — если SVG не растеризуется, не долбим каждые 0,5 с. */
@@ -492,7 +502,7 @@ export class SettlementScene extends Phaser.Scene {
         padding: { x: 6, y: 3 }
       })
       .setOrigin(0.5, 0)
-      .setResolution(2)
+      .setResolution(textRes(2))
       .setDepth(10002)
       .setVisible(false)
 
@@ -598,7 +608,7 @@ export class SettlementScene extends Phaser.Scene {
     const label = this.add
       .text(x, y - h * 0.78, def.name, textStyle(12, "#ffffff", true, 3))
       .setOrigin(0.5, 1)
-      .setResolution(2)
+      .setResolution(textRes(2))
       .setDepth(9000)
     const queue: number[] = []
     return { img, float, head: { x, y: label.getTopCenter().y ?? label.y }, nextT: MUTTER_TIMING.first, queue }
@@ -647,7 +657,7 @@ export class SettlementScene extends Phaser.Scene {
     const label = this.add
       .text(x, y - h * 0.78, def.name, textStyle(12, "#ffffff", true, 3))
       .setOrigin(0.5, 1)
-      .setResolution(2)
+      .setResolution(textRes(2))
       .setDepth(9000)
     // Пузырь «!» над именем: есть что рассказать
     const bubble = this.add.graphics()
@@ -655,7 +665,7 @@ export class SettlementScene extends Phaser.Scene {
     bubble.fillStyle(0xffd166, 1).fillTriangle(-6, 11, 6, 11, 0, 21)
     bubble.fillStyle(0xffd166, 1).fillCircle(0, 0, 15)
     bubble.lineStyle(3, 0x2a1d10, 1).strokeCircle(0, 0, 15)
-    const mark = this.add.text(0, 1, "!", textStyle(21, "#2a1d10", true, 0)).setOrigin(0.5).setResolution(2)
+    const mark = this.add.text(0, 1, "!", textStyle(21, "#2a1d10", true, 0)).setOrigin(0.5).setResolution(textRes(2))
     // над подписью с именем (её высота ≈ 16 px), с зазором под хвостик
     const story = this.add.container(x, y - h * 0.78 - 44, [bubble, mark]).setDepth(9001).setVisible(false)
     if (!reducedMotion()) this.tweens.add({ targets: story, y: story.y - 4, duration: 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
@@ -680,12 +690,12 @@ export class SettlementScene extends Phaser.Scene {
     const frame = this.add.graphics()
     const plaque = this.add.container(0, 0, [frame]).setDepth(9500)
     const badgeBg = this.add.circle(0, 0, 13, 0xe63946).setStrokeStyle(3, 0xffffff)
-    const badgeText = this.add.text(0, 0, "!", textStyle(17, "#ffffff", true, 0)).setOrigin(0.5).setResolution(2)
+    const badgeText = this.add.text(0, 0, "!", textStyle(17, "#ffffff", true, 0)).setOrigin(0.5).setResolution(textRes(2))
     const badge = this.add.container(0, 0, [badgeBg, badgeText]).setDepth(9501).setVisible(false)
     const arrow = this.add
       .text(0, 0, "▼", { ...textStyle(26, "#ffd166", true, 5), stroke: "#3b2614" })
       .setOrigin(0.5, 1)
-      .setResolution(2)
+      .setResolution(textRes(2))
       .setDepth(9502)
       .setVisible(false)
     if (!reducedMotion()) {
@@ -703,8 +713,8 @@ export class SettlementScene extends Phaser.Scene {
     v.plaque.each((o: Phaser.GameObjects.GameObject) => {
       if (o !== v.frame) o.destroy()
     })
-    const title = this.add.text(0, -8, s.title, textStyle(17, "#3b2614", true, 0)).setOrigin(0.5).setResolution(2)
-    const sub = this.add.text(0, 12, s.sub, textStyle(13, SUB_COLOR[s.status], true, 0)).setOrigin(0.5).setResolution(2)
+    const title = this.add.text(0, -8, s.title, textStyle(17, "#3b2614", true, 0)).setOrigin(0.5).setResolution(textRes(2))
+    const sub = this.add.text(0, 12, s.sub, textStyle(13, SUB_COLOR[s.status], true, 0)).setOrigin(0.5).setResolution(textRes(2))
     v.plaque.add([title, sub])
     v.w = Math.max(title.width, sub.width) + 24
     v.h = 50
@@ -770,14 +780,20 @@ export class SettlementScene extends Phaser.Scene {
    * и по вертикали.
    */
   private setupCamera(): void {
+    const f = this.fitZoom()
+    this.view.zoom = f.zoom
+    this.view.fitsH = f.fitsH
+    this.view.snap = true
+    setCssZoom(this, this.view.zoom)
+  }
+
+  /** Зум вида (CSS-единицы) под нынешний размер экрана и отступы. */
+  private fitZoom(): { zoom: number, fitsH: boolean } {
     const { top, bottom } = this.opts.insets()
     const worldH = (SETTLEMENT_H + OUTSIDE_ROWS) * T + T * 0.5
-    const availH = Math.max(1, this.scale.height - top - bottom)
-    const fit = Math.min(this.scale.width / (SCREEN_W * T), availH / worldH)
-    this.view.zoom = Phaser.Math.Clamp(fit, 0.55, 1.6)
-    this.view.fitsH = availH / worldH >= 0.55
-    this.view.snap = true
-    this.cameras.main.setZoom(this.view.zoom)
+    const availH = Math.max(1, cssViewH(this) - top - bottom)
+    const fit = Math.min(cssViewW(this) / (SCREEN_W * T), availH / worldH)
+    return { zoom: Phaser.Math.Clamp(fit, 0.55, 1.6), fitsH: availH / worldH >= 0.55 }
   }
 
   private updateCamera(dt: number): void {
@@ -788,8 +804,8 @@ export class SettlementScene extends Phaser.Scene {
     // Сверху — полклетки на крону деревьев первого ряда
     const worldTop = -T * 0.5
     const worldH = (SETTLEMENT_H + OUTSIDE_ROWS) * T - worldTop
-    const viewW = this.scale.width / zoom
-    const viewH = this.scale.height / zoom
+    const viewW = cssViewW(this) / zoom
+    const viewH = cssViewH(this) / zoom
     const hx = this.pos.x * T
     const hy = this.pos.y * T
     const x = viewW >= worldW ? worldW / 2 : Phaser.Math.Clamp(hx, viewW / 2, worldW - viewW / 2)
@@ -815,14 +831,16 @@ export class SettlementScene extends Phaser.Scene {
   private setupInput(): void {
     const kb = this.input.keyboard
     if (kb) this.keys = kb.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,E,SPACE,ENTER") as Keys
+    // Джойстик — в экранных CSS-пикселях: `p.x`/`p.y` указателя в пикселях буфера канваса делим на плотность
+    const k = 1 / renderScaleOf(this)
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       if (this.opts.paused()) return
-      this.down = { x: p.x, y: p.y, id: p.id }
+      this.down = { x: p.x * k, y: p.y * k, id: p.id }
     })
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.down || !p.isDown || p.id !== this.down.id || this.opts.paused()) return
-      const dx = p.x - this.down.x
-      const dy = p.y - this.down.y
+      const dx = p.x * k - this.down.x
+      const dy = p.y * k - this.down.y
       if (!this.joy && Math.hypot(dx, dy) > 16) this.startJoystick(this.down)
       if (this.joy) {
         const max = 46
@@ -846,12 +864,11 @@ export class SettlementScene extends Phaser.Scene {
     this.path = []
     this.openOnArrive = undefined
     this.talkOnArrive = undefined
-    const base = this.add
+    const base = pinToScreen(this.add
       .circle(at.x, at.y, 46, 0xffffff, 0.18)
       .setStrokeStyle(2, 0xffffff, 0.5)
-      .setScrollFactor(0)
-      .setDepth(20000)
-    const knob = this.add.circle(at.x, at.y, 20, 0xffffff, 0.55).setScrollFactor(0).setDepth(20001)
+      .setDepth(20000))
+    const knob = pinToScreen(this.add.circle(at.x, at.y, 20, 0xffffff, 0.55).setDepth(20001))
     this.joy = { start: { x: at.x, y: at.y }, vec: { x: 0, y: 0 }, base, knob }
   }
 

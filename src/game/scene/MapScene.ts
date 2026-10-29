@@ -30,7 +30,10 @@ import {
   ensureTexture,
   ensureUnitTextures,
   hasTexture,
+  setTileTexSize,
+  setUnitTexSize,
   tileFrameCount,
+  tileTexSize,
   withTimeout
 } from "./svgTextures"
 import { WeatherLayer } from "./weather"
@@ -51,6 +54,8 @@ import {
 import { isTallTerrain, waterFillsTile } from "@game/art/tile"
 import { bridgeVertical, decorMask } from "@game/core/map/layouts"
 import { clearGoreStains } from "./gore"
+import { camZoom, cssZoom, initHiDpiScene, pinToScreen, renderScaleOf, restCamera, setCssZoom, viewH, viewW } from "./hidpi"
+import { textRes } from "./renderScale"
 import { tr } from "@game/i18n"
 
 /** Сумрак мрачной чащи: тинт всех клеток большого поля. */
@@ -197,6 +202,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   create(): void {
+    initHiDpiScene(this)
     ensureTextures(this)
     ensureEnvTextures(this)
     this.tileLayer = this.add.container(0, 0).setDepth(0)
@@ -301,11 +307,12 @@ export class MapScene extends Phaser.Scene {
     if (!st) return Promise.resolve()
     const jobs: Promise<unknown>[] = [ensureEnvTileTextures(this, st.map.biomeId)]
     if (st.map.expedition) {
+      const px = tileTexSize(this)
       jobs.push(
-        ensureTexture(this, CHEST_TEX, chestSvg(false), 128, 128),
-        ensureTexture(this, CHEST_OPEN_TEX, chestSvg(true), 128, 128),
-        ensureTexture(this, KEY_TEX, keySvg(), 128, 128),
-        ensureTexture(this, HEART_TEX, heartSvg(), 128, 128)
+        ensureTexture(this, CHEST_TEX, chestSvg(false), px, px),
+        ensureTexture(this, CHEST_OPEN_TEX, chestSvg(true), px, px),
+        ensureTexture(this, KEY_TEX, keySvg(), px, px),
+        ensureTexture(this, HEART_TEX, heartSvg(), px, px)
       )
     }
     for (const bu of Object.values(st.units)) {
@@ -389,7 +396,10 @@ export class MapScene extends Phaser.Scene {
 
   /* ---------- Ввод: тап и перетаскивание ---------- */
 
-  /** Порог смещения, после которого тап превращается в перетаскивание (px). */
+  /**
+   * Порог смещения, после которого тап превращается в перетаскивание (CSS px). `p.x`/`p.y` указателя — в пикселях
+   * буфера канваса, поэтому сравниваются с порогом × плотность рендера.
+   */
   private static readonly DRAG_THRESHOLD = 8
   /** Максимальное смещение, при котором отпускание всё ещё считается тапом (px). */
   private static readonly TAP_SLOP = 14
@@ -430,7 +440,7 @@ export class MapScene extends Phaser.Scene {
     if (this.pan) {
       const dx = p.x - this.pan.x
       const dy = p.y - this.pan.y
-      if (!this.pan.moved && Math.hypot(dx, dy) <= MapScene.DRAG_THRESHOLD) return
+      if (!this.pan.moved && Math.hypot(dx, dy) <= MapScene.DRAG_THRESHOLD * renderScaleOf(this)) return
       this.pan.moved = true
       const cam = this.cameras.main
       this.stopCameraPan()
@@ -439,7 +449,7 @@ export class MapScene extends Phaser.Scene {
     }
     if (!this.drag && this.armed) {
       const d = Math.hypot(p.x - this.armed.x, p.y - this.armed.y)
-      if (d <= MapScene.DRAG_THRESHOLD) return
+      if (d <= MapScene.DRAG_THRESHOLD * renderScaleOf(this)) return
       const unitId = this.armed.unitId
       this.armed = null
       if (!this.canDragNow() || !beginDrag(unitId)) return
@@ -488,7 +498,7 @@ export class MapScene extends Phaser.Scene {
     if (panned || outside || $battleUi.get().busy) return
     const dx = p.upX - p.downX
     const dy = p.upY - p.downY
-    if (Math.hypot(dx, dy) > MapScene.TAP_SLOP) return
+    if (Math.hypot(dx, dy) > MapScene.TAP_SLOP * renderScaleOf(this)) return
     const up = this.worldAt(p.upX, p.upY)
     const pos = pixelToGrid(this.layout, up.x, up.y)
     if (pos) tapTile(pos)
@@ -640,17 +650,20 @@ export class MapScene extends Phaser.Scene {
     let screen: BoardLayout
     if (st?.map.mode === "expedition") {
       // Большое поле: клетка как в обычном бою, поле в мировых координатах, по нему ходит камера
-      const l = computeWorldLayout(this.scale.width, this.scale.height, insets, mapSize(st.map))
+      const l = computeWorldLayout(viewW(this), viewH(this), insets, mapSize(st.map))
       this.layout = l.world
       screen = l.screen
       this.worldMode = true
     }
     else {
-      this.layout = computeLayout(this.scale.width, this.scale.height, insets)
+      this.layout = computeLayout(viewW(this), viewH(this), insets)
       screen = this.layout
       this.worldMode = false
     }
     this.setupCamera(st)
+    // Растр тайлов и миниатюр — под клетку на экране × плотность рендера (фигура бойца — 1.05 клетки)
+    setTileTexSize(this, this.layout.tile)
+    const unitTexChanged = setUnitTexSize(this, "map", this.layout.tile * 1.05)
     const key = `${this.layout.tile}:${this.layout.ox}:${this.layout.oy}:${this.layout.cols}x${this.layout.rows}`
     if (key !== this.lastLayoutKey) {
       this.lastLayoutKey = key
@@ -660,13 +673,15 @@ export class MapScene extends Phaser.Scene {
       this.targetSig = ""
       for (const v of this.units.values()) v.resize(this.layout.tile)
     }
+    // Ступень растра сменилась (другой размер экрана): показанные позы перерисовываются в новом размере
+    if (unitTexChanged) for (const v of this.units.values()) v.retexture()
     // DOM-накладкам — раскладка экрана (на большом поле — как у обычного): панель сведений не меняет высоту
     publishBoardLayout({
       tile: screen.tile,
       ox: screen.ox,
       oy: screen.oy,
-      width: this.scale.width,
-      height: this.scale.height
+      width: viewW(this),
+      height: viewH(this)
     })
   }
 
@@ -680,11 +695,10 @@ export class MapScene extends Phaser.Scene {
     const cam = this.cameras.main
     if (!this.worldMode || !st) {
       cam.removeBounds()
-      cam.setScroll(0, 0)
-      cam.setZoom(1)
+      restCamera(this, cam)
       return
     }
-    cam.setZoom($boardZoom.get())
+    setCssZoom(this, $boardZoom.get(), cam)
     this.updateBounds($boardZoom.get())
     if (this.camBattleId !== st.id) {
       this.camBattleId = st.id
@@ -707,15 +721,15 @@ export class MapScene extends Phaser.Scene {
     const y0 = -top - t
     const w0 = this.layout.cols * t + t * 2
     const h0 = this.layout.rows * t + top + bottom + t * 2
-    const w = Math.max(w0, this.scale.width / zoom)
-    const h = Math.max(h0, this.scale.height / zoom)
+    const w = Math.max(w0, viewW(this) / zoom)
+    const h = Math.max(h0, viewH(this) / zoom)
     cam.setBounds(x0 + w0 / 2 - w / 2, y0 + h0 / 2 - h / 2, w, h)
   }
 
   private applyZoom(z: number): void {
     if (!sceneAlive(this) || !this.worldMode) return
     this.updateBounds(z)
-    this.cameras.main.zoomTo(z, 160, "Sine.easeOut", true)
+    this.cameras.main.zoomTo(camZoom(this, z), 160, "Sine.easeOut", true)
   }
 
   private stopCameraPan(): void {
@@ -735,13 +749,14 @@ export class MapScene extends Phaser.Scene {
     const { top, bottom } = $boardInsets.get()
     const v = cam.worldView
     const mx = this.tile * 1.2
-    const inside = c.x > v.x + mx && c.x < v.right - mx && c.y > v.y + (top / cam.zoom) + mx && c.y < v.bottom - (bottom / cam.zoom) - mx
+    const z = cssZoom(this, cam)
+    const inside = c.x > v.x + mx && c.x < v.right - mx && c.y > v.y + (top / z) + mx && c.y < v.bottom - (bottom / z) - mx
     if (inside) return Promise.resolve()
     return new Promise((resolve) => {
       // Сцену остановили посреди наезда — колбэк камеры уже не придёт
       const unsub = onSceneEnd(this, resolve)
       // Клетка встаёт в середину свободной части экрана (между шапкой и панелью кнопок)
-      const y = c.y - (top - bottom) / 2 / cam.zoom
+      const y = c.y - (top - bottom) / 2 / z
       cam.pan(c.x, y, ms, "Sine.easeInOut", true, (_c: Phaser.Cameras.Scene2D.Camera, progress: number) => {
         if (progress < 1) return
         unsub()
@@ -766,8 +781,8 @@ export class MapScene extends Phaser.Scene {
       cam.pan(saved.x, saved.y, ms)
       return
     }
-    cam.zoomTo(1, ms)
-    cam.pan(this.scale.width / 2, this.scale.height / 2, ms)
+    cam.zoomTo(camZoom(this, 1), ms)
+    cam.pan(viewW(this) / 2, viewH(this) / 2, ms)
   }
 
   /* ---------- Публичные помощники для Presenter ---------- */
@@ -935,10 +950,10 @@ export class MapScene extends Phaser.Scene {
   async showEnd(result: BattleResult, speed = 1): Promise<void> {
     if (!sceneAlive(this)) return
     // Заставка — в экранных координатах; камера большого поля возвращается к обычному масштабу
-    if (this.worldMode) this.cameras.main.zoomTo(1, 200 / speed)
-    const w = this.scale.width
-    const h = this.scale.height
-    const veil = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x000000, 0).setDepth(60).setScrollFactor(0)
+    if (this.worldMode) this.cameras.main.zoomTo(camZoom(this, 1), 200 / speed)
+    const w = viewW(this)
+    const h = viewH(this)
+    const veil = pinToScreen(this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x000000, 0).setDepth(60))
     this.endOverlay.push(veil)
     this.tweens.add({ targets: veil, fillAlpha: 0.55, duration: 200 / speed })
     const text = result === "victory" ? tr("VICTORY", "ПОБЕДА") : result === "defeat" ? tr("DEFEAT", "ПОРАЖЕНИЕ") : tr("RETREAT", "ОТСТУПЛЕНИЕ")
@@ -949,7 +964,7 @@ export class MapScene extends Phaser.Scene {
     const cy = h * 0.42
     const bandH = size * 1.9
     const skew = bandH * 0.4
-    const band = this.add.graphics().setDepth(61.5).setScrollFactor(0).setAlpha(0)
+    const band = pinToScreen(this.add.graphics().setDepth(61.5)).setAlpha(0)
     band.fillStyle(0x0d0b10, 0.96)
     band.fillPoints(
       [
@@ -974,23 +989,23 @@ export class MapScene extends Phaser.Scene {
     this.endOverlay.push(band)
     this.tweens.add({ targets: band, alpha: 1, duration: 180 / speed })
     const style = { ...textStyle(size, color, true, 0), fontStyle: "bold italic" }
-    const shadow = this.add
+    const shadow = pinToScreen(this.add
       .text(w / 2 + 4, cy + 4, text, { ...style, color: result === "defeat" ? "#7a0012" : "#e63946" })
       .setOrigin(0.5)
-      .setDepth(61.8).setScrollFactor(0)
+      .setDepth(61.8))
       .setScale(2.4)
       .setAlpha(0)
       .setAngle(-4)
-    const label = this.add
+    const label = pinToScreen(this.add
       .text(w / 2, cy, text, style)
       .setOrigin(0.5)
-      .setDepth(62).setScrollFactor(0)
+      .setDepth(62))
       .setScale(2.4)
       .setAlpha(0)
       .setAngle(-4)
     this.endOverlay.push(shadow, label)
     if (result === "defeat") {
-      const vignette = this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x7a0012, 0).setDepth(61).setScrollFactor(0)
+      const vignette = pinToScreen(this.add.rectangle(w / 2, h / 2, w * 3, h * 3, 0x7a0012, 0).setDepth(61))
       this.endOverlay.push(vignette)
       this.tweens.add({ targets: vignette, fillAlpha: 0.28, duration: 900 / speed, ease: "Sine.easeIn" })
     }
@@ -1003,8 +1018,7 @@ export class MapScene extends Phaser.Scene {
       for (let i = 0; i < 5; i++) {
         const x = w * (0.1 + i * 0.2)
         this.endOverlay.push(
-          bloodDecal(this, x, h * (0.3 + ((i * 37) % 50) / 100), this.tile * 1.4, "splat", i + 3)
-            .setDepth(60.5).setScrollFactor(0)
+          pinToScreen(bloodDecal(this, x, h * (0.3 + ((i * 37) % 50) / 100), this.tile * 1.4, "splat", i + 3).setDepth(60.5))
             .setAlpha(0.55)
         )
       }
@@ -1191,16 +1205,18 @@ export class MapScene extends Phaser.Scene {
     const groundTex = groundKey(st.map.biomeId)
     if (hasTexture(this, groundTex)) {
       // Большое поле: земля вокруг — по всему миру камеры, а не по экрану
-      const pad = this.worldMode ? Math.max(this.scale.width, this.scale.height) : 0
+      const pad = this.worldMode ? Math.max(viewW(this), viewH(this)) : 0
       const gx = -pad
       const gy = -pad
-      const w = this.worldMode ? l.tile * size.w + pad * 2 : this.scale.width
-      const h = this.worldMode ? l.tile * size.h + pad * 2 : this.scale.height
+      const w = this.worldMode ? l.tile * size.w + pad * 2 : viewW(this)
+      const h = this.worldMode ? l.tile * size.h + pad * 2 : viewH(this)
+      // Сторона растра земли — какой её растеризовали (ступень `tileTexSize`), период узора — одна клетка
+      const gpx = this.textures.get(groundTex).getSourceImage().width || 128
       this.groundBg = this.add
         .tileSprite(gx, gy, w, h, groundTex)
         .setOrigin(0, 0)
-        .setTileScale(l.tile / 128, l.tile / 128)
-        .setTilePosition((gx - l.ox) * (128 / l.tile), (gy - l.oy) * (128 / l.tile))
+        .setTileScale(l.tile / gpx, l.tile / gpx)
+        .setTilePosition((gx - l.ox) * (gpx / l.tile), (gy - l.oy) * (gpx / l.tile))
         // Светлые биомы (снег, лёд, песок) затемняем мягче, иначе земля вокруг поля становится серой
         .setTint(["winter_park", "glacier", "desert"].includes(st.map.biomeId) ? 0xc9d2dc : 0x9a9a9a)
         .setAlpha(0.9)
@@ -1307,7 +1323,7 @@ export class MapScene extends Phaser.Scene {
       const heart = p.kind === "heart" && hasTexture(this, HEART_TEX)
       const icon = heart
         ? this.add.image(c.x, c.y, HEART_TEX).setDisplaySize(t * 0.5, t * 0.5)
-        : this.add.text(c.x, c.y, pickupIcon(p.kind), textStyle(Math.max(12, t * 0.42), "#ffffff", false, 0)).setOrigin(0.5).setResolution(2)
+        : this.add.text(c.x, c.y, pickupIcon(p.kind), textStyle(Math.max(12, t * 0.42), "#ffffff", false, 0)).setOrigin(0.5).setResolution(textRes(2))
       this.expLayer.add([halo, icon])
       const base = icon.scale
       this.expTweens.push(

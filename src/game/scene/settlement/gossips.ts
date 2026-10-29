@@ -4,6 +4,7 @@ import type { Blocker } from "@game/core/settlement/walk"
 import { GOSSIPS, GOSSIP_GAP, GOSSIP_SPOTS, GOSSIP_TIMING, type GossipDef } from "@game/content/settlement"
 import { loadQuotes, quoteLine, type Quote } from "@game/content/quotes"
 import { furArt } from "@game/art/index"
+import { textRes } from "../renderScale"
 import { deathSfx } from "@game/platform/audio"
 import { textStyle } from "../style"
 import { reducedMotion } from "../motionFx"
@@ -55,7 +56,7 @@ export class Gossips {
     const { scene } = host
     this.pair = GOSSIPS.map((def, i): Gossiper => {
       const img = scene.add.image(0, 0, host.texture(def.id)).setOrigin(0.5, 1).setDisplaySize(host.size.w, host.size.h).setFlipX(i === 1)
-      const label = scene.add.text(0, 0, def.name, textStyle(12, "#ffffff", true, 3)).setOrigin(0.5, 1).setResolution(2).setDepth(9000)
+      const label = scene.add.text(0, 0, def.name, textStyle(12, "#ffffff", true, 3)).setOrigin(0.5, 1).setResolution(textRes(2)).setDepth(9000)
       return { def, img, label, pos: { x: 0, y: 0 }, head: { x: 0, y: 0 }, taps: 0, alive: true }
     })
     this.place(this.pickSpot())

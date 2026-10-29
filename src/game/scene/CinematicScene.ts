@@ -18,13 +18,16 @@ import { bigNumber, ensureMotionTextures, goreKindOfUnit, hitStop, shakeCam, sha
 import { WeatherLayer } from "./weather"
 import { impactFeel, isSlayer, playAttackFx, weaponKindOfUnit, weaponLookOfUnit } from "./attackFx"
 import {
+  backdropPx,
   backdropTexKey,
   ensureBackdropTexture,
   ensureUnitTextures,
   hasTexture,
+  setUnitTexSize,
   unitTexKey,
   withTimeout
 } from "./svgTextures"
+import { camZoom, initHiDpiScene, setCssZoom, viewH, viewW } from "./hidpi"
 import { FUR_PALETTES } from "@game/content/appearance"
 import { tr } from "@game/i18n"
 import { $boardInsets } from "@game/state/boardLayout"
@@ -103,6 +106,8 @@ export class CinematicScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Камера в покое (база — плотность рендера); зумы ниже — относительно неё (`camZoom`)
+    initHiDpiScene(this, { keepAtRest: true })
     ensureTextures(this)
     ensureMotionTextures(this)
     this.backdrops = []
@@ -155,7 +160,7 @@ export class CinematicScene extends Phaser.Scene {
     if (!this.sys || !f.posed) return
     if (f.dead && pose !== "dead") return
     f.pose = pose
-    const key = unitTexKey(f.unit, pose, "cine")
+    const key = unitTexKey(this, f.unit, pose, "cine")
     if (hasTexture(this, key)) f.sprite.setTexture(key)
     const h = f.height
     f.sprite.setDisplaySize(h * ART_RATIO, h)
@@ -177,12 +182,14 @@ export class CinematicScene extends Phaser.Scene {
 
   private async run(): Promise<void> {
     const { event, before, after } = this.cine
-    const w = this.scale.width
-    const h = this.scale.height
+    const w = viewW(this)
+    const h = viewH(this)
     const biome = biomeDef(before.map.biomeId)
     const feetY = h * 0.62
     // Бойцы помельче — оба целиком помещаются на одном поле и не упираются друг в друга
     const size = Math.min(w, h) * 0.42
+    // Растр поз и частей тела — под высоту бойца на экране × плотность рендера
+    setUnitTexSize(this, "cine", size)
 
     // Подложка с запасом (канвас может изменить размер во время сцены) и чёрное затемнение.
     const groundCol = Phaser.Display.Color.IntegerToColor(biome.colors.plain)
@@ -239,7 +246,7 @@ export class CinematicScene extends Phaser.Scene {
     const topY = Math.max(h * 0.07, $boardInsets.get().top + 24)
     const mk = (id: string, unit: UnitInstance, bu: BattleUnit, hpBefore: number, onLeft: boolean): Fighter => {
       const x = onLeft ? leftX : rightX
-      const idleKey = unitTexKey(unit, "idle", "cine")
+      const idleKey = unitTexKey(this, unit, "idle", "cine")
       const posed = hasTexture(this, idleKey)
       const sprite = this.add.image(x + (onLeft ? -w : w), feetY, posed ? idleKey : TEX.disc).setDepth(10)
       if (posed) {
@@ -331,8 +338,8 @@ export class CinematicScene extends Phaser.Scene {
 
     // Въезд: камера наезжает, бойцы влетают со скоростными линиями, между ними вспыхивает «VS»
     const cam = this.cameras.main
-    cam.setZoom(1.18)
-    this.tweens.add({ targets: cam, zoom: 1, duration: 420 / this.speed, ease: "Cubic.easeOut" })
+    setCssZoom(this, 1.18, cam)
+    this.tweens.add({ targets: cam, zoom: camZoom(this, 1), duration: 420 / this.speed, ease: "Cubic.easeOut" })
     await tween(this, { targets: fade, alpha: 0, duration: 220 / this.speed })
     this.setPose(fa, "run")
     this.setPose(fd, "run")
@@ -374,7 +381,8 @@ export class CinematicScene extends Phaser.Scene {
   /** Фон — одно поле без разделителя: картина по центру, на широком экране — зеркальные копии по бокам. */
   private drawBackdrop(biomeId: string, terrain: ReturnType<typeof terrainAt>, w: number, h: number, bgW: number): void {
     const biome = biomeDef(biomeId)
-    const key = backdropTexKey(biomeId, terrain, "left", bgW, Math.round(h))
+    const px = backdropPx(this, bgW, h)
+    const key = backdropTexKey(biomeId, terrain, "left", px.w, px.h)
     if (!hasTexture(this, key)) {
       // Фолбэк: простой градиент биома.
       const g = this.add.graphics().setDepth(0)
@@ -427,7 +435,7 @@ export class CinematicScene extends Phaser.Scene {
   private async playStrike(strike: Strike, atk: Fighter, def: Fighter, topY: number): Promise<void> {
     const sp = this.speed
     const dir = def.onLeft ? -1 : 1 // сторона защищающегося
-    const w = this.scale.width
+    const w = viewW(this)
     const defBodyY = this.bodyY(def)
     const atkBodyY = this.bodyY(atk)
 
@@ -467,7 +475,7 @@ export class CinematicScene extends Phaser.Scene {
           yoyo: true,
           ease: "Sine.easeInOut"
         })
-      this.tweens.add({ targets: cam, zoom: 1.06, duration: 160 / sp, yoyo: true, ease: "Sine.easeInOut" })
+      this.tweens.add({ targets: cam, zoom: camZoom(this, 1.06), duration: 160 / sp, yoyo: true, ease: "Sine.easeInOut" })
     }
     swingSfx(look.kind)
     const fx = playAttackFx({
@@ -517,7 +525,7 @@ export class CinematicScene extends Phaser.Scene {
       // Белая вспышка экрана на сильных ударах
       if (strike.special || frac >= 0.35 || lethal) {
         const flash = this.add
-          .rectangle(w / 2, this.scale.height / 2, w * 3, this.scale.height * 3, 0xffffff, 0.5 * shakeMul())
+          .rectangle(w / 2, viewH(this) / 2, w * 3, viewH(this) * 3, 0xffffff, 0.5 * shakeMul())
           .setDepth(44)
         this.tweens.add({ targets: flash, fillAlpha: 0, duration: 180 / sp, onComplete: () => flash.destroy() })
       }
@@ -616,21 +624,21 @@ export class CinematicScene extends Phaser.Scene {
   /** Slow-mo добивающего удара: время замедляется, камера наезжает на жертву и возвращается. */
   private async killCam(f: Fighter, sp: number): Promise<void> {
     const cam = this.cameras.main
-    const w = this.scale.width
-    const h = this.scale.height
+    const w = viewW(this)
+    const h = viewH(this)
     const prevT = this.tweens.timeScale
     if (prevT >= 10) return
     this.tweens.timeScale = 0.35
     const zoom = { z: cam.zoom }
     const tx = (f.sprite.x - w / 2) * 0.35
     const ty = (this.bodyY(f) - h / 2) * 0.35
-    this.tweens.add({ targets: zoom, z: 1.22, duration: 90 / sp, onUpdate: () => cam.setZoom(zoom.z) })
+    this.tweens.add({ targets: zoom, z: camZoom(this, 1.22), duration: 90 / sp, onUpdate: () => cam.setZoom(zoom.z) })
     cam.pan(w / 2 + tx, h / 2 + ty, 220 / sp, "Sine.easeOut")
     await wait(this, 520 / sp)
     if (!this.sys || !this.sys.isActive()) return
     if (this.tweens.timeScale === 0.35) this.tweens.timeScale = prevT
     cam.pan(w / 2, h / 2, 260 / sp, "Sine.easeInOut")
-    this.tweens.add({ targets: zoom, z: 1, duration: 260 / sp, onUpdate: () => cam.setZoom(zoom.z) })
+    this.tweens.add({ targets: zoom, z: camZoom(this, 1), duration: 260 / sp, onUpdate: () => cam.setZoom(zoom.z) })
   }
 
   /** Вспышка «VS» между бойцами на входе. */
@@ -638,7 +646,7 @@ export class CinematicScene extends Phaser.Scene {
     if (this.skipped) return
     const t = this.add
       .text(x, y, "VS", {
-        ...textStyle(Math.min(56, this.scale.width * 0.12), "#ffffff", true, 8),
+        ...textStyle(Math.min(56, viewW(this) * 0.12), "#ffffff", true, 8),
         fontStyle: "bold italic"
       })
       .setOrigin(0.5)
@@ -660,8 +668,8 @@ export class CinematicScene extends Phaser.Scene {
 
   private async cutIn(specialId: string, atk: Fighter): Promise<void> {
     const sp = this.speed
-    const w = this.scale.width
-    const h = this.scale.height
+    const w = viewW(this)
+    const h = viewH(this)
     const overlay = this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0).setDepth(40)
     const band = this.add.rectangle(atk.onLeft ? -w : w * 2, h * 0.42, w, h * 0.16, atk.weaponColor, 0.95).setDepth(41)
     const name = specialDef(specialId).name
@@ -689,7 +697,7 @@ export class CinematicScene extends Phaser.Scene {
     await tween(this, { targets: [band, label], x: w / 2, duration: 160 / sp, ease: "Cubic.easeOut" })
     this.tweens.add({ targets: portrait, x: w / 2 + (atk.onLeft ? -w * 0.36 : w * 0.36), duration: 160 / sp })
     // Портрет бойца на полосе (если есть текстура позы) и вспышка
-    const key = unitTexKey(atk.unit, "happy", "cine")
+    const key = unitTexKey(this, atk.unit, "happy", "cine")
     let face: Phaser.GameObjects.Image | null = null
     if (hasTexture(this, key)) {
       face = this.add
@@ -764,11 +772,11 @@ export class CinematicScene extends Phaser.Scene {
     const word = isPlayer
       ? tr("FALLEN", unit?.gender === "f" ? "ПАЛА" : "ПАЛ")
       : tr("DONE FOR", unit?.gender === "f" ? "ГОТОВА" : "ГОТОВ")
-    const w = this.scale.width
+    const w = viewW(this)
     const stampText = this.add
       .text(
         w / 2,
-        this.scale.height * 0.35,
+        viewH(this) * 0.35,
         word,
         textStyle(Math.min(48, w * 0.14), isPlayer ? "#ff4d6d" : "#f1f1f1", true, 7)
       )

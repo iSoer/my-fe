@@ -24,6 +24,7 @@ import { tr } from "@game/i18n"
 import { deathSfx, sfx } from "@game/platform/audio"
 
 import { deathHash as hash, type DeathVariant } from "./deathVariants"
+import { viewW } from "./hidpi"
 export { DEATH_VARIANTS, deathSeed, pickDeathVariant, type DeathVariant } from "./deathVariants"
 
 /* Варианты гибели: милые и кровавые. Выбор варианта — `deathVariants.ts`. */
@@ -791,7 +792,7 @@ const launch: VariantFn = async (ctx, b) => {
   )
   gush(ctx, b, ctx.x, ctx.y - s * 0.45, 1, "blunt", -0.6)
   ctx.onPool?.()
-  const dist = b.mode === "cine" ? b.scene.scale.width * 0.9 : ctx.size * 2.1
+  const dist = b.mode === "cine" ? viewW(b.scene) * 0.9 : ctx.size * 2.1
   const up = b.mode === "cine" ? s * 0.6 : ctx.size * 0.8
   const dur = 650 / sp
   const proxy = { k: 0 }

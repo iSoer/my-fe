@@ -18,7 +18,7 @@
 | `settlement`                                  | Здания (`barracks`, `training`, `store`, `graveyard`, `tavern`), тренировки, `hero?`, `drink?`, `lastReviveAt?`                            |
 | `memorial`                                    | Кладбище (`memorialSchema`: юнит, причина `killed`/`released`, `revivedAt?`)                                                               |
 | `achievements`, `stats`                       | Достижения и общая статистика                                                                                                              |
-| `settings`                                    | `settingsSchema`; поля `endTurnConfirm`, `dialogues`, `lang` берут значение через `.default()`                                             |
+| `settings`                                    | `settingsSchema`; поля `endTurnConfirm`, `dialogues`, `lang`, `graphics` (качество графики Phaser-сцен, `"auto"`) берут значение через `.default()`                                             |
 | `story`                                       | Сюжетные факты: `counters`, `seen`                                                                                                         |
 | `pendingBattle?`                              | Разведанный бой: `seed`, `difficulty`, `biomeId`, `team` (по умолчанию 0), `map`                                                           |
 | `sortieSeed?`, `rewardChoice?`, `lastBattle?` | Сид вражеских команд вылазки, выбор награды-персонажа, итоги прошлого боя                                                                  |
