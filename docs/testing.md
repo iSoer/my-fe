@@ -44,12 +44,13 @@ pnpm test:coverage
 
 ```bash
 VITE_BASE_PATH=/my-fe/ pnpm build && VITE_BASE_PATH=/my-fe/ pnpm preview   # в одном терминале
-pnpm smoke        # tools/smoke.mjs: меню → новая игра → поселение → Лавка → вылазка → бой → сдача → итоги → перезагрузка
+pnpm smoke        # tools/smoke.mjs: меню → новая игра → поселение → Лавка → вылазка → бой (кинематики ударов) → сдача → итоги → перезагрузка
 pnpm smoke:tg     # tools/smoke-telegram.mjs: мок window.Telegram.WebApp — сейв по user id, CloudStorage, «Назад», конфликт
 pnpm smoke:pwa    # tools/smoke-pwa.mjs: сам поднимает preview; SW → офлайн → перезагрузка → бой из кэша
 ```
 
 - Свой Chromium задаётся через `CHROMIUM_PATH=/path/to/chrome`. При падении `smoke.mjs` сохраняет скриншот в `/tmp/smoke-fail.png`.
+- `smoke.mjs` идёт с `deviceScaleFactor: 2` и падает на любой `pageerror` или `console.error`. Шаг с кинематиками бьёт трижды: бойцам ставится `hp: 999, maxHp: 1`, чтобы каждый удар оставлял кляксы `screenBloodSplat`, закреплённые через `pinToScreen`, и `CinematicScene` останавливалась, пока они ещё на экране. Так ловятся падения при уничтожении сцены на HiDPI. Если игра зависает после исключения в цикле Phaser, шаг падает сразу, а не ждёт вечно.
 - Смоуки управляют игрой через `window.__pf` (см. [ui-and-routing.md](ui-and-routing.md)) и ищут кнопки по английским подписям: язык по умолчанию — `en`.
 
 ## Перед коммитом

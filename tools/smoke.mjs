@@ -80,6 +80,99 @@ await step('ворота → вылазка 1/2 и 2/2', async () => {
   await page.locator('#battle-canvas canvas').waitFor({ timeout: 30000 });
   await page.waitForTimeout(2500);
 });
+// Кинематика удара: CinematicScene останавливается через scene.stop(), пока на экране ещё живут закреплённые
+// (pinToScreen) кляксы крови. При плотности 2 это ловит падения при уничтожении сцены.
+await step('кинематики ударов → сцена останавливается без ошибок', async () => {
+  await pf(() => {
+    const s = window.__pf.save.get();
+    window.__pf.save.set({
+      ...s,
+      settings: { ...s.settings, cinematic: 'always', blood: 'sea', confirmAttack: true },
+    });
+  });
+  // Враги ждут, пока к ним подойдут: каждый боец бьёт ближайшего врага, если достаёт, иначе идёт к нему
+  const advance = () =>
+    pf(async () => {
+      const pf = window.__pf;
+      const units = () => Object.values(pf.save.get().battle?.units ?? {});
+      const idle = async () => {
+        while (pf.ui.get().busy) await new Promise((r) => setTimeout(r, 50));
+      };
+      const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+      let attacks = 0;
+      for (const { unitId } of units().filter((u) => u.side === 'player')) {
+        const me = units().find((u) => u.unitId === unitId);
+        const foe = units()
+          .filter((u) => u.side === 'enemy' && u.alive)
+          .sort((a, b) => dist(a.pos, me?.pos) - dist(b.pos, me?.pos))[0];
+        if (!me?.alive || me.acted || !foe) continue;
+        pf.battle.tapTile(me.pos);
+        pf.battle.tapTile(foe.pos);
+        if (pf.ui.get().mode === 'forecast') {
+          // Каждый удар (и ответный тоже) снимает больше 40% maxHp, и кинематика ставит кляксы (screenBloodSplat),
+          // живущие ~1.4 с. Оба бойца выживают: долгой анимации смерти нет, сцена закрывается при кляксах на экране
+          const s = pf.save.get();
+          const tough = (u) => ({ ...u, hp: 999, maxHp: 1 });
+          pf.save.set({
+            ...s,
+            battle: {
+              ...s.battle,
+              units: {
+                ...s.battle.units,
+                [foe.unitId]: tough(s.battle.units[foe.unitId]),
+                [unitId]: tough(s.battle.units[unitId]),
+              },
+            },
+          });
+          // confirm ждёт проигрывания боя вместе с кинематикой
+          await pf.battle.confirm();
+          await idle();
+          attacks++;
+          continue;
+        }
+        pf.battle.tapTile(me.pos);
+        const reach = [...(pf.ui.get().reach?.values() ?? [])].filter((n) => n.canStop);
+        const to = reach.sort((a, b) => dist(a.pos, foe.pos) - dist(b.pos, foe.pos))[0];
+        if (to) pf.battle.tapTile(to.pos);
+        await idle();
+      }
+      return attacks;
+    });
+  // Исключение в цикле Phaser останавливает игру: кинематика не закончится, и ожидание повиснет навсегда.
+  // Поэтому падаем сразу по первой ошибке на странице или по тайм-ауту
+  const guarded = async (promise, what) => {
+    let timer;
+    const fail = new Promise((_, reject) => {
+      const started = Date.now();
+      timer = setInterval(() => {
+        if (errors.length) reject(new Error(errors[0]));
+        else if (Date.now() - started > 60000) reject(new Error(`${what}: игра зависла на 60 с`));
+      }, 200);
+    });
+    try {
+      return await Promise.race([promise, fail]);
+    } finally {
+      clearInterval(timer);
+    }
+  };
+  // Несколько ударов: у отдельного удара может не быть урона (лекарь, броня), и тогда клякс нет
+  let attacks = 0;
+  for (let turn = 0; turn < 8 && attacks < 3; turn++) {
+    attacks += await guarded(advance(), 'ход игрока');
+    // endTurn ждёт всю фазу врагов вместе с кинематиками
+    if (attacks < 3)
+      await guarded(
+        pf(() => window.__pf.battle.endTurn()),
+        'ход врагов',
+      );
+    if (await pf(() => window.__pf.save.get().battle?.result))
+      throw new Error('бой закончился раньше проверки');
+  }
+  if (attacks < 3) throw new Error(`за 8 ходов только ${attacks} удара`);
+  // Остановка сцены обрабатывается в следующем кадре Phaser
+  await page.waitForTimeout(1000);
+  if (errors.length) throw new Error(errors[0]);
+});
 await step('сдача → итоги → деревня', async () => {
   await pf(() => {
     location.hash = '#/';
