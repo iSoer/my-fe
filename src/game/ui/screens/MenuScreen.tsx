@@ -19,9 +19,9 @@ const YARD_BG = backdropSvg("yard", "plain", "left").replace(
 )
 /** Демо-тройка для меню без армии: кот, пёс и мышь. Генерируется при показе — имена на текущем языке. */
 const demoCrew = (): UnitInstance[] => [
-  generateUnit({ seed: 1, level: 1, species: "cat", classId: "infantry_claw" }),
-  generateUnit({ seed: 2, level: 1, species: "dog", classId: "infantry_stick" }),
-  generateUnit({ seed: 3, level: 1, species: "mouse", classId: "infantry_slingshot" })
+  generateUnit({ seed: 1, level: 1, species: "cat", classId: "soldier" }),
+  generateUnit({ seed: 2, level: 1, species: "dog", classId: "hunter" }),
+  generateUnit({ seed: 3, level: 1, species: "mouse", classId: "mage" })
 ]
 const BLOOD_SVG = `<svg viewBox="0 0 390 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <g fill="#c81e2e" opacity=".85">

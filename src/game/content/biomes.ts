@@ -19,8 +19,8 @@ export interface BiomeDef {
   /** Цвета плейсхолдеров тайлов. */
   colors: Record<TerrainId, number>
   bg: number
-  /** Смещения долей местности относительно базовых. */
-  bias: { forest: number, walls: number, impassable: number, covers: number, mountainVsWater: number }
+  /** Смещения генерации: доля зарослей в раскладках (`LayoutEnv.forestBias`) и число укрытий игрока. */
+  bias: { forest: number, covers: number }
 }
 
 /** Названия местности: геттеры, чтобы текст брался на текущем языке в момент показа. */
@@ -57,7 +57,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xd7ccc8
     },
     bg: 0x9ccc65,
-    bias: { forest: 0, walls: 0, impassable: 0, covers: 0, mountainVsWater: 0.5 }
+    bias: { forest: 0, covers: 0 }
   },
   {
     id: "roofs",
@@ -83,7 +83,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xcfd8dc
     },
     bg: 0xff8a65,
-    bias: { forest: -0.05, walls: 0, impassable: 0.03, covers: 0, mountainVsWater: 0.5 }
+    bias: { forest: -0.05, covers: 0 }
   },
   {
     id: "basement",
@@ -109,7 +109,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0x5d4037
     },
     bg: 0x424242,
-    bias: { forest: 0, walls: 0.03, impassable: -0.03, covers: 0, mountainVsWater: 0.6 }
+    bias: { forest: 0, covers: 0 }
   },
   {
     id: "dump",
@@ -135,7 +135,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0x8d6e63
     },
     bg: 0xafb42b,
-    bias: { forest: 0.03, walls: 0, impassable: 0, covers: 1, mountainVsWater: 0.5 }
+    bias: { forest: 0.03, covers: 1 }
   },
   {
     id: "winter_park",
@@ -161,7 +161,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xe0e0e0
     },
     bg: 0xe3f2fd,
-    bias: { forest: 0.02, walls: 0, impassable: 0.02, covers: 0, mountainVsWater: 0.4 }
+    bias: { forest: 0.02, covers: 0 }
   },
   {
     id: "jungle",
@@ -187,7 +187,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0x7a5a3a
     },
     bg: 0x8fd36a,
-    bias: { forest: 0.08, walls: -0.02, impassable: 0.04, covers: 0, mountainVsWater: 0.3 }
+    bias: { forest: 0.08, covers: 0 }
   },
   {
     id: "desert",
@@ -213,7 +213,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xe8e0c8
     },
     bg: 0xffe8b0,
-    bias: { forest: -0.08, walls: -0.02, impassable: 0.02, covers: 0, mountainVsWater: 0.8 }
+    bias: { forest: -0.08, covers: 0 }
   },
   {
     id: "glacier",
@@ -239,7 +239,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xeaf6ff
     },
     bg: 0xcfe9ff,
-    bias: { forest: 0, walls: 0.02, impassable: 0.03, covers: 0, mountainVsWater: 0.5 }
+    bias: { forest: 0, covers: 0 }
   },
   {
     id: "canyon",
@@ -265,7 +265,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xc47a52
     },
     bg: 0xffb07a,
-    bias: { forest: -0.04, walls: 0.03, impassable: 0.02, covers: 0, mountainVsWater: 0.7 }
+    bias: { forest: -0.04, covers: 0 }
   },
   {
     id: "deep_forest",
@@ -291,7 +291,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0x8a6440
     },
     bg: 0x2f5a34,
-    bias: { forest: 0.1, walls: 0, impassable: 0, covers: 1, mountainVsWater: 0.5 }
+    bias: { forest: 0.1, covers: 1 }
   },
   {
     id: "indoors",
@@ -317,7 +317,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0x8a3b4a
     },
     bg: 0xf1e3c8,
-    bias: { forest: -0.08, walls: 0.04, impassable: 0, covers: 1, mountainVsWater: 0.8 }
+    bias: { forest: -0.08, covers: 1 }
   },
   {
     id: "factory",
@@ -343,7 +343,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0xc9a227
     },
     bg: 0x5a5f66,
-    bias: { forest: -0.06, walls: 0.03, impassable: 0.01, covers: 1, mountainVsWater: 0.6 }
+    bias: { forest: -0.06, covers: 1 }
   },
   {
     id: "infested",
@@ -369,7 +369,7 @@ export const BIOMES: readonly BiomeDef[] = [
       cover: 0x8a8a8f
     },
     bg: 0x3a3048,
-    bias: { forest: 0, walls: 0.02, impassable: 0.02, covers: 1, mountainVsWater: 0.4 }
+    bias: { forest: 0, covers: 1 }
   }
 ]
 

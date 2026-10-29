@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { BuildingId, SaveGame } from "@game/core/types"
 import { MAX_LEVEL, SQUAD_SIZE } from "@game/core/types"
-import { BUILDING_MAX_LEVEL, PLOTS, buildingDef, type StatLine } from "@game/content/settlement"
+import { BUILDING_MAX_LEVEL, GRAVEYARD, PLOTS, buildingDef, type StatLine } from "@game/content/settlement"
 import { XP } from "@game/content/balance"
 import {
   buildingLevel,
@@ -21,7 +21,7 @@ import {
   trainingRate
 } from "@game/core/settlement"
 import { displayName, unitClassName } from "@game/core/units"
-import { ensureRoster } from "@game/state/save"
+import { $save, ensureRoster } from "@game/state/save"
 import { buildAction, closePanel, collectAction, orderDrinkAction, trainAction, upgradeAction } from "@game/state/settlement"
 import { canOrderDrink, drinkPct, drinksAt } from "@game/core/settlement/tavern"
 import { DRINKS, drinkDef } from "@game/content/tavern"
@@ -73,27 +73,32 @@ function Stats({ lines, next }: { lines: StatLine[], next?: StatLine[] }) {
 
 /** Постройка или улучшение: цена, кнопка и причина, если сейчас нельзя. */
 function GrowthBlock({ save, id, toast }: { save: SaveGame, id: BuildingId, toast: Toast }) {
-  const [busy, setBusy] = useState(false)
+  // Замок от двойного тапа: снимается только после перерисовки с новым уровнем (или после ошибки)
+  const busy = useRef(false)
   const level = buildingLevel(save, id)
+  useEffect(() => { busy.current = false }, [level])
   const cost = levelCost(id, level)
   if (cost === null)
     return <p className="small st-max">{tr("★ Maximum level reached", "★ Достигнут максимальный уровень")}</p>
   const check = level === 0 ? canBuild(save, id) : canUpgrade(save, id)
   const act = () => {
-    // Повторное нажатие до перерисовки не спишет ресурсы дважды: проверка идёт по текущему сейву, а кнопка гаснет
-    if (busy) return
-    setBusy(true)
+    if (busy.current) return
+    busy.current = true
     const r = level === 0 ? buildAction(id) : upgradeAction(id)
-    setBusy(false)
-    if (!r.ok) return toast(r.error, true)
+    if (!r.ok) {
+      busy.current = false
+      return toast(r.error, true)
+    }
     haptic("success")
+    // Уровень берём из нового сейва, а не из замыкания
+    const now = buildingLevel($save.get(), id)
     toast(level === 0
       ? tr(`${buildingDef(id).name} built!`, `${buildingDef(id).name}: построено!`)
-      : tr(`${buildingDef(id).name}: level ${level + 1}`, `${buildingDef(id).name}: уровень ${level + 1}`))
+      : tr(`${buildingDef(id).name}: level ${now}`, `${buildingDef(id).name}: уровень ${now}`))
   }
   return (
     <div className="stack" style={{ gap: 6 }}>
-      <Button block primary={check.ok} disabled={!check.ok || busy} icon={level === 0 ? "🔨" : "⬆"} onClick={act}>
+      <Button block primary={check.ok} disabled={!check.ok} icon={level === 0 ? "🔨" : "⬆"} onClick={act}>
         {level === 0
           ? `${tr("Build", "Построить")} · ${cost} 🦴`
           : `${tr(`Upgrade to level ${level + 1}`, `Улучшить до ${level + 1}-го уровня`)} · ${cost} 🦴`}
@@ -201,7 +206,8 @@ function TrainingSection({ save, toast }: { save: SaveGame, toast: Toast }) {
         if (!u) return null
         const max = u.level >= MAX_LEVEL
         // Опыт, накопленный с последнего начисления (ещё не записан в сейв) — для живой полоски
-        const pending = rate > 0 ? Math.floor(((now - t.lastTick + t.carryMs) * rate) / 3_600_000) : 0
+        // (на максимальном уровне опыт не копится — и в «+N» его не показываем)
+        const pending = rate > 0 && !max ? Math.floor(((now - t.lastTick + t.carryMs) * rate) / 3_600_000) : 0
         const xp = max ? XP.perLevel : Math.min(XP.perLevel, u.xp + pending)
         return (
           <div key={t.unitId} className="card st-trainee">
@@ -282,7 +288,7 @@ function GraveyardSection({ save }: { save: SaveGame }) {
       </p>
       <div className={`st-revive ${status.unlocked && status.readyToday ? "is-ready" : ""}`}>
         {!status.unlocked
-          ? tr("🔒 Resurrection opens at level 5.", "🔒 Воскрешение откроется на 5-м уровне.")
+          ? tr(`🔒 Resurrection opens at level ${GRAVEYARD.reviveLevel}.`, `🔒 Воскрешение откроется на ${GRAVEYARD.reviveLevel}-м уровне.`)
           : status.readyToday
             ? tr(`✨ You can revive one fighter today (${candidates} can be revived).`, `✨ Сегодня можно воскресить одного бойца (доступно: ${candidates}).`)
             : tr(`⏳ Next resurrection in ${fmtDuration((status.nextAt ?? now) - now)}.`, `⏳ Следующее воскрешение через ${fmtDuration((status.nextAt ?? now) - now)}.`)}
@@ -369,6 +375,21 @@ function Header({ icon, name, level, desc }: { icon: string, name: string, level
   )
 }
 
+/** Раздел здания; `switch` исчерпывающий — новый BuildingId без раздела не скомпилируется. */
+function buildingSection(id: BuildingId, save: SaveGame, toast: Toast): ReactNode {
+  switch (id) {
+    case "barracks": return <BarracksSection save={save} />
+    case "training": return <TrainingSection save={save} toast={toast} />
+    case "store": return <StoreSection save={save} />
+    case "tavern": return <TavernSection save={save} toast={toast} />
+    case "graveyard": return <GraveyardSection save={save} />
+    default: {
+      const never: never = id
+      return never
+    }
+  }
+}
+
 /** Карточка места: здание (характеристики, улучшение, свой раздел), пустое место (постройка) или резерв. */
 export function BuildingPanel({ plotId, save, toast }: { plotId: string, save: SaveGame, toast: Toast }) {
   const plot = PLOTS.find(p => p.id === plotId)
@@ -386,14 +407,7 @@ export function BuildingPanel({ plotId, save, toast }: { plotId: string, save: S
   const def = buildingDef(id)
   const level = buildingLevel(save, id)
   const status = plotStatus(save, plot)
-  let section: ReactNode = null
-  if (level > 0) {
-    if (id === "barracks") section = <BarracksSection save={save} />
-    else if (id === "training") section = <TrainingSection save={save} toast={toast} />
-    else if (id === "store") section = <StoreSection save={save} />
-    else if (id === "tavern") section = <TavernSection save={save} toast={toast} />
-    else section = <GraveyardSection save={save} />
-  }
+  const section: ReactNode = level > 0 ? buildingSection(id, save, toast) : null
   return (
     <div className="stack">
       <Header icon={def.icon} name={def.name} level={level} desc={def.desc} />

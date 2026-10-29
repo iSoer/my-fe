@@ -18,6 +18,7 @@ import type {
 import { MAX_LEVEL, SQUAD_SIZE, STATS } from "../types"
 import { generateUnit, levelGains, loadoutsAt, unitClassName } from "../units"
 import { addItem } from "../items"
+import { KILLER_FLAG } from "../battle/query"
 import { treatsMultiplier } from "../skills/engine"
 import { LOOT, PRICES, REWARDS, SHOP, XP, recruitRarityWeights } from "@game/content/balance"
 import { EPITAPHS } from "@game/content/epitaphs"
@@ -168,8 +169,6 @@ export function resolveBattle(save: SaveGame, state: BattleState, now: number): 
         levelUps.push({ unitId: u.id, from: u.level, to: merged.level, gains: statDiff(u, merged) })
     }
     else {
-      const killerEvent = [...state.decals]
-      void killerEvent
       const killerId = findKiller(state, u.id)
       const killerName = killerId ? state.roster[killerId]?.name : undefined
       const extra: { killerName?: string, turn?: number, biomeId: string } = {
@@ -266,13 +265,18 @@ function statDiff(a: UnitInstance, b: UnitInstance): Partial<Stats> {
   return out
 }
 
+/**
+ * Кто убил бойца: убийцу помечает редьюсер флагом павшего (`KILLER_FLAG`). Нет флага (погиб от эффекта, бой из
+ * старого сохранения) — ближайший к телу живой враг.
+ */
 function findKiller(state: BattleState, unitId: string): string | undefined {
-  // Последний combat-ивент в логе недоступен (лог не хранится), поэтому ищем по истории: враг с убийствами, ближайший к телу.
   const bu = state.units[unitId]
   if (!bu) return undefined
+  const flagged = Object.keys(bu.flags).find(k => k.startsWith(KILLER_FLAG))
+  if (flagged) return flagged.slice(KILLER_FLAG.length)
   let best: { id: string, d: number } | undefined
   for (const e of Object.values(state.units)) {
-    if (e.side === bu.side) continue
+    if (e.side === bu.side || !e.alive) continue
     const d = Math.abs(e.pos.x - bu.pos.x) + Math.abs(e.pos.y - bu.pos.y)
     if (!best || d < best.d) best = { id: e.unitId, d }
   }

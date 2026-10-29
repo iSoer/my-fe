@@ -8,7 +8,7 @@
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [art/index.ts](../src/game/art/index.ts)       | Публичный вход: `unitArt(unit, opts)` → `CritterArt`, `unitSvg`, `unitPartSvg`, `unitArtKey`, `unitMounted`, `WEAPON_HEX`, реэкспорт остального                                                                                                  |
 | [art/critter.ts](../src/game/art/critter.ts)   | Сборка зверька: `critterSvg`, `critterPortraitSvg`, `critterPartSvg`, `CRITTER_PARTS`, `CRITTER_PART_ANCHORS`, `VIEW` (`0 -28 120 140`), зомби-вариант (`zombieFur`, `zombify`, `zombieRags`)                                                    |
-| [art/look.ts](../src/game/art/look.ts)         | `critterLook(species, breedLook, seed)` → `CritterLook` (уши, хвост, морда, отметина, пух, клок, брови, веснушки, усы, носочки, клык, кудри), `DEFAULT_LOOK`, хеш `lookRand(seed, salt)` без состояния                                           |
+| [art/look.ts](../src/game/art/look.ts)         | `critterLook(species, breedLook, seed)` → `CritterLook` (уши, хвост, морда, отметина, пух, клок, брови, веснушки, усы, носочки, клык, кудри), `DEFAULT_LOOK`, `DRAWABLE_EARS`/`DRAWABLE_TAILS` (какие формы рисует каждый вид; породы сверяет тест), хеш `lookRand(seed, salt)` без состояния                                           |
 | [art/palettes.ts](../src/game/art/palettes.ts) | `FUR_ART` (12 окрасов: `fur`/`belly`/`line`/`dark`/`earInner`, `tabby`), `EYE_ART` (5), `furArt(i)` / `eyeArt(i)` (индекс по модулю), `shade`, `mixColor`, `hex`, `INK`/`BLUSH`/`NOSE`                                                           |
 | [art/outfits.ts](../src/game/art/outfits.ts)   | `CLASS_OUTFITS` (наряд каждого из 54 классов), `outfitOf`, слои наряда (`outfitAura`, `outfitCape`, `outfitBack`, `outfitBody`, `outfitHeadBack`, `outfitHead`), животные (`mountSvg`, `RIDER_TRANSFORM`), отделка яруса `TIER_TRIM`, `hatLift`  |
 | [art/held.ts](../src/game/art/held.ts)         | Оружие в правой лапе: `heldWeaponSvg({ kind, grade, variant, pose, paw, pawSvg, leftPaw })`. Форма — по виду оружия, материал — по грейду (`kit`), отметка — по разновидности (`VARIANT_TRIM`). Есть хват по позам и выпавшее оружие (`DROPPED`) |
@@ -65,7 +65,7 @@
 
 - [scene/svgTextures.ts](../src/game/scene/svgTextures.ts): `unitTexKey(unit, pose, size) = "u:" + unitArtKey(unit, pose) + ":" + size`. Размеры `UNIT_TEX_SIZE`: `map` 128×149 и `cine` 300×350. `ensureUnitTexture(s)` растеризует `unitSvg(unit, { pose })` один раз на ключ. Наборы поз: `MAP_POSES` (без `happy`) и `CINE_POSES` (без `carried`). Части тела — `ensureUnitPartTextures` с ключом `up:…`.
 - `unitArtKey` в [art/index.ts](../src/game/art/index.ts) содержит всё, что меняет картинку: вид, породу, seed, класс, оружейный навык, id оружия, индексы внешности, признаки вожака и врага, позу.
-- [scene/UnitView.ts](../src/game/scene/UnitView.ts) (`class UnitView extends Phaser.GameObjects.Container`): спрайт миниатюры в контейнере `rig`, тень цвета оружия, полоска HP, значок перезарядки Special, глиф движения, плашки баффов и дебаффов. Пока текстура грузится, на месте спрайта стоит плейсхолдер: диск цвета `FUR_PALETTES[...].color` и эмодзи вида. Позы переключаются `setPose`, бег — `setRunning` (смена `idle`/`run` каждые 110 мс). Есть дыхание и моргание (`blink`), походка по типу движения (`Gait`), `takeHit`, `setDead`, `setLifted` («за шкирку»).
+- [scene/UnitView.ts](../src/game/scene/UnitView.ts) (`class UnitView extends Phaser.GameObjects.Container`): спрайт миниатюры в контейнере `rig`, тень цвета оружия, полоска HP, значок перезарядки Special, глиф движения, плашки баффов и дебаффов. Пока текстура грузится, на месте спрайта стоит плейсхолдер: диск цвета `FUR_PALETTES[...].color` (он выводится из `FUR_ART[i].fur`, совпадает с рисунком) и эмодзи вида. Позы переключаются `setPose`, бег — `setRunning` (смена `idle`/`run` каждые 110 мс). Есть дыхание и моргание (`blink`), походка по типу движения (`Gait`), `takeHit`, `setDead`, `setLifted` («за шкирку»).
 - React: [ui/components/UnitAvatar.tsx](../src/game/ui/components/UnitAvatar.tsx) вставляет `unitSvg(unit, { pose, animated, blinkDelay, friendly })` напрямую, без растрового кэша.
 
 ## Жители и главный герой поселения
@@ -75,9 +75,9 @@
 
 ## Галерея
 
-`pnpm dev` → http://localhost:5173/tools/gallery/index.html. Код: [tools/gallery/main.ts](../tools/gallery/main.ts), страница: [tools/gallery/index.html](../tools/gallery/index.html). Галерея показывает позы трёх видов, «снаряжение» по типу движения, 12 окрасов, тайлы и фоны биомов, героя и постройки деревни.
+`pnpm dev` → http://localhost:5173/tools/gallery/index.html. Код: [tools/gallery/main.ts](../tools/gallery/main.ts), страница: [tools/gallery/index.html](../tools/gallery/index.html). Галерея показывает позы трёх видов, все `WEAPON_SKILLS` с грейдами, типы движения с верховыми животными, вожака и зомби, все окрасы `FUR_ART`, каждый класс `CHARACTER_CLASSES` (настоящий боец `generateUnit` → `unitSvg`), тайлы и фоны биомов, героя, каждое здание на всех уровнях (`villageBuildingSvg`), ворота, пустырь и деревья.
 
-Галерея устарела. В секции снаряжения передаются старые id оружия (`claw`, `fang`, `stick`, `slingshot`, `burr`, `bandage`, `howl`, `purr`, `hiss`) вместо `WeaponSkill`. Для них `heldWeaponSvg` выдаёт `undefined` и `rotate(NaN)`. Классы, наряды, породы и `look` галерея не показывает. Её не проверяет `tsc`: `tools` нет в `include` в `tsconfig.json`.
+`tools/gallery` входит в `include` в `tsconfig.json`, так что `pnpm typecheck` ловит устаревшие вызовы арта.
 
 ## Где менять
 

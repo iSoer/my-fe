@@ -12,6 +12,7 @@ import {
 import { FISHER_MUTTERS } from "@game/content/dialogues"
 import { setLang } from "@game/i18n"
 import {
+  BUILDING_IDS,
   FISHER,
   HERO_RETURN,
   HERO_START,
@@ -33,7 +34,7 @@ import { SETTLEMENT_RAIN } from "@game/content/settlement"
 
 const ALL_BUILT = (): SaveGame => {
   const save = createEmptySave(1)
-  for (const id of ["barracks", "training", "store", "graveyard", "tavern"] as const) save.settlement.buildings[id] = { level: 1, builtAt: 1 }
+  for (const id of BUILDING_IDS) save.settlement.buildings[id] = { level: 1, builtAt: 1 }
   return save
 }
 

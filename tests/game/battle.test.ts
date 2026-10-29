@@ -6,7 +6,11 @@ import { generateMap } from "@game/core/map/generate"
 import { generateRoster } from "@game/core/units"
 import type { BattleState, Difficulty } from "@game/core/types"
 import { livingUnits } from "@game/core/battle/query"
-import { makeBattle } from "./helpers"
+import { makeBattle, makeUnit, plainTiles } from "./helpers"
+import { KILLER_FLAG, terrainAt } from "@game/core/battle/query"
+import { posKey, type SaveGame, type UnitInstance } from "@game/core/types"
+import { createEmptySave } from "@game/core/save"
+import { resolveBattle } from "@game/core/progression"
 import { planAssist } from "@game/core/battle/assist"
 import { BATTLE, COMBAT } from "@game/content/balance"
 import { simulateCombat } from "@game/core/combat"
@@ -347,5 +351,225 @@ describe("опыт как в Fire Emblem", () => {
     expect(xpForHeal(10)).toBe(15)
     expect(xpForHeal(20)).toBeGreaterThan(xpForHeal(10))
     expect(xpForHeal(200)).toBe(25)
+  })
+})
+
+describe("Поддержки: перемещения и HP", () => {
+  /** Боец с Поддержкой `assist` на (2,5), союзник на (2,4) — направление «вверх». */
+  const pair = (assist: string, opts: { blocker?: { x: number, y: number } } = {}) => {
+    const b = makeBattle(
+      [
+        { classId: "infantry_sword", pos: { x: 2, y: 5 }, baseStats: { ...flat, hp: 40 }, skills: { assist } },
+        { classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, hp: 40 } }
+      ],
+      [{ classId: "infantry_sword", pos: opts.blocker ?? { x: 5, y: 0 }, stance: "hold" }]
+    )
+    const self = b.players[0]!.id
+    const ally = b.players[1]!.id
+    const run = (st = b.state) => applyAction(st, { type: "assist", unitId: self, to: { x: 2, y: 5 }, targetId: ally })
+    return { b, self, ally, run }
+  }
+
+  it("Перестановка ставит союзника на клетку позади бойца", () => {
+    const { self, ally, run } = pair("as_reposition")
+    const { state } = run()
+    expect(state.units[ally]!.pos).toEqual({ x: 2, y: 6 })
+    expect(state.units[self]!.pos).toEqual({ x: 2, y: 5 })
+  })
+
+  it("Оттащить: боец отступает на клетку, союзник встаёт на его место", () => {
+    const { self, ally, run } = pair("as_drawback")
+    const { state } = run()
+    expect(state.units[self]!.pos).toEqual({ x: 2, y: 6 })
+    expect(state.units[ally]!.pos).toEqual({ x: 2, y: 5 })
+  })
+
+  it("Пируэт переносит бойца за союзника", () => {
+    const { self, ally, run } = pair("as_pivot")
+    const { state } = run()
+    expect(state.units[self]!.pos).toEqual({ x: 2, y: 3 })
+    expect(state.units[ally]!.pos).toEqual({ x: 2, y: 4 })
+  })
+
+  it("Толкнуть сдвигает союзника на 1, Пнуть — на 2; занятая клетка на пути — Поддержка невозможна", () => {
+    const shove = pair("as_shove")
+    expect(shove.run().state.units[shove.ally]!.pos).toEqual({ x: 2, y: 3 })
+    const smite = pair("as_smite")
+    expect(smite.run().state.units[smite.ally]!.pos).toEqual({ x: 2, y: 2 })
+    const blocked = pair("as_smite", { blocker: { x: 2, y: 3 } })
+    expect(planAssist(blocked.b.state, blocked.self, { x: 2, y: 5 }, blocked.ally).valid).toBe(false)
+    expect(() => blocked.run()).toThrow()
+  })
+
+  it("Отдать вкусняшку: −10 HP себе, +10 союзнику; при HP ≤ 10 — нельзя", () => {
+    const { b, self, ally, run } = pair("as_ardent")
+    b.state.units[ally]!.hp = 20
+    const { state, events } = run()
+    expect(state.units[self]!.hp).toBe(30)
+    expect(state.units[ally]!.hp).toBe(30)
+    expect(events.find(e => e.type === "assist")).toMatchObject({ heal: 10, unitHpAfter: 30, targetHpAfter: 30 })
+    b.state.units[self]!.hp = 10
+    expect(planAssist(b.state, self, { x: 2, y: 5 }, ally).valid).toBe(false)
+  })
+
+  it("Поменяться шкурой (v1.1, движок) обменивает HP в пределах максимума", () => {
+    const { b, self, ally } = pair("as_reciprocal")
+    b.state.units[self]!.hp = 35
+    b.state.units[ally]!.hp = 8
+    const plan = planAssist(b.state, self, { x: 2, y: 5 }, ally)
+    expect(plan.valid).toBe(true)
+    expect(plan.selfHpDelta).toBe(8 - 35)
+    expect(plan.targetHpDelta).toBe(35 - 8)
+    b.state.units[self]!.hp = 8
+    expect(planAssist(b.state, self, { x: 2, y: 5 }, ally).valid).toBe(false)
+  })
+
+  it("союзник, сдвинутый Поддержкой в чаще, подбирает ключ и сердечко на новой клетке", () => {
+    const { b, ally, run } = pair("as_shove")
+    const at = { x: 2, y: 3 }
+    b.state.map.expedition = { chests: [], exits: [], pickups: [], elites: [] }
+    b.state.expedition = {
+      keys: { c1: { pos: at } },
+      opened: [],
+      pickups: [{ id: "h1", pos: at, kind: "heart" }],
+      buffs: { team: [], units: {} },
+      found: []
+    }
+    b.state.units[ally]!.hp = 10
+    const { state, events } = run()
+    expect(state.expedition!.keys["c1"]).toEqual({ unitId: ally })
+    expect(state.units[ally]!.hp).toBe(state.units[ally]!.maxHp)
+    expect(events.some(e => e.type === "keyTaken" && e.unitId === ally)).toBe(true)
+    expect(events.some(e => e.type === "pickup" && e.unitId === ally)).toBe(true)
+  })
+})
+
+describe("лечащие спецприёмы", () => {
+  const healers = (special: string) => {
+    const b = makeBattle(
+      [
+        { classId: "infantry_whiteMagic", pos: { x: 2, y: 7 }, baseStats: flat, skills: { special } },
+        { classId: "infantry_sword", pos: { x: 3, y: 7 }, baseStats: { ...flat, hp: 90 } },
+        { classId: "infantry_sword", pos: { x: 0, y: 5 }, baseStats: { ...flat, hp: 90 } }
+      ],
+      [{ classId: "infantry_sword", pos: { x: 5, y: 0 }, stance: "hold" }]
+    )
+    const [h, t, o] = b.players.map(u => u.id) as [string, string, string]
+    b.state.units[h]!.specialCd = 0
+    b.state.units[t]!.hp = 1
+    b.state.units[o]!.hp = 50
+    return { b, h, t, o }
+  }
+
+  it("Мурчание исцеления добавляет +10 к лечению и уходит на перезарядку", () => {
+    const { b, h, t } = healers("sp_imbue")
+    const plan = planAssist(b.state, h, { x: 2, y: 7 }, t)
+    expect(plan.specialTriggered).toBe(true)
+    expect(plan.heal).toBe(5 + healPower(b.players[0]!) + 10)
+    const { state } = applyAction(b.state, { type: "assist", unitId: h, to: { x: 2, y: 7 }, targetId: t })
+    expect(state.units[t]!.hp).toBe(1 + plan.heal)
+    expect(state.units[h]!.specialCd).toBe(1)
+  })
+
+  it("Общий лай лечит остальных союзников на 10 — с событием на каждого — и даёт опыт за всё вылеченное", () => {
+    const { b, h, t, o } = healers("sp_heavenly")
+    const { state, events } = applyAction(b.state, { type: "assist", unitId: h, to: { x: 2, y: 7 }, targetId: t })
+    expect(state.units[o]!.hp).toBe(60)
+    const ev = events.find(e => e.type === "effect" && e.effect.unitId === o)
+    expect(ev).toMatchObject({ effect: { type: "heal", amount: 10, sourceId: h }, hpAfter: 60 })
+    const heal = (events.find(e => e.type === "assist") as { heal: number }).heal
+    expect(events.find(e => e.type === "xp" && e.unitId === h)).toMatchObject({ amount: xpForHeal(heal + 10) })
+  })
+})
+
+describe("стены, подкрепления, стойки, счёт ходов", () => {
+  it("attackWall: два удара ломают стену, клетка становится проходимой; стена вне дальности — ошибка", () => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 5 }, baseStats: flat }],
+      [{ classId: "infantry_sword", pos: { x: 5, y: 0 }, stance: "hold" }],
+      { tiles: plainTiles({ "2,3": "wall_breakable" }) }
+    )
+    const id = b.players[0]!.id
+    const wall = { x: 2, y: 3 }
+    expect(b.state.walls[posKey(wall)]).toBe(BATTLE.wallHp)
+    expect(() => applyAction(b.state, { type: "attackWall", unitId: id, to: { x: 2, y: 5 }, wall })).toThrow()
+    let r = applyAction(b.state, { type: "attackWall", unitId: id, to: { x: 2, y: 4 }, wall })
+    expect(r.events.find(e => e.type === "wallHit")).toMatchObject({ hpAfter: 1 })
+    expect(r.state.units[id]!.acted).toBe(true)
+    expect(terrainAt(r.state, wall)).toBe("wall_breakable")
+    const s = applyAction(applyAction(r.state, { type: "endPhase" }).state, { type: "endPhase" }).state
+    r = applyAction(s, { type: "attackWall", unitId: id, to: { x: 2, y: 4 }, wall })
+    expect(r.state.walls[posKey(wall)]).toBe(0)
+    expect(terrainAt(r.state, wall)).toBe("plain")
+  })
+
+  it("подкрепление на занятой клетке встаёт на ближайшую свободную проходимую (поиск в ширину)", () => {
+    const wave = makeUnit({ classId: "infantry_sword", pos: { x: 2, y: 0 } }, true)
+    const b = makeBattle(
+      [
+        { classId: "infantry_sword", pos: { x: 2, y: 0 } },
+        { classId: "infantry_sword", pos: { x: 1, y: 0 } },
+        { classId: "infantry_sword", pos: { x: 3, y: 0 } },
+        { classId: "infantry_sword", pos: { x: 2, y: 1 } }
+      ],
+      [{ classId: "infantry_sword", pos: { x: 5, y: 7 }, stance: "hold" }],
+      { reinforcements: [{ turn: 1, units: [{ unit: wave, pos: { x: 2, y: 0 } }] }] }
+    )
+    const { state, events } = applyAction(b.state, { type: "endPhase" })
+    expect(state.units[wave.id]?.pos).toEqual({ x: 4, y: 0 })
+    expect(events.some(e => e.type === "reinforcements" && e.unitIds.includes(wave.id))).toBe(true)
+  })
+
+  it("враг из guard, чья цель выжила, переходит в наступление; добил — стойка из действия", () => {
+    const duel = (playerHp: number) => {
+      const b = makeBattle(
+        [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: { ...flat, hp: 90 } }],
+        [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: { ...flat, hp: 90, str: 20 }, stance: "guard" }]
+      )
+      b.state.phase = "enemy"
+      b.state.units[b.players[0]!.id]!.hp = playerHp
+      const e = b.enemies[0]!.id
+      const r = applyAction(b.state, { type: "attack", unitId: e, to: { x: 2, y: 3 }, targetId: b.players[0]!.id, newStance: "guard" })
+      return r.state.units[e]!.stance
+    }
+    expect(duel(90)).toBe("advance")
+    expect(duel(1)).toBe("guard")
+  })
+
+  it("stats.turns считает текущий ход с первого", () => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 7 } }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 0 }, stance: "hold" }]
+    )
+    expect(b.state.stats.turns).toBe(1)
+    const s = applyAction(applyAction(b.state, { type: "endPhase" }).state, { type: "endPhase" }).state
+    expect(s.stats.turns).toBe(2)
+  })
+
+  it("павший помнит убийцу: Мемориал называет его, а не ближайшего (тем более мёртвого) врага", () => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: flat }],
+      [
+        { classId: "infantry_bow", pos: { x: 2, y: 2 }, baseStats: { ...flat, str: 40 } },
+        { classId: "infantry_sword", pos: { x: 3, y: 4 }, baseStats: flat, stance: "hold" }
+      ]
+    )
+    const p = b.players[0]!
+    const [archer, near] = b.enemies as [UnitInstance, UnitInstance]
+    b.state.phase = "enemy"
+    const { state } = applyAction(b.state, { type: "attack", unitId: archer.id, to: { x: 2, y: 2 }, targetId: p.id })
+    expect(state.units[p.id]!.alive).toBe(false)
+    expect(state.units[p.id]!.flags[`${KILLER_FLAG}${archer.id}`]).toBe(1)
+    const save: SaveGame = {
+      ...createEmptySave(1),
+      army: { id: "a", units: b.players, squadIds: [p.id], createdAt: 1, battles: 0, wins: 0 }
+    }
+    const done = { ...state, result: "defeat" as const }
+    expect(resolveBattle(save, done, 5000).memorial.at(-1)?.killerName).toBe(archer.name)
+    // Без отметки — ближайший живой враг: мёртвый сосед не в счёт
+    const legacy = structuredClone(done)
+    legacy.units[p.id]!.flags = {}
+    legacy.units[near.id]!.alive = false
+    expect(resolveBattle(save, legacy, 5000).memorial.at(-1)?.killerName).toBe(archer.name)
   })
 })

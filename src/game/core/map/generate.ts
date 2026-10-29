@@ -146,7 +146,9 @@ export function pickEnemyLoadout(rng: Rng, level: number, roles: EnemyRoles, dif
       w *= 3
     return w
   }
-  return rng.weighted(pool.map(l => ({ item: l, w: weightOf(l) })))
+  const items = pool.map(l => ({ item: l, w: weightOf(l) }))
+  // Все веса обнулились поправками (одни лекари и танцоры на уровне) — тогда по базовым весам, а не исключение
+  return rng.weighted(items.some(i => i.w > 0) ? items : pool.map(l => ({ item: l, w: l.weight })))
 }
 
 export function makeEnemy(
@@ -301,9 +303,14 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
     enemies.push({ unit, pos, stance })
   })
   if (diff.boss) {
-    // Босс стоит дальше всех — в ряду 0 по центру, если свободно
+    // Босс стоит дальше всех — в ряду 0 по центру, если свободно. Только на клетке, куда пехота игрока может
+    // дойти: проверка карты допускает до 20 % отрезанных спавнов, а цель «Победить вожака» обязана быть выполнима
     const boss = enemies.find(e => e.unit.isBoss)
-    const far = [...enemySpawns].sort((a, b) => a.y - b.y || Math.abs(a.x - 2.5) - Math.abs(b.x - 2.5))[0]
+    const first = playerSpawns[0]
+    const reach = first ? bfsReach(tiles, first, "infantry") : new Set<string>()
+    const far = [...enemySpawns]
+      .sort((a, b) => a.y - b.y || Math.abs(a.x - 2.5) - Math.abs(b.x - 2.5))
+      .find(p => reach.has(posKey(p)))
     if (boss && far) {
       const other = enemies.find(e => e.pos.x === far.x && e.pos.y === far.y)
       if (other && other !== boss) other.pos = boss.pos
@@ -317,11 +324,17 @@ export function generateMap(opts: GenerateMapOptions): MapDef {
   const reinforcements: ReinforcementWave[] = []
   const rrng = root.fork("reinforcements")
   const topFree = cells().filter(p => p.y === 0 && isPassable(get(tiles, p), "infantry"))
+  // Запас клеток, если волна больше свободного ряда 0: следующие ряды сверху вниз, ближе к центру — первыми
+  // (без случайности: волны, умещающиеся в ряд 0, раскладываются как прежде)
+  const spill = cells()
+    .filter(p => p.y > 0 && p.y <= 2 && isPassable(get(tiles, p), "infantry"))
+    .sort((a, b) => a.y - b.y || Math.abs(a.x - 2.5) - Math.abs(b.x - 2.5) || a.x - b.x)
   for (const wave of diff.reinforcements) {
     const units: ReinforcementWave["units"] = []
     const spots = rrng.shuffle(topFree)
-    for (let i = 0; i < wave.count; i++) {
-      const pos = spots[i % Math.max(1, spots.length)] ?? { x: i, y: 0 }
+    if (wave.count > spots.length) spots.push(...spill)
+    for (let i = 0; i < Math.min(wave.count, spots.length); i++) {
+      const pos = spots[i] as Pos
       const level = levelOf()
       const loadout = pickEnemyLoadout(
         rrng,

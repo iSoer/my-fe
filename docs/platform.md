@@ -9,7 +9,7 @@ my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Пла�
 3. `setStorageNamespace(userNamespace())`: ключ сейва зависит от пользователя Telegram.
 4. Только в продакшене: `initPwa({ getSerwist, beforeReload: flushPersist })`.
 5. `setGameHost({ Overlay: PwaBanners, SettingsSection: AppCard, haptic: tgHaptic })`.
-6. `await reconcileCloudSave()`. Если есть конфликт, показывается `ConflictScreen`, иначе сразу `start()`.
+6. `await reconcileCloudSave()`. `newer` (сейв более новой версии игры) — `NewerSaveScreen`, игра не стартует; конфликт — `ConflictScreen`; иначе сразу `start()`.
 7. `start()`:
    - `root.render(<GameRoot />)`;
    - `startCloudMirror()`;
@@ -48,9 +48,12 @@ my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Пла�
   - SW регистрируется после `load`;
   - сторы `$updateReady`, `$offlineReady`, `$installPrompt`, `$isStandalone`, `$online`;
   - обновления проверяются раз в `UPDATE_CHECK_INTERVAL_MS = 30 мин` и при возврате на вкладку;
-  - `applyUpdate()` вызывает `beforeReload()` (`flushPersist`) и `messageSkipWaiting()`, перезагружается по событию `controlling` или через 4 с;
+  - `applyUpdate()` вызывает `beforeReload()` (`flushPersist`) и `messageSkipWaiting()`, перезагружается по `controllerchange` или через 4 с;
+  - если новый SW взял управление по команде другой вкладки (`controllerchange` без своего `applyUpdate`; первый захват при установке не считается), старые кэши уже удалены — вкладка перезагружается на новую версию, но не в бою и не на итогах: там перезагрузка откладывается до ухода с этих маршрутов;
+  - `vite:preloadError` (ленивый чанк старой версии не загрузился): вне боя и итогов — `preventDefault` и перезагрузка (не чаще раза в `CHUNK_RELOAD_GUARD_MS = 15 с`, метка в `sessionStorage`), в бою и на итогах — отложенная перезагрузка;
+  - `updateAndReload()` — для `NewerSaveScreen`: `registration.update()`, активировать скачанный SW и перезагрузиться;
   - `promptInstall()`, `requestPersistence()` (в установленном приложении), `storageEstimate()`.
-- Баннер обновления не показывается на маршрутах `NO_RELOAD_ROUTES = {battle, battleResult}`.
+- Баннер обновления не показывается на маршрутах `NO_RELOAD_ROUTES = {battle, battleResult}` (`canReloadOn` в pwa.ts).
 - Манифест и иконки лежат в [public](../public). Иконки генерирует `pnpm icons` ([tools/gen-icons.mjs](../tools/gen-icons.mjs)) из процедурного арта, результат коммитится.
 
 ## Сборка и деплой
@@ -61,7 +64,7 @@ my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Пла�
   - все файлы `dist` (кроме `sw.js` и `404.html`) попали в precache;
   - общий размер не больше 10 МБ.
 - `VITE_BASE_PATH` задаёт `base` Vite и scope SW. Для Pages это `/<repo>/`, для локальных смоуков — `/my-fe/`.
-- CI в [.github/workflows/deploy.yml](../.github/workflows/deploy.yml): на push в `main` и вручную. Шаги: Node 22, `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm test`, `pnpm build` с `VITE_BASE_PATH=/${repo}/`, затем `upload-pages-artifact` и `deploy-pages`. Смоуки в CI не запускаются. `concurrency: pages` с `cancel-in-progress: true`.
+- CI в [.github/workflows/deploy.yml](../.github/workflows/deploy.yml): на push в `main` и вручную. Шаги: Node 22, `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm test`, `pnpm build` с `VITE_BASE_PATH=/${repo}/`, затем `upload-pages-artifact` и `deploy-pages`. Смоуки в CI не запускаются. Сборка — в группе `pages-build-<ref>` с `cancel-in-progress: true`, деплой — в группе `pages` с `cancel-in-progress: false` (идущий деплой не обрывается, следующий ждёт).
 
 ## Где менять
 

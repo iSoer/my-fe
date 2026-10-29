@@ -4,7 +4,7 @@ import {
   MOVEMENT_SKILLS, WEAPON_SKILLS, meanSkillShift, rankAtLevel, rankIndex, ranksAtLevel, type Aptitudes, type Rank, type Ranks, type Skill
 } from "./skills"
 
-// Classes of Fire Emblem: Fortune's Weave and when a character may take them (docs/character-model.md, "Классы")
+// Classes of Fire Emblem: Fortune's Weave and when a character may take them (docs/classes.md)
 
 export const CLASS_TIERS = ["beginner", "specialty", "advanced", "master", "divine"] as const
 
@@ -171,7 +171,8 @@ export const movementOf = (item: CharacterClass): Movement => {
       : required.includes("heavyArmor") ? "armored" : "infantry"
 }
 
-const FLIER_MOUNTS: Record<string, Mount> = {
+/** Who each flier class rides: every flier class needs an entry, or it flies with no mount */
+export const FLIER_MOUNTS: Record<string, Mount> = {
   "wing-soldier": "pegasus",
   "celestial-trooper": "pegasus",
   "dragoon": "dragon",

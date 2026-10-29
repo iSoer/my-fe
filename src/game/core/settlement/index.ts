@@ -9,11 +9,11 @@ import type {
   TrainingSlot,
   UnitInstance
 } from "../types"
-import { SQUAD_SIZE } from "../types"
+import { MAX_LEVEL, SQUAD_SIZE } from "../types"
 import { createRng } from "../rng"
 import { gainXp } from "../progression"
 import { EMPTY_STORE, generateStore, itemPrice } from "../items"
-import { equipWeapon } from "../units"
+import { equipWeapon, isUniqueClassId } from "../units"
 import { invalidateKit } from "../skills/engine"
 import {
   BARRACKS,
@@ -29,6 +29,7 @@ import {
   type PlotDef
 } from "@game/content/settlement"
 import { gradeWeaponId, weaponDef } from "@game/content/weapons"
+import { XP } from "@game/content/balance"
 import { tr } from "@game/i18n"
 
 // Поселение: строительство и улучшение зданий, вместимость Казарм, тренировки, витрина Лавки и воскрешение.
@@ -225,17 +226,29 @@ export function stopTraining(save: SaveGame, unitId: string, now: number): Outco
   }
 }
 
+/** Сколько опыта боец ещё может получить до максимального уровня (на максимуме — 0). */
+function xpRoom(u: UnitInstance): number {
+  return u.level >= MAX_LEVEL ? 0 : (MAX_LEVEL - u.level) * XP.perLevel - u.xp
+}
+
+/**
+ * Начислить опыт тренирующимся. В счётчик слота (`xp`, «+N опыта» на панели) идёт только реально полученный
+ * опыт: на максимальном уровне он не копится.
+ */
 function giveXp(save: SaveGame, gains: Map<string, number>): { save: SaveGame, levelUps: LevelUpSummary[] } {
   if (!save.army || gains.size === 0) return { save, levelUps: [] }
   const levelUps: LevelUpSummary[] = []
+  const received = new Map<string, number>()
   const units = save.army.units.map((u) => {
-    const xp = gains.get(u.id) ?? 0
+    const xp = Math.min(gains.get(u.id) ?? 0, xpRoom(u))
     if (xp <= 0) return u
+    received.set(u.id, xp)
     const r = gainXp(u, xp)
     levelUps.push(...r.levelUps)
     return r.unit
   })
-  return { save: { ...save, army: { ...save.army, units } }, levelUps }
+  const training = save.settlement.training.map(t => (received.has(t.unitId) ? { ...t, xp: t.xp + (received.get(t.unitId) ?? 0) } : t))
+  return { save: { ...save, army: { ...save.army, units }, settlement: { ...save.settlement, training } }, levelUps }
 }
 
 /** Убрать с полигона тех, кого больше нет в ростере (пал, отпущен, вся армия погибла): их тренировка окончена. */
@@ -267,7 +280,7 @@ export function settleTraining(save: SaveGame, now: number): { save: SaveGame, l
     const xp = Math.floor(total / msPerXp)
     changed = true
     if (xp > 0) gains.set(t.unitId, xp)
-    return { ...t, lastTick: now, carryMs: total - xp * msPerXp, xp: t.xp + xp }
+    return { ...t, lastTick: now, carryMs: total - xp * msPerXp }
   })
   if (!changed) return { save: pruned, levelUps: [] }
   return giveXp({ ...pruned, settlement: { ...pruned.settlement, training } }, gains)
@@ -287,8 +300,7 @@ export function applySortieTraining(save: SaveGame, battleId: string, now: numbe
     return { save: { ...s, settlement: { ...s.settlement, sortiesTrained } }, levelUps: settled.levelUps }
   const bonus = atLevel(TRAINING.sortieXp, level)
   const gains = new Map(s.settlement.training.map(t => [t.unitId, bonus]))
-  const training = s.settlement.training.map(t => ({ ...t, xp: t.xp + bonus }))
-  const given = giveXp({ ...s, settlement: { ...s.settlement, training, sortiesTrained } }, gains)
+  const given = giveXp({ ...s, settlement: { ...s.settlement, sortiesTrained } }, gains)
   return { save: given.save, levelUps: [...settled.levelUps, ...given.levelUps] }
 }
 
@@ -401,6 +413,9 @@ export function canRevive(save: SaveGame, entryId: string, now: number): Check {
     return { ok: false, error: tr(`Resurrection opens at Graveyard level ${GRAVEYARD.reviveLevel}`, `Воскрешение откроется на ${GRAVEYARD.reviveLevel}-м уровне Кладбища`) }
   if (!status.readyToday) return { ok: false, error: tr("Someone was already revived today", "Сегодня уже воскрешали") }
   if (freeRosterSlots(save) === 0) return { ok: false, error: tr("The Barracks are full", "В Казармах нет мест") }
+  // Божественный класс — один на армию: пока он у другого бойца, павшего с тем же классом не вернуть
+  if (isUniqueClassId(entry.unit.classId) && save.army?.units.some(u => u.classId === entry.unit.classId))
+    return { ok: false, error: tr("Another fighter already has this divine class", "Божественный класс уже у другого бойца") }
   return { ok: true }
 }
 

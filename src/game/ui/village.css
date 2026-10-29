@@ -73,9 +73,10 @@
     font-weight: 900;
   }
   /* Нижняя панель: сразу к месту на карте; «Вылазка» — главное действие */
+  /* --st-buildings — число зданий, его ставит SettlementScreen (BUILDING_IDS.length); последняя колонка — ворота */
   .st-dock {
     display: grid;
-    grid-template-columns: repeat(5, 1fr) 1.2fr;
+    grid-template-columns: repeat(var(--st-buildings, 5), 1fr) 1.2fr;
     gap: 6px;
     width: 100%;
     max-width: 620px;
@@ -148,7 +149,7 @@
     border-color: #ffb703;
     animation: st-guide 1.4s ease-in-out infinite;
   }
-  /* Телефоны: шесть кнопок не делятся поровну — ширина каждой по своей подписи («Бару» хватает меньше) */
+  /* Телефоны: кнопки не делятся поровну — ширина каждой по своей подписи («Бару» хватает меньше) */
   @media (max-width: 430px) {
     .st-dock {
       display: flex;
@@ -157,7 +158,7 @@
       flex: 1 0 auto;
       min-width: 42px;
     }
-    /* «построить» не помещается в шесть кнопок — непостроенное и так видно по серой иконке и фону */
+    /* «построить» не помещается в узкие кнопки — непостроенное и так видно по серой иконке и фону */
     .st-dock-hint {
       display: none;
     }

@@ -21,6 +21,8 @@ interface Bubble {
   /** Плашка без хвостика, w × h, и высота вместе с хвостиком. */
   w: number
   h: number
+  /** Появление доиграло: дальше масштаб держит fit() (зум камеры меняется при ресайзе). */
+  shown: boolean
 }
 
 const INK = 0x2a1d10
@@ -70,10 +72,10 @@ export class SpeechBubbles {
     const box = s.add.container(0, 0, caption ? [g, label, caption] : [g, label])
     const scale = 1 / this.zoom()
     const root = s.add.container(head.x, head.y - 2, [box, tip]).setDepth(9600).setScale(scale * 0.6).setAlpha(0)
-    const bubble: Bubble = { owner, root, box, w, h: h + TAIL }
+    const bubble: Bubble = { owner, root, box, w, h: h + TAIL, shown: false }
     this.list.push(bubble)
     this.fit(bubble)
-    s.tweens.add({ targets: root, alpha: 1, scale, duration: reducedMotion() ? 0 : 180, ease: "Back.easeOut" })
+    s.tweens.add({ targets: root, alpha: 1, scale, duration: reducedMotion() ? 0 : 180, ease: "Back.easeOut", onComplete: () => { bubble.shown = true } })
     s.tweens.add({ targets: root, alpha: 0, delay: hold * 1000, duration: 350, onComplete: () => this.drop(bubble) })
   }
 
@@ -119,6 +121,8 @@ export class SpeechBubbles {
   private fit(b: Bubble): void {
     const view = this.scene.cameras.main.worldView
     const k = 1 / this.zoom()
+    // Экранный размер: после ресайза зум другой — подгоняем масштаб
+    if (b.shown && b.root.scale !== k) b.root.setScale(k)
     const gap = 8 * k
     const half = (b.w / 2) * k
     const x = b.root.x

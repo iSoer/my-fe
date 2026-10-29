@@ -3,7 +3,7 @@ import { useStore } from "@nanostores/react"
 import type { BattleState } from "@game/core/types"
 import { biomeDef } from "@game/content/biomes"
 import { $settings, updateSettings } from "@game/state/save"
-import { retreat } from "@game/state/battleUi"
+import { $battleUi, retreat } from "@game/state/battleUi"
 import { Button } from "../components/Button"
 import { ConfirmModal, Modal } from "../components/Sheet"
 import { $pauseOpen } from "../lib/pause"
@@ -15,6 +15,8 @@ export function PauseModal({ battle }: { battle: BattleState }) {
   const open = useStore($pauseOpen)
   const settings = useStore($settings)
   const [retreatAsk, setRetreatAsk] = useState(false)
+  // Пока идёт ход врага или анимация, отступить нельзя (retreat() это и так отклонит)
+  const busy = useStore($battleUi).busy
   const biome = biomeDef(battle.map.biomeId)
   return (
     <>
@@ -91,13 +93,13 @@ export function PauseModal({ battle }: { battle: BattleState }) {
           <Button primary block onClick={() => $pauseOpen.set(false)}>
             {tr("Resume", "Продолжить")}
           </Button>
-          <Button danger block onClick={() => setRetreatAsk(true)}>
+          <Button danger block disabled={busy} onClick={() => setRetreatAsk(true)}>
             {tr("Retreat", "Отступить")}
           </Button>
         </div>
       </Modal>
       <ConfirmModal
-        open={retreatAsk}
+        open={retreatAsk && !busy}
         title={tr("Retreat?", "Отступить?")}
         text={tr(
           "You keep three quarters of the Treats you’ve looted, no victory bonus. The fallen stay dead, XP is kept.",

@@ -34,7 +34,7 @@
 
 | id          | Название (en / ru)                         | Значок | Назначение                                                                | Цена: постройка · 1→2 · 2→3 · 3→4 · 4→5 | Всего | Параметры по уровням 1…5                                                                                                                        |
 | ----------- | ------------------------------------------ | ------ | ------------------------------------------------------------------------- | --------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `barracks`  | Barracks / Казармы                         | 🛡️     | Ростер бойцов. Стоит с начала игры (`starter: true`, `defaultSettlement`) | 0 · 150 · 350 · 700 · 1400              | 2600  | `BARRACKS.capacity` = 8, 11, 14, 17, 20 бойцов в ростере                                                                                        |
+| `barracks`  | Barracks / Казармы                         | 🛡️     | Ростер бойцов. Стоит с начала игры (`defaultSettlement`) | 0 · 150 · 350 · 700 · 1400              | 2600  | `BARRACKS.capacity` = 8, 11, 14, 17, 20 бойцов в ростере                                                                                        |
 | `training`  | Training Ground / Тренировочный полигон    | 🎯     | Бойцы получают опыт со временем и за каждую вылазку, но в бой не идут     | 120 · 200 · 400 · 800 · 1500            | 3020  | `TRAINING.capacity` = 1, 2, 4, 6, 8 мест; `xpPerHour` = 10, 12, 14, 17, 20; `sortieXp` = 10, 12, 15, 18, 20                                     |
 | `store`     | Trading Post / Торговая лавка              | 🛒     | Оружие и талисманы, витрина меняется по времени                           | 80 · 180 · 380 · 750 · 1400             | 2790  | `STORE.offers` = 6, 8, 10, 12, 14 позиций; `discount` = 0, 5, 10, 15, 20 %; `refreshHours = 4`; каждая 3-я позиция — талисман (`talismanEvery`) |
 | `graveyard` | Graveyard / Кладбище                       | 🪦     | Хранит имена павших; с 5-го уровня воскрешает одного бойца в игровой день | 60 · 150 · 350 · 800 · 2000             | 3360  | `GRAVEYARD.reviveLevel = 5`                                                                                                                     |
@@ -69,7 +69,7 @@
   - каждая единица опыта стоит `3 600 000 / xpPerHour` мс;
   - дробный остаток копится в `carryMs`;
   - если часы переведены назад, отсчёт начинается заново без опыта;
-  - опыт идёт через `gainXp`, поэтому на максимальном уровне он не копится.
+  - опыт идёт через `gainXp`, поэтому на максимальном уровне он не копится. В счётчик слота `TrainingSlot.xp` (строка «+N опыта» на панели) попадает только реально полученный опыт: на максимуме он не растёт.
 - `applySortieTraining(save, battleId, now)` начисляет бонус `sortieXp` каждому тренирующемуся один раз за бой. Последние 20 id боёв хранятся в `sortiesTrained` (`SORTIES_REMEMBERED`). Вызывается из `finishBattle` в [state/save.ts](../src/game/state/save.ts).
 - `pruneTraining` снимает с полигона тех, кого больше нет в ростере.
 - `stopTraining` и `collectAction` сначала начисляют опыт, потом освобождают слот.
@@ -95,7 +95,7 @@
   - добавляет его в отряд, если там меньше `SQUAD_SIZE` бойцов;
   - ставит записи `revivedAt` и запоминает `settlement.lastReviveAt`.
 
-  Если в Казармах нет мест, сейв не меняется.
+  Если в Казармах нет мест, сейв не меняется. Божественный класс — один на армию (`isUniqueClassId`): пока такой же божественный класс у живого бойца, `canRevive` отказывает.
 
 ### Бар
 
@@ -233,12 +233,12 @@ Phaser грузится лениво: `SettlementScreen` вызывает `impor
   - Под воротами рисуется ряд «за околицей» (`OUTSIDE_ROWS = 1`), а в нём горящие глаза (`EYES_X`).
   - 8 факелов (`TORCHES`) с аддитивным мерцающим свечением.
   - Для каждого участка — спрайт пустого участка (`villagePlotSvg`) и спрайт здания текущего уровня. Ключ текстуры здания — `st:building:<plotId>:<level>`. Виден один из двух спрайтов.
-  - Высота спрайта над участком — `buildingOver`: у домиков `HOUSE_ROOF_OVER = 1.4`, у полигона `TRAINING_H − h`, у Кладбища `GRAVEYARD_H_OVER = 0.5`. Сам SVG — `buildingSvg`: `villageHouseSvg` с цветами крыши и стен, `villageTrainingSvg` или `villageGraveyardSvg`.
+  - Высота спрайта над участком — `buildingOver`: у домиков `HOUSE_ROOF_OVER = 1.4`, у полигона `TRAINING_H − h`, у Кладбища `GRAVEYARD_H_OVER = 0.5`. Сам SVG — `villageBuildingSvg(id, w, h, level)` в [art/village.ts](../src/game/art/village.ts) (исчерпывающий `switch`): `villageHouseSvg` с цветами крыши и стен, `villageTrainingSvg` или `villageGraveyardSvg`. Его же показывает галерея арта.
   - Вид здания зависит от уровня через `buildingWear(level)`: 1, 0.78, 0.58, 0.4, 0.25. Чем выше уровень, тем меньше разрушений, но совсем целым здание не бывает.
-- Глубина — y нижней кромки (`setDepth(bottom)`), так объекты сортируются по y. Подписи — 9000+, вывески — 9500+, облачка — 9600, джойстик — 20000.
+- Глубина — y нижней кромки (`setDepth(bottom)`), так объекты сортируются по y. Глубину героя меняют только когда она изменилась: `setDepth` всегда ставит сортировку всего списка (~1000 тайлов). Подписи — 9000+, вывески — 9500+, облачка — 9600, джойстик — 20000.
 - Раз в 0,5 с вызывается `refreshSigns()`. Она запрашивает `opts.signs()` (это `placeSigns($save.get())`) и `opts.npcAlerts()` и делает следующее:
   - показывает или прячет здания и жителей;
-  - меняет текстуру при улучшении: нужная догружается, пока висит прежняя;
+  - меняет текстуру при улучшении: нужная догружается, пока висит прежняя (`retryBuilding`: одна попытка за раз, не больше `BUILDING_RETRIES = 3` — если SVG не растеризуется, остаётся прежняя);
   - подсвечивает участки (`available` — тёплый оттенок, `locked` — серый);
   - перерисовывает плашки, только если строка `title|sub|status|guide|built` изменилась;
   - показывает «!» над местом (`PlaceSign.alert`), стрелку следующего шага (`guide`) и «!» над жителем с новой сюжетной сценой.
@@ -254,7 +254,7 @@ Phaser грузится лениво: `SettlementScreen` вызывает `impor
 
 - [SettlementScreen.tsx](../src/game/ui/screens/SettlementScreen.tsx):
   - верхняя панель: 🏠, `ResourceBar`, ⚙️;
-  - нижняя панель `st-dock` с кнопками `[...BUILDING_IDS, "gate"]`; кнопка переносит героя ко входу и открывает карточку. В CSS сетка прибита к 6 колонкам: `grid-template-columns: repeat(5, 1fr) 1.2fr` в [village.css](../src/game/ui/village.css);
+  - нижняя панель `st-dock` с кнопками `[...BUILDING_IDS, "gate"]`; кнопка переносит героя ко входу и открывает карточку. Сетка — `repeat(var(--st-buildings), 1fr) 1.2fr` в [village.css](../src/game/ui/village.css); `--st-buildings` = `BUILDING_IDS.length` ставит `SettlementScreen`, так что новое здание получает колонку само;
   - `BottomSheet` с `BuildingPanel` или `GatePanel`;
   - `DialogueBox`;
   - тосты о новых уровнях с полигона.
@@ -269,7 +269,8 @@ Phaser грузится лениво: `SettlementScreen` вызывает `impor
   - `Header` — значок, имя, `LevelPips`, описание;
   - `Stats` — текущий уровень → следующий, из `def.stats(level)`;
   - `GrowthBlock` — кнопка постройки или улучшения с ценой и причиной отказа;
-  - раздел здания: `BarracksSection`, `TrainingSection`, `StoreSection`, `TavernSection`, `GraveyardSection`. Раздел выбирает цепочка `if/else`; последний `else` — Кладбище.
+  - раздел здания: `BarracksSection`, `TrainingSection`, `StoreSection`, `TavernSection`, `GraveyardSection`. Раздел выбирает `buildingSection` — исчерпывающий `switch` по `BuildingId` с проверкой `never`: без раздела новое здание не скомпилируется.
+  - `GrowthBlock` защищён от двойного тапа: `useRef`-замок снимается после перерисовки с новым уровнем (или после ошибки); уровень в тосте берётся из нового сейва.
 - `GatePanel` показывает одно из трёх: «Вернуться в бой», «В Казармы» (если нет бойцов или отряда) или «Собрать вылазку» → `#/battle/setup`.
 
 ## Отладка
@@ -301,7 +302,7 @@ __pf.save.set({ ...__pf.save.get(), profile: { ...__pf.save.get().profile, treat
 - **Цены, уровни, параметры зданий** — `BUILDINGS[id].cost` и таблицы `BARRACKS`, `TRAINING`, `STORE`, `TAVERN_MENU`, `GRAVEYARD` в [content/settlement.ts](../src/game/content/settlement.ts). Напитки — [content/tavern.ts](../src/game/content/tavern.ts).
 - **Правила** (что можно и когда) — [core/settlement/index.ts](../src/game/core/settlement/index.ts), [core/settlement/tavern.ts](../src/game/core/settlement/tavern.ts).
 - **Карта, участки, жители, точки появления** — `SETTLEMENT_TILES`, `PLOTS`, `NPCS`, `FISHER`, `GOSSIP_SPOTS`, `HERO_*` в [content/settlement.ts](../src/game/content/settlement.ts). После правок запустите `pnpm vitest run tests/game/settlementMap.test.ts tests/game/gossips.test.ts`.
-- **Вид зданий** — [art/village.ts](../src/game/art/village.ts), а также `buildingSvg` и `buildingOver` в [SettlementScene.ts](../src/game/scene/settlement/SettlementScene.ts).
+- **Вид зданий** — [art/village.ts](../src/game/art/village.ts), а `villageBuildingSvg` там же; `buildingOver` — в [SettlementScene.ts](../src/game/scene/settlement/SettlementScene.ts).
 - **Карточка здания** — [BuildingPanel.tsx](../src/game/ui/settlement/BuildingPanel.tsx). Подсказки «!» — `placeAlerts` в [state/settlement.ts](../src/game/state/settlement.ts).
 - **Схема сейва** — `settlementSchema`, `SAVE_VERSION`, `MIGRATIONS` в [core/save/index.ts](../src/game/core/save/index.ts).
 - **Игровой день** — `GAME_DAY`. **Дождь** — `SETTLEMENT_RAIN`.

@@ -23,6 +23,7 @@ import { terrainAt, unitAt } from "@game/core/battle/query"
 import { $save, dispatchBattle } from "./save"
 import { haptic } from "@game/platform/haptics"
 import { sfx } from "@game/platform/audio"
+import { tr } from "@game/i18n"
 
 /**
  * Управление в духе Fire Emblem Heroes, без меню действий и «Ждать»:
@@ -107,7 +108,32 @@ export interface Presenter {
 
 let presenter: Presenter | null = null
 export function setPresenter(p: Presenter | null): void {
+  // Старый презентер уходит вместе со своей Phaser-игрой: его недоигранные анимации не дождаться
+  if (p !== presenter) releasePlays()
   presenter = p
+}
+
+/**
+ * Сеанс экрана боя. Вход и уход с экрана меняют номер: циклы прошлого сеанса (ход врага, ожидание анимаций)
+ * после ближайшего await видят чужой номер и молча выходят. Состояние боя от этого не страдает: редьюсер
+ * уже применил и сохранил каждое действие, остановилось только проигрывание. При возврате на экран
+ * `enterBattleScreen` продолжит ход врага с того места, где он прервался.
+ */
+let session = 0
+/** Ожидающие окончания `presenter.play`: при уходе с экрана или смене презентера отпускаются сразу. */
+const pendingPlays = new Set<() => void>()
+
+function releasePlays(): void {
+  const all = [...pendingPlays]
+  pendingPlays.clear()
+  for (const release of all) release()
+}
+
+/** Уход с экрана боя: прервать проигрывание и циклы контроллера, сбросить интерфейс. */
+export function leaveBattleScreen(): void {
+  session++
+  releasePlays()
+  $battleUi.set({ ...BASE })
 }
 
 let onEnded: ((state: BattleState) => void) | null = null
@@ -160,6 +186,8 @@ export function setFastForward(on: boolean): void {
 }
 
 export function enterBattleScreen(): void {
+  session++
+  releasePlays()
   const st = state()
   const settings = $save.get().settings
   $battleUi.set({ ...BASE, mode: st?.result ? "ended" : "idle", dangerOn: settings.dangerZoneDefault })
@@ -541,7 +569,7 @@ async function moveTo(unitId: string, to: Pos, animate: boolean): Promise<void> 
   const extra = animate ? [] : result.events.filter(e => e.type === "chestOpened" || e.type === "keyTaken")
   if (animate || extra.length > 0) {
     patch({ ...NO_PREVIEW, mode: "busy", busy: true })
-    await playEvents(animate ? result.events : extra, before, result.state)
+    if (!(await playEvents(animate ? result.events : extra, before, result.state))) return
     patch({ busy: false })
   }
   const bu = result.state.units[unitId]
@@ -576,15 +604,30 @@ export async function confirm(): Promise<void> {
     await commit({ type: "attackWall", unitId: ui.selectedId, to: ui.movedTo, wall: ui.wallPos })
 }
 
-async function playEvents(events: BattleEvent[], before: BattleState, after: BattleState): Promise<void> {
-  if (presenter) {
-    try {
-      await presenter.play(events, before, after)
-    }
-    catch (e) {
-      console.error("presenter error", e)
-    }
+/**
+ * Проиграть события. Возвращает false, если за время проигрывания экран боя закрыли (сменился сеанс):
+ * тогда вызывающий выходит, ничего не трогая. Ожидание отпускается и без ответа презентера —
+ * если Phaser-игру уничтожили посреди анимации.
+ */
+async function playEvents(events: BattleEvent[], before: BattleState, after: BattleState): Promise<boolean> {
+  const id = session
+  const p = presenter
+  if (p) {
+    await new Promise<void>((resolve) => {
+      let done = false
+      const release = (): void => {
+        if (done) return
+        done = true
+        pendingPlays.delete(release)
+        resolve()
+      }
+      pendingPlays.add(release)
+      new Promise<void>(r => r(p.play(events, before, after)))
+        .catch((e: unknown) => console.error("presenter error", e))
+        .finally(release)
+    })
   }
+  return id === session
 }
 
 async function commit(action: BattleAction): Promise<void> {
@@ -599,7 +642,7 @@ async function commit(action: BattleAction): Promise<void> {
     return
   }
   clearSelection({ mode: "busy", busy: true })
-  await playEvents(result.events, before, result.state)
+  if (!(await playEvents(result.events, before, result.state))) return
   afterAction(result.state)
 }
 
@@ -618,47 +661,103 @@ export async function endTurn(): Promise<void> {
   const before = state()
   const ui = $battleUi.get()
   if (!before || ui.busy || before.result || before.phase !== "player") return
+  let r: { state: BattleState, events: BattleEvent[] }
+  try {
+    r = dispatchBattle({ type: "endPhase" })
+  }
+  catch (e) {
+    toast((e as Error).message)
+    return
+  }
   clearSelection({ mode: "busy", busy: true })
-  const r = dispatchBattle({ type: "endPhase" })
-  await playEvents(r.events, before, r.state)
-  if (r.state.result) return afterAction(r.state)
+  if (!(await playEvents(r.events, before, r.state))) return
+  if (r.state.result || r.state.phase !== "enemy") return afterAction(r.state)
   await runEnemyPhase()
 }
 
+type Reduced = { state: BattleState, events: BattleEvent[] }
+
+/** Действие, которое не бросает: ошибка — в консоль, результат null. */
+function tryDispatch(action: BattleAction, what: string): Reduced | null {
+  try {
+    return dispatchBattle(action)
+  }
+  catch (e) {
+    console.error(what, action, e)
+    return null
+  }
+}
+
+/**
+ * Один шаг ИИ с запасными вариантами: действие ИИ → «ждать» на месте тем же врагом → конец фазы.
+ * `force` — сразу конец фазы (сработал предохранитель от зацикливания). null — не сработало ничего.
+ */
+function enemyStep(before: BattleState, force: boolean): Reduced | null {
+  if (!force) {
+    let action: BattleAction | null = null
+    try {
+      action = nextEnemyAction(before)
+    }
+    catch (e) {
+      console.error("enemy AI failed", e)
+    }
+    if (action) {
+      const r = tryDispatch(action, "enemy action failed")
+      if (r) return r
+      const uid = "unitId" in action ? action.unitId : undefined
+      const bu = uid ? before.units[uid] : undefined
+      if (bu && bu.alive && !bu.acted && bu.side === "enemy") {
+        const w = tryDispatch({ type: "wait", unitId: bu.unitId, to: bu.pos }, "enemy wait fallback failed")
+        if (w) return w
+      }
+    }
+  }
+  return tryDispatch({ type: "endPhase" }, "enemy endPhase fallback failed")
+}
+
 async function runEnemyPhase(): Promise<void> {
+  const id = session
   clearSelection({ mode: "busy", busy: true })
   let guard = 0
   for (;;) {
+    if (id !== session) return
     const before = state()
-    // Предохранитель от зацикливания: по нескольку действий на каждого врага (в чаще их десятки)
-    if (!before || before.result || before.phase !== "enemy" || guard++ > 100 + Object.keys(before.units).length * 3) break
-    const action = nextEnemyAction(before)
-    let r: { state: BattleState, events: BattleEvent[] }
-    try {
-      r = dispatchBattle(action)
+    if (!before || before.result || before.phase !== "enemy") break
+    // Предохранитель от зацикливания: по нескольку действий на каждого врага (в чаще их десятки).
+    // Сработал — фаза врага завершается принудительно, иначе ни ход врага, ни ход игрока не продолжить.
+    const force = guard++ > 100 + Object.keys(before.units).length * 3
+    if (force) console.error("enemy phase guard tripped: forcing endPhase")
+    const r = enemyStep(before, force)
+    if (!r) {
+      // Не удалось даже завершить фазу — состояние боя испорчено; не падаем, а сообщаем
+      toast(tr("The enemy turn got stuck", "Ход врага застрял"))
+      break
     }
-    catch (e) {
-      console.error("enemy action failed", action, e)
-      const uid = "unitId" in action ? action.unitId : undefined
-      const bu = uid ? before.units[uid] : undefined
-      r = bu ? dispatchBattle({ type: "wait", unitId: bu.unitId, to: bu.pos }) : dispatchBattle({ type: "endPhase" })
-    }
-    await playEvents(r.events, before, r.state)
+    if (!(await playEvents(r.events, before, r.state))) return
     if (r.state.result || r.state.phase === "player") {
       afterAction(r.state)
       return
     }
   }
+  if (id !== session) return
   const st = state()
   if (st) afterAction(st)
 }
 
 export async function retreat(): Promise<void> {
   const before = state()
-  if (!before || before.result) return
-  const r = dispatchBattle({ type: "retreat" })
+  // Во время хода врага и анимаций отступать нельзя: действие ляжет посреди проигрывания
+  if (!before || before.result || $battleUi.get().busy) return
+  let r: Reduced
+  try {
+    r = dispatchBattle({ type: "retreat" })
+  }
+  catch (e) {
+    toast((e as Error).message)
+    return
+  }
   clearSelection({ mode: "busy", busy: true })
-  await playEvents(r.events, before, r.state)
+  if (!(await playEvents(r.events, before, r.state))) return
   afterAction(r.state)
 }
 

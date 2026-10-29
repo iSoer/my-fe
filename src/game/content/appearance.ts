@@ -1,4 +1,5 @@
 import { tr } from "@game/i18n"
+import { EYE_ART, FUR_ART } from "@game/art/palettes"
 
 /**
  * Список подписей, элементы которого переводятся в момент чтения (`PATTERNS[i]`).
@@ -17,20 +18,26 @@ const palette = (en: string, ru: string, color: number): { readonly name: string
   color
 })
 
-/** Палитры шерсти (плейсхолдеры: основной цвет), узоры, глаза, аксессуары. */
+/** "#rrggbb" → 0xrrggbb. */
+const num = (color: string): number => parseInt(color.slice(1), 16)
+/** Основной цвет шерсти палитры `i` — тот же, что рисует арт (`FUR_ART[i].fur`): заглушки и эффекты не расходятся со спрайтом. */
+const furColor = (i: number): number => num(FUR_ART[i]?.fur ?? "#cccccc")
+const eyeColor = (i: number): number => num(EYE_ART[i] ?? "#cccccc")
+
+/** Палитры шерсти (плейсхолдеры: основной цвет из `FUR_ART`), узоры, глаза, аксессуары. Индексы — как у `FUR_ART`. */
 export const FUR_PALETTES: readonly { readonly name: string, color: number }[] = [
-  palette("Ginger", "Рыжий", 0xf0932b),
-  palette("Gray", "Серый", 0x95a5a6),
-  palette("White", "Белый", 0xf5f6fa),
-  palette("Black", "Чёрный", 0x2d3436),
-  palette("Beige", "Бежевый", 0xe1b382),
-  palette("Chocolate", "Шоколадный", 0x6d4c41),
-  palette("Sandy", "Песочный", 0xf7d794),
-  palette("Smoky", "Дымчатый", 0x636e72),
-  palette("Blue", "Голубой", 0xa4b0be),
-  palette("Cream", "Кремовый", 0xffeaa7),
-  palette("Tabby", "Табби", 0xcc8e35),
-  palette("Charcoal", "Угольный", 0x1e272e)
+  palette("Ginger", "Рыжий", furColor(0)),
+  palette("Gray", "Серый", furColor(1)),
+  palette("White", "Белый", furColor(2)),
+  palette("Black", "Чёрный", furColor(3)),
+  palette("Beige", "Бежевый", furColor(4)),
+  palette("Chocolate", "Шоколадный", furColor(5)),
+  palette("Sandy", "Песочный", furColor(6)),
+  palette("Smoky", "Дымчатый", furColor(7)),
+  palette("Blue", "Голубой", furColor(8)),
+  palette("Cream", "Кремовый", furColor(9)),
+  palette("Tabby", "Табби", furColor(10)),
+  palette("Charcoal", "Угольный", furColor(11))
 ]
 export const PATTERNS = labels([
   ["Solid", "Однотонный"],
@@ -47,11 +54,11 @@ export const EYES = labels([
   ["Cross-eyed", "Косые"]
 ])
 export const EYE_COLORS: readonly { readonly name: string, color: number }[] = [
-  palette("Green", "Зелёные", 0x2ecc71),
-  palette("Yellow", "Жёлтые", 0xf1c40f),
-  palette("Blue", "Голубые", 0x3498db),
-  palette("Brown", "Карие", 0x8e5a2a),
-  palette("Red", "Красные", 0xe74c3c)
+  palette("Green", "Зелёные", eyeColor(0)),
+  palette("Yellow", "Жёлтые", eyeColor(1)),
+  palette("Blue", "Голубые", eyeColor(2)),
+  palette("Brown", "Карие", eyeColor(3)),
+  palette("Red", "Красные", eyeColor(4))
 ]
 export const ACCESSORIES = labels([
   ["No accessory", "Без аксессуара"],

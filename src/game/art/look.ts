@@ -33,6 +33,21 @@ export interface CritterLook {
   curly: boolean
 }
 
+/**
+ * Формы ушей и хвоста, которые умеет рисовать каждый вид (`catEar`/`dogEar`/`mouseEar`, `catTail`/`dogTail`/
+ * `mouseTail` в `critter.ts`). Чужая форма молча нарисуется формой вида по умолчанию — породы проверяет тест.
+ */
+export const DRAWABLE_EARS: Record<"cat" | "dog" | "mouse", readonly EarShape[]> = {
+  cat: ["pointy", "tufted", "round", "folded", "big"],
+  dog: ["floppy", "erect", "big", "semi", "button", "long"],
+  mouse: ["round", "big", "small"]
+}
+export const DRAWABLE_TAILS: Record<"cat" | "dog" | "mouse", readonly TailShape[]> = {
+  cat: ["long", "fluffy", "thin", "stub"],
+  dog: ["sickle", "curl", "long", "plume", "pom", "thin", "stub"],
+  mouse: ["bare", "ringed", "curl", "tufted", "stub", "fluffy"]
+}
+
 /** Прежний облик вида: для миниатюр без данных бойца (заставки, деревня). */
 export const DEFAULT_LOOK: Record<"cat" | "dog" | "mouse", CritterLook> = {
   cat: base("pointy", "long"),

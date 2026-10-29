@@ -13,15 +13,16 @@ import type {
   UnitInstance
 } from "../types"
 import { STATS, inMap, manhattan, mapSize, posKey, samePos } from "../types"
-import { livingUnits, otherSide, unitAt } from "./query"
+import { KILLER_FLAG, livingUnits, otherSide, terrainAt, unitAt } from "./query"
 import { planAssist } from "./assist"
-import { moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
+import { isPassable, moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
+import { unitClass } from "@game/content/classes"
 import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
 import { drinkBonus, drinkBonusOf } from "./drink"
 import { lootFor } from "../progression"
-import { BUFF, difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
+import { BATTLE, BUFF, difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
 import { BUFFS } from "@game/content/expedition"
 import { buffLootMult } from "./buffs"
 import { gainSkillXp } from "../units/proficiency"
@@ -75,14 +76,14 @@ export function createBattle(opts: CreateBattleOptions): ReduceResult {
     roster: {},
     walls: {},
     decals: [],
-    stats: { kills: 0, damage: 0, turns: 0, deaths: [], xpGained: {}, loot: 0 },
+    stats: { kills: 0, damage: 0, turns: 1, deaths: [], xpGained: {}, loot: 0 },
     spawnedWaves: [],
     enemyQueue: null,
     startedAt: opts.now
   }
   opts.map.tiles.forEach((row, y) =>
     row.forEach((t, x) => {
-      if (t === "wall_breakable") state.walls[posKey({ x, y })] = 2
+      if (t === "wall_breakable") state.walls[posKey({ x, y })] = BATTLE.wallHp
     })
   )
   if (opts.drink) state.drink = { id: opts.drink.id, pct: { ...opts.drink.pct } }
@@ -256,6 +257,7 @@ function killUnit(state: BattleState, u: BattleUnit, killerId: string | undefine
   u.alive = false
   u.hp = 0
   u.acted = true
+  if (killerId) u.flags = { ...u.flags, [`${KILLER_FLAG}${killerId}`]: 1 }
   passKeys(state, u, killerId, events)
   state.decals.push({ pos: { ...u.pos }, kind: "pool" })
   if (u.side === "player") state.stats.deaths.push(u.unitId)
@@ -389,25 +391,44 @@ function spawnReinforcements(state: BattleState, events: BattleEvent[]): void {
     state.spawnedWaves.push(wave.turn)
     const ids: string[] = []
     for (const r of wave.units) {
-      let pos = r.pos
-      if (unitAt(state, pos)) {
-        const alt = [
-          { x: pos.x + 1, y: pos.y },
-          { x: pos.x - 1, y: pos.y },
-          { x: pos.x, y: pos.y + 1 }
-        ].find(
-          p =>
-            inMap(mapSize(state.map), p) && !unitAt(state, p) && state.map.tiles[p.y]?.[p.x] === "plain"
-        )
-        if (!alt) continue
-        pos = alt
-      }
+      const pos = spawnTile(state, r.unit, r.pos)
+      // Свободной проходимой клетки на всём поле нет — подкрепление не приходит
+      if (!pos) continue
       state.roster[r.unit.id] = r.unit
       state.units[r.unit.id] = makeBattleUnit(r.unit, "enemy", pos, "advance", state.turn)
       ids.push(r.unit.id)
     }
     if (ids.length > 0) events.push({ type: "reinforcements", unitIds: ids })
   }
+}
+
+/**
+ * Клетка появления подкрепления: заданная, а если занята — ближайшая свободная, по которой боец может стоять
+ * (поиск в ширину по проходимым для его типа передвижения клеткам; соседи — в порядке →, ←, ↓, ↑).
+ */
+function spawnTile(state: BattleState, unit: UnitInstance, from: Pos): Pos | undefined {
+  const size = mapSize(state.map)
+  const moveType = unitClass(unit).moveType
+  const free = (p: Pos) => !unitAt(state, p) && isPassable(terrainAt(state, p), moveType)
+  if (!inMap(size, from)) return undefined
+  // Заданная генератором клетка годится, если свободна
+  if (!unitAt(state, from)) return from
+  const seen = new Set([posKey(from)])
+  const queue: Pos[] = [from]
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i] as Pos
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const p = { x: cur.x + dx, y: cur.y + dy }
+      const key = posKey(p)
+      if (!inMap(size, p) || seen.has(key)) continue
+      seen.add(key)
+      // Непроходимая клетка (стена, вода у пехоты) — не место и не дорога; занятую союзником можно «пройти»
+      if (!isPassable(terrainAt(state, p), moveType)) continue
+      if (free(p)) return p
+      queue.push(p)
+    }
+  }
+  return undefined
 }
 
 function startPhase(state: BattleState, side: Side, events: BattleEvent[]): void {
@@ -535,15 +556,6 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       for (const b of plan.buffs) applyEffects(state, [{ type: "buff", unitId: b.unitId, stats: b.stats }], [])
       if (plan.targetHpDelta !== 0) target.hp = Math.max(1, Math.min(target.maxHp, target.hp + plan.targetHpDelta))
       if (plan.selfHpDelta !== 0) bu.hp = Math.max(1, Math.min(bu.maxHp, bu.hp + plan.selfHpDelta))
-      let healedAll = 0
-      if (plan.allHeal > 0) {
-        for (const ally of livingUnits(state, bu.side)) {
-          if (ally.unitId === bu.unitId || ally.unitId === target.unitId) continue
-          const before = ally.hp
-          ally.hp = Math.min(ally.maxHp, ally.hp + plan.allHeal)
-          healedAll += ally.hp - before
-        }
-      }
       if (plan.assist.kind === "heal") {
         if (plan.specialTriggered) bu.specialCd = specialMaxCd(state.roster[bu.unitId] as UnitInstance) ?? 0
         else if (state.roster[bu.unitId]?.skills.special) bu.specialCd = Math.max(0, bu.specialCd - 1)
@@ -563,6 +575,19 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
         targetHpAfter: target.hp,
         unitHpAfter: bu.hp
       })
+      // Общий лай: остальные союзники лечатся — по событию на каждого, как от любого лечения
+      let healedAll = 0
+      if (plan.allHeal > 0) {
+        const fx: Effect[] = livingUnits(state, bu.side)
+          .filter(a => a.unitId !== bu.unitId && a.unitId !== target.unitId)
+          .map(a => ({ type: "heal", unitId: a.unitId, amount: plan.allHeal, sourceId: bu.unitId }))
+        const healEvents: BattleEvent[] = []
+        applyEffects(state, fx, healEvents)
+        for (const ev of healEvents) if (ev.type === "effect" && ev.effect.type === "heal") healedAll += ev.effect.amount
+        events.push(...healEvents)
+      }
+      // Сдвинутый Поддержкой союзник встаёт на клетку как при обычном шаге: ключ, сундук, бонус (сам боец — ниже)
+      for (const m of plan.moves) if (m.unitId !== bu.unitId) expeditionStepOn(state, m.unitId, events)
       finishAction(state, bu, action.newStance, events)
       // Лечение — по вылеченному (с лечением всех союзников спецприёмом), танец и Ободрение — фиксированно
       const kind = plan.assist.kind
@@ -581,7 +606,10 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       if (!target || !target.alive || target.side === bu.side) throw new Error(tr("target unavailable", "цель недоступна"))
       if (!targetsFrom(state, bu, bu.pos).some(t => t.unitId === target.unitId)) throw new Error(tr("target out of range", "цель вне дальности"))
       resolveCombat(state, bu, target, events)
-      finishAction(state, bu, action.newStance ?? (bu.side === "enemy" ? "advance" : undefined), events)
+      // Враг, чья цель выжила, ввязался в бой и наступает (даже из `guard`); добил — стойка из действия
+      const engaged = bu.side === "enemy" && target.alive
+      const stance = engaged ? "advance" : action.newStance ?? (bu.side === "enemy" ? "advance" : undefined)
+      finishAction(state, bu, stance, events)
       break
     }
   }
@@ -608,7 +636,6 @@ function resolveCombat(state: BattleState, bu: BattleUnit, target: BattleUnit, e
   const dealtByA = outcome.strikes.filter(s => s.attackerId === bu.unitId).reduce((a, s) => a + s.damage, 0)
   const dealtByD = outcome.strikes.filter(s => s.attackerId === target.unitId).reduce((a, s) => a + s.damage, 0)
   if (bu.side === "player") state.stats.damage += dealtByA
-  else state.stats.damage += 0
   if (target.side === "player") state.stats.damage += dealtByD
 
   const updHistory = (u: UnitInstance, dealt: number, taken: number, hpAfter: number): UnitInstance => ({
@@ -625,7 +652,6 @@ function resolveCombat(state: BattleState, bu: BattleUnit, target: BattleUnit, e
 
   if (target.side === "enemy" && state.roster[target.unitId]?.isBoss && target.hp < target.maxHp)
     target.stance = "advance"
-  if (bu.side === "enemy" && target.hp > 0) bu.stance = "advance"
 
   events.push({
     type: "combat",

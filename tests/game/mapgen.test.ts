@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest"
 import fc from "fast-check"
 import { generateMap } from "@game/core/map/generate"
-import { LAYOUTS, LAYOUT_WEIGHTS, bridgeVertical, decorMask, layoutDef } from "@game/core/map/layouts"
+import { LAYOUTS, LAYOUT_WEIGHTS, bridgeVertical, decorMask, emptyDraft, layoutDef } from "@game/core/map/layouts"
+import { createRng } from "@game/core/rng"
 import { isPassable } from "@game/core/map/pathing"
-import type { Difficulty, MapDef, Pos, TerrainId } from "@game/core/types"
+import type { Difficulty, MapDef, MapLayout, Pos, TerrainId } from "@game/core/types"
 import { MAP_H, MAP_W, MAX_LEVEL, posKey } from "@game/core/types"
 import { ENEMY_TEAMS, TERRAIN_SHARE, difficultyDef, teamLevels, teamTreats } from "@game/content/balance"
 import { BIOMES, waterFillsTile } from "@game/content/biomes"
@@ -98,6 +99,14 @@ describe("generateMap", () => {
           if (d.boss) {
             expect(m.enemies.filter(e => e.unit.isBoss).length).toBe(1)
             expect(m.objective).toBe("killBoss")
+            // до вожака пехота игрока может дойти
+            expect(reach.has(posKey(m.enemies.find(e => e.unit.isBoss)!.pos))).toBe(true)
+          }
+          // в одной волне подкреплений позиции не повторяются
+          for (const w of m.reinforcements) {
+            const keys = w.units.map(u => posKey(u.pos))
+            expect(new Set(keys).size).toBe(keys.length)
+            for (const u of w.units) expect(isPassable(m.tiles[u.pos.y]![u.pos.x]!, unitClass(u.unit).moveType)).toBe(true)
           }
           expect(m.rewards.treats).toBeGreaterThan(0)
         }
@@ -105,6 +114,37 @@ describe("generateMap", () => {
       { numRuns: 200 }
     )
   })
+})
+
+describe("генерация не падает", () => {
+  const DIFFS: Difficulty[] = ["easy", "normal", "hard", "nightmare"]
+
+  it("регрессия: seed, на которых рощи брали pick из пустого списка (крепость в подвале, дворе, чаще)", () => {
+    const cases: [string, number][] = [["basement", 572], ["basement", 1924], ["basement", 2529], ["yard", 2529], ["deep_forest", 2786]]
+    for (const [biomeId, seed] of cases)
+      for (const difficulty of DIFFS)
+        expect(() => generateMap({ seed, biomeId, difficulty, team: 1, squadSize: 4 }), `${biomeId} ${seed} ${difficulty}`).not.toThrow()
+  })
+
+  it("каждая раскладка строится без исключений на тысячах seed и при любом смещении зарослей", () => {
+    const reserved = [{ x: 1, y: 7 }, { x: 4, y: 7 }, { x: 2, y: 7 }, { x: 3, y: 7 }, { x: 2, y: 6 }, { x: 3, y: 6 }].map(posKey)
+    for (const id of Object.keys(LAYOUTS) as MapLayout[]) {
+      for (let seed = 0; seed < 1500; seed++) {
+        const forestBias = [-0.08, 0, 0.1][seed % 3]!
+        expect(() => layoutDef(id).build(emptyDraft(reserved), createRng(seed), { waterOk: true, forestBias }), `${id} ${seed}`).not.toThrow()
+      }
+    }
+  })
+
+  it("generateMap не бросает исключений: широкий перебор seed × все биомы × сложности", () => {
+    for (const biomeId of ALL_BIOMES) {
+      for (let seed = 0; seed < 240; seed++) {
+        const s = seed * 13 + 7
+        const difficulty = DIFFS[seed % DIFFS.length]!
+        expect(() => generateMap({ seed: s, biomeId, difficulty, team: seed % ENEMY_TEAMS, squadSize: 1 + (seed % 6) }), `${biomeId} ${s} ${difficulty}`).not.toThrow()
+      }
+    }
+  }, 30_000)
 })
 
 describe("баланс карт и сложности", () => {
@@ -264,6 +304,102 @@ describe("раскладки карт", () => {
       }
     }
     expect(lonely / Math.max(1, forest)).toBeLessThan(0.1)
+  })
+
+  const count = (m: MapDef, t: TerrainId) => m.tiles.flat().filter(x => x === t).length
+  const pathRows = (m: MapDef) => new Set(Object.entries(m.decor ?? {}).filter(([, d]) => d === "path").map(([k]) => Number(k.split(",")[1])))
+  const cellsOf = (m: MapDef, t: TerrainId): Pos[] =>
+    m.tiles.flatMap((r, y) => r.flatMap((x, xi) => (x === t ? [{ x: xi, y }] : [])))
+  const isWall = (t: TerrainId | undefined) => t === "wall" || t === "wall_breakable"
+
+  it("поляна: открытое поле с рощами — без воды и сплошных стен, валунов не больше одного", () => {
+    const list = maps("glade")
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      expect(count(m, "water")).toBe(0)
+      expect(count(m, "wall")).toBe(0)
+      expect(count(m, "mountain")).toBeLessThanOrEqual(1)
+    }
+    expect(list.some(m => count(m, "forest") >= 3)).toBe(true)
+  })
+
+  it("перекрёсток: дорога через весь ряд 3 или 4 и тропинка снизу доверху", () => {
+    const list = maps("crossroads")
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      const full = [3, 4].filter(y => Array.from({ length: MAP_W }, (_, x) => m.decor?.[posKey({ x, y })]).every(d => d === "path"))
+      expect(full.length).toBeGreaterThanOrEqual(1)
+      expect(pathRows(m).size).toBe(MAP_H)
+    }
+  })
+
+  it("ущелье: скалы только у боковых краёв рядов 2–5, не больше 8, в узких рядах 3–4 — с обеих сторон", () => {
+    const list = maps("pass")
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      const rocks = cellsOf(m, "mountain")
+      expect(rocks.length).toBeLessThanOrEqual(8)
+      for (const p of rocks) {
+        expect([0, 1, MAP_W - 2, MAP_W - 1]).toContain(p.x)
+        expect(p.y).toBeGreaterThanOrEqual(2)
+        expect(p.y).toBeLessThanOrEqual(5)
+      }
+      for (const y of [3, 4]) {
+        expect(m.tiles[y]![0]).toBe("mountain")
+        expect(m.tiles[y]![MAP_W - 1]).toBe("mountain")
+      }
+      expect(pathRows(m).size).toBe(MAP_H)
+    }
+  })
+
+  it("озеро: 3–4 клетки воды в квадрате посреди поля (x 2–3, ряды 3–4), тропинка обходит его снизу доверху", () => {
+    const list = maps("lake", ["yard", "jungle", "winter_park", "infested", "deep_forest"])
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      const water = cellsOf(m, "water")
+      expect(water.length).toBeGreaterThanOrEqual(3)
+      expect(water.length).toBeLessThanOrEqual(4)
+      for (const p of water) {
+        expect([2, 3]).toContain(p.x)
+        expect([3, 4]).toContain(p.y)
+      }
+      expect(pathRows(m).size).toBe(MAP_H)
+    }
+  })
+
+  it("крепость: стена поперёк ряда 2 или 3 с воротами-тропинкой, хлипкие пролёты через один", () => {
+    const list = maps("fort")
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      const forts = [2, 3].flatMap(y => Array.from({ length: MAP_W }, (_, gate) => ({ y, gate }))).filter(({ y, gate }) => {
+        if (m.decor?.[posKey({ x: gate, y })] !== "path") return false
+        return Array.from({ length: MAP_W }, (_, x) => Math.abs(x - gate)).every((dist, x) => {
+          const t = m.tiles[y]![x]
+          if (dist === 1 || dist === 5) return t === "wall"
+          if (dist === 2 || dist === 4) return t === "wall_breakable"
+          return true
+        })
+      })
+      expect(forts.length).toBeGreaterThanOrEqual(1)
+      expect(pathRows(m).size).toBe(MAP_H)
+    }
+  })
+
+  it("руины: обломки стен в рядах 2–5, каждая сплошная стена примыкает к другому обломку; ни воды, ни скал", () => {
+    const list = maps("ruins")
+    expect(list.length).toBeGreaterThan(5)
+    for (const m of list) {
+      expect(count(m, "water")).toBe(0)
+      expect(count(m, "mountain")).toBe(0)
+      const walls = cellsOf(m, "wall")
+      for (const p of walls) {
+        expect(p.y).toBeGreaterThanOrEqual(2)
+        expect(p.y).toBeLessThanOrEqual(5)
+        const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isWall(m.tiles[p.y + dy!]?.[p.x + dx!]))
+        expect(near).toBe(true)
+      }
+    }
+    expect(list.every(m => count(m, "wall") + count(m, "wall_breakable") >= 2)).toBe(true)
   })
 
   it("маска автотайла: прямой участок, поворот, перекрёсток и выход за край поля", () => {

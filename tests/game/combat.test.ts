@@ -285,3 +285,107 @@ describe("защитные пассивки: неуязвимость на вр�
     for (const s of later) expect(s.damage).toBeGreaterThan(0)
   })
 })
+
+describe("спецприёмы в бою", () => {
+  const strong = { ...flat, str: 30, mag: 30, def: 12, res: 14 }
+  /** Дуэль: боец игрока со спецприёмом `special` (кулдаун 0) бьёт врага с Def 10 и Res 10. */
+  const offense = (special: string, opts: { hp?: number } = {}) => {
+    const b = makeBattle(
+      [{ classId: "infantry_sword", pos: { x: 2, y: 4 }, baseStats: strong, skills: { special } }],
+      [{ classId: "infantry_sword", pos: { x: 2, y: 3 }, baseStats: { ...flat, hp: 90, def: 10, res: 10 } }]
+    )
+    const p = b.players[0]!
+    b.state.units[p.id]!.specialCd = 0
+    if (opts.hp !== undefined) b.state.units[p.id]!.hp = opts.hp
+    const out = simulateCombat(b.state, p.id, b.enemies[0]!.id, { x: 2, y: 4 })
+    return { p, e: b.enemies[0]!, out, first: out.strikes[0]! }
+  }
+
+  it("Лунный серп и Клыкастая луна игнорируют 30 % и 50 % Def цели", () => {
+    const moon = offense("sp_moonbow")
+    expect(moon.first.special).toBe("sp_moonbow")
+    expect(moon.first.damage).toBe(attackOf(moon.p) - (10 - 3))
+    const luna = offense("sp_luna")
+    expect(luna.first.damage).toBe(attackOf(luna.p) - (10 - 5))
+  })
+
+  it("Пламя шерсти, Ледяная шерсть и Шквал когтей добавляют долю своего стата", () => {
+    const fire = offense("sp_bonfire")
+    const base = attackOf(fire.p) - 10
+    expect(fire.first.damage).toBe(base + Math.floor(visibleStats(fire.p).def * 0.5))
+    const ice = offense("sp_iceberg")
+    expect(ice.first.damage).toBe(base + Math.floor(visibleStats(ice.p).res * 0.5))
+    const claws = offense("sp_draconic")
+    expect(claws.first.damage).toBe(base + Math.floor(attackOf(claws.p) * 0.3))
+  })
+
+  it("Чистая рана лечит атакующего на 50 % нанесённого урона, но не выше максимума", () => {
+    const sol = offense("sp_sol", { hp: 5 })
+    expect(sol.first.special).toBe("sp_sol")
+    expect(sol.first.healed).toBe(Math.floor(sol.first.damage * 0.5))
+    expect(sol.first.attackerHpAfter).toBe(5 + sol.first.healed)
+    const full = offense("sp_sol")
+    expect(full.first.healed).toBe(0)
+  })
+
+  /** Дуэль: враг со спецприёмом `special` (кулдаун 0) защищается от бойца игрока с оружием `attacker`. */
+  const defense = (special: string, attacker = "infantry_sword", species: "cat" | "dog" | "mouse" = "dog", extra: Partial<{ classId: string, b: string }> = {}) => {
+    const ranged = attacker.endsWith("_bow")
+    const b = makeBattle(
+      [{ classId: attacker, pos: { x: 2, y: ranged ? 5 : 4 }, baseStats: strong }],
+      [
+        {
+          classId: extra.classId ?? "infantry_sword",
+          pos: { x: 2, y: 3 },
+          baseStats: { ...flat, hp: 90 },
+          species,
+          skills: { special, b: extra.b }
+        }
+      ]
+    )
+    const p = b.players[0]!
+    const e = b.enemies[0]!
+    b.state.units[e.id]!.specialCd = 0
+    const out = simulateCombat(b.state, p.id, e.id, b.state.units[p.id]!.pos)
+    return { p, e, out, first: out.strikes[0]!, base: attackOf(p) - visibleStats(e).def, maxHp: b.state.units[e.id]!.maxHp }
+  }
+
+  it("Пушистая стена снимает 30 % только ближнего удара, Хвост-щит — только дальнего", () => {
+    const wall = defense("sp_escutcheon")
+    expect(wall.first.defenseSpecial).toBe("sp_escutcheon")
+    expect(wall.first.damage).toBe(Math.floor(wall.base * 0.7))
+    expect(wall.out.defender.specialTriggered).toBe(true)
+    const wallVsBow = defense("sp_escutcheon", "infantry_bow")
+    expect(wallVsBow.first.defenseSpecial).toBeUndefined()
+    expect(wallVsBow.first.damage).toBe(wallVsBow.base)
+
+    const cowl = defense("sp_cowl", "infantry_bow")
+    expect(cowl.first.defenseSpecial).toBe("sp_cowl")
+    expect(cowl.first.damage).toBe(Math.floor(cowl.base * 0.7))
+    expect(defense("sp_cowl").first.defenseSpecial).toBeUndefined()
+  })
+
+  it("Шмыг снимает 40 % любого удара", () => {
+    const squeak = defense("sp_squeak", "infantry_bow", "mouse")
+    expect(squeak.first.defenseSpecial).toBe("sp_squeak")
+    expect(squeak.first.damage).toBe(Math.floor(squeak.base * 0.6))
+  })
+
+  it("Верность лечит пса после удара на 30 % снятого урона — даже с полным HP — и пишет лечение в удар", () => {
+    const loyal = defense("sp_loyalty")
+    const dmg = Math.floor(loyal.base * 0.7)
+    const heal = Math.floor((loyal.base - dmg) * 0.3)
+    expect(heal).toBeGreaterThan(0)
+    expect(loyal.first.damage).toBe(dmg)
+    expect(loyal.first.defenderHealed).toBe(heal)
+    expect(loyal.first.defenderHpAfter).toBe(loyal.maxHp - dmg + heal)
+  })
+
+  it("защитный спецприём не тратится, если удар и так гасит неуязвимость", () => {
+    const iron = defense("sp_escutcheon", "infantry_sword", "dog", { classId: "armored_sword", b: "b_iron_hide" })
+    expect(iron.first.damage).toBe(0)
+    expect(iron.first.defenseSpecial).toBeUndefined()
+    expect(iron.out.defender.specialTriggered).toBe(false)
+    expect(iron.out.defender.cdAfter).toBe(0)
+  })
+})

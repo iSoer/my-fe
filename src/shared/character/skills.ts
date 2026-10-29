@@ -1,7 +1,7 @@
 import { STATS, type Stat } from "./stats"
 import { MAX_LEVEL, MIN_LEVEL } from "./leveling"
 
-// Weapon and movement skills of characters, after Fire Emblem: Fortune's Weave (docs/character-model.md, "Навыки")
+// Weapon and movement skills of characters, after Fire Emblem: Fortune's Weave (docs/classes.md, "Владение оружием и смена класса"; docs/progression.md, "Владение навыками")
 
 export const WEAPON_SKILLS = ["sword", "axe", "spear", "bow", "gauntlet", "whiteMagic", "blackMagic"] as const
 

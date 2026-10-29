@@ -19,7 +19,9 @@ import { WEAPONS } from "@game/content/weapons"
 import { zombieFur } from "@game/art/critter"
 import { TALISMANS } from "@game/content/items"
 import { MATERIAL, ringSvg, weaponIconSvg } from "@game/art/gear"
-import { critterLook, DEFAULT_LOOK } from "@game/art/look"
+import { critterLook, DEFAULT_LOOK, DRAWABLE_EARS, DRAWABLE_TAILS } from "@game/art/look"
+import { EYE_ART, FUR_ART } from "@game/art/palettes"
+import { EYE_COLORS, FUR_PALETTES } from "@game/content/appearance"
 import { BREEDS } from "@game/content/breeds"
 import { WEAPON_SKILLS, type WeaponGrade, type WeaponSkill } from "@shared/character/skills"
 import { gearAlerts } from "@game/ui/components/UnitPanels"
@@ -268,6 +270,16 @@ describe("арт: облик бойца", () => {
       for (const part of CRITTER_PARTS) wellFormed(unitPartSvg(u, part))
     }
   })
+  it("формы ушей и хвоста пород — из тех, что вид умеет рисовать", () => {
+    for (const b of BREEDS) {
+      for (const e of b.look.ears) expect(DRAWABLE_EARS[b.species], `${b.id}: уши ${e}`).toContain(e)
+      for (const t of b.look.tails) expect(DRAWABLE_TAILS[b.species], `${b.id}: хвост ${t}`).toContain(t)
+    }
+    for (const s of ["cat", "dog", "mouse"] as const) {
+      expect(DRAWABLE_EARS[s]).toContain(DEFAULT_LOOK[s].ears)
+      expect(DRAWABLE_TAILS[s]).toContain(DEFAULT_LOOK[s].tail)
+    }
+  })
   it("неизвестная порода не ломает миниатюру", () => {
     const u = { ...generateUnit({ seed: 8, level: 5 }), breedId: "nope" }
     wellFormed(unitSvg(u))
@@ -351,5 +363,14 @@ describe("арт: враги-зомби", () => {
       expect(boss).toContain(mark)
       expect(unitSvg(u)).not.toContain(mark)
     }
+  })
+})
+
+describe("арт: палитры", () => {
+  it("FUR_PALETTES и FUR_ART совпадают по длине и основному цвету; глаза — так же", () => {
+    expect(FUR_PALETTES.length).toBe(FUR_ART.length)
+    FUR_PALETTES.forEach((p, i) => expect(p.color, `шерсть ${i}`).toBe(parseInt((FUR_ART[i]?.fur ?? "").slice(1), 16)))
+    expect(EYE_COLORS.length).toBe(EYE_ART.length)
+    EYE_COLORS.forEach((p, i) => expect(p.color, `глаза ${i}`).toBe(parseInt((EYE_ART[i] ?? "").slice(1), 16)))
   })
 })

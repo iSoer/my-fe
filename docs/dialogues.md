@@ -96,7 +96,7 @@ interface DialogueLine {
 - `building.level.<id>`;
 - `glory`, `treats`;
 - `army.size`, `army.maxLevel`;
-- `memorial` — длина `save.memorial`, включая отпущенных (`reason: "released"`);
+- `memorial` — сколько бойцов погибло (записи `save.memorial` с `reason: "killed"`; отпущенные не в счёт);
 - `seen.<sceneId>` = 1.
 
 Если факта нет, он равен 0.

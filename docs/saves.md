@@ -46,33 +46,35 @@
 | 9 → 10  | Только номер версии: бар (`tavern`) и напитки необязательны                                                                                                                                                                                                                                                       |
 | 10 → 11 | `story.counters` заполняются из `stats`: `sortie.started`, `sortie.finished`, `sortie.victory`, `kills`, `fallen`. `seen = []`                                                                                                                                                                                    |
 
-`parseSave(json)` работает так: `JSON.parse`, затем проверка `MIN_SAVE_VERSION`, затем `migrate`, затем `saveSchema.safeParse`. Результат — `{ ok, save }` или `{ ok: false, error }`, в ошибке не больше 5 первых проблем zod. Сейв **новее** `SAVE_VERSION` не отклоняется: он идёт в схему как есть, и zod молча отбрасывает незнакомые поля.
+`parseSave(json)` работает так: `JSON.parse`, затем проверка `MIN_SAVE_VERSION`, затем `migrate`, затем `saveSchema.safeParse`. Результат — `{ ok, save }` или `{ ok: false, error }`, в ошибке не больше 5 первых проблем zod. Сейв **новее** `SAVE_VERSION` отклоняется с `{ ok: false, newer: true, error }` (иначе zod молча отбросил бы незнакомые поля и сейв обрезался бы при первой записи). Результат `parseSave` возвращается без каста: если схема и тип `SaveGame` разойдутся, это ошибка компиляции.
 
-Тесты миграций есть для 6→7 и 7→8 ([save.test.ts](../tests/game/save.test.ts)) и для 10→11 ([dialogue.test.ts](../tests/game/dialogue.test.ts)). Шаги 4→5, 5→6, 8→9 и 9→10 и цепочка 4→11 целиком не покрыты.
+Тесты миграций: 4→5, 5→6, 6→7, 7→8, 8→9, 9→10, цепочка 4→11 целиком и отказ от сейва новой версии — [save.test.ts](../tests/game/save.test.ts); 10→11 — [dialogue.test.ts](../tests/game/dialogue.test.ts).
 
 ## Хранение
 
 - Ключ `localStorage` — `pawfield:save:<namespace>` (`localKey()` в [platform/storage.ts](../src/game/platform/storage.ts)). Namespace задаёт `setStorageNamespace(userNamespace())` в [main.tsx](../src/main.tsx): id пользователя из `tg.initDataUnsafe.user.id` или `local`.
 - `updateSave(fn)` ставит `updatedAt = Date.now()`, вызывает `$save.set` и `persist()` (запись через 100 мс).
 - `flushPersist()` пишет сразу. Вызывается при `visibilitychange → hidden` (подписка в `initSave`), перед перезагрузкой обновления PWA (`beforeReload`) и в `resetProgress`/`importSaveCode`.
-- `initSave()` загружает сейв. Если сейв повреждён, ошибка уходит в `$saveError` (тост на заставке) и **начинается новая игра**. Старый JSON не сохраняется, первое же `updateSave` его перезапишет.
-- Экспорт и импорт — `exportSaveCode()` / `importSaveCode(code)`: base64 от UTF-8 JSON, экран [SettingsScreen](../src/game/ui/screens/SettingsScreen.tsx).
+- `initSave()` загружает сейв. Если сейв повреждён, сырой JSON сначала копируется в `pawfield:backup:<namespace>` (`backupRawSave`; одна, последняя копия), ошибка с пометкой «копия сохранена» уходит в `$saveError` (тост на заставке), и начинается новая игра. `exportBackupCode()` отдаёт копию кодом для импорта (как `exportSaveCode`); в настройках ([SettingsScreen](../src/game/ui/screens/SettingsScreen.tsx)) есть кнопка «Показать копию повреждённого сейва», пока копия существует.
+- Сейв более новой версии игры `initSave` не трогает: `$saveNewer = true`, `$saveStatus = "error"`, запись выключена (ни локально, ни в облако — зеркало пишет только в статусе `ready`).
+- Экспорт и импорт — `exportSaveCode()` / `importSaveCode(code)`: base64 от UTF-8 JSON, экран [SettingsScreen](../src/game/ui/screens/SettingsScreen.tsx). Импорт ставит `updatedAt = Date.now()` (иначе более новый сейв другого устройства выиграл бы конфликт с облаком) и применяет настройку вибрации.
 
 ## Облако Telegram
 
 [host/cloud.ts](../src/host/cloud.ts) и [host/sync.ts](../src/host/sync.ts):
 
-- Формат: `LZString.compressToUTF16(json)` режется на чанки по `CLOUD_CHUNK = 4000` символов (`pf_c_0`, `pf_c_1`, …). Рядом лежит `pf_meta` = `{ version: 1, updatedAt, chunks, hash }`, где `hash` — FNV-1a (`hashSave`) от сжатой строки.
-- `cloudStore` пишет сначала чанки, потом meta, потом удаляет лишние старые чанки. Вызовы идут последовательно: пока идёт запись, новый вызов запоминается в `pending`, и пишется только последний.
+- Формат: `LZString.compressToUTF16(json)` режется на чанки по `CLOUD_CHUNK = 4000` символов. Каждая запись — новое поколение `gen`: ключи `pf_s_<gen>_0`, `pf_s_<gen>_1`, …. Рядом лежит `pf_meta` = `{ version: 2, updatedAt, chunks, hash, gen, saveVersion }`, где `hash` — FNV-1a (`hashSave`) от сжатой строки, `saveVersion` — `SAVE_VERSION` записавшего клиента. Старый формат (meta `version: 1` без `gen`, чанки `pf_c_<i>`) читается и вычищается при следующей записи.
+- `cloudStore(json, updatedAt, saveVersion)` пишет чанки нового поколения, затем переключает meta, затем удаляет чанки прочих поколений и старого формата (`staleChunkKeys`) — только если meta всё ещё наша. Прерванная запись или второе устройство не портят копию, на которую указывает meta. Если в облаке meta с `saveVersion` больше нашей, запись пропускается. Вызовы идут последовательно: пока идёт запись, новый вызов запоминается в `pending`, и пишется только последний.
 - `cloudLoad` проверяет хэш. Если хэш не совпал, облака как будто нет (`null`).
 - `startCloudMirror()` (после монтирования игры): подписка на `$save`. Обычные изменения уходят через `CLOUD_DEBOUNCE_MS = 3000`. Смена ключа боя `battle.id:result` (начало или конец боя) уходит сразу. `visibilitychange → hidden` (сворачивание Mini App) — тоже сразу.
 
 ## Конфликт сейвов
 
-`reconcileCloudSave()` выполняется в `boot()` до монтирования игры. Таймаут облака — `CLOUD_TIMEOUT_MS = 4000`.
+`reconcileCloudSave()` выполняется в `boot()` до монтирования игры и возвращает `{ kind: 'ok' | 'conflict' | 'newer' }`. Таймаут облака — `CLOUD_TIMEOUT_MS = 4000`.
 
+0. Локальный или облачный сейв записан более новой версией игры (`newer`) — игра не стартует, показывается [NewerSaveScreen](../src/host/NewerSaveScreen.tsx) с кнопкой «Обновить и перезагрузить» (`updateAndReload` в pwa.ts), зеркало в облако не запускается.
 1. В облаке пусто, оно повреждено или недоступно — грузится локальный сейв.
-2. Локального нет или он битый — облачный JSON кладётся в `localStorage`, `initSave` его прочитает.
+2. Локального нет или он битый — облачный JSON кладётся в `localStorage` (битый локальный сначала уходит в резервную копию), `initSave` его прочитает.
 3. Облачный `updatedAt` больше локального больше чем на `CONFLICT_GAP_MS = 60_000` и сейвы различаются — показывается [ConflictScreen](../src/host/ConflictScreen.tsx) на языке локального сейва. Кнопка «Загрузить из облака» вызывает `chooseCloud` (пишет облачный JSON локально), «Оставить этот» ничего не пишет. После выбора игра стартует.
 4. В остальных случаях выигрывает локальный сейв, и зеркало перезапишет облако.
 
@@ -81,7 +83,7 @@
 ## Как поменять форму сейва (рецепт)
 
 1. Измените тип в [core/types.ts](../src/game/core/types.ts) (`SaveGame` и вложенные интерфейсы).
-2. Измените zod-схему в [core/save/index.ts](../src/game/core/save/index.ts). `res.data as SaveGame` — это приведение, компилятор расхождение типа и схемы **не поймает**.
+2. Измените zod-схему в [core/save/index.ts](../src/game/core/save/index.ts). `parseSave` возвращает `res.data` без каста, так что расхождение схемы и типа — ошибка `pnpm typecheck`.
 3. Увеличьте `SAVE_VERSION` на 1 и допишите строку в JSDoc над ним.
 4. Добавьте `MIGRATIONS[<старая версия>]`. Функция чистая, на входе `Record<string, unknown>`, не мутирует вход (`{ ...old }`), возвращает `version: <новая>`. Чисто аддитивное необязательное поле можно оформить как `.optional()` или `.default()` в схеме плюс пустую миграцию с номером (как 9→10).
 5. Обновите `createEmptySave`, если у поля есть стартовое значение.
@@ -99,4 +101,4 @@
 - Тип `SaveGame`, `DEFAULT_SETTINGS`: [core/types.ts](../src/game/core/types.ts).
 - Загрузка, автосохранение, импорт и экспорт: [state/save.ts](../src/game/state/save.ts).
 - Ключ хранилища: [platform/storage.ts](../src/game/platform/storage.ts).
-- Облако и конфликт: [host/cloud.ts](../src/host/cloud.ts), [host/sync.ts](../src/host/sync.ts), [host/ConflictScreen.tsx](../src/host/ConflictScreen.tsx).
+- Облако и конфликт: [host/cloud.ts](../src/host/cloud.ts), [host/sync.ts](../src/host/sync.ts), [host/ConflictScreen.tsx](../src/host/ConflictScreen.tsx), [host/NewerSaveScreen.tsx](../src/host/NewerSaveScreen.tsx).

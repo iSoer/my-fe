@@ -106,7 +106,7 @@ export function planAssist(state: BattleState, unitId: string, from: Pos, target
     }
     case "heal": {
       if (target.hp >= target.maxHp) return invalid(tr("ally is at full HP", "союзник здоров"))
-      // База умения + ½ Mag лекаря + Mt посоха (`healPower`)
+      // База умения + Mag лекаря × `HEALING.magShare` + Mt посоха (`healPower`)
       let amount = (assist.heal ?? 5) + healPower(unit)
       const spId = unit.skills.special
       if (spId) {
@@ -129,9 +129,11 @@ export function planAssist(state: BattleState, unitId: string, from: Pos, target
     }
     case "sacrifice": {
       if (target.hp >= target.maxHp) return invalid(tr("ally is at full HP", "союзник здоров"))
-      if (bu.hp <= 10) return invalid(tr("too little HP", "слишком мало HP"))
-      const give = Math.min(10, target.maxHp - target.hp)
-      base.selfHpDelta = -10
+      // Цена и лечение — `heal` умения (Отдать вкусняшку: −10 себе, +10 союзнику)
+      const cost = assist.heal ?? 10
+      if (bu.hp <= cost) return invalid(tr("too little HP", "слишком мало HP"))
+      const give = Math.min(cost, target.maxHp - target.hp)
+      base.selfHpDelta = -cost
       base.targetHpDelta = give
       base.heal = give
       return base

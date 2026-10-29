@@ -209,14 +209,16 @@ function reach(g: Grid, size: BoardSize, from: Pos): Set<string> {
 
 /**
  * Ручей — по диагонали из левого верхнего угла в правый нижний, поперёк средней дороги, с плавными изгибами.
- * Лестница из пар клеток: по нему не пройти пешком, только по мостам и бродам.
+ * Лестница из пар клеток: по нему не пройти пешком, только по мостам и бродам. На неквадратном поле диагональ
+ * растягивается по высоте (на квадратном ряд равен столбцу).
  */
 function river(g: Grid, size: BoardSize, rng: Rng): void {
   let off = 0
+  const slope = (size.h - 1) / Math.max(1, size.w - 1)
   // До углов ручей не доходит: там выходы
   for (let t = 4; t < size.w - 5; t++) {
     if (t % 4 === 0) off = clamp(off + rng.int(-1, 1), -2, 2)
-    const y = t + off
+    const y = Math.round(t * slope) + off
     for (const p of [{ x: t, y }, { x: t + 1, y }]) if (inMap(size, p)) set(g, p, "water")
   }
 }
@@ -243,12 +245,15 @@ function pickCamps(g: Grid, size: BoardSize, rng: Rng, count: number, start: Pos
   return []
 }
 
-/** Стражи лагеря: ближайшие к сундуку свободные проходимые клетки (на 1–3 клетки от него). */
-function guardSpots(g: Grid, size: BoardSize, rng: Rng, chest: Pos, count: number, taken: Set<string>): Pos[] {
+/**
+ * Стражи лагеря: ближайшие к сундуку свободные проходимые клетки (на 1–3 клетки от него), только достижимые
+ * от старта (`reachable`) — страж в замкнутом кармане был бы недосягаем.
+ */
+function guardSpots(g: Grid, size: BoardSize, rng: Rng, chest: Pos, count: number, taken: Set<string>, reachable: Set<string>): Pos[] {
   const cands = rng.shuffle(diamond(size, chest, 3).filter((p) => {
     const d = manhattan(p, chest)
     return d >= 1 && !blocked(get(g, p)) && !taken.has(posKey(p))
-  })).sort((a, b) => manhattan(a, chest) - manhattan(b, chest))
+  })).filter(p => reachable.has(posKey(p))).sort((a, b) => manhattan(a, chest) - manhattan(b, chest))
   return cands.slice(0, count)
 }
 
@@ -366,6 +371,34 @@ function terrainAttempt(size: BoardSize, rng: Rng, start: Pos, exits: Pos[], cam
   return { g, decor, camps }
 }
 
+/**
+ * Крайний случай, если ни одна попытка `terrainAttempt` не сложилась: ровная поляна без препятствий и ручья, дороги
+ * и лагеря на ней. Поле сплошь проходимо, поэтому связность гарантирована; лагерь — хотя бы один: если
+ * `pickCamps` не уложилась в ограничения, лагеря ставятся детерминированно в самых удалённых от троп клетках.
+ */
+export function fallbackTerrain(size: BoardSize, rng: Rng, start: Pos, exits: Pos[], campCount: number): { g: Grid, decor: Map<string, MapDecor>, camps: Pos[] } {
+  const g: Grid = Array.from({ length: size.h }, () => Array.from({ length: size.w }, (): TerrainId => "plain"))
+  const decor = new Map<string, MapDecor>()
+  for (const e of exits) carve(g, size, rng, start, e, decor)
+  let camps = pickCamps(g, size, rng, campCount, start, exits, decor)
+  if (camps.length === 0) {
+    const trail = [...decor.keys()].map((k) => {
+      const [x, y] = k.split(",").map(Number)
+      return { x: x ?? 0, y: y ?? 0 }
+    })
+    const gapOf = (p: Pos) => trail.reduce((m, q) => Math.min(m, manhattan(p, q)), Infinity)
+    const cands = cellsOf(size)
+      .filter(p => !decor.has(posKey(p)) && !exits.some(e => posKey(e) === posKey(p)) && manhattan(p, start) >= 6)
+      .map(p => ({ p, gap: gapOf(p) }))
+      .sort((a, b) => b.gap - a.gap || a.p.y - b.p.y || a.p.x - b.p.x)
+      .map(c => c.p)
+    camps = spread(cands, Math.max(1, campCount), 6, [start, ...exits], 6)
+    if (camps.length === 0) camps = cands.slice(0, 1)
+  }
+  for (const c of camps) carve(g, size, rng, c, start, decor)
+  return { g, decor, camps }
+}
+
 /** Карта вылазки в чащу. Детерминирована по seed. */
 export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
   const size: BoardSize = { w: EXPEDITION.w, h: EXPEDITION.h }
@@ -388,17 +421,10 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
   let built: { g: Grid, decor: Map<string, MapDecor>, camps: Pos[] } | null = null
   for (let attempt = 0; attempt < 30 && !built; attempt++)
     built = terrainAttempt(size, root.fork(`terrain:${attempt}`), start, exits, campCount, playerSpawns)
-  if (!built) {
-    // Крайний случай: ровная поляна без препятствий и ручья, дороги и лагеря на ней
-    const rng = root.fork("fallback")
-    const g: Grid = Array.from({ length: size.h }, () => Array.from({ length: size.w }, (): TerrainId => "plain"))
-    const decor = new Map<string, MapDecor>()
-    for (const e of exits) carve(g, size, rng, start, e, decor)
-    const camps = pickCamps(g, size, rng, campCount, start, exits, decor)
-    for (const c of camps) carve(g, size, rng, c, start, decor)
-    built = { g, decor, camps }
-  }
+  built ??= fallbackTerrain(size, root.fork("fallback"), start, exits, campCount)
   const { g: tiles, decor, camps } = built
+  // Всё, что ставится дальше (стражи, усиленные одиночки, сердечки), — только на достижимых от старта клетках
+  const reachable = reach(tiles, size, start)
 
   // Стражи: группа на каждый лагерь, у одного из них ключ; чем больше группа, тем богаче сундук
   const erng = root.fork("enemies")
@@ -409,7 +435,7 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
   const baseTreats = teamTreats(diff, opts.team)
   camps.forEach((pos, i) => {
     const roles: EnemyRoles = { melee: 0, ranged: 0, healer: 0, dancer: 0, heavy: 0 }
-    const places = guardSpots(tiles, size, erng, pos, erng.int(gMin, gMax), taken)
+    const places = guardSpots(tiles, size, erng, pos, erng.int(gMin, gMax), taken, reachable)
     const ids: string[] = []
     for (const at of places) {
       const level = clamp(erng.int(minLevel, maxLevel), 1, MAX_LEVEL)
@@ -436,7 +462,9 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
   // Усиленные одиночки: в лесу, вдали от старта, выхода, лагерей и друг от друга; у каждого свой бонус
   const prng = root.fork("pickups")
   const open = (p: Pos) => !blocked(get(tiles, p)) && !taken.has(posKey(p))
-  const wild = prng.shuffle(cellsOf(size).filter(p => open(p) && manhattan(p, start) >= 9 && exits.every(e => manhattan(p, e) >= 5)))
+  // Недостижимые клетки отсеиваются после перемешивания: порядок случайных чисел (и карты прежних seed) не меняется
+  const reached = (p: Pos) => reachable.has(posKey(p))
+  const wild = prng.shuffle(cellsOf(size).filter(p => open(p) && manhattan(p, start) >= 9 && exits.every(e => manhattan(p, e) >= 5))).filter(reached)
   const elitePos = spread(wild, EXPEDITION.elites[opts.difficulty], 7, camps, 6)
   const buffs = prng.shuffle(BUFF_KINDS)
   const elites: { unitId: string, buff: BuffKind }[] = []
@@ -452,14 +480,14 @@ export function generateExpedition(opts: GenerateExpeditionOptions): MapDef {
   const trails = prng.shuffle(Object.keys(Object.fromEntries(decor)).map((k) => {
     const [x, y] = k.split(",").map(Number)
     return { x: x ?? 0, y: y ?? 0 }
-  }).filter(p => open(p) && manhattan(p, start) >= 7 && exits.every(e => manhattan(p, e) >= 2)))
+  }).filter(p => open(p) && manhattan(p, start) >= 7 && exits.every(e => manhattan(p, e) >= 2))).filter(reached)
   const pickups: Pickup[] = spread(trails, EXPEDITION.hearts, 6, [...camps, ...elitePos], 3)
     .map((pos, i) => ({ id: `heart_${i}`, pos, kind: "heart" as const }))
 
   // Стражи выходов: два случайных выхода из трёх стережёт по одному врагу, третий свободен
   const grng = root.fork("exit-guards")
   for (const e of grng.shuffle(exits).slice(0, EXPEDITION.exitGuards)) {
-    const at = guardSpots(tiles, size, grng, e, 1, taken)[0]
+    const at = guardSpots(tiles, size, grng, e, 1, taken, reachable)[0]
     if (!at) continue
     const level = clamp(grng.int(minLevel, maxLevel), 1, MAX_LEVEL)
     const loadout = pickEnemyLoadout(grng, level, { melee: 0, ranged: 1, healer: 1, dancer: 1, heavy: 0 }, opts.difficulty)

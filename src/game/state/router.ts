@@ -22,6 +22,8 @@ export type Route
 const DIFFICULTY_IDS: readonly Difficulty[] = ["easy", "normal", "hard", "nightmare"]
 
 export function parseRoute(hash: string): Route {
+  // Telegram может передать параметры запуска в хеше (`#tgWebAppData=…`) — это стартовый экран, а не маршрут
+  if (hash.replace(/^#/, "").startsWith("tgWeb")) return { name: "menu" }
   const path = hash.replace(/^#/, "").replace(/^\/+/, "").replace(/\/+$/, "")
   const parts = path.split("/").filter(Boolean)
   const [a, b] = parts
@@ -86,7 +88,34 @@ const currentHash = (): string => (typeof location !== "undefined" ? location.ha
 
 export const $route = atom<Route>(parseRoute(currentHash()))
 
+/**
+ * Сколько наших записей истории над стартовой. Глубина хранится в `history.state` каждой записи (`pfDepth`), поэтому
+ * системная кнопка «назад» браузера и вперёд/назад по истории её корректно восстанавливают (popstate / hashchange).
+ */
 let depth = 0
+
+const DEPTH_KEY = "pfDepth"
+
+function stateDepth(state: unknown): number | null {
+  if (!state || typeof state !== "object") return null
+  const d = (state as Record<string, unknown>)[DEPTH_KEY]
+  return typeof d === "number" ? d : null
+}
+
+/** Синхронизировать `depth` с текущей записью истории; запись без метки (ручная правка хеша, ссылка) — новый шаг. */
+export function syncDepth(): void {
+  const d = stateDepth(history.state)
+  if (d !== null) depth = d
+  else {
+    depth++
+    history.replaceState({ [DEPTH_KEY]: depth }, "", location.href)
+  }
+}
+
+/** Текущая глубина истории (для тестов и отладки). */
+export function historyDepth(): number {
+  return depth
+}
 
 export function navigate(path: string, replace = false): void {
   const target = `#${path.startsWith("/") ? path : `/${path}`}`
@@ -95,10 +124,10 @@ export function navigate(path: string, replace = false): void {
     return
   }
   if (location.hash === target) return
-  if (replace) history.replaceState(null, "", target)
+  if (replace) history.replaceState({ [DEPTH_KEY]: depth }, "", target)
   else {
-    history.pushState(null, "", target)
     depth++
+    history.pushState({ [DEPTH_KEY]: depth }, "", target)
   }
   $route.set(parseRoute(target))
 }
@@ -107,15 +136,13 @@ export function go(r: Route, replace = false): void {
   navigate(routePath(r), replace)
 }
 
-/** Назад: по истории, если она наша; иначе — в меню. */
+/** Назад: по истории, если она наша; иначе (открыли по ссылке, после перезагрузки) — на родительский экран. */
 export function back(): void {
-  if (depth > 0) {
-    depth--
-    history.back()
-  }
-  else navigate("/", true)
+  if (depth > 0 && typeof history !== "undefined") history.back()
+  else go(parentRoute($route.get()), true)
 }
 
+/** Куда ведёт «Назад», когда своей истории нет. */
 export function parentRoute(r: Route): Route {
   switch (r.name) {
     case "unit":
@@ -135,8 +162,18 @@ export function parentRoute(r: Route): Route {
   }
 }
 
+let routerHooked = false
+
 export function initRouter(): void {
-  if (typeof window === "undefined") return
-  window.addEventListener("popstate", () => $route.set(parseRoute(location.hash)))
-  window.addEventListener("hashchange", () => $route.set(parseRoute(location.hash)))
+  if (typeof window === "undefined" || routerHooked) return
+  routerHooked = true
+  // Стартовая запись — глубина 0: от неё «Назад» внутри игры уже не уходит из приложения
+  depth = stateDepth(history.state) ?? 0
+  history.replaceState({ ...(history.state as object | null), [DEPTH_KEY]: depth }, "", location.href)
+  const onChange = () => {
+    syncDepth()
+    $route.set(parseRoute(location.hash))
+  }
+  window.addEventListener("popstate", onChange)
+  window.addEventListener("hashchange", onChange)
 }

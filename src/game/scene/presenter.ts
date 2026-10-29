@@ -6,7 +6,7 @@ import { haptic, strikeHaptic } from "@game/platform/haptics"
 import { sfx, stopMusic, strikeSfx, swingSfx } from "@game/platform/audio"
 import { MAP_SCENE_KEY, MapScene } from "./MapScene"
 import { CINEMATIC_SCENE_KEY, type CinematicData, type CombatEvent } from "./CinematicScene"
-import { banner, floatText, ghostRise, stamp, tween, wait } from "./fx"
+import { banner, floatText, ghostRise, onSceneEnd, stamp, tween, wait } from "./fx"
 import { specialDef } from "@game/content/skills/specials"
 import { unitClass } from "@game/content/classes"
 import type { CritterPart } from "@game/art/index"
@@ -550,6 +550,7 @@ export class GamePresenter implements Presenter {
       floatText(map, atk.x, atk.y - tile * 0.5, `+${strike.healed}`, "#80ed99", sp, { size: tile * 0.3 })
       healPillar(map, ox, oy, tile, sp)
     }
+    if (strike.defenderHealed) floatText(map, def.x, def.y - tile * 0.65, `+${strike.defenderHealed}`, "#80ed99", sp, { size: tile * 0.26 })
     if (strike.miracle) floatText(map, def.x, def.y - tile * 0.8, "1 HP!", "#ffd700", sp, { size: tile * 0.3 })
     // Отдача и возврат с пружиной
     map.tweens.add({ targets: rig, scaleX: 1, scaleY: 1, duration: 160 / sp, ease: "Back.easeOut" })
@@ -565,7 +566,13 @@ export class GamePresenter implements Presenter {
     map: MapScene,
     sp: number
   ): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((done) => {
+      // Карту остановили/уничтожили (ушли с экрана боя) до запуска кинематики или во время неё — не висим
+      const unsub = onSceneEnd(map, done)
+      const resolve = (): void => {
+        unsub()
+        done()
+      }
       const data: CinematicData = { event: ev, before, after, speed: sp, resolve }
       // Зум камеры карты к цели перед переходом (вид запоминается — после кинематики камера вернётся)
       map.saveView()

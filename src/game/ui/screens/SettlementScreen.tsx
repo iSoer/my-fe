@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, type CSSProperties } from "react"
 import { useStore } from "@nanostores/react"
 import type { BuildingId } from "@game/core/types"
 import { BUILDING_IDS, buildingDef, plotOf, type PlaceId } from "@game/content/settlement"
@@ -141,7 +141,7 @@ export function SettlementScreen() {
             ⚙️
           </button>
         </div>
-        <nav className="st-dock" ref={dockRef} aria-label={tr("Settlement", "Поселение")}>
+        <nav className="st-dock" ref={dockRef} style={{ "--st-buildings": BUILDING_IDS.length } as CSSProperties} aria-label={tr("Settlement", "Поселение")}>
           {DOCK.map((p) => {
             const main = p === "gate"
             const built = main || isBuilt(save, p as BuildingId)

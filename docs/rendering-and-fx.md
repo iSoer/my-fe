@@ -4,7 +4,7 @@
 
 ## Монтирование
 
-- [BattleScreen.tsx](../src/game/ui/screens/BattleScreen.tsx) загружает `import("@game/scene/index")` и вызывает `mountBattleGame(el)`, затем `enterBattleScreen()`. При размонтировании вызывается `handle.destroy()`: `setPresenter(null)` и `game.destroy(true)`.
+- [BattleScreen.tsx](../src/game/ui/screens/BattleScreen.tsx) загружает `import("@game/scene/index")` и вызывает `mountBattleGame(el)`, затем `enterBattleScreen()`. При размонтировании сначала вызывается `leaveBattleScreen()` (циклы контроллера боя прерываются, см. [ui-and-routing.md](ui-and-routing.md)), затем `handle.destroy()`: `setPresenter(null)` и `game.destroy(true)`.
 - [scene/index.ts](../src/game/scene/index.ts) создаёт `Phaser.Game` с `Scale.RESIZE`, сценами `[MapScene, CinematicScene]` и `audio.noAudio`, потому что звук свой. Затем `new GamePresenter(game)` и `setPresenter`.
 - `MapScene` ([MapScene.ts](../src/game/scene/MapScene.ts)) подписывается на `$save`, `$battleUi`, `$boardZoom`, `$boardInsets` и вешает `pointerdown` на canvas. Всё снимается в `cleanup` по событиям `SHUTDOWN` и `DESTROY`. Ввод передаётся в `tapTile`, `beginDrag`, `dragHover`, `endDrag`. Геометрия поля публикуется в `$boardLayout`.
 - Поселение — отдельная Phaser-игра в [scene/settlement](../src/game/scene/settlement), её монтирует `SettlementScreen`.
@@ -34,13 +34,13 @@
 
 Скорость: `settings.animSpeed` × 3 при `$battleUi.fastForward`. Все длительности делятся на неё.
 
-`CinematicScene` ([CinematicScene.ts](../src/game/scene/CinematicScene.ts)) запускается через `scene.launch(CINEMATIC_SCENE_KEY, { event, before, after, speed, resolve })`. Тап ускоряет время в 40 раз (`skip`). В `finish()` снимаются таймеры и вызываются `scene.stop()` и `resolve()`. Режим кинематика задаёт настройка `settings.cinematic`: `always`, `mine` или `never`.
+`CinematicScene` ([CinematicScene.ts](../src/game/scene/CinematicScene.ts)) запускается через `scene.launch(CINEMATIC_SCENE_KEY, { event, before, after, speed, resolve })`. Тап ускоряет время в 40 раз (`skip`). В `finish()` вызывается `scene.stop()`, а уборка (таймеры моргания, погода, `skip`) и `resolve()` выполняются в `onEnd`. `onEnd` висит и на `SHUTDOWN`/`DESTROY` сцены, поэтому презентер отпускается, даже если кинематику остановили снаружи или `run()` упал. `resolve` вызывается один раз (флаг `settled`). `runCinematic` дополнительно отпускает ожидание, если до запуска кинематики остановили `MapScene`. Режим кинематика задаёт настройка `settings.cinematic`: `always`, `mine` или `never`.
 
 ## Модули эффектов
 
 | Модуль                                                 | Содержимое                                                                                                                                                                                                                    |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [fx.ts](../src/game/scene/fx.ts)                       | Базовые примитивы: `sceneAlive`, промисы `wait(scene, ms)` и `tween(scene, cfg)`, `floatText`, `banner`, `stamp`, `ghostRise`, `healSparkles`, `confettiRain`, `debrisBurst` и др.                                            |
+| [fx.ts](../src/game/scene/fx.ts)                       | Базовые примитивы: `sceneAlive`, `onSceneEnd(scene, cb)`, промисы `wait(scene, ms)` и `tween(scene, cfg)`, `floatText`, `banner`, `stamp`, `ghostRise`, `healSparkles`, `confettiRain`, `debrisBurst` и др.                                            |
 | [attackFx.ts](../src/game/scene/attackFx.ts)           | Атаки по виду оружия: `playAttackFx` (кинематик), `playQuickAttackFx` (карта), `impactFeel`, `zoomPunch`, `shakePx`, `weaponLookOfUnit`, `magicElement`                                                                       |
 | [motionFx.ts](../src/game/scene/motionFx.ts)           | Движение и действия: текстуры `MTEX`, `stepFx`, следы оружия, снаряды, `hitStop`, `afterImages`, `healPillar`, `buffRunes`, `danceFx`, `levelUpFx`, `portalSpawn`, `specialCutIn`, `bigNumber`, `shakeCam`, `reducedMotion()` |
 | [epicFx.ts](../src/game/scene/epicFx.ts)               | Зрелищные приёмы: `fireball`, `lightningStrike`, `holyPillar`, `specialAura`, `finisherBurst`                                                                                                                                 |
@@ -57,7 +57,8 @@
 
 ## Известные особенности
 
-- Промисы `wait` и `tween` из `fx.ts` разрешаются, только когда срабатывает `delayedCall` или `onComplete`. Если `Phaser.Game` уничтожен во время анимации (ушли с экрана боя), `presenter.play` никогда не завершится, и цикл в `battleUi` повиснет. Повторный вход на экран это компенсирует: `enterBattleScreen` сбрасывает `$battleUi`.
+- Промисы `wait` и `tween` из `fx.ts` разрешаются и при остановке или уничтожении сцены (`onSceneEnd` слушает `SHUTDOWN`/`DESTROY`), а `tween` — ещё и по `onStop`. Так же устроены `MapScene.focusOn` и ожидание кинематики в `runCinematic`. Свои промисы в эффектах заводите через `wait`/`tween` или `onSceneEnd`, иначе `await` повиснет при уходе с экрана.
+- Даже если Phaser не дошёл до `SHUTDOWN` (например, кадр не наступил во фоновой вкладке), контроллер боя не висит: `leaveBattleScreen` и `setPresenter(null)` отпускают ожидание `presenter.play` сами.
 
 ## Где менять
 

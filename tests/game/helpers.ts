@@ -8,6 +8,7 @@ import type {
   UnitInstance,
   UnitSkills,
   Difficulty,
+  Species,
   Stance,
   WeaponSkill
 } from "@game/core/types"
@@ -25,7 +26,7 @@ export interface TestUnitSpec {
   seed?: number
   pos: Pos
   skills?: Partial<UnitSkills>
-  species?: "cat" | "dog"
+  species?: Species
   stance?: Stance
   /** Боевые статы (шкала FEH), одинаковые на любом уровне. */
   baseStats?: Partial<Stats>

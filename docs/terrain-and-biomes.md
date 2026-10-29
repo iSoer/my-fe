@@ -63,7 +63,7 @@
 - `terrainNames` — `Record<TerrainId, string>` через `terrain()` с геттерами `tr`;
 - `colors` — `Record<TerrainId, number>`, плейсхолдеры и палитра арта;
 - `bg` — цвет фона камеры;
-- `bias`.
+- `bias` — `{ forest, covers }`.
 
 ### Как биом влияет на генерацию
 
@@ -75,8 +75,7 @@
 - `factionId` — фракция врагов.
 - Чаща всегда использует `deep_forest` (`EXPEDITION_BIOME`).
 
-**Мёртвые поля**: `bias.walls`, `bias.impassable`, `bias.mountainVsWater` и `TERRAIN_SHARE.forest`, `.walls`,
-`.impassable` объявлены, но нигде не читаются.
+**Мёртвые поля**: `TERRAIN_SHARE.forest`, `.walls`, `.impassable` объявлены, но нигде не читаются.
 
 ### Как биом влияет на вид
 

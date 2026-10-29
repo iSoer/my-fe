@@ -77,6 +77,10 @@ export const validateCharacterRequest = (model: CharacterModel, request: Generat
 
   const item = request.class === undefined ? undefined : classById(request.class)
 
+  if (request.class !== undefined && !item) {
+    violations.push(`unknown class ${request.class}`)
+  }
+
   if (!item) {
     return violations
   }

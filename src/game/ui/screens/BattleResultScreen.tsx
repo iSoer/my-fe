@@ -112,10 +112,11 @@ export function BattleResultScreen() {
   const levelViews = useMemo<LevelUpView[]>(() => {
     if (!lb) return []
     return lb.levelUps.flatMap((l) => {
-      const unit = lb.survivors.find(u => u.id === l.unitId)
+      // Бойцы с полигона в отряде не были — их ищем в армии
+      const unit = lb.survivors.find(u => u.id === l.unitId) ?? save.army?.units.find(u => u.id === l.unitId)
       return unit ? [{ unit, from: l.from, to: l.to }] : []
     })
-  }, [lb])
+  }, [lb, save.army])
   const [shown, setShown] = useState<{ index: number, chain: boolean } | null>(null)
   const [levelsShown, setLevelsShown] = useState(false)
   const autoDelay = lb ? 500 + lb.survivors.length * 110 : 0

@@ -24,7 +24,7 @@
 - `map: MapDef`: клетки `tiles`, `playerSpawns`, `enemies` (`EnemyPlacement`: позиция, стойка, `post`/`leash` у стражей), `reinforcements`, `objective`, `mode`, `expedition`.
 - `turn` (с 1) и `phase: "player" | "enemy"`.
 - `units: Record<id, BattleUnit>`: состояние бойца в бою. `roster: Record<id, UnitInstance>`: снимок персонажей. XP, уровни, `history` и `skillXp` меняются в `roster`, а после боя сливаются в армию.
-- `walls`: HP хлипких стен по `posKey`. В `createBattle` каждая `wall_breakable` получает 2 HP. Стена с 0 HP читается в `terrainAt` как `plain`.
+- `walls`: HP хлипких стен по `posKey`. В `createBattle` каждая `wall_breakable` получает `BATTLE.wallHp = 2` HP. Стена с 0 HP читается в `terrainAt` как `plain`.
 - `decals`: лужи крови на местах гибели.
 - `stats: BattleStats`: `kills`, `damage` (урон только от бойцов игрока), `deaths`, `xpGained`, `loot`.
 - `spawnedWaves`: номера ходов уже пришедших волн подкреплений.
@@ -62,7 +62,9 @@
   - **сбрасывает `penalties`**, поэтому дебафф живёт до следующего действия бойца;
   - меняет стойку;
   - начисляет опыт навыков передвижения (`SKILL_XP.move = 2.5` каждому из `MOVEMENT_SKILLS`).
-- После действия срабатывает вылазка: `move` вызывает `expeditionStepOn`, а остальные действия бойца вызывают `expeditionStep`. Затем всегда вызывается `checkEnd`.
+- После действия срабатывает вылазка: `move` вызывает `expeditionStepOn`, а остальные действия бойца вызывают `expeditionStep`. Союзник, которого сдвинула Поддержка (`swap`, `reposition`, `drawBack`, `shove`, `smite`), тоже встаёт на новую клетку через `expeditionStepOn`: подбирает ключ, сердечко, бонус, открывает сундук (но не уходит через выход). Затем всегда вызывается `checkEnd`.
+- `stats.turns` — номер текущего хода: 1 с начала боя, растёт вместе с `turn`.
+- `killUnit` помечает павшего флагом `killer:<id убийцы>` = 1 (`KILLER_FLAG` в `battle/query.ts`). Лог событий не хранится, а флаги сохраняются вместе с боем; по флагу Мемориал называет убийцу (`findKiller` в [core/progression](../src/game/core/progression/index.ts): флаг, а без него — ближайший к телу **живой** враг).
 
 ## События (`BattleEvent`)
 
@@ -111,7 +113,7 @@
 2. В `stats.damage` идёт урон, нанесённый бойцами игрока. В `roster[...].history` обновляются `damageDealt`, `damageTaken` и `closestCall`.
 3. Стойки:
    - раненый вожак-враг переходит в `advance`;
-   - атаковавший враг, чья цель выжила, тоже переходит в `advance`, но `finishAction` затем ставит `newStance` из действия.
+   - атаковавший враг, чья цель выжила, переходит в `advance` даже из `guard`: ветка `attack` передаёт эту стойку в `finishAction` вместо `newStance` действия. Если враг цель добил, ставится `newStance` (по умолчанию `advance`).
 4. Событие `combat`, затем `killUnit` для погибших (сначала защитник).
 5. `afterEffects` из хуков `afterCombat` применяются через `applyEffects`. Эффект `damage` **никогда не убивает**: минимум 1 HP.
 6. Опыт выжившим:
@@ -156,10 +158,10 @@
 | `shove` / `smite` | Цель сдвигается на 1 / 2 клетки от бойца                              | Путь перекрыт                                               |
 | `heal`            | Лечит на `assist.heal + healPower(unit)`, не больше недостающего HP   | Цель здорова                                                |
 | `refresh`         | Цель снова может действовать (`acted = false`, `turnStart` удаляется) | Цель ещё не действовала, или цель — танцор (`DANCER_CLASS`) |
-| `sacrifice`       | −10 HP себе, +min(10, недостающее) цели                               | Цель здорова, или у бойца ≤ 10 HP                           |
+| `sacrifice`       | −`assist.heal` HP себе (10), +min(`heal`, недостающее) цели           | Цель здорова, или у бойца ≤ `heal` HP                       |
 | `reciprocal`      | Боец и цель меняются HP, каждый в пределах своего `maxHp`             | Обмен ничего не меняет                                      |
 
-`healPower(unit) = floor(собственный Mag × HEALING.magShare) + weaponMt(unit)`, где `magShare = 1` ([units](../src/game/core/units/index.ts)). Спецприём вида `heal` срабатывает при `specialCd <= 0` и прибавляет `bonusHeal` к лечению цели или `allAlliesHeal` остальным союзникам. Затем кулдаун сбрасывается на максимум, а если спецприём не сработал, уменьшается на 1.
+`healPower(unit) = floor(собственный Mag × HEALING.magShare) + weaponMt(unit)`, где `magShare = 1` ([units](../src/game/core/units/index.ts)). Спецприём вида `heal` срабатывает при `specialCd <= 0` и прибавляет `bonusHeal` к лечению цели или `allAlliesHeal` остальным союзникам. Лечение остальных (`sp_heavenly`) идёт через `applyEffects` после события `assist`: на каждого вылеченного — событие `effect` (`heal`, `sourceId` — лекарь); вылеченное суммируется в опыт за лечение. Затем кулдаун сбрасывается на максимум, а если спецприём не сработал, уменьшается на 1.
 
 `canStand` проверяет границы поля, проходимость клетки для типа движения (`isPassable`) и то, что клетка свободна (участники Поддержки не мешают).
 
@@ -178,7 +180,7 @@
 `spawnReinforcements` вызывается в начале каждой фазы врага. Для волны с `wave.turn === state.turn`, которой ещё нет в `spawnedWaves`:
 
 - номер волны записывается в `spawnedWaves`;
-- каждый юнит встаёт на `r.pos`. Если клетка занята, он встаёт на первую свободную клетку `plain` среди (x+1, y), (x−1, y), (x, y+1), а если таких нет, тихо пропускается;
+- каждый юнит встаёт на `r.pos`. Если клетка занята, `spawnTile` ищет в ширину (соседи в порядке →, ←, ↓, ↑) ближайшую свободную клетку, проходимую для его типа движения; через занятые клетки поиск идёт, через непроходимые — нет. Юнит пропускается, только если такой клетки на поле нет;
 - юнит создаётся со стойкой `advance` и `spawnedTurn = turn`, поэтому действует уже в эту же фазу врага;
 - шлётся событие `reinforcements`.
 

@@ -32,7 +32,6 @@ description: Пошаговый рецепт добавления новой п�
        stats: level => [{ label: tr("Bonus", "Бонус"), value: String(atLevel(FORGE.bonus, level)) }]
      },
      ```
-   - Поле `starter` нигде не читается, не полагайся на него.
 
 ## 2. Место на карте
 
@@ -51,13 +50,13 @@ description: Пошаговый рецепт добавления новой п�
 
 ## 4. Арт и сцена
 
-- В `src/game/art/village.ts` напиши SVG-функцию `village<Name>Svg(..., wear)` или переиспользуй `villageHouseSvg({ w, h, roof, wall, npc, wear })`, расширив union `HouseArt.npc`. `wear` — степень разрушения из `buildingWear(level)`: целым здание не бывает никогда.
-- В `src/game/scene/settlement/SettlementScene.ts` добавь `case` в `buildingSvg` (спрайт уровня) и `buildingOver` (на сколько клеток спрайт выступает над участком). Обе функции — исчерпывающие `switch`, их проверяет TS.
+- В `src/game/art/village.ts` напиши SVG-функцию `village<Name>Svg(..., wear)` или переиспользуй `villageHouseSvg({ w, h, roof, wall, npc, wear })`, расширив union `HouseArt.npc`. `wear` — степень разрушения из `buildingWear(level)`: целым здание не бывает никогда. Добавь `case` в `villageBuildingSvg(id, w, h, level)` там же (спрайт уровня; его используют и сцена, и галерея).
+- В `src/game/scene/settlement/SettlementScene.ts` добавь `case` в `buildingOver` (на сколько клеток спрайт выступает над участком). Обе функции — исчерпывающие `switch`, их проверяет TS.
 
 ## 5. UI
 
-- В `src/game/ui/settlement/BuildingPanel.tsx` добавь компонент `<Name>Section` и **явную ветку** `else if (id === "forge")` перед последней. Последний `else` рисует `GraveyardSection`, поэтому без ветки новое здание молча получит UI кладбища, и TS это не поймает. Хорошо бы переделать на исчерпывающий `switch`.
-- Нижняя панель поселения: сетка `grid-template-columns: repeat(5, 1fr) 1.2fr` в `src/game/ui/village.css`. Увеличь число колонок.
+- В `src/game/ui/settlement/BuildingPanel.tsx` добавь компонент `<Name>Section` и `case "forge"` в `buildingSection` — это исчерпывающий `switch` с проверкой `never`, без ветки TS не скомпилирует.
+- Нижняя панель поселения подстраивается сама: число колонок `--st-buildings` = `BUILDING_IDS.length` (ставит `SettlementScreen`, CSS в `src/game/ui/village.css`). Проверь только, что подписи помещаются на узком экране.
 
 ## 6. Сейв (обязательно)
 
@@ -69,7 +68,7 @@ description: Пошаговый рецепт добавления новой п�
 
 ## 7. Тесты
 
-- `tests/game/settlementMap.test.ts`: допиши новое здание в `ALL_BUILT` (список захардкожен) и проверь тесты проходимости и экранов.
+- `tests/game/settlementMap.test.ts`: `ALL_BUILT` строит все `BUILDING_IDS` сам — проверь тесты проходимости и экранов.
 - `tests/game/settlement.test.ts`: тесты правил здания, цен и `requires`.
 - Запусти:
   ```bash
@@ -85,6 +84,7 @@ description: Пошаговый рецепт добавления новой п�
   - построй здание: `__pf.settlement.build("forge")`;
   - улучшай его через `__pf.settlement.upgrade("forge")` и проверь все 5 стадий `wear`;
   - подойди к участку: `__pf.settlement.teleport("plot-forge")`.
+- Все уровни спрайта разом — в галерее: `http://localhost:5173/tools/gallery/index.html`, секция «здание: forge».
 - Скрин или полный цикл: `pnpm smoke` (см. `docs/testing.md`).
 
 ## 9. Документация

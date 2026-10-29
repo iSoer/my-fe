@@ -16,7 +16,8 @@ description: Рецепты добавления новых персонажей
 
 1. В `src/shared/character/classes.ts` добавь запись в нужный `tier(...)` массива `CHARACTER_CLASSES` в формате `[id, "English Name", { требования: ранг }, { таланты: ранг }?]`.
    - Если классу нужно больше `MAX_TALENTS` (3) талантов, он не генерируется и доступен только через смену класса.
-   - Летающему классу обязательно добавь запись в `FLIER_MOUNTS`. Тест этого не проверяет, без записи у класса просто не будет арта маунта.
+   - Летающему классу обязательно добавь запись в `FLIER_MOUNTS` (экспортирована из `src/shared/character/classes.ts`). Тест в `content.test.ts` проверяет, что у каждого летуна она есть и лишних нет.
+   - `classId` должен существовать: модель отвергает неизвестный класс (`validateCharacterRequest` → `unknown class`), `generateUnit` бросает ошибку.
    - Название класса пишется только по-английски, так принято в проекте.
 2. В `src/game/content/classStats.ts` добавь модификаторы `CLASS_STAT_MODS[id]`.
 3. В `src/game/art/outfits.ts` добавь `CLASS_OUTFITS[id]` с узнаваемым силуэтом. Новый `HatKind` нужно нарисовать в `outfitHead` и добавить в `hatLift`.
@@ -32,13 +33,13 @@ description: Рецепты добавления новых персонажей
    breed("cat_bengal", "cat", "Bengal", "Бенгальская", 1, l(["pointy"], ["long"], { marking: "calico" })),
    ```
    Аргументы: id `<вид>_<порода>`, вид, en, ru, телосложение `0|1|2`, внешность `l(ears, tails, {muzzle?, fluffy?, marking?})`.
-2. Бери только те формы ушей (`EarShape`) и хвостов (`TailShape`), которые этот вид умеет рисовать: `catEar`, `dogEar`, `mouseEar` и функции хвостов в `src/game/art/critter.ts`. Новая форма требует отрисовки там же.
+2. Бери только те формы ушей (`EarShape`) и хвостов (`TailShape`), которые этот вид умеет рисовать: таблицы `DRAWABLE_EARS`/`DRAWABLE_TAILS` в `src/game/art/look.ts` (их сверяет тест в `art.test.ts`). Новая форма требует отрисовки в `catEar`/`dogEar`/`mouseEar` или функции хвоста в `src/game/art/critter.ts` и записи в таблицу.
 3. Сейв: `breedId` — это `z.string()`, подъём версии не нужен. **Удалять породу нельзя**: `breedDef` бросает исключение в `UnitScreen` и `UnitDetails` для старых бойцов.
 4. Тесты: `content.test.ts` (уникальность id), `art.test.ts` («облик бойца»).
 
 ## C. Новая вражеская фракция
 
-1. В `src/game/content/factions.ts` добавь в `FACTIONS`: `id`, `get name()` и `get desc()` через `tr`, `palettes` (индексы 0–11) и `species: { cat, dog, mouse }`. Веса указываются для всех трёх видов.
+1. В `src/game/content/factions.ts` добавь в `FACTIONS`: `id`, `get name()` и `get desc()` через `tr`, `palettes` (индексы `FUR_PALETTES`, 0–11; диапазон проверяет тест) и `species: { cat, dog, mouse }`. Веса указываются для всех трёх видов.
 2. Привяжи фракцию к биому: `factionId` в `src/game/content/biomes.ts`. См. также `add-small-map` и `add-big-map`.
 3. Сейв: id хранится строкой, подъём версии не нужен. **Удалять фракцию нельзя**: `factionDef` бросает исключение на сохранённых картах.
 
@@ -53,7 +54,7 @@ description: Рецепты добавления новых персонажей
 
 Всё лежит в `src/game/content/names.ts`, `epitaphs.ts` и `personalities.ts`. На сейв не влияет, кроме характеров.
 
-- Имена: `NAMES_RU` и `NAMES_EN` заполняются **под одним индексом** с одинаковым полом (`m()` / `f()`).
+- Имена: `NAMES_RU` и `NAMES_EN` заполняются **под одним индексом** с одинаковым полом (`m()` / `f()`) — это проверяет тест в `content.test.ts` (длины, пол по индексу, не меньше 60 мышиных).
 - Эпитеты и титулы боссов — пары `[м, ж]`. Длины массивов в обоих языках должны совпадать, иначе `langArray` бросит исключение при загрузке.
 - `EPITAPHS`: `(c) => tr(...)`.
 - `PERSONALITIES` добавляй **только в конец**: id `p<n>` хранится в сейвах.
@@ -94,7 +95,7 @@ pnpm typecheck && pnpm lint && pnpm test
 - открой армию (`#/army`) или магазин казарм и посмотри бойцов;
 - сгенерировать бойца нужного класса можно через `generateUnit({ seed, level, species, classId })` и `__pf.save` (см. `docs/ui-and-routing.md`).
 
-Галерея `tools/gallery` сейчас сломана: в ней устаревшие id оружия и SVG-функций, и `tools/` не входит в tsconfig. Не полагайся на неё, пока её не починят.
+Галерея: `pnpm dev` → `http://localhost:5173/tools/gallery/index.html`. В ней все классы (секция «классы»), оружие, типы движения, окрасы и герой. Она входит в `pnpm typecheck`; если менял API арта — поправь `tools/gallery/main.ts`.
 
 ## Документация
 

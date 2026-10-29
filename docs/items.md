@@ -47,7 +47,7 @@
 
 Названия на английском: `WEAPON_GRADE_LABELS` + `SKILL_LABELS` или `VARIANT_PREFIX` + навык. Формат названий проверяет `content.test.ts`. Описание (`desc`) — геттер с `tr`.
 
-**Владение.** Оружие может взять любой боец. `equipWeapon` ставит `unit.weaponSkill = weapon.kind`, а `withClassAssist` при необходимости выдаёт или снимает `as_heal` и `as_dance`.
+**Владение.** Оружие может взять любой боец. `equipWeapon` ставит `unit.weaponSkill = weapon.kind`, а `withClassSkills` снимает ставшие недоступными навыки (см. [skills](skills.md)) и при необходимости выдаёт `as_heal` и `as_dance`.
 
 `weaponMt = max(0, mt + weaponTier·2 + floor(rankIndex/3) − shortfall·2)`, где `shortfall = max(0, rankIndex(requiredRank) − rankIndex(ранг навыка))`. Заточка (`weaponTier` 0–3, цены `PRICES.sharpen = [200, 500, 1000]`) принадлежит **бойцу**, а не оружию, и сохраняется при смене оружия.
 
@@ -76,7 +76,7 @@
 
 `Inventory = Record<itemId, count>` лежит в `SaveGame.inventory`.
 
-- `addItem` не кладёт деревянное оружие и ограничивает количество `ITEMS.stackCap = 99`. Излишек молча теряется.
+- `addItem` не кладёт деревянное оружие и количество не ограничивает: возврат снаряжения и находки из сундуков не теряются. `ITEMS.stackCap = 99` ограничивает только покупку в Лавке (`buyItemAction`).
 - `removeItem` бросает исключение, если предметов не хватает.
 - `unitGear(unit)`: что возвращается в инвентарь, когда бойца отпускают (купленное оружие и талисман).
 - При смене оружия или талисмана прежний предмет возвращается в инвентарь (`equipWeaponAction`, `equipTalismanAction`).

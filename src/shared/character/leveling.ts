@@ -1,6 +1,6 @@
 import { STATS, type Stat } from "./stats"
 
-// Deterministic leveling of generated characters (docs/character-model.md, "Прокачка")
+// Deterministic leveling of generated characters (docs/progression.md; docs/units.md, "Статы")
 
 export const MIN_LEVEL = 1
 

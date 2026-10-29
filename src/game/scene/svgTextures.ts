@@ -3,7 +3,6 @@ import type { TerrainId, UnitInstance } from "@game/core/types"
 import {
   backdropSvg,
   svgToImage,
-  tileSvg,
   unitArtKey,
   unitPartSvg,
   unitSvg,
@@ -33,7 +32,20 @@ export const TERRAINS: readonly TerrainId[] = [
   "cover"
 ]
 
-const inflight = new Map<string, Promise<string>>()
+/**
+ * Растеризации в полёте — отдельно на каждый TextureManager: пересозданная игра не должна получить промис,
+ * который положит текстуру в менеджер уже уничтоженной игры.
+ */
+const inflightByTm = new WeakMap<Phaser.Textures.TextureManager, Map<string, Promise<string>>>()
+
+function inflightOf(tm: Phaser.Textures.TextureManager): Map<string, Promise<string>> {
+  let m = inflightByTm.get(tm)
+  if (!m) {
+    m = new Map()
+    inflightByTm.set(tm, m)
+  }
+  return m
+}
 
 function texturesOf(scene: Phaser.Scene): Phaser.Textures.TextureManager | null {
   // После уничтожения сцены/игры sys и textures могут быть undefined.
@@ -51,12 +63,14 @@ export function ensureTexture(scene: Phaser.Scene, key: string, svg: string, w: 
   const tm = texturesOf(scene)
   if (!tm) return Promise.resolve(key)
   if (tm.exists(key)) return Promise.resolve(key)
+  const inflight = inflightOf(tm)
   const hit = inflight.get(key)
   if (hit) return hit
   const p = svgToImage(key, svg, w, h)
     .then((img) => {
+      // Кладём только в тот же менеджер и только пока сцена жива
       const t = texturesOf(scene)
-      if (t && !t.exists(key)) t.addImage(key, img)
+      if (t === tm && !t.exists(key)) t.addImage(key, img)
       return key
     })
     .catch(() => key)
@@ -116,24 +130,9 @@ export function ensureUnitPartTextures(
 
 /* ---------- Тайлы ---------- */
 
-/** Сколько кадров анимации у местности (вода 3, листва 2, остальное 1). */
+/** Сколько кадров анимации у местности (вода 4, листва 2, остальное 1). */
 export function tileFrameCount(terrain: TerrainId): number {
   return TILE_FRAME_COUNT[terrain] ?? 1
-}
-
-export function tileTexKey(biomeId: string, terrain: TerrainId, frame = 0): string {
-  return `tile:${biomeId}:${terrain}:${frame}`
-}
-
-/** Все кадры анимированных тайлов и нулевой кадр остальных: ≤ 10 текстур на биом. */
-export function ensureTileTextures(scene: Phaser.Scene, biomeId: string): Promise<string[]> {
-  const jobs: Promise<string>[] = []
-  for (const t of TERRAINS) {
-    const frames = tileFrameCount(t)
-    for (let f = 0; f < frames; f++)
-      jobs.push(ensureTexture(scene, tileTexKey(biomeId, t, f), tileSvg(biomeId, t, f), TILE_TEX_PX, TILE_TEX_PX))
-  }
-  return Promise.all(jobs)
 }
 
 /* ---------- Фоны кинематика ---------- */

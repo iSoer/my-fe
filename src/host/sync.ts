@@ -1,7 +1,7 @@
 import type { SaveGame } from '@game/core/types';
-import { parseSave, serializeSave } from '@game/core/save';
+import { SAVE_VERSION, parseSave, serializeSave } from '@game/core/save';
 import { loadLocal, saveLocal } from '@game/platform/storage';
-import { $saveStatus, $save } from '@game/state/save';
+import { $saveStatus, $save, backupRawSave } from '@game/state/save';
 import { cloudLoad, cloudStore } from './cloud';
 
 /** Облачный сейв новее локального больше чем на минуту — спросить игрока, какой оставить. */
@@ -20,27 +20,45 @@ export interface SaveConflict {
 const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
 
+export type ReconcileResult =
+  | { kind: 'ok' }
+  | { kind: 'conflict'; conflict: SaveConflict }
+  /** Локальный или облачный сейв записан более новой версией игры — эту версию запускать нельзя. */
+  | { kind: 'newer' };
+
+/** Локальный сейв записан более новой версией игры (без облака: вызывается и вне Telegram). */
+export function localSaveIsNewer(): boolean {
+  const json = loadLocal();
+  if (!json) return false;
+  const r = parseSave(json);
+  return !r.ok && r.newer === true;
+}
+
 /**
- * До монтирования игры: сравнить локальный сейв с облачным. Если локального нет — облачный кладётся в localStorage
- * (игра прочитает его в initSave); если облачный заметно новее — вернуть конфликт для выбора игроком.
+ * До монтирования игры: сравнить локальный сейв с облачным. Если локального нет или он нечитаем — облачный кладётся
+ * в localStorage (игра прочитает его в initSave; нечитаемый локальный уходит в резервную копию); если облачный
+ * заметно новее — вернуть конфликт для выбора игроком. Сейв более новой версии игры (локальный или облачный) — `newer`:
+ * старый клиент не должен его ни читать, ни перезаписывать.
  */
-export async function reconcileCloudSave(): Promise<SaveConflict | null> {
+export async function reconcileCloudSave(): Promise<ReconcileResult> {
+  if (localSaveIsNewer()) return { kind: 'newer' };
   const remote = await withTimeout(cloudLoad(), CLOUD_TIMEOUT_MS);
-  if (!remote) return null;
+  if (!remote) return { kind: 'ok' };
   const cloud = parseSave(remote.json);
-  if (!cloud.ok) return null;
+  if (!cloud.ok) return cloud.newer ? { kind: 'newer' } : { kind: 'ok' };
   const localJson = loadLocal();
   const local = localJson ? parseSave(localJson) : null;
   if (!local || !local.ok) {
+    if (localJson) backupRawSave(localJson);
     saveLocal(remote.json);
-    return null;
+    return { kind: 'ok' };
   }
   if (
     cloud.save.updatedAt > local.save.updatedAt + CONFLICT_GAP_MS &&
     serializeSave(cloud.save) !== serializeSave(local.save)
   )
-    return { local: local.save, cloud: cloud.save, cloudJson: remote.json };
-  return null;
+    return { kind: 'conflict', conflict: { local: local.save, cloud: cloud.save, cloudJson: remote.json } };
+  return { kind: 'ok' };
 }
 
 /** Выбор игрока в конфликте: облачный сейв записывается локально до старта игры. */
@@ -61,7 +79,7 @@ export function startCloudMirror(): void {
     lastBattle = battleKey;
     if (timer) clearTimeout(timer);
     timer = setTimeout(
-      () => void cloudStore(serializeSave($save.get()), $save.get().updatedAt),
+      () => void cloudStore(serializeSave($save.get()), $save.get().updatedAt, SAVE_VERSION),
       immediate ? 0 : CLOUD_DEBOUNCE_MS,
     );
   });
@@ -69,6 +87,6 @@ export function startCloudMirror(): void {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden' || $saveStatus.get() !== 'ready') return;
     if (timer) clearTimeout(timer);
-    void cloudStore(serializeSave($save.get()), $save.get().updatedAt);
+    void cloudStore(serializeSave($save.get()), $save.get().updatedAt, SAVE_VERSION);
   });
 }

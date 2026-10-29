@@ -12,10 +12,12 @@ import { BUILDING_MAX_LEVEL } from "@game/content/settlement"
 import { DEFAULT_LANG, tr } from "@game/i18n"
 
 /**
- * v6: деревня-хаб (позиция героя), признак начатой игры, инвентарь армии, Лавка, талисман бойца, рюкзак вылазки;
- * оружие — предмет, а не навык за SP (v5 и v4 мигрируют). v7: без классов Commoner / Noble / Diviner.
- * v8: без предметов лечения и рюкзака вылазки. v9: поселение со зданиями и уровнями вместо деревни с героем,
- * тренировочный полигон, витрина Лавки по периодам, воскрешение на Кладбище; герой ходит по карте поселения.
+ * v5: армия — ростер, Приют — магазин. v6: деревня-хаб (позиция героя), признак начатой игры, инвентарь армии,
+ * Лавка, талисман бойца, рюкзак вылазки; оружие — предмет, а не навык за SP (v5 и v4 мигрируют).
+ * v7: без классов Commoner / Noble / Diviner. v8: без предметов лечения и рюкзака вылазки. v9: поселение со
+ * зданиями и уровнями вместо деревни с героем, тренировочный полигон, витрина Лавки по периодам, воскрешение на
+ * Кладбище; герой ходит по карте поселения. v10: бар (`tavern`), заказанная кружка в поселении и выпитый напиток
+ * в бою. v11: сюжетные факты (`story`: счётчики и просмотренные диалоги) для триггеров диалогов.
  */
 export const SAVE_VERSION = 11
 
@@ -522,7 +524,11 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   return data
 }
 
-export type ParseResult = { ok: true, save: SaveGame } | { ok: false, error: string }
+/**
+ * `newer` — сейв записан более новой версией игры: эта версия его не читает и не должна перезаписывать
+ * (zod отбросил бы незнакомые поля, и сейв обрезался бы при первой же записи).
+ */
+export type ParseResult = { ok: true, save: SaveGame } | { ok: false, error: string, newer?: true }
 
 export function parseSave(json: string): ParseResult {
   let raw: unknown
@@ -542,6 +548,15 @@ export function parseSave(json: string): ParseResult {
         `сейв версии ${version} устарел: бойцы и оружие теперь из модели персонажа`
       )
     }
+  if (typeof version === "number" && version > SAVE_VERSION)
+    return {
+      ok: false,
+      newer: true,
+      error: tr(
+        `Save version ${version} is from a newer game version (this one reads up to ${SAVE_VERSION}) — reload to update`,
+        `сейв версии ${version} записан более новой версией игры (эта читает до ${SAVE_VERSION}) — перезагрузите, чтобы обновиться`
+      )
+    }
   const migrated = migrate(raw as Record<string, unknown>)
   const res = saveSchema.safeParse(migrated)
   if (!res.success)
@@ -552,7 +567,8 @@ export function parseSave(json: string): ParseResult {
         .slice(0, 5)
         .join("; ")
     }
-  return { ok: true, save: res.data as SaveGame }
+  // Без каста: если схема и тип SaveGame разойдутся, это ошибка компиляции
+  return { ok: true, save: res.data }
 }
 
 export function serializeSave(save: SaveGame): string {

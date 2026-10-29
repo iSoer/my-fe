@@ -19,6 +19,8 @@ const serwist = new Serwist({
   cacheId: 'pawfield',
   precacheEntries: self.__SW_MANIFEST,
   precacheOptions: {
+    // Старые кэши удаляются при активации новой версии. Открытые вкладки старой версии после этого не догрузят
+    // свои ленивые чанки — их переводит на новую версию host/pwa.ts (controllerchange, vite:preloadError).
     cleanupOutdatedCaches: true,
     // Hash-роутинг: любая навигация в scope отдаётся index.html из precache.
     navigateFallback: new URL('index.html', self.registration.scope).href,

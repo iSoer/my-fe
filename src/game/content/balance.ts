@@ -30,7 +30,6 @@ export interface AiProfile {
   wExposure: number
   /** Бонус за добивание раненых: умножается на долю потерянного HP цели. */
   focusLowHp: number
-  silentReinforcements: boolean
   /** Стоящий (hold) враг просыпается, если боец игрока ближе этого расстояния. */
   alertRadius: number
   /** С этого хода все стоящие враги идут в атаку сами. */
@@ -63,7 +62,6 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
       wTaken: 0.3,
       wExposure: 0,
       focusLowHp: 0,
-      silentReinforcements: false,
       alertRadius: 3,
       wakeTurn: 6,
       cohesion: 0,
@@ -90,7 +88,6 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
       wTaken: 0.7,
       wExposure: 3,
       focusLowHp: 8,
-      silentReinforcements: false,
       alertRadius: 4,
       wakeTurn: 4,
       cohesion: 1.5,
@@ -117,7 +114,6 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
       wTaken: 1.0,
       wExposure: 6,
       focusLowHp: 14,
-      silentReinforcements: false,
       alertRadius: 5,
       wakeTurn: 3,
       cohesion: 2.5,
@@ -147,7 +143,6 @@ export const DIFFICULTIES: readonly DifficultyDef[] = [
       wTaken: 1.0,
       wExposure: 8,
       focusLowHp: 20,
-      silentReinforcements: true,
       alertRadius: 6,
       wakeTurn: 2,
       cohesion: 3,
@@ -284,8 +279,7 @@ export const XP = {
 export const SP = {
   combat: 4,
   kill: 8,
-  assist: 4,
-  costs: { assist: 150, special: 200, passive: [120, 200, 300] as const }
+  assist: 4
 }
 
 export const REWARDS = {
@@ -440,7 +434,9 @@ export const BUFF = { fury: 0.2, aegis: 0.2, swift: 2, regen: 0.25, fortune: 1.5
 
 /** Бой длится не дольше `turnLimit` ходов: после фазы врага последнего хода отряд отступает (живые бойцы целы, часть добычи). */
 export const BATTLE = {
-  turnLimit: 20
+  turnLimit: 20,
+  /** Прочность ломаемой стены: столько ударов (`attackWall`, −1 за удар), и клетка становится проходимой. */
+  wallHp: 2
 }
 
 /** Лимит ходов боя: в чаще поле больше — и ходов больше (`EXPEDITION.turnLimit`). */

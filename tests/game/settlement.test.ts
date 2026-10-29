@@ -44,6 +44,7 @@ import {
 import { SAVE_VERSION, createEmptySave, parseSave, serializeSave } from "@game/core/save"
 import { itemPrice } from "@game/core/items"
 import { memorialEntry } from "@game/core/progression"
+import { factsOf } from "@game/core/story/facts"
 import { generateRoster } from "@game/core/units"
 import { XP } from "@game/content/balance"
 import { BARRACKS, BUILDINGS, GAME_DAY, STORE, TRAINING, atLevel } from "@game/content/settlement"
@@ -257,6 +258,8 @@ describe("тренировочный полигон", () => {
     tickSettlement(T0 + 50 * HOUR)
     expect(unit(id).level).toBe(MAX_LEVEL)
     expect(unit(id).xp).toBe(0)
+    // «+N опыта» на панели — только реально полученный опыт
+    expect(s().settlement.training[0]!.xp).toBe(0)
   })
 
   it("опыт за вылазку начисляется один раз за бой", () => {
@@ -460,6 +463,24 @@ describe("кладбище и воскрешение", () => {
     const status = reviveStatus(r.save, T0 + 2 * HOUR)
     expect(status.nextAt).toBe(nextDayStart(T0))
     expect(canRevive(r.save, eb, nextDayStart(T0)).ok).toBe(true)
+  })
+
+  it("божественный класс — один на армию: павшего с занятым божественным классом не вернуть", () => {
+    setLevel("graveyard", 5)
+    const [a, b] = units()
+    $save.set({ ...s(), army: { ...s().army!, units: units().map(u => (u.id === a!.id || u.id === b!.id ? { ...u, classId: "the-blade" } : u)) } })
+    const entry = kill(a!.id)
+    expect(canRevive(s(), entry, T0).ok).toBe(false)
+    kill(b!.id)
+    expect(reviveAction(entry, T0).ok).toBe(true)
+  })
+
+  it("факт memorial считает только павших: отпущенный боец не открывает сцену первой могилы", () => {
+    const u = units()[0]!
+    $save.set({ ...s(), memorial: [memorialEntry(u, "released", T0)] })
+    expect(factsOf(s())["memorial"]).toBe(0)
+    kill(units()[1]!.id)
+    expect(factsOf(s())["memorial"]).toBe(1)
   })
 
   it("игровой день начинается в resetHour по UTC+offset", () => {

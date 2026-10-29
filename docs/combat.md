@@ -75,12 +75,14 @@ dmg = floor(dmg × damageMultiplier(ctx))   // для каждого хука �
 if staff и нет wrathfulStaff: dmg = floor(dmg × 0.5)
 
 // защитный спецприём (kind "defense", specialCd ≤ 0, подходит vsRange)
-dmg = floor(dmg × (1 − reduction)); защитник лечится на floor(снятое × healPctOfDamage/100)
+dmg = floor(dmg × (1 − reduction)); снятое = до − после
 для каждого damageReduction(ctx) = r > 0: dmg = floor(dmg × (1 − r))
 dmg = floor(dmg × buffDamageMult)          // вылазка: fury ×1.2, aegis ×0.8
 dmg = max(1, dmg)                          // COMBAT.minDamage
-if какой-то damageImmune(ctx, strike, dmg): dmg = 0
+if какой-то damageImmune(ctx, strike, dmg): dmg = 0, защитный спецприём не срабатывает (кулдаун не сбрасывается, лечения нет)
 ```
+
+Лечение защитника `healPctOfDamage` (`sp_loyalty`) — уже после удара, если защитник выжил: `floor(снятое × pct/100)`, не больше недостающего HP. Поэтому оно работает и при полном HP. Вылеченное пишется в `Strike.defenderHealed` (поле необязательное), `defenderHpAfter` — уже с лечением.
 
 Смертельный удар (`hp − dmg ≤ 0`) не убивает, если `hp > 1` и выполнено одно из двух:
 
@@ -108,7 +110,7 @@ if какой-то damageImmune(ctx, strike, dmg): dmg = 0
 | `cover`                  | `COMBAT.coverBonus`: +30 % к Def/Res защитника (только когда по нему бьют) |
 | `plain`                  | Ничего                                                                     |
 | `mountain`, `water`      | Только для `flier`, бонусов нет                                            |
-| `wall`, `wall_breakable` | Непроходимы; хлипкая стена ломается за 2 удара `attackWall`                |
+| `wall`, `wall_breakable` | Непроходимы; хлипкая стена ломается за `BATTLE.wallHp = 2` удара `attackWall`                |
 
 Подписи для карточки клетки строит [content/terrain.ts](../src/game/content/terrain.ts), стоимость хода задаёт `moveCost` в [pathing.ts](../src/game/core/map/pathing.ts).
 

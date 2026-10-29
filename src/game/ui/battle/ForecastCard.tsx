@@ -17,7 +17,10 @@ function HpBarFill({ before, after, max }: { before: number, after: number, max:
   const pctAfter = max > 0 ? Math.max(0, Math.min(100, (after / max) * 100)) : 0
   const [w, setW] = useState(pctBefore)
   useEffect(() => {
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => setW(pctAfter)))
+    // Два кадра подряд: отменять при размонтировании нужно и вложенный
+    let id = requestAnimationFrame(() => {
+      id = requestAnimationFrame(() => setW(pctAfter))
+    })
     return () => cancelAnimationFrame(id)
   }, [pctAfter])
   const cls = pctAfter <= 25 ? "crit" : pctAfter <= 50 ? "low" : ""

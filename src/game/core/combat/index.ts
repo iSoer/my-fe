@@ -226,6 +226,9 @@ export function simulateCombat(
 
     // Защитный спецприём
     let defenseSpecial: string | undefined
+    // Сколько урона снял защитный спецприём: от этого — лечение защитника (Верность), уже после удара
+    let defHealPct = 0
+    let prevented = 0
     const defensive = spDef && spDef.kind === "defense" && spDef.defense
     if (defensive && def.bu.specialCd <= 0) {
       const dd = spDef.defense as NonNullable<typeof spDef.defense>
@@ -237,10 +240,8 @@ export function simulateCombat(
         defenseSpecial = spDef.id
         const before = dmg
         dmg = Math.floor(dmg * (1 - dd.reduction))
-        if (dd.healPctOfDamage) {
-          const heal = Math.floor(((before - dmg) * dd.healPctOfDamage) / 100)
-          def.bu.hp = Math.min(def.bu.maxHp, def.bu.hp + heal)
-        }
+        prevented = before - dmg
+        defHealPct = dd.healPctOfDamage ?? 0
       }
     }
     for (const h of hooksDef) {
@@ -253,7 +254,12 @@ export function simulateCombat(
     // Любой удар ранит хотя бы на COMBAT.minDamage — бойцы, не пробивающие друг друга, не затягивают бой навсегда;
     // обнулить урон может только неуязвимость (пассивки)
     dmg = Math.max(COMBAT.minDamage, dmg)
-    if (hooksDef.some(h => h.damageImmune?.(ctxDef, info, dmg))) dmg = 0
+    if (hooksDef.some(h => h.damageImmune?.(ctxDef, info, dmg))) {
+      dmg = 0
+      // Удар и так не ранит: защитный спецприём не тратится и не лечит
+      defenseSpecial = undefined
+      defHealPct = 0
+    }
 
     // Применение
     let miracle = false
@@ -271,6 +277,11 @@ export function simulateCombat(
       else newHp = 0
     }
     def.bu.hp = newHp
+    let defenderHealed = 0
+    if (defHealPct > 0 && newHp > 0) {
+      defenderHealed = Math.min(def.bu.maxHp - def.bu.hp, Math.floor((prevented * defHealPct) / 100))
+      def.bu.hp += defenderHealed
+    }
     let healed = 0
     if (healPct > 0 && dmg > 0) {
       healed = Math.min(atk.bu.maxHp - atk.bu.hp, Math.floor((dmg * healPct) / 100))
@@ -309,6 +320,7 @@ export function simulateCombat(
     if (usedSpecial) strike.special = usedSpecial
     if (defenseSpecial) strike.defenseSpecial = defenseSpecial
     if (miracle) strike.miracle = true
+    if (defenderHealed > 0) strike.defenderHealed = defenderHealed
     strikes.push(strike)
   }
 

@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import { CLASS_IDS, MOVE_RANGE, classInfo, classWeapons } from "@game/content/classes"
 import { CLASS_STAT_MODS } from "@game/content/classStats"
 import { SKILL_LABELS, WEAPON_GRADE_LABELS, aptitudesOf, type Skill } from "@shared/character/skills"
-import { CHARACTER_CLASSES, TIER_LEVELS, earliestLevelOf } from "@shared/character/classes"
+import { CHARACTER_CLASSES, FLIER_MOUNTS, TIER_LEVELS, earliestLevelOf, mountOf, movementOf } from "@shared/character/classes"
+import { FUR_PALETTES } from "@game/content/appearance"
+import { DEFAULT_LANG, setLang } from "@game/i18n"
 import { WEAPONS } from "@game/content/weapons"
 import { SPECIALS } from "@game/content/skills/specials"
 import { ASSISTS } from "@game/content/skills/assists"
@@ -118,5 +120,49 @@ describe("биомы", () => {
     for (const b of BIOMES) expect(() => factionDef(b.factionId), b.id).not.toThrow()
     for (const id of ["deep_forest", "indoors", "factory", "infested"]) expect(BIOMES.some(b => b.id === id)).toBe(true)
     expect(new Set(BIOMES.map(b => b.id)).size).toBe(BIOMES.length)
+  })
+})
+
+describe("контент: имена, породы, фракции", () => {
+  const SPECIES = ["cat", "dog", "mouse"] as const
+  const namesIn = (l: "en" | "ru", s: (typeof SPECIES)[number]) => {
+    setLang(l)
+    return [...NAMES[s]]
+  }
+  afterEach(() => setLang(DEFAULT_LANG))
+
+  it("списки имён RU и EN одной длины и с тем же полом на каждом индексе", () => {
+    for (const s of SPECIES) {
+      const en = namesIn("en", s)
+      const ru = namesIn("ru", s)
+      expect(en.length, s).toBe(ru.length)
+      en.forEach((e, i) => expect(e.gender, `${s}[${i}] ${e.name} / ${ru[i]?.name}`).toBe(ru[i]?.gender))
+    }
+  })
+  it("мышиных имён не меньше, чем у котов и псов (минимум для MVP)", () => {
+    for (const l of ["en", "ru"] as const) expect(namesIn(l, "mouse").length).toBeGreaterThanOrEqual(60)
+  })
+  it("у каждого вида есть хотя бы одна порода", () => {
+    for (const s of SPECIES) expect(BREEDS.some(b => b.species === s), s).toBe(true)
+  })
+  it("палитры фракций — существующие индексы FUR_PALETTES", () => {
+    for (const f of FACTIONS) {
+      expect(f.palettes.length, f.id).toBeGreaterThan(0)
+      for (const i of f.palettes) {
+        expect(Number.isInteger(i), f.id).toBe(true)
+        expect(i, f.id).toBeGreaterThanOrEqual(0)
+        expect(i, f.id).toBeLessThan(FUR_PALETTES.length)
+      }
+    }
+  })
+  it("у каждого летающего класса есть верховое животное в FLIER_MOUNTS", () => {
+    const fliers = CHARACTER_CLASSES.filter(c => movementOf(c) === "flier")
+    expect(fliers.length).toBeGreaterThan(0)
+    for (const c of fliers) {
+      expect(FLIER_MOUNTS[c.id], c.id).toBeDefined()
+      expect(mountOf(c), c.id).toBe(FLIER_MOUNTS[c.id])
+    }
+    // и наоборот: в таблице нет лишних id
+    for (const id of Object.keys(FLIER_MOUNTS)) expect(fliers.some(c => c.id === id), id).toBe(true)
   })
 })

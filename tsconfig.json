@@ -25,6 +25,6 @@
     },
     "types": ["vite/client", "node", "@serwist/vite/typings"]
   },
-  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"],
+  "include": ["src", "tests", "tools/gallery", "vite.config.ts", "vitest.config.ts"],
   "exclude": ["src/sw.ts"]
 }

@@ -10,6 +10,7 @@ import {
   openClasses,
   learnableNow,
   skillCost,
+  skillUsable,
   slotOf,
   unitClass,
   unitClassName,
@@ -158,7 +159,8 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     const out: { id: string, state: "equipped" | "learned" | "learnable" }[] = []
     const equipped = unit.skills[s]
     if (equipped) out.push({ id: equipped, state: "equipped" })
-    for (const id of unit.learned) if (id !== equipped && slotOf(id) === s) out.push({ id, state: "learned" })
+    // Изученные, но недоступные после смены класса или оружия навыки не предлагаем: экипировать их нельзя
+    for (const id of unit.learned) if (id !== equipped && slotOf(id) === s && skillUsable(unit, id)) out.push({ id, state: "learned" })
     for (const id of learnable) if (slotOf(id) === s) out.push({ id, state: "learnable" })
     return out
   }

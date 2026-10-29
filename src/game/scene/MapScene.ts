@@ -23,7 +23,7 @@ import { ensureTextures, TEX } from "./textures"
 import { HL, TERRAIN_GLYPH, textStyle } from "./style"
 import type { BattleResult } from "@game/core/types"
 import { UnitView } from "./UnitView"
-import { actorFlash, bloodBurst, bloodDecal, confettiRain, debrisBurst, sceneAlive, tween } from "./fx"
+import { actorFlash, bloodBurst, bloodDecal, confettiRain, debrisBurst, onSceneEnd, sceneAlive, tween, wait } from "./fx"
 import { haptic } from "@game/platform/haptics"
 import { sfx } from "@game/platform/audio"
 import {
@@ -738,10 +738,14 @@ export class MapScene extends Phaser.Scene {
     const inside = c.x > v.x + mx && c.x < v.right - mx && c.y > v.y + (top / cam.zoom) + mx && c.y < v.bottom - (bottom / cam.zoom) - mx
     if (inside) return Promise.resolve()
     return new Promise((resolve) => {
+      // Сцену остановили посреди наезда — колбэк камеры уже не придёт
+      const unsub = onSceneEnd(this, resolve)
       // Клетка встаёт в середину свободной части экрана (между шапкой и панелью кнопок)
       const y = c.y - (top - bottom) / 2 / cam.zoom
       cam.pan(c.x, y, ms, "Sine.easeInOut", true, (_c: Phaser.Cameras.Scene2D.Camera, progress: number) => {
-        if (progress >= 1) resolve()
+        if (progress < 1) return
+        unsub()
+        resolve()
       })
     })
   }
@@ -1005,10 +1009,7 @@ export class MapScene extends Phaser.Scene {
         )
       }
     }
-    await new Promise<void>((resolve) => {
-      if (!sceneAlive(this)) return resolve()
-      this.time.delayedCall(1200 / speed, () => resolve())
-    })
+    await wait(this, 1200 / speed)
   }
 
   shakeTile(pos: Pos): void {

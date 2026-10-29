@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import type { BattleAction, BattleState } from "@game/core/types"
+import type * as AiModule from "@game/core/ai"
 import { $save } from "@game/state/save"
 import {
   $battleUi,
@@ -6,12 +8,23 @@ import {
   cancel,
   dragHover,
   endDrag,
+  endTurn,
   enterBattleScreen,
   isDisplaced,
+  leaveBattleScreen,
+  retreat,
+  setPresenter,
   tapTile
 } from "@game/state/battleUi"
 import { createEmptySave } from "@game/core/save"
 import { makeBattle, plainTiles } from "./helpers"
+
+// ИИ врага можно подменить в отдельном тесте (зацикливание, ошибки); по умолчанию — настоящий
+const ai = vi.hoisted(() => ({ override: null as ((s: BattleState) => BattleAction) | null }))
+vi.mock("@game/core/ai", async (orig) => {
+  const real = await orig<typeof AiModule>()
+  return { ...real, nextEnemyAction: (s: BattleState) => (ai.override ? ai.override(s) : real.nextEnemyAction(s)) }
+})
 
 const flat = { hp: 20, str: 10, mag: 10, spd: 5, def: 5, res: 5 }
 
@@ -274,5 +287,75 @@ describe("контроллер боя: выбор союзника", () => {
     tapTile({ x: 3, y: 7 })
     tapTile({ x: 2, y: 7 })
     expect($battleUi.get().mode).toBe("assistPreview")
+  })
+})
+
+describe("контроллер боя: ход врага и уход с экрана", () => {
+  afterEach(() => {
+    ai.override = null
+    setPresenter(null)
+  })
+
+  it("ИИ топчется на месте — предохранитель завершает фазу врага, ход переходит к игроку", async () => {
+    const b = setup({ x: 2, y: 0 })
+    const enemy = b.enemies[0]!.id
+    // «Передвинуться» на свою же клетку: действие законно, но фаза не продвигается
+    ai.override = s => ({ type: "move", unitId: enemy, to: s.units[enemy]!.pos })
+    const err = vi.spyOn(console, "error").mockImplementation(() => {})
+    await endTurn()
+    err.mockRestore()
+    const st = $save.get().battle!
+    expect(st.phase).toBe("player")
+    expect(st.turn).toBe(2)
+    expect($battleUi.get().mode).toBe("idle")
+    expect($battleUi.get().busy).toBe(false)
+  })
+
+  it("ошибочное действие ИИ — враг ждёт на месте, игра не падает", async () => {
+    const b = setup({ x: 2, y: 0 })
+    const enemy = b.enemies[0]!.id
+    ai.override = s => ({ type: "attack", unitId: enemy, to: s.units[enemy]!.pos, targetId: "нет-такого" })
+    const err = vi.spyOn(console, "error").mockImplementation(() => {})
+    await endTurn()
+    err.mockRestore()
+    const st = $save.get().battle!
+    expect(st.phase).toBe("player")
+    expect(st.units[enemy]!.pos).toEqual({ x: 2, y: 0 })
+    expect($battleUi.get().busy).toBe(false)
+  })
+
+  it("отступить во время хода врага нельзя", async () => {
+    setup({ x: 2, y: 0 })
+    let release = (): void => {}
+    setPresenter({ play: () => new Promise<void>((r) => { release = r }) })
+    const turn = endTurn()
+    expect($battleUi.get().busy).toBe(true)
+    await retreat()
+    expect($save.get().battle!.result).toBeUndefined()
+    release()
+    setPresenter(null)
+    await turn
+    expect($save.get().battle!.phase).toBe("player")
+  })
+
+  it("уход с экрана посреди анимации: циклы останавливаются, бой в сейве цел, при возврате ход врага доигрывается", async () => {
+    setup({ x: 2, y: 0 })
+    // Презентер, который никогда не доигрывает (Phaser-игру уничтожили посреди твина)
+    setPresenter({ play: () => new Promise<void>(() => {}) })
+    const turn = endTurn()
+    await flush()
+    leaveBattleScreen()
+    await turn
+    let st = $save.get().battle!
+    expect(st.phase).toBe("enemy")
+    expect($battleUi.get().busy).toBe(false)
+    setPresenter(null)
+    enterBattleScreen()
+    await flush()
+    await flush()
+    st = $save.get().battle!
+    expect(st.phase).toBe("player")
+    expect(st.turn).toBe(2)
+    expect($battleUi.get().mode).toBe("idle")
   })
 })

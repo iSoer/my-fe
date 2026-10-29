@@ -13,11 +13,11 @@ import {
   updateSettings
 } from "@game/state/save"
 import { SAVE_VERSION, createEmptySave, parseSave, serializeSave } from "@game/core/save"
-import { generateStore, itemPrice } from "@game/core/items"
+import { addItem, generateStore, itemCount, itemPrice } from "@game/core/items"
 import { lootShare, resolveBattle } from "@game/core/progression"
 import { simulateCombat } from "@game/core/combat"
 import { attackOf, openClasses, weaponMt, weaponShortfall } from "@game/core/units"
-import { REWARDS } from "@game/content/balance"
+import { ITEMS, REWARDS } from "@game/content/balance"
 import { STORE } from "@game/content/settlement"
 import { weaponDef } from "@game/content/weapons"
 import type { SaveGame, UnitInstance } from "@game/core/types"
@@ -229,5 +229,12 @@ describe("главный экран и сейв v6", () => {
     expect(u.learnable).not.toContain("sword_armorslayer")
     expect(r.save.profile.startedAt).toBeDefined()
     expect(r.save.store.weapons).toEqual([])
+  })
+})
+
+describe("инвентарь без потерь", () => {
+  it("addItem не срезает количество выше лимита покупки: возврат снаряжения не теряется", () => {
+    const inv = addItem({ sword_steel: ITEMS.stackCap }, "sword_steel")
+    expect(itemCount(inv, "sword_steel")).toBe(ITEMS.stackCap + 1)
   })
 })

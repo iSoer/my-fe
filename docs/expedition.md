@@ -14,7 +14,7 @@
 
 | Файл                                                         | Что внутри                                                                                                                                                                                              |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [core/map/expedition.ts](../src/game/core/map/expedition.ts) | `generateExpedition`, `EXPEDITION_BIOME = "deep_forest"`, `thickets`, `river`, `carve` (поиск пути на двоичной куче `Heap`), `road`, `pickCamps`, `guardSpots`, `chestItem`, `spread`, `terrainAttempt` |
+| [core/map/expedition.ts](../src/game/core/map/expedition.ts) | `generateExpedition`, `EXPEDITION_BIOME = "deep_forest"`, `thickets`, `river`, `carve` (поиск пути на двоичной куче `Heap`), `road`, `pickCamps`, `guardSpots`, `chestItem`, `spread`, `terrainAttempt`, `fallbackTerrain` |
 | [content/expedition.ts](../src/game/content/expedition.ts)   | `BUFFS` (fury, swift, aegis, regen, fortune: значок, название, описание, `scope`), `BUFF_KINDS`, `pickupIcon`, `CHEST_MARK`                                                                             |
 | [content/balance.ts](../src/game/content/balance.ts)         | `EXPEDITION`, `BUFF`, `turnLimitOf`                                                                                                                                                                     |
 | [core/battle/reducer.ts](../src/game/core/battle/reducer.ts) | состояние `state.expedition`: ключи, открытые сундуки, подборы, бонусы; победа по выходу                                                                                                                |
@@ -68,8 +68,12 @@
 
 ## Алгоритм `generateExpedition`
 
-1. До 30 попыток `terrainAttempt(root.fork("terrain:N"))`. Если ни одна не прошла, строится плоская поляна,
-   дороги и лагеря прокладываются прямо по ней (`fork("fallback")`).
+1. До 30 попыток `terrainAttempt(root.fork("terrain:N"))`. Если ни одна не прошла, `fallbackTerrain`
+   (`fork("fallback")`) строит плоскую поляну без препятствий и ручья (связность гарантирована) и прокладывает
+   по ней дороги и лагеря. Хотя бы один лагерь есть всегда: если `pickCamps` не уложилась в ограничения, лагеря
+   ставятся детерминированно в самых удалённых от троп клетках (иначе без сундука из чащи не уйти).
+   Дальше считается `reach` от старта: стражи лагерей и выходов, одиночки и сердечки ставятся только на
+   достижимые клетки (недостижимые отсеиваются после перемешивания, порядок случайных чисел не меняется).
 2. **Стражи** (`fork("enemies")`):
    - на каждый лагерь `erng.int(group)` врагов на ближайших свободных клетках в 1–3 шагах (`guardSpots`);
    - стойка `hold`, `post` — сундук, `leash = 5`;
@@ -115,6 +119,9 @@
 - property-тест (40 запусков): размер, биом, 3 выхода в углах, число сундуков, 2–4 стража на сундук, ключ у
   стража, достижимость выходов, сундуков и стражей, тропы проходимы;
 - стражей выходов (30 запусков);
+- достижимость всех врагов (включая одиночек и стражей выходов) и сердечек (30 запусков);
+- перебор 40 seed × 4 сложности без исключений;
+- запасную поляну `fallbackTerrain`: ≥ 1 лагеря, выходы и лагеря достижимы;
 - три дороги и мосты;
 - время генерации меньше 400 мс;
 - детерминизм;
@@ -132,8 +139,8 @@
 1. Константы: вынести параметры в `EXPEDITION` ([balance.ts](../src/game/content/balance.ts)) или завести
    соседний объект, например `EXPEDITION_SHAPES: Record<ExpeditionShape, {...}>`. Там задаются `w`, `h`,
    число лагерей и т. п.
-   - `river()` идёт по диагонали через `size.w` и предполагает квадратное поле. Для прямоугольного поля его
-     нужно переписать.
+   - `river()` идёт по диагонали через `size.w` и растягивает её по высоте (`(h−1)/(w−1)`), так что работает и
+     на прямоугольном поле; углы с выходами для другой формы нужно проверить.
 2. Генератор: в [core/map/expedition.ts](../src/game/core/map/expedition.ts) добавить параметр в
    `GenerateExpeditionOptions` (например `shape`).
    - Ветвить `terrainAttempt` по форме: другие опорные точки дорог, другие `start` и `exits`, без ручья и т. д.

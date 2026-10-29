@@ -71,8 +71,6 @@ export interface BuildingDef {
   cost: readonly [number, number, number, number, number]
   /** Что нужно для постройки: минимальные уровни других зданий (нет — строится сразу). */
   requires?: Partial<Record<BuildingId, number>>
-  /** Стоит с начала игры и не сносится. */
-  starter?: boolean
   /** Характеристики уровня — для карточки здания (текущий и следующий уровень). */
   stats(level: number): StatLine[]
 }
@@ -87,7 +85,6 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     get short() { return tr("Barracks", "Казармы") },
     get desc() { return tr("Home of your roster. The higher the level, the more fighters you can keep.", "Дом ростера бойцов. Чем выше уровень, тем больше бойцов можно содержать.") },
     cost: [0, 150, 350, 700, 1400],
-    starter: true,
     stats: level => [{ label: tr("Roster capacity", "Вместимость ростера"), value: String(atLevel(BARRACKS.capacity, level)) }]
   },
   training: {

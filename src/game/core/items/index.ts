@@ -55,9 +55,13 @@ export function itemCount(inv: Inventory, id: string): number {
   return inv[id] ?? 0
 }
 
+/**
+ * Положить предмет. Без потолка: возврат снаряжения и находки не должны теряться — `ITEMS.stackCap` ограничивает
+ * только покупку в Лавке.
+ */
 export function addItem(inv: Inventory, id: string, n = 1): Inventory {
   if (n <= 0 || isWoodWeapon(id)) return inv
-  return { ...inv, [id]: Math.min(ITEMS.stackCap, itemCount(inv, id) + n) }
+  return { ...inv, [id]: itemCount(inv, id) + n }
 }
 
 export function removeItem(inv: Inventory, id: string, n = 1): Inventory {

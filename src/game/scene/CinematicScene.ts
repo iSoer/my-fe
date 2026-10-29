@@ -75,6 +75,8 @@ interface Fighter {
 
 export class CinematicScene extends Phaser.Scene {
   private cine!: CinematicData
+  /** Ожидающий презентер уже отпущен (finish или остановка сцены извне). */
+  private settled = false
   private skipped = false
   private fighters = new Map<string, Fighter>()
   private speed = 1
@@ -92,6 +94,7 @@ export class CinematicScene extends Phaser.Scene {
 
   init(data: CinematicData): void {
     this.cine = data
+    this.settled = false
     this.skipped = false
     this.speed = Math.max(0.25, data.speed)
     this.fighters.clear()
@@ -103,9 +106,37 @@ export class CinematicScene extends Phaser.Scene {
     ensureTextures(this)
     ensureMotionTextures(this)
     this.backdrops = []
+    // Сцену могут остановить или уничтожить снаружи (уход с экрана боя посреди кинематики):
+    // тогда таймеры не досчитают и finish() не вызовется — отпускаем презентер здесь.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onEnd, this)
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.onEnd, this)
     // Во время create() сцена ещё в статусе CREATING и sys.isActive() === false:
     // хелперы tween/wait пропустили бы первое затемнение. Стартуем на следующем тике.
-    this.time.delayedCall(0, () => void this.run())
+    this.time.delayedCall(0, () => {
+      this.run().catch((e: unknown) => {
+        console.error("cinematic", e)
+        this.finish()
+      })
+    })
+  }
+
+  /** Сцена остановлена (сама в finish() или снаружи): убрать таймеры и отпустить презентер. */
+  private onEnd(): void {
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.onEnd, this)
+    this.events.off(Phaser.Scenes.Events.DESTROY, this.onEnd, this)
+    this.input?.off("pointerdown", this.skip)
+    this.weather?.destroy()
+    this.weather = null
+    for (const t of this.blinkTimers) t.remove(false)
+    this.blinkTimers = []
+    for (const f of this.fighters.values()) f.hurtTimer?.remove(false)
+    this.settle()
+  }
+
+  private settle(): void {
+    if (this.settled) return
+    this.settled = true
+    this.cine.resolve()
   }
 
   private skip = (): void => {
@@ -189,7 +220,8 @@ export class CinematicScene extends Phaser.Scene {
       ]),
       ART_WAIT_MS
     )
-    if (!this.sys || !this.sys.isActive()) return
+    // Сцену остановили, пока грузился арт: презентер отпущен в onEnd
+    if (!this.sys || !this.sys.isActive()) return this.finish()
 
     this.drawBackdrop(biome.id, terrain, w, h, bgW)
     // Та же погода, что на поле, но реже: над фоном, под бойцами.
@@ -537,6 +569,8 @@ export class CinematicScene extends Phaser.Scene {
     }
     if (strike.healed > 0)
       floatText(this, atk.sprite.x, atkBodyY - 50, `+${strike.healed}`, "#80ed99", sp, { size: 22, rise: 28 })
+    if (strike.defenderHealed)
+      floatText(this, def.sprite.x, defBodyY - 60, `+${strike.defenderHealed}`, "#80ed99", sp, { size: 20, rise: 26 })
     if (strike.miracle) {
       floatText(this, def.sprite.x, defBodyY - 90, "1 HP!", "#ffd700", sp, { size: 28, rise: 30 })
       this.cameras.main.flash(200 / sp, 255, 215, 0)
@@ -770,14 +804,14 @@ export class CinematicScene extends Phaser.Scene {
   }
 
   private finish(): void {
-    this.input.off("pointerdown", this.skip)
-    this.weather?.destroy()
-    this.weather = null
-    for (const t of this.blinkTimers) t.remove(false)
-    this.blinkTimers = []
-    for (const f of this.fighters.values()) f.hurtTimer?.remove(false)
-    const resolve = this.cine.resolve
-    this.scene.stop()
-    resolve()
+    if (this.settled) return
+    // stop() шлёт SHUTDOWN → onEnd: уборка и отпускание презентера
+    try {
+      if (this.sys) this.scene.stop()
+    }
+    catch (e) {
+      console.error("cinematic stop", e)
+    }
+    this.onEnd()
   }
 }

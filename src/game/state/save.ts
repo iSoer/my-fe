@@ -72,7 +72,7 @@ import {
 } from "@game/core/progression"
 import { difficultyDef } from "@game/content/balance"
 import { invalidateKit } from "@game/core/skills/engine"
-import { clearLocal, loadLocal, saveLocal } from "@game/platform/storage"
+import { clearLocal, loadLocal, localKey, saveLocal } from "@game/platform/storage"
 import { setHapticsEnabled } from "@game/platform/haptics"
 import { setLang, tr } from "@game/i18n"
 
@@ -81,6 +81,8 @@ import { setLang, tr } from "@game/i18n"
 export const $save = atom<SaveGame>(createEmptySave(Date.now()))
 export const $saveStatus = atom<"loading" | "ready" | "error">("loading")
 export const $saveError = atom<string | null>(null)
+/** Локальный сейв записан более новой версией игры: игра не стартует и ничего не перезаписывает (ни локально, ни в облаке). */
+export const $saveNewer = atom(false)
 
 // Язык интерфейса следует за сейвом: загрузка, импорт, сброс, облако и настройки меняют его одинаково
 $save.subscribe(s => setLang(s.settings.lang))
@@ -134,7 +136,41 @@ export function updateSave(fn: (s: SaveGame) => SaveGame): SaveGame {
   return next
 }
 
-/** Загрузить сейв из localStorage (повреждённый заменяется новым). Повторный вызов ничего не делает. */
+/** Ключ резервной копии нечитаемого сейва — рядом с сейвом, но не под префиксом `pawfield:save:`. */
+function backupKey(): string {
+  return localKey().replace(/^pawfield:save:/, "pawfield:backup:")
+}
+
+/**
+ * Сохранить сырой нечитаемый сейв перед тем, как его заменит новая игра: из копии его можно вернуть
+ * (`exportBackupCode` → импорт в версии, которая его прочтёт). Хранится одна, последняя копия.
+ */
+export function backupRawSave(json: string): void {
+  try {
+    localStorage.setItem(backupKey(), json)
+  }
+  catch {
+    /* quota or private mode */
+  }
+}
+
+/** Код резервной копии нечитаемого сейва для импорта (как `exportSaveCode`); null — копии нет. */
+export function exportBackupCode(): string | null {
+  let json: string | null = null
+  try {
+    json = localStorage.getItem(backupKey())
+  }
+  catch {
+    return null
+  }
+  return json ? btoa(unescape(encodeURIComponent(json))) : null
+}
+
+/**
+ * Загрузить сейв из localStorage. Повреждённый заменяется новым, но сначала копируется в резерв (`backupRawSave`),
+ * а причина — в `$saveError`. Сейв более новой версии игры не трогается: статус «error», `$saveNewer`, запись
+ * выключена. Повторный вызов ничего не делает.
+ */
 export function initSave(): void {
   if ($saveStatus.get() === "ready") return
   const localJson = loadLocal()
@@ -142,7 +178,16 @@ export function initSave(): void {
   if (localJson) {
     const r = parseSave(localJson)
     if (r.ok) local = r.save
-    else $saveError.set(r.error)
+    else if (r.newer) {
+      $saveError.set(r.error)
+      $saveNewer.set(true)
+      $saveStatus.set("error")
+      return
+    }
+    else {
+      backupRawSave(localJson)
+      $saveError.set(`${r.error} (${tr("a copy is kept", "копия сохранена")})`)
+    }
   }
   setHapticsEnabled(local?.settings.haptics ?? true)
   $save.set(local ?? createEmptySave(Date.now()))
@@ -641,7 +686,6 @@ export function startBattle(squadIds: string[]): { ok: boolean, error?: string, 
       out = { ...out, settlement }
     }
     return out
-    return next
   })
   return { ok: true, events }
 }
@@ -669,6 +713,7 @@ export function finishBattle(): BattleSummary | null {
   const state = s.battle
   const now = Date.now()
   const res = resolveBattle(s, state, now)
+  let summary = res.summary
   updateSave((st) => {
     const next: SaveGame = {
       ...st,
@@ -696,8 +741,10 @@ export function finishBattle(): BattleSummary | null {
     // После боя герой возвращается в поселение через ворота
     next.settlement = { ...next.settlement, hero: { pos: { ...HERO_RETURN }, facing: "up" } }
     // Павшие уходят с полигона; тренирующиеся получают опыт за вылазку (за этот бой — один раз)
-    const trained = applySortieTraining(pruneTraining(next), state.id, now).save
-    return recordEvent(trained, {
+    const trained = applySortieTraining(pruneTraining(next), state.id, now)
+    // Повышения уровня на полигоне — в итоги вылазки рядом с боевыми
+    if (trained.levelUps.length > 0) summary = { ...res.summary, levelUps: [...res.summary.levelUps, ...trained.levelUps] }
+    return recordEvent({ ...trained.save, lastBattle: summary }, {
       type: "sortieFinished",
       mode: state.map.mode ?? "skirmish",
       difficulty: state.difficulty,
@@ -706,7 +753,7 @@ export function finishBattle(): BattleSummary | null {
       fallen: res.summary.fallen.length
     })
   })
-  return res.summary
+  return summary
 }
 
 /* ---------- Настройки ---------- */
@@ -733,7 +780,9 @@ export function importSaveCode(code: string): { ok: boolean, error?: string } {
     const json = decodeURIComponent(escape(atob(code.trim())))
     const r = parseSave(json)
     if (!r.ok) return { ok: false, error: r.error }
-    $save.set(r.save)
+    // Импорт — свежее изменение: иначе более новый сейв другого устройства выиграл бы конфликт с облаком
+    $save.set({ ...r.save, updatedAt: Date.now() })
+    setHapticsEnabled(r.save.settings.haptics)
     flushPersist()
     return { ok: true }
   }

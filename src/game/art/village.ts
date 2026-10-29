@@ -2,6 +2,8 @@
 // окна. Свет сверху-слева, как у тайлов боя (`art/tile.ts`). Палитра приглушённая, холодная; тёплые пятна — только
 // огонь и окна, за которыми живут. Без id и градиентов — копии не конфликтуют.
 
+import type { BuildingId } from "@game/core/types"
+
 /** Размер клетки в SVG-единицах (как `TILE_SIZE` поля боя). */
 export const VT = 64
 
@@ -911,4 +913,24 @@ export function villagePlotSvg(w: number, reserved = false): string {
   return svg(W, H, `<ellipse cx="${r1(W / 2)}" cy="${r1((H + top) / 2)}" rx="${r1(W / 2 - 4)}" ry="${r1((H - top) / 2 - 2)}" fill="${reserved ? "#3a3128" : MUD.base}" />`
     + `<ellipse cx="${r1(W / 2)}" cy="${r1((H + top) / 2)}" rx="${r1(W / 2 - 18)}" ry="${r1((H - top) / 2 - 10)}" fill="#000" opacity=".2" />`
     + ruins + rope + corners.map(([x, y]) => stake(x, y)).join("") + planks)
+}
+
+/**
+ * Спрайт здания на участке `w × h` клеток на уровне `level`: чем выше уровень, тем меньше разбито (`buildingWear`),
+ * но целым не бывает. Исчерпывающий `switch` — новое здание без арта не скомпилируется.
+ */
+export function villageBuildingSvg(id: BuildingId, w: number, h: number, level: number): string {
+  const wear = buildingWear(level)
+  switch (id) {
+    case "barracks":
+      return villageHouseSvg({ w, h, roof: "#5e3a2e", wall: "#7d6a52", npc: "barracks", wear })
+    case "store":
+      return villageHouseSvg({ w, h, roof: "#3b4a3c", wall: "#857256", npc: "store", wear })
+    case "training":
+      return villageTrainingSvg(w, wear)
+    case "graveyard":
+      return villageGraveyardSvg(w, h, wear)
+    case "tavern":
+      return villageHouseSvg({ w, h, roof: "#4a3a52", wall: "#7a6448", npc: "tavern", wear })
+  }
 }

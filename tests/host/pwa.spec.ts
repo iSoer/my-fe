@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { installModeFor, isIosDevice, shouldCheckUpdate, UPDATE_CHECK_INTERVAL_MS } from '@host/pwa';
+import {
+  CHUNK_RELOAD_GUARD_MS,
+  canReloadOn,
+  chunkReloadAllowed,
+  installModeFor,
+  isIosDevice,
+  shouldCheckUpdate,
+  UPDATE_CHECK_INTERVAL_MS,
+} from '@host/pwa';
 
-const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
-const IPAD_DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
-const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
+const IPHONE =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+const IPAD_DESKTOP_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
+const ANDROID =
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
 
 describe('pwa', () => {
   it('распознаёт iPhone и iPadOS, но не Mac и Android', () => {
@@ -29,5 +40,18 @@ describe('pwa', () => {
     expect(shouldCheckUpdate(1000, 0)).toBe(false);
     expect(shouldCheckUpdate(UPDATE_CHECK_INTERVAL_MS, 0)).toBe(true);
     expect(shouldCheckUpdate(UPDATE_CHECK_INTERVAL_MS + 5, 10)).toBe(false);
+  });
+
+  it('перезагрузка на новую версию — не в бою и не на итогах', () => {
+    expect(canReloadOn('battle')).toBe(false);
+    expect(canReloadOn('battleResult')).toBe(false);
+    expect(canReloadOn('village')).toBe(true);
+    expect(canReloadOn('menu')).toBe(true);
+  });
+
+  it('по ошибке чанка перезагружаемся не чаще раза в интервал', () => {
+    expect(chunkReloadAllowed(1000, null)).toBe(true);
+    expect(chunkReloadAllowed(1000 + CHUNK_RELOAD_GUARD_MS - 1, 1000)).toBe(false);
+    expect(chunkReloadAllowed(1000 + CHUNK_RELOAD_GUARD_MS, 1000)).toBe(true);
   });
 });

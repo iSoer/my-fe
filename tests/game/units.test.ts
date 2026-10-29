@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest"
 import fc from "fast-check"
 import {
   allowedSkillIds,
+  COMMON_SKILLS,
+  equipSkill,
+  equipWeapon,
+  learnSkill,
+  skillUsable,
   attackOf,
   canTakeClassNow,
   combatStats,
@@ -211,5 +216,42 @@ describe("классы FW", () => {
     }
     expect(loadoutsAt(1).every(l => l.cls.tier === "beginner")).toBe(true)
     expect(loadoutsAt(20).some(l => l.cls.moveType === "flier")).toBe(true)
+  })
+})
+
+describe("навыки: пул, слот и смена класса/оружия", () => {
+  const sword = () => ({ ...generateUnit({ seed: 11, level: 10, classId: "gladiator", weaponSkill: "sword", rarity: 3 }), sp: 5000 })
+
+  it("learnSkill не учит навык вне пула бойца (посох-спецприём мечнику)", () => {
+    const u = sword()
+    expect(learnableNow(u)).not.toContain("sp_imbue")
+    expect(() => learnSkill(u, "sp_imbue")).toThrow()
+    const common = COMMON_SKILLS.find(id => !u.learned.includes(id))!
+    expect(learnSkill(u, common).learned).toContain(common)
+  })
+
+  it("equipSkill проверяет слот и доступность навыка классу", () => {
+    const u = { ...sword(), learned: [...sword().learned, "sp_glimmer", "b_iron_hide"] }
+    expect(() => equipSkill(u, "sp_glimmer", "a")).toThrow()
+    expect(equipSkill(u, "sp_glimmer", "special").skills.special).toBe("sp_glimmer")
+    // Железная шкура — только латникам
+    expect(skillUsable(u, "b_iron_hide")).toBe(false)
+    expect(() => equipSkill(u, "b_iron_hide", "b")).toThrow()
+  })
+
+  it("смена оружия снимает навыки, которые стали недоступны, но оставляет их изученными", () => {
+    const base = generateUnit({ seed: 12, level: 10, classId: "healer", weaponSkill: "whiteMagic", rarity: 3 })
+    const healer = { ...base, learned: [...base.learned, "sp_imbue"], skills: { ...base.skills, special: "sp_imbue" } }
+    const armed = equipWeapon(healer, "sword_basic")
+    expect(armed.skills.special).toBeUndefined()
+    expect(armed.skills.assist).toBeUndefined()
+    expect(armed.learned).toContain("sp_imbue")
+
+    const hunter = generateUnit({ seed: 13, level: 10, classId: "hunter", weaponSkill: "bow", rarity: 3 })
+    const counter = { ...hunter, learned: [...hunter.learned, "a_close_counter"], skills: { ...hunter.skills, a: "a_close_counter" } }
+    expect(skillUsable(counter, "a_close_counter")).toBe(true)
+    const melee = equipWeapon(counter, "sword_basic")
+    expect(melee.skills.a).toBeUndefined()
+    expect(melee.learned).toContain("a_close_counter")
   })
 })

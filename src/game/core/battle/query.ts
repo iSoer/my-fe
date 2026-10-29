@@ -1,6 +1,12 @@
 import type { BattleState, BattleUnit, BoardSize, Pos, Side, TerrainId } from "../types"
 import { MAP_H, MAP_W, inMap, manhattan, mapSize, posKey } from "../types"
 
+/**
+ * Флаг павшего «кто его убил»: `killer:<unitId>` = 1. Лог событий в бою не хранится, а флаги — часть `BattleUnit`
+ * и переживают сохранение; по нему итог боя называет убийцу в Мемориале (`findKiller` в `core/progression`).
+ */
+export const KILLER_FLAG = "killer:"
+
 export function unitAt(state: BattleState, pos: Pos): BattleUnit | undefined {
   for (const u of Object.values(state.units)) {
     if (u.alive && u.pos.x === pos.x && u.pos.y === pos.y) return u

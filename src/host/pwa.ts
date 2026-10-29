@@ -1,6 +1,7 @@
 /** Тонкий адаптер PWA: регистрация Service Worker (Serwist), обновления, установка на устройство. */
 import { atom } from 'nanostores';
 import type { Serwist } from '@serwist/window';
+import { $route } from '@game/state/router';
 import { isTelegram } from './telegram';
 
 /** Нестандартное событие Chromium; в lib.dom его нет. */
@@ -49,6 +50,20 @@ export function installModeFor(env: {
   return null;
 }
 
+/** Перезагрузка в бою и на итогах потеряла бы незавершённые анимации и экран итогов — там страница не перезагружается. */
+const NO_RELOAD_ROUTES = new Set(['battle', 'battleResult']);
+
+export function canReloadOn(routeName: string): boolean {
+  return !NO_RELOAD_ROUTES.has(routeName);
+}
+
+/** Не перезагружаться по ошибке загрузки чанка чаще, чем раз в это время (защита от цикла перезагрузок). */
+export const CHUNK_RELOAD_GUARD_MS = 15_000;
+
+export function chunkReloadAllowed(now: number, lastReloadAt: number | null): boolean {
+  return lastReloadAt === null || now - lastReloadAt >= CHUNK_RELOAD_GUARD_MS;
+}
+
 export function shouldCheckUpdate(now: number, lastCheck: number): boolean {
   return now - lastCheck >= UPDATE_CHECK_INTERVAL_MS;
 }
@@ -75,6 +90,52 @@ let sw: Serwist | undefined;
 let hooks: PwaHooks | null = null;
 let applying = false;
 let lastCheck = 0;
+let reloadPending = false;
+const CHUNK_RELOAD_KEY = 'pawfield:chunk-reload-at';
+
+function reloadNow(): void {
+  hooks?.beforeReload();
+  location.reload();
+}
+
+/**
+ * Страница должна перезагрузиться (версия сменилась под ногами): сразу, если можно, иначе — как только игрок
+ * уйдёт с боя и итогов.
+ */
+function reloadWhenSafe(): void {
+  if (canReloadOn($route.get().name)) return reloadNow();
+  if (reloadPending) return;
+  reloadPending = true;
+  $route.listen((r) => {
+    if (canReloadOn(r.name)) reloadNow();
+  });
+}
+
+function readChunkReloadAt(): number | null {
+  try {
+    const v = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+    return v ? Number(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ленивый чанк (Phaser, сцена поселения) не загрузился: после деплоя старой вкладке его файлов уже нет ни на сервере,
+ * ни в кэше SW. Перезагрузиться на новую версию — вне боя и итогов, не чаще раза в CHUNK_RELOAD_GUARD_MS.
+ */
+function onPreloadError(e: Event): void {
+  const now = Date.now();
+  if (!chunkReloadAllowed(now, readChunkReloadAt())) return;
+  if (!canReloadOn($route.get().name)) return reloadWhenSafe();
+  e.preventDefault();
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
+  } catch {
+    /* ignore */
+  }
+  reloadNow();
+}
 
 export function initPwa(h: PwaHooks): void {
   hooks = h;
@@ -97,6 +158,7 @@ export function initPwa(h: PwaHooks): void {
   });
 
   if ($isStandalone.get()) void requestPersistence();
+  window.addEventListener('vite:preloadError', onPreloadError);
 
   if (!('serviceWorker' in navigator)) return;
   // После load — не конкурируем с загрузкой игры.
@@ -114,8 +176,17 @@ async function register(): Promise<void> {
     if (!e.isUpdate) $offlineReady.set(true);
   });
   sw.addEventListener('waiting', () => $updateReady.set(true));
-  sw.addEventListener('controlling', () => {
-    if (applying) location.reload();
+  // Новый SW взял управление. Если это мы нажали «Обновить» — перезагрузка. Если обновление активировала другая
+  // вкладка, старые кэши уже удалены (cleanupOutdatedCaches): эта вкладка тоже переходит на новую версию, но не
+  // посреди боя и не на итогах. Первый захват страницы при установке SW (clientsClaim) — не обновление.
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (applying) return location.reload();
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
+    reloadWhenSafe();
   });
   await sw.register();
   lastCheck = Date.now();
@@ -140,6 +211,28 @@ export function applyUpdate(): void {
   hooks?.beforeReload();
   sw.messageSkipWaiting();
   setTimeout(() => location.reload(), RELOAD_FALLBACK_MS);
+}
+
+/**
+ * Сейв записан более новой версией игры: подтянуть новый SW (если он уже скачан — активировать) и перезагрузиться.
+ * Боя здесь нет — игра с таким сейвом не стартует.
+ */
+export async function updateAndReload(): Promise<void> {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    await reg?.update();
+    const next = reg?.waiting ?? reg?.installing;
+    if (next) {
+      applying = true;
+      navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+      next.postMessage({ type: 'SKIP_WAITING' });
+      setTimeout(() => location.reload(), RELOAD_FALLBACK_MS);
+      return;
+    }
+  } catch {
+    /* без SW — обычная перезагрузка */
+  }
+  location.reload();
 }
 
 export async function promptInstall(): Promise<boolean> {

@@ -84,7 +84,7 @@
 
 ## Внешность (`appearance`)
 
-[content/appearance.ts](../src/game/content/appearance.ts) содержит подписи и плейсхолдер-цвета: `FUR_PALETTES` (12), `PATTERNS` (4), `EYES` (6), `EYE_COLORS` (5), `ACCESSORIES` (8). В сейве хранятся только индексы, а рисунок берёт цвета из [art/palettes.ts](../src/game/art/palettes.ts) (`FUR_ART`, `EYE_ART`), индексы там те же. Мелкие детали облика (уши, хвост, веснушки и т. п.) в сейв не пишутся: `critterLook` выводит их из породы и `seed`.
+[content/appearance.ts](../src/game/content/appearance.ts) содержит подписи и плейсхолдер-цвета: `FUR_PALETTES` (12), `PATTERNS` (4), `EYES` (6), `EYE_COLORS` (5), `ACCESSORIES` (8). В сейве хранятся только индексы, а рисунок берёт цвета из [art/palettes.ts](../src/game/art/palettes.ts) (`FUR_ART`, `EYE_ART`), индексы там те же. Числовые `color` у `FUR_PALETTES` и `EYE_COLORS` выводятся из `FUR_ART[i].fur` и `EYE_ART[i]` — заглушки и эффекты (UnitView, разлёт при гибели, кинематик) того же цвета, что и рисунок. `appearance.build` пишется в сейв, но пока нигде не читается. Мелкие детали облика (уши, хвост, веснушки и т. п.) в сейв не пишутся: `critterLook` выводит их из породы и `seed`.
 
 ## Ростер и отряд
 
@@ -100,8 +100,8 @@
 
 - В итогах боя (`resolveBattle` в [core/progression](../src/game/core/progression/index.ts)) каждый павший боец игрока превращается в `memorialEntry(unit, "killed", now, { killerName, turn, biomeId })` и уходит в `save.memorial`. Снаряжение пропадает вместе с ним, а `REWARDS.gloryPerDeath` даёт +1 Славы за смерть. Если пала вся армия, Слава вырастает на `max(5, Σуровней / 4)`, а игра начинается с нового стартового ростера.
 - Эпитафия: `epitaphFor` выбирает один из 16 шаблонов `EPITAPHS` ([content/epitaphs.ts](../src/game/content/epitaphs.ts)) по `createRng(unit.seed ^ now).fork("epitaph")`. Текст строится на текущем языке и сохраняется готовой строкой. Шаблон получает `EpitaphCtx`: имя, пол, убийцу, класс, ход и характер.
-- Убийцу ищет `findKiller`: это ближайший к телу боец противоположной стороны.
-- Воскрешение (`revive` в [core/settlement](../src/game/core/settlement/index.ts)) доступно с 5-го уровня Кладбища, одно за игровой день. Павший возвращается без снаряжения (`strippedUnit`: деревянное оружие своего навыка, без талисмана), а записи ставится `revivedAt`.
+- Убийцу ищет `findKiller`: по флагу павшего `killer:<id>` (ставит `killUnit`), а без флага — ближайший к телу **живой** боец противоположной стороны (см. [progression.md](progression.md)).
+- Воскрешение (`revive` в [core/settlement](../src/game/core/settlement/index.ts)) доступно с 5-го уровня Кладбища, одно за игровой день. Божественный класс — один на армию: павшего не вернуть, пока его божественный класс у живого бойца. Павший возвращается без снаряжения (`strippedUnit`: деревянное оружие своего навыка, без талисмана), а записи ставится `revivedAt`.
 
 ## Перерождение
 
@@ -120,7 +120,7 @@
 
 ### Новый класс
 
-1. [shared/character/classes.ts](../src/shared/character/classes.ts): добавьте строку `[id, "Name", all, any?]` в нужный `tier(...)` в `CHARACTER_CLASSES`. Оружие и тип движения выводятся из требований. Летуну нужна запись в `FLIER_MOUNTS`, иначе `mountOf` вернёт `undefined` и животного на рисунке не будет. Если классу нужно больше трёх талантов на его ярусе (`MAX_TALENTS`), модель не будет его генерировать, и взять его можно будет только сменой класса.
+1. [shared/character/classes.ts](../src/shared/character/classes.ts): добавьте строку `[id, "Name", all, any?]` в нужный `tier(...)` в `CHARACTER_CLASSES`. Оружие и тип движения выводятся из требований. Летуну нужна запись в `FLIER_MOUNTS`, иначе `mountOf` вернёт `undefined` и животного на рисунке не будет (тест в content.test.ts это проверяет). Неизвестный `classId` модель отвергает (`validateCharacterRequest` → `unknown class`, `generateUnit` бросает `GenerateRequestError`). Если классу нужно больше трёх талантов на его ярусе (`MAX_TALENTS`), модель не будет его генерировать, и взять его можно будет только сменой класса.
 2. [content/classStats.ts](../src/game/content/classStats.ts): добавьте запись `CLASS_STAT_MODS[id]`. Тест требует её наличия, хотя бы одного положительного значения и модулей не больше 50.
 3. [art/outfits.ts](../src/game/art/outfits.ts): добавьте `CLASS_OUTFITS[id] = o(hat, hatColor, garb, color, accent, emblem, extra)`. Набор признаков должен быть уникальным. Новый `HatKind` нужно отрисовать в `outfitHead` и учесть в `hatLift`.
 4. Особое поведение, как у Dancer, задаётся вручную: `DANCER_CLASS` и ветки в `withClassAssist`, `allowedSkillIds`, `classRole`.
@@ -131,7 +131,7 @@
 
 ### Новая порода
 
-1. [content/breeds.ts](../src/game/content/breeds.ts): добавьте `breed("cat_xxx", "cat", "English", "Русский", build, l(ears, tails, { muzzle?, fluffy?, marking? }))` в `BREEDS`. Формы ушей и хвоста берите из тех, что рисует ветка этого вида в [critter.ts](../src/game/art/critter.ts) (`catEar`/`dogEar`/`mouseEar`, `catTail`/`dogTail`/`mouseTail`): неподходящая форма молча уйдёт в ветку `default`. Новую форму нужно добавить в union `EarShape`/`TailShape`/`Marking` и отрисовать там же.
+1. [content/breeds.ts](../src/game/content/breeds.ts): добавьте `breed("cat_xxx", "cat", "English", "Русский", build, l(ears, tails, { muzzle?, fluffy?, marking? }))` в `BREEDS`. Формы ушей и хвоста берите из `DRAWABLE_EARS`/`DRAWABLE_TAILS` вида в [look.ts](../src/game/art/look.ts) — это то, что рисует ветка вида в [critter.ts](../src/game/art/critter.ts) (`catEar`/`dogEar`/`mouseEar`, `catTail`/`dogTail`/`mouseTail`); тест в art.test.ts сверяет породы с таблицей. Новую форму нужно добавить в union `EarShape`/`TailShape`/`Marking`, отрисовать в critter.ts и внести в таблицу.
 2. Сейв: `breedId` хранится как `z.string()`, повышать версию не нужно. Породу нельзя удалять или переименовывать: `breedDef` бросает ошибку на неизвестный id в [UnitScreen](../src/game/ui/screens/UnitScreen.tsx) и [UnitDetails](../src/game/ui/components/UnitDetails.tsx).
 3. Новая порода меняет выбор породы для тех же seed, но сохранённые бойцы не меняются.
 4. Тесты: `uniqueIds(BREEDS)` в [content.test.ts](../tests/game/content.test.ts) и «облик бойца» в [art.test.ts](../tests/game/art.test.ts).

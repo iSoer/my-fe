@@ -43,19 +43,16 @@ import {
   TRAINING_H,
   TREE_H,
   TREE_VARIANTS,
-  buildingWear,
+  villageBuildingSvg,
   villageBushSvg,
   villageGateSvg,
   villageGrassSvg,
-  villageGraveyardSvg,
-  villageHouseSvg,
   villagePalisadeSideSvg,
   villagePalisadeSvg,
   villagePathSvg,
   villagePlotSvg,
   villageSpikesSvg,
   villageTorchSvg,
-  villageTrainingSvg,
   villageTreeSvg,
   villageWeedsSvg
 } from "@game/art/village"
@@ -73,6 +70,8 @@ export const SETTLEMENT_SCENE_KEY = "settlement"
 /** Клетка поселения на экране (мировые пиксели); текстуры растеризуются вдвое крупнее ради чёткости. */
 const T = 48
 const RES = 2
+/** Сколько раз пробовать растеризовать текстуру уровня здания, прежде чем оставить прежнюю. */
+const BUILDING_RETRIES = 3
 const FACINGS: readonly Facing[] = ["down", "up", "left", "right"]
 const WATER_FRAMES = TILE_FRAME_COUNT.water ?? 1
 /** Высота героя и жителей на экране (в клетках). */
@@ -131,6 +130,8 @@ interface TorchView {
 /** Пара глаз в темноте за оградой: загорается, моргает и гаснет. */
 interface EyesView {
   img: Phaser.GameObjects.Container
+  /** Исходная x: каждый раз глаза смещаются от неё, а не от прошлого места (иначе уползают). */
+  baseX: number
   /** Когда загорятся в следующий раз (секунды сцены). */
   next: number
 }
@@ -213,23 +214,6 @@ function buildingOver(id: BuildingId, p: PlotDef): number {
   }
 }
 
-/** Спрайт здания на уровне `level`: чем выше уровень, тем меньше разбито (`buildingWear`), но целым не бывает. */
-function buildingSvg(id: BuildingId, p: PlotDef, level: number): string {
-  const wear = buildingWear(level)
-  switch (id) {
-    case "barracks":
-      return villageHouseSvg({ w: p.w, h: p.h, roof: "#5e3a2e", wall: "#7d6a52", npc: "barracks", wear })
-    case "store":
-      return villageHouseSvg({ w: p.w, h: p.h, roof: "#3b4a3c", wall: "#857256", npc: "store", wear })
-    case "training":
-      return villageTrainingSvg(p.w, wear)
-    case "graveyard":
-      return villageGraveyardSvg(p.w, p.h, wear)
-    case "tavern":
-      return villageHouseSvg({ w: p.w, h: p.h, roof: "#4a3a52", wall: "#7a6448", npc: "tavern", wear })
-  }
-}
-
 const SUB_COLOR: Record<PlaceSign["status"], string> = {
   occupied: "#6d4c2f",
   available: "#2f7a1f",
@@ -256,6 +240,8 @@ export class SettlementScene extends Phaser.Scene {
   private water: Phaser.GameObjects.Image[] = []
   private torches: TorchView[] = []
   private eyes: EyesView[] = []
+  /** Попытки догрузить текстуру здания по ключу: −1 — грузится сейчас. */
+  private buildingTries = new Map<string, number>()
   /** Время сцены для мерцания факелов и глаз, с. */
   private fxT = 0
   private keys?: Keys
@@ -375,7 +361,17 @@ export class SettlementScene extends Phaser.Scene {
   /** Текстура здания на уровне `level` (растеризуется один раз). */
   private loadBuilding(p: PlotDef, level: number): Promise<string> {
     const id = p.building as BuildingId
-    return ensureTexture(this, texKey.building(p.id, level), buildingSvg(id, p, level), p.w * T * RES, (p.h + buildingOver(id, p)) * T * RES)
+    return ensureTexture(this, texKey.building(p.id, level), villageBuildingSvg(id, p.w, p.h, level), p.w * T * RES, (p.h + buildingOver(id, p)) * T * RES)
+  }
+
+  /** Догрузка текстуры уровня: не чаще одной попытки за раз и не больше BUILDING_RETRIES — если SVG не растеризуется, не долбим каждые 0,5 с. */
+  private retryBuilding(p: PlotDef, level: number, key: string): void {
+    const tries = this.buildingTries.get(key) ?? 0
+    if (tries < 0 || tries >= BUILDING_RETRIES) return
+    this.buildingTries.set(key, -1)
+    void this.loadBuilding(p, level).then(() => {
+      this.buildingTries.set(key, this.textures?.exists(key) ? 0 : tries + 1)
+    })
   }
 
   /** Свечение огня: мягкое пятно (канвас с радиальным градиентом), его тонируют и мерцают. */
@@ -554,7 +550,7 @@ export class SettlementScene extends Phaser.Scene {
       parts.push(this.add.ellipse(dx, 0, 4.5, 3, 0xd8ff9a, 1))
     }
     const img = this.add.container(cx, cy, parts).setDepth((y + 1) * T + 1).setAlpha(0)
-    return { img, next: 4 + (hash(x, y) % 20) }
+    return { img, baseX: cx, next: 4 + (hash(x, y) % 20) }
   }
 
   private animateFx(dt: number): void {
@@ -569,7 +565,7 @@ export class SettlementScene extends Phaser.Scene {
       if (t < e.next) continue
       // загораются, моргают и гаснут; следующий раз — через 8–30 с
       e.next = t + 8 + Math.random() * 22
-      e.img.setX(e.img.x + (Math.random() - 0.5) * T * 0.6)
+      e.img.setX(e.baseX + (Math.random() - 0.5) * T * 0.6)
       this.tweens.chain({
         targets: e.img,
         tweens: [
@@ -735,7 +731,7 @@ export class SettlementScene extends Phaser.Scene {
       const key = texKey.building(p.def.id, level)
       if (p.building && p.building.texture.key !== key) {
         if (this.textures.exists(key)) p.building.setTexture(key)
-        else void this.loadBuilding(p.def, level)
+        else this.retryBuilding(p.def, level, key)
       }
       p.building?.setVisible(built)
       p.lot.setVisible(!built)
@@ -1011,7 +1007,10 @@ export class SettlementScene extends Phaser.Scene {
     }
     else this.stuckT = 0
     this.setMoving(moved)
-    this.hero.setPosition(this.pos.x * T, this.pos.y * T).setDepth(this.pos.y * T)
+    this.hero.setPosition(this.pos.x * T, this.pos.y * T)
+    // setDepth всегда ставит в очередь сортировку всего списка отображения (~1000 тайлов) — только при изменении
+    const depth = this.pos.y * T
+    if (this.hero.depth !== depth) this.hero.setDepth(depth)
     if (moved) this.footsteps(dt)
     this.animateHero(dt)
     this.updateNear()

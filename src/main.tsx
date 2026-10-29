@@ -9,8 +9,9 @@ import { $pauseOpen } from '@game/ui/lib/pause';
 import { $dialogue, skipDialogue } from '@game/state/dialogue';
 import '@game/ui/styles.css';
 import { initTelegram, setBackButton, setClosingConfirmation, tgHaptic, userNamespace } from '@host/telegram';
-import { initPwa } from '@host/pwa';
+import { initPwa, updateAndReload } from '@host/pwa';
 import { chooseCloud, reconcileCloudSave, startCloudMirror } from '@host/sync';
+import { NewerSaveScreen } from '@host/NewerSaveScreen';
 import { PwaBanners } from '@host/PwaBanners';
 import { AppCard } from '@host/AppCard';
 import { ConflictScreen } from '@host/ConflictScreen';
@@ -84,8 +85,14 @@ async function boot(): Promise<void> {
     $battle.subscribe((b) => setClosingConfirmation(!!b && !b.result));
   };
 
-  const conflict = await reconcileCloudSave();
-  if (!conflict) return start();
+  const reconciled = await reconcileCloudSave();
+  if (reconciled.kind === 'ok') return start();
+  // Сейв от более новой версии игры: не запускаем игру и не зеркалим в облако, чтобы не обрезать его
+  if (reconciled.kind === 'newer') {
+    root.render(<NewerSaveScreen onReload={() => void updateAndReload()} />);
+    return;
+  }
+  const { conflict } = reconciled;
   // Сейв ещё не загружен в игру — экран выбора показываем на языке локального сейва
   setLang(conflict.local.settings.lang);
   root.render(

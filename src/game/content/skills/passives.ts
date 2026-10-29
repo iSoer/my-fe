@@ -15,7 +15,7 @@ function breaker(skill: WeaponSkill): PassiveDef {
   const label = SKILL_LABELS[skill]
   return {
     id: `b_breaker_${skill}`,
-    name: `${label}breaker`,
+    get name() { return tr(`${label}breaker`, `Гроза: ${label}`) },
     get desc() {
       return tr(
         `Vs ${label} at HP ≥ 50%: guaranteed follow-up, foe can't follow up.`,

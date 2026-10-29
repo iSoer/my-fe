@@ -29,6 +29,7 @@ import { levelOneStats, type StatValues } from "@shared/character/leveling"
 import { CHARACTER_CLASSES, CLASS_TIERS, isUniqueClass } from "@shared/character/classes"
 import { rankIndex, type Rank, type WeaponGrade, type WeaponSkill } from "@shared/character/skills"
 import { canTakeClassWith, classPresetStats, classesOpenTo, presetSkillXp, skillRank, unitRanks } from "./proficiency"
+import { tr } from "@game/i18n"
 
 /* ---------- Статы: модель персонажа → бой ---------- */
 
@@ -296,20 +297,22 @@ function bestWeapon(
   return pick(weapons.filter(w => rankIndex(ranks[w]) === top))
 }
 
-/** Поддержка, которую боец получает вместе с классом и оружием: White Magic лечит, Dancer танцует. */
-function withClassAssist(unit: UnitInstance, prev: UnitInstance): UnitInstance {
+/**
+ * Навыки после смены класса или оружия: снятые с бойца те, что ему больше не положены (пассивки латника, посох-
+ * спецприёмы и т. п., `skillUsable`), — изученными они остаются. Поддержка — вместе с классом и оружием:
+ * White Magic лечит, Dancer танцует.
+ */
+function withClassSkills(unit: UnitInstance, prev: UnitInstance): UnitInstance {
   const skills = { ...unit.skills }
   const learned = [...unit.learned]
   const grant = (id: string) => {
     if (!learned.includes(id)) learned.push(id)
     skills.assist = id
   }
-  const assist = skills.assist ? ASSISTS.find(a => a.id === skills.assist) : undefined
-  if (
-    assist
-    && ((assist.staffOnly && unit.weaponSkill !== "whiteMagic") || (assist.dancerOnly && unit.classId !== DANCER_CLASS))
-  )
-    delete skills.assist
+  for (const slot of EQUIP_SLOTS) {
+    const id = skills[slot]
+    if (id && !skillUsable(unit, id)) delete skills[slot]
+  }
   if (unit.classId === DANCER_CLASS) grant("as_dance")
   else if (unit.weaponSkill === "whiteMagic" && (prev.weaponSkill !== "whiteMagic" || !skills.assist)) grant("as_heal")
   return { ...unit, skills, learned }
@@ -323,7 +326,7 @@ export function reclassUnit(unit: UnitInstance, classId: string): UnitInstance {
   if (!canTakeClassNow(unit, classId)) throw new Error(`class ${classId} is not open at level ${unit.level}`)
   const next: UnitInstance = { ...unit, classId }
   invalidateKit(unit)
-  return withClassAssist(next, unit)
+  return withClassSkills(next, unit)
 }
 
 /**
@@ -334,7 +337,7 @@ export function equipWeapon(unit: UnitInstance, weaponId: string): UnitInstance 
   const w = weaponDef(weaponId)
   const next: UnitInstance = { ...unit, weaponSkill: w.kind, skills: { ...unit.skills, weapon: weaponId } }
   invalidateKit(unit)
-  return withClassAssist(next, unit)
+  return withClassSkills(next, unit)
 }
 
 /* ---------- Перерождение ---------- */
@@ -765,9 +768,24 @@ export function withSkills(unit: UnitInstance, patch: Partial<UnitSkills>): Unit
   return next
 }
 
+/** Слоты навыков, кроме оружия (оружие — предмет). */
+const EQUIP_SLOTS = ["special", "assist", "a", "b", "c"] as const satisfies readonly (keyof UnitSkills)[]
+
+/**
+ * Может ли боец с его нынешними классом, оружием и видом носить навык: общий, из пула класса/вида
+ * (`allowedSkillIds`) или танец танцора (его пул не содержит — танец выдаётся автоматически).
+ */
+export function skillUsable(unit: UnitInstance, skillId: string): boolean {
+  if (COMMON_SKILLS.includes(skillId)) return true
+  if (skillId === "as_dance" && unit.classId === DANCER_CLASS) return true
+  return allowedSkillIds(unitClass(unit), unit.species).includes(skillId)
+}
+
 export function learnSkill(unit: UnitInstance, skillId: string): UnitInstance {
   if (isWeaponId(skillId)) throw new Error("weapon is an item, not a skill")
   if (unit.learned.includes(skillId)) return unit
+  if (!learnableNow(unit).includes(skillId))
+    throw new Error(tr("This fighter can't learn that skill", "Этот боец не может изучить этот навык"))
   const cost = skillCost(skillId)
   if (unit.sp < cost) throw new Error("not enough SP")
   const slot = slotOf(skillId)
@@ -783,6 +801,9 @@ export function learnSkill(unit: UnitInstance, skillId: string): UnitInstance {
 export function equipSkill(unit: UnitInstance, skillId: string | undefined, slot: keyof UnitSkills): UnitInstance {
   if (slot === "weapon") throw new Error("weapon is an item: use equipWeapon")
   if (skillId && !unit.learned.includes(skillId)) throw new Error("skill not learned")
+  if (skillId && slotOf(skillId) !== slot) throw new Error(tr("Skill doesn't fit this slot", "Навык не для этого слота"))
+  if (skillId && !skillUsable(unit, skillId))
+    throw new Error(tr("This fighter's class can't use that skill", "Классу бойца этот навык недоступен"))
   const skills = { ...unit.skills }
   if (skillId) skills[slot] = skillId as string
   else delete skills[slot]

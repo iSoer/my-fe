@@ -57,7 +57,7 @@ export function recordEvent(save: SaveGame, ev: GameEvent): SaveGame {
 
 /**
  * Все факты разом: накопленные счётчики плюс производные из сейва. Производные ключи:
- * `building.level.<id>`, `glory`, `treats`, `army.size`, `army.maxLevel`, `memorial`, `seen.<sceneId>` (1 — сцена была).
+ * `building.level.<id>`, `glory`, `treats`, `army.size`, `army.maxLevel`, `memorial` (сколько бойцов погибло — отпущенные не в счёт), `seen.<sceneId>` (1 — сцена была).
  */
 export function factsOf(save: SaveGame): Record<string, number> {
   const f: Record<string, number> = { ...save.story.counters }
@@ -66,7 +66,8 @@ export function factsOf(save: SaveGame): Record<string, number> {
   f["treats"] = save.profile.treats
   f["army.size"] = save.army?.units.length ?? 0
   f["army.maxLevel"] = Math.max(0, ...(save.army?.units.map(u => u.level) ?? []))
-  f["memorial"] = save.memorial.length
+  // Отпущенные тоже записаны на камнях, но это не могилы: считаем только павших
+  f["memorial"] = save.memorial.filter(m => m.reason === "killed").length
   for (const id of save.story.seen) f[`seen.${id}`] = 1
   return f
 }

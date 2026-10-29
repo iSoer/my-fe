@@ -419,6 +419,8 @@ export interface Strike {
   attackerHpAfter: number
   defenderHpAfter: number
   miracle?: boolean
+  /** Защитник вылечился после удара (Верность: доля снятого урона); `defenderHpAfter` — уже с лечением. */
+  defenderHealed?: number
 }
 
 export type BattleAction

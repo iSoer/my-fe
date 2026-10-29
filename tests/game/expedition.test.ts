@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import fc from "fast-check"
-import { generateExpedition } from "@game/core/map/expedition"
+import { fallbackTerrain, generateExpedition } from "@game/core/map/expedition"
+import { createRng } from "@game/core/rng"
 import { generateMap } from "@game/core/map/generate"
 import { applyAction, createBattle } from "@game/core/battle/reducer"
 import { decideAction } from "@game/core/ai"
@@ -107,6 +108,41 @@ describe("вылазка в чащу: карта", () => {
       }),
       { numRuns: 30 }
     )
+  })
+
+  it("все враги (стражи лагерей и выходов, одиночки) и сердечки — на клетках, достижимых пехотой от старта (property)", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 0x7fffffff }), fc.constantFrom(...DIFFS), (seed, difficulty) => {
+        const m = generateExpedition({ seed, difficulty, team: 1, squadSize: 4 })
+        const reach = bfs(m, m.playerSpawns[0]!)
+        for (const e of m.enemies) expect(reach.has(posKey(e.pos)), `враг ${posKey(e.pos)}`).toBe(true)
+        for (const h of m.expedition!.pickups) expect(reach.has(posKey(h.pos)), `сердечко ${posKey(h.pos)}`).toBe(true)
+        expect(m.expedition!.elites.length).toBe(m.enemies.filter(e => e.unit.isBoss).length)
+      }),
+      { numRuns: 30 }
+    )
+  })
+
+  it("generateExpedition не бросает исключений на переборе seed × сложностей", () => {
+    for (let seed = 0; seed < 40; seed++)
+      for (const difficulty of DIFFS)
+        expect(() => generateExpedition({ seed: seed * 7919 + 3, difficulty, team: seed % 4, squadSize: 1 + (seed % 6) }), `${seed} ${difficulty}`).not.toThrow()
+  }, 30_000)
+
+  it("запасная поляна: хотя бы один лагерь, всё поле проходимо — выходы и лагеря достижимы", () => {
+    const size = { w: EXPEDITION.w, h: EXPEDITION.h }
+    const start = { x: 2, y: size.h - 3 }
+    const exits = [{ x: size.w - 1, y: 0 }, { x: 0, y: 0 }, { x: size.w - 1, y: size.h - 1 }]
+    for (let seed = 0; seed < 20; seed++) {
+      for (const campCount of [1, 3, 6, 40]) {
+        const { g, camps } = fallbackTerrain(size, createRng(seed), start, exits, campCount)
+        expect(camps.length).toBeGreaterThanOrEqual(1)
+        expect(camps.length).toBeLessThanOrEqual(Math.max(1, campCount))
+        const m = { tiles: g } as MapDef
+        const reach = bfs(m, start)
+        for (const p of [...exits, ...camps]) expect(reach.has(posKey(p))).toBe(true)
+      }
+    }
   })
 
   it("уйти можно через любой выход", () => {

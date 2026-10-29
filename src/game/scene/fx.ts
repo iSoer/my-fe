@@ -15,17 +15,58 @@ export function sceneAlive(scene: Phaser.Scene): boolean {
   )
 }
 
+/**
+ * Вызвать `cb` один раз, когда сцену остановят или уничтожат (уход с экрана боя, конец кинематики).
+ * Возвращает отписку. Нужна обещаниям анимаций: таймеры и твины сцены при остановке выбрасываются молча,
+ * и без этого `await` на них не вернулся бы никогда.
+ */
+export function onSceneEnd(scene: Phaser.Scene, cb: () => void): () => void {
+  const events = scene.sys?.events
+  if (!events) {
+    cb()
+    return () => {}
+  }
+  let done = false
+  const fire = (): void => {
+    if (done) return
+    done = true
+    off()
+    cb()
+  }
+  const off = (): void => {
+    events.off(Phaser.Scenes.Events.SHUTDOWN, fire)
+    events.off(Phaser.Scenes.Events.DESTROY, fire)
+  }
+  events.once(Phaser.Scenes.Events.SHUTDOWN, fire)
+  events.once(Phaser.Scenes.Events.DESTROY, fire)
+  return () => {
+    done = true
+    off()
+  }
+}
+
+/** Пауза в `ms`. Завершается и при остановке/уничтожении сцены. */
 export function wait(scene: Phaser.Scene, ms: number): Promise<void> {
   return new Promise((resolve) => {
     if (ms <= 0 || !sceneAlive(scene)) return resolve()
-    scene.time.delayedCall(Math.max(1, Math.round(ms)), () => resolve())
+    const unsub = onSceneEnd(scene, resolve)
+    scene.time.delayedCall(Math.max(1, Math.round(ms)), () => {
+      unsub()
+      resolve()
+    })
   })
 }
 
+/** Твин как обещание. Завершается и если твин остановили, и при остановке/уничтожении сцены. */
 export function tween(scene: Phaser.Scene, config: Phaser.Types.Tweens.TweenBuilderConfig): Promise<void> {
   return new Promise((resolve) => {
     if (!sceneAlive(scene)) return resolve()
-    scene.tweens.add({ ...config, onComplete: () => resolve() })
+    const unsub = onSceneEnd(scene, resolve)
+    const finish = (): void => {
+      unsub()
+      resolve()
+    }
+    scene.tweens.add({ ...config, onComplete: finish, onStop: finish })
   })
 }
 

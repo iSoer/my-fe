@@ -10,13 +10,13 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Сборку старого коммита можно отменить: новый пуш всё равно её заменит
+    concurrency:
+      group: pages-build-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -37,6 +37,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # Идущий деплой не отменяется (оборванный деплой Pages может оставить сайт полуобновлённым); следующий ждёт
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

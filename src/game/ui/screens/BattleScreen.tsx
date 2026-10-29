@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useStore } from "@nanostores/react"
 import { $battle, finishBattle } from "@game/state/save"
-import { $battleUi, enterBattleScreen, setOnBattleEnded } from "@game/state/battleUi"
+import { $battleUi, enterBattleScreen, leaveBattleScreen, setOnBattleEnded } from "@game/state/battleUi"
 import { navigate } from "@game/state/router"
 import type { BattleGameHandle } from "@game/scene/index"
 import { Toast } from "../components/Toast"
@@ -95,6 +95,9 @@ export function BattleScreen() {
     return () => {
       cancelled = true
       setOnBattleEnded(null)
+      // Сначала прервать циклы контроллера (ход врага, ожидание анимаций), затем снести Phaser:
+      // недоигранные твины уже не завершатся, а бой в сейве и так актуален
+      leaveBattleScreen()
       handle?.destroy()
       $pauseOpen.set(false)
     }

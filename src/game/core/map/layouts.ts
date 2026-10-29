@@ -184,8 +184,11 @@ function groves(d: Draft, rng: Rng, density: number, keepOff: (p: Pos) => boolea
   const target = Math.round(MAP_W * MAP_H * Math.max(0, density))
   let planted = 0
   for (let guard = 0; planted < target && guard < 12; guard++) {
-    const start = rng.pick(allCells().filter(p => ok(p) && around(d, p, "forest") === 0))
-    if (!start) break
+    // Свободной земли без лесных соседей не осталось (тесный двор крепости, густой биом) — рощ больше не будет.
+    // Проверка до pick: на пустом массиве pick бросает исключение
+    const seeds = allCells().filter(p => ok(p) && around(d, p, "forest") === 0)
+    if (seeds.length === 0) break
+    const start = rng.pick(seeds)
     setT(d.g, start, "forest")
     const grove = [start]
     const size = Math.min(rng.int(3, 5), target - planted)
@@ -309,8 +312,8 @@ const lake: LayoutDef = {
     }
     const minX = Math.min(...lakeCells.map(p => p.x))
     const maxX = Math.max(...lakeCells.map(p => p.x))
-    const around = rng.chance(0.5) ? Math.max(0, minX - 1) : Math.min(MAP_W - 1, maxX + 1)
-    mainPath(d, rng, [2, 3], { x: around, y: 3 })
+    const bypassX = rng.chance(0.5) ? Math.max(0, minX - 1) : Math.min(MAP_W - 1, maxX + 1)
+    mainPath(d, rng, [2, 3], { x: bypassX, y: 3 })
     banks(d, rng, 0.45)
   }
 }

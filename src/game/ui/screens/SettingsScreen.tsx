@@ -2,7 +2,7 @@ import { gameHost } from "@game/platform/host"
 import { useState } from "react"
 import { useStore } from "@nanostores/react"
 import type { Settings } from "@game/core/types"
-import { $save, exportSaveCode, importSaveCode, resetProgress, updateSettings } from "@game/state/save"
+import { $save, exportBackupCode, exportSaveCode, importSaveCode, resetProgress, updateSettings } from "@game/state/save"
 import { navigate } from "@game/state/router"
 import { Button } from "../components/Button"
 import { TopBar } from "../components/TopBar"
@@ -40,6 +40,8 @@ export function SettingsScreen() {
   const save = useStore($save)
   const s = save.settings
   const [exportCode, setExportCode] = useState<string | null>(null)
+  // Копия сейва, который не прочитался при загрузке (см. `backupRawSave`): её можно вынести и импортировать позже
+  const [backupCode] = useState(() => exportBackupCode())
   const [importCode, setImportCode] = useState("")
   const [resetOpen, setResetOpen] = useState(false)
   const [resetWord, setResetWord] = useState("")
@@ -224,6 +226,11 @@ export function SettingsScreen() {
                 {tr("Copy", "Скопировать")}
               </Button>
             </>
+          )}
+          {backupCode !== null && (
+            <Button block sm icon="🗄️" onClick={() => setExportCode(backupCode)}>
+              {tr("Show the backup of the damaged save", "Показать копию повреждённого сейва")}
+            </Button>
           )}
           <textarea
             placeholder={tr("Paste a save code to import", "Вставьте код сейва для импорта")}

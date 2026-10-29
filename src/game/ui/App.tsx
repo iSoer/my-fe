@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useStore } from "@nanostores/react"
 import { $route, type Route } from "@game/state/router"
-import { $saveError, $saveStatus } from "@game/state/save"
+import { $saveError, $saveNewer, $saveStatus } from "@game/state/save"
 import { MenuScreen } from "./screens/MenuScreen"
 import { ArmyScreen } from "./screens/ArmyScreen"
 import { UnitScreen } from "./screens/UnitScreen"
@@ -124,6 +124,7 @@ function Router() {
 export function App() {
   const status = useStore($saveStatus)
   const err = useStore($saveError)
+  const newer = useStore($saveNewer)
   const [started, setStarted] = useState(false)
   if (status !== "ready" || !started) {
     return (
@@ -133,7 +134,9 @@ export function App() {
           <div className="toast toast-error">
             <span className="ico">✕</span>
             <span>
-              {tr(`Save corrupted: ${err}. Started a new one.`, `Сейв повреждён: ${err}. Начат новый.`)}
+              {newer
+                ? tr(`${err}. Update the game to continue.`, `${err}. Обновите игру, чтобы продолжить.`)
+                : tr(`Save corrupted: ${err}. Started a new one.`, `Сейв повреждён: ${err}. Начат новый.`)}
             </span>
           </div>
         )}
