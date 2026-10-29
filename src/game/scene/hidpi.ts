@@ -87,6 +87,15 @@ export function pinToScreen<T extends Pinnable>(obj: T): T {
     if (box.scene) box.destroy()
   }
   obj.once(Phaser.GameObjects.Events.DESTROY, drop)
+  // Контейнер уничтожается первым (выключение сцены): его preDestroy уничтожает obj раньше, чем box
+  // испустит DESTROY. Без отписки drop повторно вошёл бы в box.destroy() и уничтожил obj вложенно —
+  // внешний obj.destroy() падал бы на `this.scene.sys` (scene уже undefined).
+  const hooked = box as unknown as { preDestroy: (this: Phaser.GameObjects.Container) => void }
+  const boxPreDestroy = hooked.preDestroy
+  hooked.preDestroy = function (this: Phaser.GameObjects.Container): void {
+    obj.off(Phaser.GameObjects.Events.DESTROY, drop)
+    boxPreDestroy.call(this)
+  }
   box.once(Phaser.GameObjects.Events.DESTROY, () => scene.scale?.off(Phaser.Scale.Events.RESIZE, relayout))
   return obj
 }
