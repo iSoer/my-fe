@@ -416,41 +416,13 @@ p {
 }
 
 /* ---------- Иконки-штампы вместо эмодзи (art/icons, компоненты Icon и IconText) ---------- */
-/* Тон по фону: светлый (белая заливка) — по умолчанию, тёмный (чернильная заливка, белые линии) — на светлых
-   поверхностях; тёмные поверхности внутри светлых возвращают светлый */
+/* Везде светлый тон: белая заливка, чернильный контур и линии, красная тень. Тёмный тон (art/icons, `dark`)
+   включается переопределением этих переменных на контейнере */
 :root {
   --ic-fill: #ffffff;
   --ic-line: #0d0b10;
   --ic-det: #0d0b10;
   --ic-sh: #dc3341;
-}
-.card,
-.sheet,
-.modal-box,
-.chip,
-.res-row,
-.resources .res,
-.bf-chip,
-.bf-card,
-.foe-card,
-.squad-slot,
-.btn,
-.st-dock-btn {
-  --ic-fill: #1d1924;
-  --ic-det: #ffffff;
-}
-.card.ink,
-.btn-primary,
-.btn-danger,
-.btn-ghost,
-.bf-unit,
-.warning-box,
-.st-menu-item.is-sys,
-.res-tile,
-.res-big-item:not(.gold),
-.fallen-card {
-  --ic-fill: #ffffff;
-  --ic-det: #0d0b10;
 }
 .ic {
   display: inline-block;

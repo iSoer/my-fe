@@ -16,7 +16,7 @@ export const MAP_ICONS = [
   "dagger", "swords", "ring", "tooth", "bell", "chain", "ribbon", "book", "coin", "leaf", "shield", "fire", "sneaker", "herb"
 ] as const
 
-/** Иконки вывесок поселения (тёмный тон — на бежевой плашке). */
+/** Иконки вывесок поселения. */
 export const SIGN_ICONS = ["shield", "target", "cart", "headstone", "beer", "barrier", "lock", "hammer", "bone", "swords", "up"] as const
 
 /** Растр иконки: 48 CSS-пикселей × плотность (не больше ×3) — хватает и вывескам, и всплывающим надписям. */
