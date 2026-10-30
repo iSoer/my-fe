@@ -28,6 +28,7 @@ import { DRINKS, drinkDef } from "@game/content/tavern"
 import { navigate } from "@game/state/router"
 import { haptic } from "@game/platform/haptics"
 import { Button } from "../components/Button"
+import { ConfirmModal } from "../components/Sheet"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { UnitRow } from "../components/UnitRow"
 import { drinkEffects, fmtDuration } from "../lib/format"
@@ -76,6 +77,7 @@ function Stats({ lines, next }: { lines: StatLine[], next?: StatLine[] }) {
 function GrowthBlock({ save, id, toast }: { save: SaveGame, id: BuildingId, toast: Toast }) {
   // Замок от двойного тапа: снимается только после перерисовки с новым уровнем (или после ошибки)
   const busy = useRef(false)
+  const [asking, setAsking] = useState(false)
   const level = buildingLevel(save, id)
   useEffect(() => { busy.current = false }, [level])
   const cost = levelCost(id, level)
@@ -99,12 +101,24 @@ function GrowthBlock({ save, id, toast }: { save: SaveGame, id: BuildingId, toas
   }
   return (
     <div className="stack" style={{ gap: 6 }}>
-      <Button block primary={check.ok} disabled={!check.ok} icon={level === 0 ? "🔨" : "⬆"} onClick={act}>
+      {/* Постройка — с подтверждением (табличка у стройки ведёт сюда); улучшение — сразу */}
+      <Button block primary={check.ok} disabled={!check.ok} icon={level === 0 ? "🔨" : "⬆"} onClick={level === 0 ? () => setAsking(true) : act}>
         <IconText text={level === 0
           ? `${tr("Build", "Построить")} · ${cost} 🦴`
           : `${tr(`Upgrade to level ${level + 1}`, `Улучшить до ${level + 1}-го уровня`)} · ${cost} 🦴`} />
       </Button>
       {!check.ok && <p className="small danger-text st-why">{check.error}</p>}
+      <ConfirmModal
+        open={asking}
+        title={tr(`Build ${buildingDef(id).name}?`, `Построить «${buildingDef(id).name}»?`)}
+        text={tr(`It costs ${cost} 🦴. The building appears right away.`, `Это стоит ${cost} 🦴, здание появится сразу.`)}
+        confirmLabel={tr("Build", "Построить")}
+        onConfirm={() => {
+          setAsking(false)
+          act()
+        }}
+        onClose={() => setAsking(false)}
+      />
     </div>
   )
 }
@@ -369,7 +383,7 @@ function Header({ icon, name, level, desc }: { icon: string, name: string, level
                   <span className="muted small">{tr(`Level ${level}/${BUILDING_MAX_LEVEL}`, `Уровень ${level}/${BUILDING_MAX_LEVEL}`)}</span>
                 </span>
               )
-            : <span className="muted small">{tr("Not built", "Не построено")}</span>}
+            : <span className="muted small">{tr("Not built yet — this lot can hold it", "Ещё не построено — этот участок под него")}</span>}
         <span className="muted small">{desc}</span>
       </div>
     </div>
@@ -415,7 +429,7 @@ export function BuildingPanel({ plotId, save, toast }: { plotId: string, save: S
       {level === 0
         ? (
             <>
-              <div className="section-title">{tr("After construction", "После постройки")}</div>
+              <div className="section-title">{tr("What you get", "Что даст постройка")}</div>
               <Stats lines={def.stats(1)} />
               {status === "locked" && <p className="small st-state-locked"><IconText text={tr("🔒 Can’t be built yet", "🔒 Пока построить нельзя")} /></p>}
             </>

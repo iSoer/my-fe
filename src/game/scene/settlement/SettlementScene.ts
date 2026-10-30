@@ -51,6 +51,8 @@ import {
   villagePalisadeSvg,
   villagePathSvg,
   villagePlotSvg,
+  villageStakeSignSvg,
+  type StakeSignKind,
   villageSpikesSvg,
   villageTorchSvg,
   villageTreeSvg,
@@ -171,9 +173,16 @@ interface PlotView {
 }
 
 /** Вывеска места: плашка «название + состояние», значок «!» и стрелка следующего шага. */
+/** Табличка у стройки: размер в клетках и знаки на ней. */
+const STAKE_W = 0.9
+const STAKE_H = 1.08
+const STAKE_KINDS: readonly StakeSignKind[] = ["build", "locked", "reserved"]
+
 interface SignView {
   id: PlaceId
   plaque: Phaser.GameObjects.Container
+  /** Табличка у стройки: вместо плашки, пока здание не построено (у ворот её нет). */
+  stake?: Phaser.GameObjects.Image
   frame: Phaser.GameObjects.Graphics
   w: number
   h: number
@@ -200,6 +209,7 @@ const texKey = {
   gate: "st:gate",
   building: (id: string, level: number) => `st:building:${id}:${level}`,
   lot: (id: string) => `st:lot:${id}`,
+  stake: (kind: StakeSignKind) => `st:stake:${kind}`,
   npc: (id: string, pose: string) => `st:npc:${id}:${pose}`
 }
 
@@ -326,6 +336,7 @@ export class SettlementScene extends Phaser.Scene {
     const signs = this.opts.signs()
     for (const p of PLOTS) {
       jobs.push(t(texKey.lot(p.id), villagePlotSvg(p.w, !p.building), p.w * T, PLOT_H * T))
+    for (const kind of STAKE_KINDS) jobs.push(t(texKey.stake(kind), villageStakeSignSvg(kind), STAKE_W * T, STAKE_H * T))
       if (p.building) jobs.push(this.loadBuilding(p, Math.max(1, signs[p.id]?.level ?? 1)))
     }
     for (const n of NPCS) {
@@ -703,7 +714,29 @@ export class SettlementScene extends Phaser.Scene {
       this.tweens.add({ targets: badge, scale: 1.15, duration: 520, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
       this.tweens.add({ targets: arrow, alpha: 0.55, duration: 480, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
     }
-    return { id, plaque, frame, w: 0, h: 0, badge, arrow, drawn: "" }
+    const stake = id === "gate"
+      ? undefined
+      : this.add.image(0, 0, texKey.stake("build")).setOrigin(0.5, 1).setDisplaySize(STAKE_W * T, STAKE_H * T).setVisible(false)
+    return { id, plaque, stake, frame, w: 0, h: 0, badge, arrow, drawn: "" }
+  }
+
+  /**
+   * Непостроенный участок: вместо большой плашки с названием — табличка, вбитая у левого края фасада. Знак на ней —
+   * можно ли строить; что и за сколько, показывает карточка участка (тап по табличке или по стройке).
+   */
+  private drawStake(v: SignView, s: PlaceSign): void {
+    const stake = v.stake as Phaser.GameObjects.Image
+    const plot = PLOTS.find(p => p.id === v.id)
+    const kind: StakeSignKind = !plot?.building ? "reserved" : s.status === "available" ? "build" : "locked"
+    stake.setTexture(texKey.stake(kind)).setDisplaySize(STAKE_W * T, STAKE_H * T)
+    const r = this.placeRect(v.id)
+    const x = (r.x + 0.75) * T
+    const y = (r.y + r.h + 0.2) * T
+    stake.setPosition(x, y).setDepth(y).setVisible(true)
+    stake.setTint(s.guide ? 0xfff1b8 : 0xffffff)
+    v.plaque.setVisible(false)
+    v.badge.setPosition(x + STAKE_W * T * 0.42, y - STAKE_H * T * 0.95)
+    v.arrow.setPosition(x, y - STAKE_H * T - 2)
   }
 
   /** Перерисовать вывеску: плашка над зданием — это и есть пункт меню поселения (тап ведёт туда героя). */
@@ -711,6 +744,9 @@ export class SettlementScene extends Phaser.Scene {
     const key = `${s.title}|${s.sub}|${s.status}|${s.guide}|${s.built}`
     if (key === v.drawn) return
     v.drawn = key
+    if (v.stake && !s.built) return this.drawStake(v, s)
+    v.stake?.setVisible(false)
+    v.plaque.setVisible(true)
     v.plaque.each((o: Phaser.GameObjects.GameObject) => {
       if (o !== v.frame) o.destroy()
     })

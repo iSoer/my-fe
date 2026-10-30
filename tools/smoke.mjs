@@ -64,6 +64,8 @@ await step('Лавка: постройка и покупка талисмана'
   await page.locator('.st-menu-toggle').click();
   await page.locator('.st-menu-item', { hasText: 'Shop' }).click();
   await page.getByRole('button', { name: /^Build ·/ }).click();
+  // Постройка — с подтверждением
+  await page.locator('.modal-box').getByRole('button', { name: 'Build', exact: true }).click();
   await page.getByRole('button', { name: /Open the shop/ }).click({ timeout: 15000 });
   await page.getByRole('tab', { name: 'Talismans' }).click();
   await page.locator('.store-item button').first().click();

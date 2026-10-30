@@ -129,4 +129,4 @@ endTurn(): dispatch endPhase → playEvents → runEnemyPhase(): цикл nextEn
 - Phaser: [scene/iconText.ts](../src/game/scene/iconText.ts) — `richText` (надпись «текст + иконки», ею пользуются `floatText` и вывески поселения) и `iconImage`. Текстуры `ic:<id>:<тон>`: `MAP_ICONS` предзагружаются в бою и кинематике, `SIGN_ICONS` — в поселении (тоже светлый тон), остальные по требованию (до загрузки виден эмодзи).
 - Символы шрифта (★ ♥ ♪ ♫ ♣ ✦ ✓ ✕) остаются текстом.
 - Новый эмодзи: добавьте геометрию в `ICONS` и строку в `EMOJI_ICON`. Тест [icons.test.ts](../tests/game/icons.test.ts) падает, если в коде есть эмодзи без иконки.
-
+- `Modal` (и `ConfirmModal`) рендерится порталом в корень `.pawfield`: у шторки `.sheet` есть `transform`, и fixed-окно внутри неё оказалось бы под её затемнением.

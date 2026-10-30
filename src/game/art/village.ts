@@ -915,6 +915,31 @@ export function villagePlotSvg(w: number, reserved = false): string {
     + ruins + rope + corners.map(([x, y]) => stake(x, y)).join("") + planks)
 }
 
+/** Знак на табличке стройки: можно строить (молоток), пока нельзя (замок), участок под будущее (крест). */
+export type StakeSignKind = "build" | "locked" | "reserved"
+
+/**
+ * Табличка, вбитая в землю у непостроенного участка (60 × 72): столбик в грязи, доска на гвоздях и выжженный знак.
+ * Тап по ней открывает карточку участка: что здесь можно построить и за сколько.
+ */
+export function villageStakeSignSvg(kind: StakeSignKind): string {
+  const mark = kind === "build"
+    // молоток
+    ? `<path d="M33 16 L22 30" stroke="${WOOD.grain}" stroke-width="4" stroke-linecap="round" /><path d="M28 10 L40 18 L36 23 L24 15 Z" fill="${WOOD.grain}" />`
+    : kind === "locked"
+      // замок
+      ? `<path d="M24 20 V16 a6 6 0 0 1 12 0 V20" stroke="${WOOD.grain}" stroke-width="3" fill="none" /><rect x="21" y="19" width="18" height="13" rx="2" fill="${WOOD.grain}" /><circle cx="30" cy="25" r="1.8" fill="${WOOD.pale}" />`
+      // крест из досок
+      : `<path d="M22 12 L38 30 M38 12 L22 30" stroke="${WOOD.grain}" stroke-width="4" stroke-linecap="round" />`
+  return svg(60, 72, `<ellipse cx="30" cy="67" rx="14" ry="4" fill="${MUD.dark}" opacity=".8" />`
+    + `<path d="M26.5 34 H33.5 V64 L30 69 L26.5 64 Z" fill="${WOOD.dark}" stroke="${WOOD.grain}" stroke-width="1.6" />`
+    + `<g transform="rotate(-4 30 21)"><rect x="6" y="6" width="48" height="31" rx="3" fill="#000" opacity=".25" transform="translate(2 2)" />`
+    + `<rect x="6" y="6" width="48" height="31" rx="3" fill="${WOOD.pale}" stroke="${WOOD.grain}" stroke-width="2" />`
+    + `<path d="M8 17 H52 M8 27 H52" stroke="${WOOD.light}" stroke-width="1.2" />`
+    + `<circle cx="11" cy="11" r="1.6" fill="${IRON.mid}" /><circle cx="49" cy="11" r="1.6" fill="${IRON.mid}" /><circle cx="11" cy="32" r="1.6" fill="${IRON.mid}" /><circle cx="49" cy="32" r="1.6" fill="${IRON.mid}" />`
+    + `${mark}</g>`)
+}
+
 /**
  * Спрайт здания на участке `w × h` клеток на уровне `level`: чем выше уровень, тем меньше разбито (`buildingWear`),
  * но целым не бывает. Исчерпывающий `switch` — новое здание без арта не скомпилируется.

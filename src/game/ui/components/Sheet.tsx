@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "./Button"
 import { tr } from "@game/i18n"
 import { IconText } from "./Icon"
@@ -38,7 +39,7 @@ export function Modal({
   children: ReactNode
 }) {
   if (!open) return null
-  return (
+  const box = (
     <div className="overlay modal" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>
         {title && <h3><IconText text={title} /></h3>}
@@ -46,6 +47,10 @@ export function Modal({
       </div>
     </div>
   )
+  // Порталом в корень игры: у шторки есть transform (анимация выезда), и fixed-окно внутри неё оказалось бы
+  // привязано к шторке и спрятано под её затемнением
+  const root = typeof document !== "undefined" ? document.querySelector(".pawfield") : null
+  return root ? createPortal(box, root) : box
 }
 
 export function ConfirmModal({
