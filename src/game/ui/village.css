@@ -243,6 +243,13 @@
   .st-menu-item .st-dock-hint {
     margin-left: auto;
   }
+  /* Значок «новое» у пункта меню — снаружи, слева от кнопки, по центру высоты */
+  .st-menu-item .st-badge {
+    top: 50%;
+    right: auto;
+    left: -32px;
+    transform: translateY(-50%);
+  }
   .st-menu-backdrop {
     position: absolute;
     inset: 0;

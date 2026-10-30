@@ -2326,7 +2326,7 @@ p {
 }
 .result-banner .stamp {
   display: inline-block;
-  font-size: 38px;
+  font-size: 30px;
   letter-spacing: 2px;
   font-weight: 900;
   padding: 8px 22px;
@@ -2364,11 +2364,28 @@ p {
   background: #b1a7b3;
   box-shadow: 6px 6px 0 var(--paper);
 }
-.result-banner .sub {
-  position: relative;
-  z-index: 1;
-  margin-top: 10px;
+/* Сложность, биом и счёт побед — косыми плашками под баннером, как шаги итогов */
+.result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
   animation: fade 0.6s ease 0.4s both;
+}
+.result-meta span {
+  padding: 3px 12px;
+  background: var(--ink-3);
+  color: var(--text-ink);
+  font-size: 12px;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transform: skewX(-8deg);
+}
+.result-meta span.gold {
+  background: var(--gold);
+  color: var(--ink);
 }
 .splat-bg {
   position: absolute;
@@ -2653,6 +2670,7 @@ p {
   .lvl-arrow,
   .result-banner .stamp,
   .result-banner::before,
+  .result-meta,
   .splat-bg,
   .confetti span,
   .diorama .crew .critter-svg,

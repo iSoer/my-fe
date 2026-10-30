@@ -257,10 +257,14 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
         <h1>
           <span className="stamp">{title}</span>
         </h1>
-        <div className="muted small sub">
-          {`${difficultyName(lb.difficulty)} · ${biomeDef(lb.biomeId).name}`}
-          {lb.result === "victory" ? ` · ${tr("wins here", "побед на сложности")}: ${profile.wins[lb.difficulty] ?? 0}` : ""}
-        </div>
+      </div>
+      {/* Где был бой — косыми плашками под баннером */}
+      <div className="result-meta">
+        <span>{difficultyName(lb.difficulty)}</span>
+        <span>{biomeDef(lb.biomeId).name}</span>
+        {lb.result === "victory" && (
+          <span className="gold">{`${tr("Wins here", "Побед на сложности")}: ${profile.wins[lb.difficulty] ?? 0}`}</span>
+        )}
       </div>
 
       {lb.timeUp && (
