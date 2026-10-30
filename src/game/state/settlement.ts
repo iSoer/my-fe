@@ -97,6 +97,13 @@ export function closePanel(): void {
 /** Рядом с каким местом стоит герой (подсветка кнопки панели, «E — открыть»). */
 export const $settlementNear = atom<PlaceId | undefined>(undefined)
 
+/** Выделенное место на карте (рядом с героем или куда он идёт): его название показывает верх экрана. */
+export const $settlementFocus = atom<PlaceId | undefined>(undefined)
+
+export function setFocusPlace(id: PlaceId | undefined): void {
+  if ($settlementFocus.get() !== id) $settlementFocus.set(id)
+}
+
 export function setNearPlace(id: PlaceId | undefined): void {
   if ($settlementNear.get() !== id) $settlementNear.set(id)
 }
@@ -159,6 +166,8 @@ export function settlementGuide(save: SaveGame): SettlementPlace {
 /** Вывеска места на карте: название, строка состояния и подсветки. */
 export interface PlaceSign {
   title: string
+  /** Название без иконки: короткая плашка над построенным зданием. */
+  name: string
   sub: string
   status: PlotStatus | "gate"
   alert: boolean
@@ -179,7 +188,7 @@ export function placeSigns(save: SaveGame, now = Date.now()): Record<PlaceId, Pl
     const id = plot.building
     const status = plotStatus(save, plot)
     if (!id) {
-      out[plot.id] = { title: `🚧 ${tr("Vacant lot", "Пустырь")}`, sub: `🔒 ${tr("Coming soon", "Скоро")}`, status, alert: false, guide: false, built: false, level: 0 }
+      out[plot.id] = { title: `🚧 ${tr("Vacant lot", "Пустырь")}`, name: tr("Vacant lot", "Пустырь"), sub: `🔒 ${tr("Coming soon", "Скоро")}`, status, alert: false, guide: false, built: false, level: 0 }
       continue
     }
     const def = buildingDef(id)
@@ -187,11 +196,12 @@ export function placeSigns(save: SaveGame, now = Date.now()): Record<PlaceId, Pl
     const sub = level > 0
       ? `${"◆".repeat(level)}${"◇".repeat(BUILDING_MAX_LEVEL - level)}${canUp.has(id) ? " ⬆" : ""}`
       : status === "locked" ? `🔒 ${tr("Unavailable", "Недоступно")}` : `🔨 ${levelCost(id, 0) ?? 0} 🦴`
-    out[plot.id] = { title: `${def.icon} ${def.name}`, sub, status, alert: alerts[id], guide: guide === id, built: level > 0, level }
+    out[plot.id] = { title: `${def.icon} ${def.name}`, name: def.name, sub, status, alert: alerts[id], guide: guide === id, built: level > 0, level }
   }
   const battleOn = !!save.battle && !save.battle.result
   out["gate"] = {
     title: `⚔️ ${battleOn ? tr("Back to battle", "Вернуться в бой") : tr("Sortie", "Вылазка")}`,
+    name: battleOn ? tr("Back to battle", "Вернуться в бой") : tr("Sortie", "Вылазка"),
     sub: tr("Beyond the fence", "За околицу"),
     status: "gate",
     alert: alerts.gate,

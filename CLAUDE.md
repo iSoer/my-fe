@@ -12,6 +12,7 @@ UI strings, code comments, and test names are in Russian. User-facing text is bi
 
 ```bash
 pnpm dev                 # dev server at http://localhost:5173 (works outside Telegram; the SW is disabled in dev)
+pnpm dev:rich            # same dev server, but Treats are kept at 999 999 (refilled after every spend)
 pnpm test                # vitest run: tests/**/*.test.ts and tests/**/*.spec.ts
 pnpm vitest run tests/game/battle.test.ts      # one file
 pnpm vitest run -t "редьюсер боя"              # filter by test name

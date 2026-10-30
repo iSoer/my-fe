@@ -4,7 +4,7 @@ import GameRoot from '@game/GameRoot';
 import { setGameHost } from '@game/platform/host';
 import { setStorageNamespace } from '@game/platform/storage';
 import { $route, back, navigate } from '@game/state/router';
-import { $battle, flushPersist } from '@game/state/save';
+import { $battle, $save, flushPersist } from '@game/state/save';
 import { $pauseOpen } from '@game/ui/lib/pause';
 import { $dialogue, skipDialogue } from '@game/state/dialogue';
 import '@game/ui/styles.css';
@@ -56,6 +56,16 @@ window.addEventListener('unhandledrejection', (e) => {
   showFatal(r instanceof Error ? r.message : String(r), r instanceof Error ? (r.stack ?? '') : '');
 });
 
+/** `pnpm dev:rich`: столько Вкусняшек держим в сейве, пополняя после каждой траты. */
+const RICH_TREATS = 999_999;
+
+/** Режим разработки `rich` (`vite --mode rich`): Вкусняшки всегда на максимуме. В сборку не попадает. */
+function keepTreatsMaxed(): void {
+  $save.subscribe((s) => {
+    if (s.profile.treats < RICH_TREATS) $save.set({ ...s, profile: { ...s.profile, treats: RICH_TREATS } });
+  });
+}
+
 /** Кнопка «Назад» Telegram: в бою — пауза, из деревни — в главное меню, на меню и итогах скрыта. */
 function syncBackButton(): void {
   const route = $route.get();
@@ -83,6 +93,7 @@ async function boot(): Promise<void> {
     startCloudMirror();
     $route.subscribe(syncBackButton);
     $battle.subscribe((b) => setClosingConfirmation(!!b && !b.result));
+    if (import.meta.env.DEV && import.meta.env.MODE === 'rich') keepTreatsMaxed();
   };
 
   const reconciled = await reconcileCloudSave();

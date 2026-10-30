@@ -416,6 +416,50 @@
     text-align: center;
     flex-shrink: 0;
   }
+  /* Название выделенного места: вверху экрана, пока герой у здания, идёт к нему или открыта карточка */
+  .st-place-title {
+    position: absolute;
+    top: calc(62px + var(--tg-safe-top, 0px));
+    left: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 22px 7px;
+    background: var(--ink);
+    box-shadow: 4px 4px 0 var(--red);
+    transform: translateX(-50%) skewX(-10deg);
+    white-space: nowrap;
+    pointer-events: none;
+    animation: st-title-in 0.18s ease-out both;
+  }
+  .st-place-title > * {
+    transform: skewX(10deg);
+  }
+  .st-place-title b {
+    color: #fff;
+    font-size: 18px;
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .st-place-title span {
+    color: var(--gold);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .st-root.is-talking .st-place-title {
+    display: none;
+  }
+  @keyframes st-title-in {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-8px) skewX(-10deg);
+    }
+  }
   /* Обновление витрины за Вкусняшки: кнопка и пояснение про растущую цену */
   .store-reroll {
     display: flex;

@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react"
 import { useStore } from "@nanostores/react"
-import { BUILDING_IDS, buildingDef, plotOf, type PlaceId } from "@game/content/settlement"
+import { BUILDING_IDS, PLOTS, buildingDef, plotOf, type PlaceId } from "@game/content/settlement"
 import { isBuilt } from "@game/core/settlement"
 import { displayName } from "@game/core/units"
 import { $save, gameStarted } from "@game/state/save"
 import {
+  $settlementFocus,
   $settlementNear,
   $settlementPanel,
   closePanel,
   openPanel,
   placeAlerts,
   placeSigns,
+  setFocusPlace,
   setHeroSpot,
   setNearPlace,
   settlementControl,
@@ -51,6 +53,7 @@ export function SettlementScreen() {
   const save = useStore($save)
   const panel = useStore($settlementPanel)
   const near = useStore($settlementNear)
+  const focus = useStore($settlementFocus)
   const talking = !!useStore($dialogue)
   const canvasRef = useRef<HTMLDivElement>(null)
   const topRef = useRef<HTMLDivElement>(null)
@@ -108,6 +111,7 @@ export function SettlementScreen() {
           paused: () => !!$settlementPanel.get() || !!$dialogue.get(),
           touch,
           onNear: setNearPlace,
+          onFocus: setFocusPlace,
           onOpen: (id) => {
             haptic("light")
             openPanel(id)
@@ -129,6 +133,7 @@ export function SettlementScreen() {
       closePanel()
       skipDialogue()
       setNearPlace(undefined)
+      setFocusPlace(undefined)
     }
   }, [])
 
@@ -136,6 +141,13 @@ export function SettlementScreen() {
   const alerts = placeAlerts(save)
   const guide = settlementGuide(save)
   const battleOn = !!save.battle && !save.battle.result
+  const titleId = panel ?? focus
+  const titleSign = titleId ? placeSigns(save)[titleId] : undefined
+  const placeTitle = titleId && titleSign
+    ? titleId === "gate"
+      ? { id: titleId, name: tr("Gate", "Ворота"), sub: battleOn ? tr("Back to battle", "Вернуться в бой") : tr("Sortie", "Вылазка") }
+      : { id: titleId, name: titleSign.name, sub: titleSign.built ? "" : PLOTS.find(p => p.id === titleId)?.building ? tr("Construction site", "Стройка") : "" }
+    : undefined
 
   // Кнопка панели: герой переносится ко входу в место (камера — за ним) и открывается карточка
   const goPlace = (p: SettlementPlace) => {
@@ -160,6 +172,13 @@ export function SettlementScreen() {
         <div className="st-top" ref={topRef}>
           <ResourceBar />
         </div>
+        {placeTitle && (
+          // Название выделенного места (или открытой карточки) — вверху экрана вместо вывесок над зданиями
+          <div key={placeTitle.id} className="st-place-title" aria-live="polite">
+            <b>{placeTitle.name}</b>
+            {placeTitle.sub && <span>{placeTitle.sub}</span>}
+          </div>
+        )}
         <nav className={`st-dock${menuOpen ? " is-open" : ""}`} ref={dockRef} aria-label={tr("Settlement", "Поселение")}>
           <button
             type="button"

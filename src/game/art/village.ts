@@ -915,6 +915,58 @@ export function villagePlotSvg(w: number, reserved = false): string {
     + ruins + rope + corners.map(([x, y]) => stake(x, y)).join("") + planks)
 }
 
+/**
+ * Свет из окон здания, когда в нём есть что-то новое (вместо значка «!»): слой того же размера и наклона, что и
+ * спрайт здания уровня `level`, — яркие окна (свет пробивается и сквозь доски), щель двери и лучи на землю.
+ * У Кладбища загорается фонарь у калитки. У Полигона и Бара окон нет и «нового» не бывает — `null`.
+ * Сцена кладёт слой поверх здания с блендингом ADD и плавно пульсирует им.
+ */
+export function villageBuildingLightSvg(id: BuildingId, w: number, h: number, level: number): string | null {
+  const wear = buildingWear(level)
+  if (id === "graveyard") {
+    const W = w * VT
+    const H = (h + GRAVEYARD_H_OVER) * VT
+    const lx = W / 2 + 22 + 10
+    const ly = H - 40
+    return svg(W, H, `<defs><radialGradient id="lg"><stop offset="0" stop-color="${GLOW.core}" stop-opacity=".9" /><stop offset=".45" stop-color="${GLOW.warm}" stop-opacity=".45" /><stop offset="1" stop-color="${GLOW.warm}" stop-opacity="0" /></radialGradient></defs>`
+      + `<circle cx="${r1(lx)}" cy="${r1(ly)}" r="58" fill="url(#lg)" />`
+      + `<rect x="${r1(lx - 5)}" y="${r1(ly - 8)}" width="10" height="14" rx="2" fill="${GLOW.core}" />`)
+  }
+  if (id !== "barracks" && id !== "store") return null
+  const W = w * VT
+  const H = (h + HOUSE_ROOF_OVER) * VT
+  const cx = W / 2
+  const facadeTop = H - VT * 1.7
+  const doorW = VT * 0.62
+  const doorH = VT * 1.02
+  const doorX = cx - doorW / 2
+  const doorY = H - doorH
+  const winY = facadeTop + 22
+  // Наклон и сжатие — как у дома (`villageHouseSvg`), иначе окна разъедутся
+  const lean = (id === "barracks" ? -1 : 1) * (1 + wear * 4)
+  const fitX = (W - 40) / W
+  const win = (x: number): string =>
+    `<circle cx="${r1(x + 17)}" cy="${r1(winY + 14)}" r="40" fill="url(#halo)" />`
+    + `<path d="M${r1(x + 2)} ${r1(winY + 26)} H${r1(x + 32)} L${r1(x + 46)} ${r1(H - 2)} H${r1(x - 12)} Z" fill="url(#beam)" />`
+    + `<rect x="${r1(x + 2)}" y="${r1(winY + 2)}" width="30" height="24" fill="${GLOW.core}" opacity=".95" />`
+  const light = win(cx - doorW / 2 - 60) + win(cx + doorW / 2 + 26)
+    + `<rect x="${r1(doorX + doorW * 0.3)}" y="${r1(doorY + 4)}" width="3" height="${r1(doorH - 8)}" fill="${GLOW.core}" opacity=".9" />`
+    + `<rect x="${r1(doorX + doorW * 0.64)}" y="${r1(doorY + 4)}" width="3" height="${r1(doorH - 8)}" fill="${GLOW.core}" opacity=".9" />`
+  return svg(W, H, `<defs>`
+    + `<radialGradient id="halo"><stop offset="0" stop-color="${GLOW.core}" stop-opacity=".7" /><stop offset=".5" stop-color="${GLOW.warm}" stop-opacity=".3" /><stop offset="1" stop-color="${GLOW.warm}" stop-opacity="0" /></radialGradient>`
+    + `<linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${GLOW.warm}" stop-opacity=".55" /><stop offset="1" stop-color="${GLOW.warm}" stop-opacity="0" /></linearGradient>`
+    + `</defs><g transform="translate(${r1(cx)} ${r1(H)}) skewX(${r1(lean)}) scale(${Math.round(fitX * 1000) / 1000} 1) translate(${r1(-cx)} ${r1(-H)})">${light}</g>`)
+}
+
+/** Цвет здания: крыша домиков (у Полигона — тёмное дерево, у Кладбища — камень). */
+export const BUILDING_TRIM: Record<BuildingId, string> = {
+  barracks: "#5e3a2e",
+  store: "#3b4a3c",
+  tavern: "#4a3a52",
+  training: "#6a4a2a",
+  graveyard: "#4c505a"
+}
+
 /** Знак на табличке стройки: можно строить (молоток), пока нельзя (замок), участок под будущее (крест). */
 export type StakeSignKind = "build" | "locked" | "reserved"
 
@@ -948,14 +1000,14 @@ export function villageBuildingSvg(id: BuildingId, w: number, h: number, level: 
   const wear = buildingWear(level)
   switch (id) {
     case "barracks":
-      return villageHouseSvg({ w, h, roof: "#5e3a2e", wall: "#7d6a52", npc: "barracks", wear })
+      return villageHouseSvg({ w, h, roof: BUILDING_TRIM.barracks, wall: "#7d6a52", npc: "barracks", wear })
     case "store":
-      return villageHouseSvg({ w, h, roof: "#3b4a3c", wall: "#857256", npc: "store", wear })
+      return villageHouseSvg({ w, h, roof: BUILDING_TRIM.store, wall: "#857256", npc: "store", wear })
     case "training":
       return villageTrainingSvg(w, wear)
     case "graveyard":
       return villageGraveyardSvg(w, h, wear)
     case "tavern":
-      return villageHouseSvg({ w, h, roof: "#4a3a52", wall: "#7a6448", npc: "tavern", wear })
+      return villageHouseSvg({ w, h, roof: BUILDING_TRIM.tavern, wall: "#7a6448", npc: "tavern", wear })
   }
 }

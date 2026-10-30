@@ -44,6 +44,7 @@ import {
   TREE_H,
   TREE_VARIANTS,
   villageBuildingSvg,
+  villageBuildingLightSvg,
   villageBushSvg,
   villageGateSvg,
   villageGrassSvg,
@@ -118,6 +119,8 @@ export interface SettlementSceneOptions {
   /** Устройство без клавиатуры: подсказку «E — открыть» не показываем, есть панель мест. */
   touch: boolean
   onNear: (id: PlaceId | undefined) => void
+  /** Выделенное место (рядом с героем или куда он идёт по тапу): подсвечено на карте, название — вверху экрана. */
+  onFocus: (id: PlaceId | undefined) => void
   onOpen: (id: PlaceId) => void
   /** Заговорить с жителем: true — разговор открыт; false — диалоги выключены, тап ведёт к месту жителя. */
   canTalk: (npcId: string) => boolean
@@ -169,15 +172,17 @@ interface FisherView {
 interface PlotView {
   def: PlotDef
   building?: Phaser.GameObjects.Image
+  /** Свет из окон поверх здания: в нём есть что-то новое (вместо значка «!»). */
+  light?: Phaser.GameObjects.Image
   lot: Phaser.GameObjects.Image
 }
 
-/** Вывеска места: плашка «название + состояние», значок «!» и стрелка следующего шага. */
 /** Табличка у стройки: размер в клетках и знаки на ней. */
 const STAKE_W = 0.9
 const STAKE_H = 1.08
 const STAKE_KINDS: readonly StakeSignKind[] = ["build", "locked", "reserved"]
 
+/** Вывеска места: плашка с названием (у ворот — и состоянием), значок «!» и стрелка следующего шага. */
 interface SignView {
   id: PlaceId
   plaque: Phaser.GameObjects.Container
@@ -210,6 +215,7 @@ const texKey = {
   building: (id: string, level: number) => `st:building:${id}:${level}`,
   lot: (id: string) => `st:lot:${id}`,
   stake: (kind: StakeSignKind) => `st:stake:${kind}`,
+  light: (id: string, level: number) => `st:light:${id}:${level}`,
   npc: (id: string, pose: string) => `st:npc:${id}:${pose}`
 }
 
@@ -266,6 +272,10 @@ export class SettlementScene extends Phaser.Scene {
   /** Житель, с которым заговорить, когда герой подойдёт. */
   private talkOnArrive: NpcDef | undefined
   private near: PlaceId | undefined
+  /** Подсвеченное место и что именно подсвечено (здание или стройка): меняем свечение, только когда это изменилось. */
+  private focused = ""
+  private glowing: Phaser.GameObjects.Image[] = []
+  private gateImg?: Phaser.GameObjects.Image
   private prompt?: Phaser.GameObjects.Text
   private moving = false
   private walkT = 0
@@ -482,7 +492,7 @@ export class SettlementScene extends Phaser.Scene {
       this.plots.push(view)
     }
     const gateBottom = (SORTIE_GATE.y + 1) * T
-    this.add
+    this.gateImg = this.add
       .image(SORTIE_GATE.x * T, gateBottom, texKey.gate)
       .setOrigin(0, 1)
       .setDisplaySize(SORTIE_GATE.w * T, T * GATE_H)
@@ -750,12 +760,27 @@ export class SettlementScene extends Phaser.Scene {
     v.plaque.each((o: Phaser.GameObjects.GameObject) => {
       if (o !== v.frame) o.destroy()
     })
-    // Эмодзи на вывеске — иконками-штампами (светлый тон, как везде в игре)
-    const title = richText(this, 0, -8, s.title, { ...textStyle(17, "#3b2614", true, 0), resolution: textRes(2) })
-    const sub = richText(this, 0, 12, s.sub, { ...textStyle(13, SUB_COLOR[s.status], true, 0), resolution: textRes(2) })
-    v.plaque.add([title, sub])
-    v.w = Math.max(title.width, sub.width) + 24
-    v.h = 50
+    if (v.id === "gate") {
+      // Ворота: название и строка состояния; эмодзи — иконками-штампами
+      const title = richText(this, 0, -8, s.title, { ...textStyle(17, "#3b2614", true, 0), resolution: textRes(2) })
+      const sub = richText(this, 0, 12, s.sub, { ...textStyle(13, SUB_COLOR[s.status], true, 0), resolution: textRes(2) })
+      v.plaque.add([title, sub])
+      v.w = Math.max(title.width, sub.width) + 24
+      v.h = 50
+    }
+    else {
+      // Построенное здание — без вывески: название показывает верх экрана при выделении, «новое» — свет из окон.
+      // Над зданием остаётся только стрелка следующего шага
+      v.plaque.setVisible(false)
+      const r = this.placeRect(v.id)
+      v.arrow.setPosition((r.x + r.w / 2) * T, r.y * T + T * 0.3)
+      return
+    }
+    this.placePlaque(v, s)
+  }
+
+  /** Поставить плашку над местом (ворота) в простой скруглённой рамке. */
+  private placePlaque(v: SignView, s: PlaceSign): void {
     const r = this.placeRect(v.id)
     const x = (r.x + r.w / 2) * T
     const y = (r.y + 0.55) * T
@@ -767,6 +792,34 @@ export class SettlementScene extends Phaser.Scene {
     frame.fillStyle(0x000000, 0.25).fillRoundedRect(-w / 2 + 2, -h / 2 + 4, w, h, 10)
     frame.fillStyle(s.built ? 0xf3e2c0 : 0xe2d6bf, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 10)
     frame.lineStyle(s.guide ? 4 : 3, s.guide ? 0xffb703 : 0x5a3b22, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, 10)
+  }
+
+  /**
+   * Свет из окон: в здании есть что-то новое. Слой того же размера, что и здание, поверх него с блендингом ADD;
+   * текстура уровня догружается при первом показе (следующий опрос вывесок её покажет).
+   */
+  private updateLight(p: PlotView, on: boolean, level: number): void {
+    const id = p.def.building
+    if (!on || !id || !p.building) {
+      p.light?.setVisible(false)
+      return
+    }
+    const key = texKey.light(id, level)
+    if (!this.textures.exists(key)) {
+      const svg = villageBuildingLightSvg(id, p.def.w, p.def.h, level)
+      if (svg) void ensureTexture(this, key, svg, p.def.w * T * this.res, (p.def.h + buildingOver(id, p.def)) * T * this.res)
+      p.light?.setVisible(false)
+      return
+    }
+    if (!p.light) {
+      p.light = this.add.image(p.building.x, p.building.y, key).setOrigin(0, 1).setBlendMode(Phaser.BlendModes.ADD)
+      if (!reducedMotion()) this.tweens.add({ targets: p.light, alpha: { from: 1, to: 0.45 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+    }
+    p.light
+      .setTexture(key)
+      .setDisplaySize(p.building.displayWidth, p.building.displayHeight)
+      .setDepth(p.building.depth + 0.5)
+      .setVisible(true)
   }
 
   /** Здания, жители и вывески по текущему сейву: построили или улучшили — карта меняется сразу. */
@@ -783,6 +836,7 @@ export class SettlementScene extends Phaser.Scene {
       }
       p.building?.setVisible(built)
       p.lot.setVisible(!built)
+      this.updateLight(p, built && !!signs[p.def.id]?.alert, level)
       // Место, где можно строить, мягко подсвечено
       if (signs[p.def.id]?.status === "available") p.lot.setTint(0xfff1b8)
       else if (signs[p.def.id]?.status === "locked") p.lot.setTint(0xb8b4ae)
@@ -805,7 +859,8 @@ export class SettlementScene extends Phaser.Scene {
       const s = signs[v.id]
       if (!s) continue
       this.drawSign(v, s)
-      v.badge.setVisible(s.alert)
+      // У построенного здания «новое» показывает свет из окон, «!» — только у ворот
+      v.badge.setVisible(s.alert && (v.id === "gate" || !s.built))
       v.arrow.setVisible(s.guide)
     }
   }
@@ -1069,6 +1124,7 @@ export class SettlementScene extends Phaser.Scene {
     if (moved) this.footsteps(dt)
     this.animateHero(dt)
     this.updateNear()
+    this.updateFocus()
     this.updateCamera(dt)
 
     if (this.talkOnArrive && this.path.length === 0 && !moved) {
@@ -1182,6 +1238,41 @@ export class SettlementScene extends Phaser.Scene {
     const frame = Math.floor(this.waterT * 4) % WATER_FRAMES
     const key = texKey.water(frame)
     if (this.water[0]?.texture.key !== key) for (const w of this.water) w.setTexture(key)
+  }
+
+  /**
+   * Подсветка выделенного места: здание (или стройка с табличкой, или ворота) светится по контуру. Выделено место
+   * рядом с героем или то, к которому он идёт по тапу. Свечение — preFX (WebGL); без него — светлая тонировка.
+   */
+  private updateFocus(): void {
+    const id = this.near ?? this.openOnArrive
+    const plot = id && id !== "gate" ? this.plots.find(p => p.def.id === id) : undefined
+    const built = !!plot?.building?.visible
+    const key = id ? `${id}|${built}` : ""
+    if (key === this.focused) return
+    this.focused = key
+    for (const img of this.glowing) {
+      if (!img.scene) continue
+      if (img.preFX) img.preFX.clear()
+      else img.clearTint()
+    }
+    this.glowing = []
+    if (id) {
+      const stake = this.signs.find(v => v.id === id)?.stake
+      const targets = id === "gate"
+        ? [this.gateImg]
+        : built ? [plot?.building] : [plot?.lot, stake?.visible ? stake : undefined]
+      for (const img of targets) {
+        if (!img) continue
+        if (img.preFX) {
+          img.preFX.setPadding(18)
+          img.preFX.addGlow(0xffd27a, 4, 0, false, 0.1, 14)
+        }
+        else img.setTint(0xfff3c4)
+        this.glowing.push(img)
+      }
+    }
+    this.opts.onFocus(id)
   }
 
   private updateNear(): void {
