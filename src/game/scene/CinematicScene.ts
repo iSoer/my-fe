@@ -13,6 +13,7 @@ import { deathSeed, pickDeathVariant, playDeathCine, preloadDeathParts, type Dea
 import { ensureTextures, TEX } from "./textures"
 import { FONT, WEAPON_COLOR_HEX, hpColor, textStyle } from "./style"
 import { floatText, ghostRise, tween, wait } from "./fx"
+import { MAP_ICONS, ensureIconTextures, iconImage } from "./iconText"
 import { hitGore, screenBloodSplat } from "./gore"
 import { bigNumber, ensureMotionTextures, goreKindOfUnit, hitStop, shakeCam, shakeMul, speedLines } from "./motionFx"
 import { WeatherLayer } from "./weather"
@@ -217,6 +218,7 @@ export class CinematicScene extends Phaser.Scene {
         ensureBackdropTexture(this, biome.id, terrain, "left", bgW, h),
         ensureUnitTextures(this, aUnit, "cine"),
         ensureUnitTextures(this, dUnit, "cine"),
+        ensureIconTextures(this, MAP_ICONS, "light"),
         // Части тела только тем, кто погибнет: нужны для разлёта и «хвоста из лужи».
         event.defenderHpAfter <= 0
           ? preloadDeathParts(this, dUnit, "cine", 1500).then(p => p && this.parts.set(dUnit.id, p))
@@ -684,9 +686,7 @@ export class CinematicScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(42)
-    const portrait = this.add
-      .text(band.x, band.y, atk.side === "player" ? "🐾" : "💢", textStyle(40, "#fff", false, 0))
-      .setOrigin(0.5)
+    const portrait = iconImage(this, band.x, band.y, atk.side === "player" ? "🐾" : "💢", 52, textStyle(40, "#fff", false, 0))
       .setDepth(42)
       .setAlpha(0.6)
     portrait.setX(band.x + (atk.onLeft ? -w * 0.36 : w * 0.36))

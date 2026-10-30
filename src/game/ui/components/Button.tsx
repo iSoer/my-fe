@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { haptic } from "@game/platform/haptics"
+import { IconText } from "./Icon"
 
 export interface ButtonProps {
   children: ReactNode
@@ -47,7 +48,7 @@ export function Button(p: ButtonProps) {
       <span className="btn-inner">
         {p.icon !== undefined && (
           <span className="ico" aria-hidden="true">
-            {p.icon}
+            {typeof p.icon === "string" ? <IconText text={p.icon} /> : p.icon}
           </span>
         )}
         {p.children}

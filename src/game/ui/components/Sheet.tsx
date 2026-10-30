@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { Button } from "./Button"
 import { tr } from "@game/i18n"
+import { IconText } from "./Icon"
 
 export function BottomSheet({
   open,
@@ -18,7 +19,7 @@ export function BottomSheet({
     <div className="overlay" onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
         <div className="handle" />
-        {title && <h3>{title}</h3>}
+        {title && <h3><IconText text={title} /></h3>}
         {children}
       </div>
     </div>
@@ -40,7 +41,7 @@ export function Modal({
   return (
     <div className="overlay modal" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>
-        {title && <h3>{title}</h3>}
+        {title && <h3><IconText text={title} /></h3>}
         {children}
       </div>
     </div>
@@ -66,7 +67,7 @@ export function ConfirmModal({
 }) {
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      {text && <div className="muted">{text}</div>}
+      {text && <div className="muted">{typeof text === "string" ? <IconText text={text} /> : text}</div>}
       <div className="row">
         <Button block onClick={onClose}>
           {tr("Cancel", "Отмена")}

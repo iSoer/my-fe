@@ -167,7 +167,7 @@ export function SettlementScreen() {
             onClick={() => goPlace("gate")}
           >
             <span className="btn-inner">
-              <span className="ico" aria-hidden="true">{gateNear ? "💬" : "⚔️"}</span>
+              <span className="ico" aria-hidden="true"><Icon emoji={gateNear ? "💬" : "⚔️"} /></span>
               {battleOn ? tr("To battle", "В бой") : tr("Sortie", "Вылазка")}
             </span>
             {alerts.gate && <i className="st-badge" aria-label={tr("New", "Новое")}>!</i>}
@@ -187,7 +187,7 @@ export function SettlementScreen() {
                       navigate(it.path)
                     }}
                   >
-                    <span className="st-dock-ico" aria-hidden="true">{it.icon}</span>
+                    <span className="st-dock-ico" aria-hidden="true"><Icon emoji={it.icon} /></span>
                     <span className="st-dock-name">{it.label}</span>
                   </button>
                 </li>
@@ -203,7 +203,7 @@ export function SettlementScreen() {
                       className={`st-dock-btn st-menu-item${guide === b ? " is-guide" : ""}${built ? "" : " is-unbuilt"}${isNear ? " is-near" : ""}`}
                       onClick={() => goPlace(b)}
                     >
-                      <span className="st-dock-ico" aria-hidden="true">{isNear ? "💬" : def.icon}</span>
+                      <span className="st-dock-ico" aria-hidden="true"><Icon emoji={isNear ? "💬" : def.icon} /></span>
                       <span className="st-dock-name">{def.short}</span>
                       {!built && <span className="st-dock-hint">{tr("build", "построить")}</span>}
                       {alerts[b] && <i className="st-badge" aria-label={tr("New", "Новое")}>!</i>}
@@ -243,3 +243,5 @@ export function SettlementScreen() {
     </div>
   )
 }
+
+import { Icon } from "../components/Icon"

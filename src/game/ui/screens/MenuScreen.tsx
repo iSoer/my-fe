@@ -11,6 +11,7 @@ import { ConfirmModal } from "../components/Sheet"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { haptic } from "@game/platform/haptics"
 import { plural, tr } from "@game/i18n"
+import { IconText } from "../components/Icon"
 
 // Для широкой диорамы показываем середину сцены (забор и небо), а не только газон.
 const YARD_BG = backdropSvg("yard", "plain", "left").replace(
@@ -117,13 +118,13 @@ export function MenuScreen() {
           <Button big primary block glow={hasBattle} icon={hasBattle ? "⚔️" : "🏡"} onClick={onContinue}>
             <span className="lbl">
               {hasBattle ? tr("Resume battle", "Продолжить бой") : tr("Continue", "Продолжить")}
-              <div className="sub">{continueSub}</div>
+              <div className="sub"><IconText text={continueSub} /></div>
             </span>
           </Button>
         )}
         {hasBattle && (
           <Button ghost sm block onClick={() => setSurrender(true)}>
-            {tr("🏳️ Surrender", "🏳️ Сдаться")}
+            <IconText text={tr("🏳️ Surrender", "🏳️ Сдаться")} />
           </Button>
         )}
         <Button big block primary={!started} icon="✨" onClick={onNew}>

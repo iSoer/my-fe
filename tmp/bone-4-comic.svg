@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Вкусняшки">
+<polygon points="8,40 54,14 60,24 14,50" fill="#dc3341"/>
+<polygon points="2,52 30,36 32,40 4,56" fill="#dc3341" opacity="0.75"/>
+<g transform="rotate(-35 32 32)" fill="#0d0b10" stroke="#0d0b10" stroke-width="5" stroke-linejoin="round"><rect x="17" y="27.5" width="30" height="9" rx="1.5" /><circle cx="16.5" cy="26.5" r="6.5" /><circle cx="16.5" cy="37.5" r="6.5" /><circle cx="47.5" cy="26.5" r="6.5" /><circle cx="47.5" cy="37.5" r="6.5" /></g>
+<g transform="rotate(-35 32 32)" fill="#fff4dc"><rect x="17" y="27.5" width="30" height="9" rx="1.5" /><circle cx="16.5" cy="26.5" r="6.5" /><circle cx="16.5" cy="37.5" r="6.5" /><circle cx="47.5" cy="26.5" r="6.5" /><circle cx="47.5" cy="37.5" r="6.5" /></g>
+<g transform="rotate(-35 32 32)"><path d="M20 29.6 H41" stroke="#ffd166" stroke-width="2.8" stroke-linecap="round"/><path d="M12.5 24 a4 4 0 0 1 5 -2" stroke="#ffd166" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
+</svg>

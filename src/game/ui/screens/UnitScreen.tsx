@@ -51,6 +51,7 @@ import { LevelUpModal, type LevelUpView } from "../components/LevelUpModal"
 import { useReplay } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
 import { tr } from "@game/i18n"
+import { IconText } from "../components/Icon"
 
 function slotName(s: keyof UnitSkills): string {
   switch (s) {
@@ -268,12 +269,12 @@ export function UnitScreen({ unitId }: { unitId: string }) {
           <Button block icon="🏋️" onClick={onTrain} disabled={unit.level >= MAX_LEVEL || save.profile.treats < tCost}>
             {tr("Train: +1 level", "Тренировка: +1 уровень")}
             {" "}
-            {unit.level >= MAX_LEVEL ? tr("(max)", "(максимум)") : `(🦴 ${tCost})`}
+            <IconText text={unit.level >= MAX_LEVEL ? tr("(max)", "(максимум)") : `(🦴 ${tCost})`} />
           </Button>
           <Button block icon="🔪" onClick={onSharpen} disabled={sCost === null || save.profile.treats < sCost}>
             {tr("Sharpen weapon", "Заточить оружие")}
             {" "}
-            {sCost === null ? tr("(maxed)", "(предел)") : `(🦴 ${sCost}, Mt +2)`}
+            <IconText text={sCost === null ? tr("(maxed)", "(предел)") : `(🦴 ${sCost}, Mt +2)`} />
           </Button>
           {unit.rarity < 5 && (
             <Button block icon="🌟" onClick={() => setRebirthOpen(true)} disabled={!canRebirth(unit)}>

@@ -6,6 +6,7 @@ import { WEAPON_COLOR } from "@game/content/weapons"
 import { UnitAvatar } from "../components/UnitAvatar"
 import { COLOR_CSS } from "../lib/format"
 import { tr } from "@game/i18n"
+import { IconText } from "../components/Icon"
 
 /** Полоска HP, которая за кадр проезжает от «до» к «после»; новый прогноз монтирует её заново (key). */
 function HpBar(props: { before: number, after: number, max: number }) {
@@ -93,8 +94,8 @@ function Side({
           </span>
         )}
         {effective && hits > 0 && <span className="bf-tag red">×1.5</span>}
-        {dies && !enemy && <span className="bf-tag death">{tr("☠ WILL DIE", "☠ ПОГИБНЕТ")}</span>}
-        {dies && enemy && <span className="bf-tag kill">{tr("☠ kill", "☠ погибнет")}</span>}
+        {dies && !enemy && <span className="bf-tag death"><IconText text={tr("☠ WILL DIE", "☠ ПОГИБНЕТ")} /></span>}
+        {dies && enemy && <span className="bf-tag kill"><IconText text={tr("☠ kill", "☠ погибнет")} /></span>}
       </div>
     </div>
   )

@@ -2,13 +2,14 @@ import { useStore } from "@nanostores/react"
 import { $profile } from "@game/state/save"
 import { useCountUp } from "../lib/animate"
 import { tr } from "@game/i18n"
+import { Icon } from "./Icon"
 
 function Res({ icon, value, title }: { icon: string, value: number, title: string }) {
   const shown = useCountUp(value, 600)
   return (
     <span className={`res ${shown !== value ? "ticking" : ""}`} title={title}>
       <span className="res-ico" aria-hidden="true">
-        {icon}
+        <Icon emoji={icon} />
       </span>
       <b key={value} className="res-val">
         {shown}

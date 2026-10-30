@@ -85,7 +85,7 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
         <span className="team-name">
           <b>{TEAM_RANK(offer.team)}</b>
           <span className="muted small">{` · ${faction.name}`}</span>
-          <span className="team-biome small">{`${BIOME_ICON[offer.map.biomeId] ?? "🗺️"} ${biomeDef(offer.map.biomeId).name}`}</span>
+          <span className="team-biome small"><IconText text={`${BIOME_ICON[offer.map.biomeId] ?? "🗺️"} ${biomeDef(offer.map.biomeId).name}`} /></span>
         </span>
       </div>
       <div className="team-foes">
@@ -108,7 +108,7 @@ function TeamCard({ offer, selected, onPick, index }: { offer: EnemyTeamOffer, s
           {offer.reinforcements > 0 ? tr(` (${offer.reinforcements} as reinforcements)`, ` (из них ${offer.reinforcements} — подкрепление)`) : ""}
         </span>
         <span className="team-reward">
-          {`🦴 ${offer.treats} · ✦ ${offer.glory}`}
+          <IconText text={`🦴 ${offer.treats} · ✦ ${offer.glory}`} />
           <small>{offer.map.expedition ? tr(" for escaping + chests + loot", " за уход + сундуки + добыча") : tr(" for victory + loot", " за победу + добыча")}</small>
         </span>
         <span className={`team-xp ${xp.cls}`}>{xp.text}</span>
@@ -142,7 +142,7 @@ function DrinkNote({ save }: { save: SaveGame }) {
   if (!drink || !def) return null
   return (
     <div className="card drink-note">
-      <span aria-hidden="true">{def.icon}</span>
+      <span aria-hidden="true"><Icon emoji={def.icon} /></span>
       <span className="small">
         <b>{tr(`Before the fight: ${def.name}`, `Перед боем: ${def.name}`)}</b>
         {` · ${drinkEffects(drink.pct)}`}
@@ -181,7 +181,7 @@ export function BattleSetupScreen() {
                 $sortieMode.set(m.id)
               }}
             >
-              <span className="mode-ico" aria-hidden="true">{m.icon}</span>
+              <span className="mode-ico" aria-hidden="true"><Icon emoji={m.icon} /></span>
               <b>{m.name()}</b>
               <span className="muted small">{m.desc()}</span>
             </button>
@@ -224,7 +224,7 @@ export function BattleSetupScreen() {
                 }}
               >
                 <span className="diff-ico" aria-hidden="true">
-                  {unlocked ? st.icon : "🔒"}
+                  <Icon emoji={unlocked ? st.icon : "🔒"} />
                 </span>
                 <div className="diff-body">
                   <b>
@@ -233,7 +233,7 @@ export function BattleSetupScreen() {
                   </b>
                   <div className="muted small">{unlocked ? d.desc : `${tr("Locked", "Закрыто")}: ${unlockText}`}</div>
                   <div className="diff-meta">
-                    <span className="chip">{`🦴 ×${d.treatsMult}`}</span>
+                    <span className="chip"><IconText text={`🦴 ×${d.treatsMult}`} /></span>
                     <span className="chip gold">{`✦ ${d.glory}`}</span>
                     {rules.map(r => (
                       <span key={r} className="chip red">
@@ -295,7 +295,7 @@ export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
       <div className="screen-body">
         <div className="row between">
           <div className="section-title">
-            {`${st.icon} ${diff?.name ?? ""} · ${mode === "expedition" ? tr("thicket guards", "стражи чащи") : tr("enemy army", "армия врага")}`}
+            <IconText text={`${st.icon} ${diff?.name ?? ""} · ${mode === "expedition" ? tr("thicket guards", "стражи чащи") : tr("enemy army", "армия врага")}`} />
           </div>
           <span className="muted small">{tr(`your army: Lv. ${armyLevel}`, `ваша армия: ур. ${armyLevel}`)}</span>
         </div>
@@ -329,3 +329,5 @@ export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
     </div>
   )
 }
+
+import { Icon, IconText } from "../components/Icon"

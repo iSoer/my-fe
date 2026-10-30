@@ -75,7 +75,7 @@ export function StoreScreen() {
         <TopBar title={tr("Shop", "Лавка")} right={<ResourceBar />} onBack={back} />
         <div className="screen-body">
           <div className="empty">
-            <div className="big">🛒</div>
+            <div className="big"><Icon emoji="🛒" /></div>
             <h3>{tr("Not built yet", "Лавка ещё не построена")}</h3>
             <p>{tr("Build the Trading Post in the settlement to buy weapons and talismans.", "Постройте Торговую лавку в поселении, чтобы покупать оружие и талисманы.")}</p>
           </div>
@@ -123,7 +123,7 @@ export function StoreScreen() {
         </p>
         <div className="store-reroll">
           <Button sm icon="🎲" disabled={save.profile.treats < rerollCost} onClick={reroll}>
-            {`${tr("Refresh goods", "Обновить товар")} · ${rerollCost} 🦴`}
+            <IconText text={`${tr("Refresh goods", "Обновить товар")} · ${rerollCost} 🦴`} />
           </Button>
           <span className="muted small">
             {tr("Each refresh costs more; the price resets after a sortie.", "Каждое обновление дороже; цена сбрасывается после вылазки.")}
@@ -143,7 +143,7 @@ export function StoreScreen() {
                   ? <GearIcon svg={weaponIconSvg(w.kind, w.grade, w.variant)} size={44} />
                   : tab === "talisman"
                     ? <GearIcon svg={ringSvg(id)} size={44} />
-                    : <span className="store-ico" aria-hidden="true">{info.icon}</span>}
+                    : <span className="store-ico" aria-hidden="true"><Icon emoji={info.icon} /></span>}
                 <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
                   <div className="row wrap" style={{ gap: 6 }}>
                     <b>{info.name}</b>
@@ -169,3 +169,6 @@ export function StoreScreen() {
     </div>
   )
 }
+
+import { Icon } from "../components/Icon"
+import { IconText } from "../components/Icon"

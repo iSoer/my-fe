@@ -3,6 +3,7 @@ import { TEX } from "./textures"
 import { FONT, textStyle } from "./style"
 import { GORE_TEX, ensureGoreTextures, goreBurst, goreDecal, goreEnabled } from "./gore"
 import { pinToScreen, viewH, viewW } from "./hidpi"
+import { iconImage, richText } from "./iconText"
 
 /** Сцена пригодна для твинов/таймеров: создаётся или работает. */
 export function sceneAlive(scene: Phaser.Scene): boolean {
@@ -90,10 +91,8 @@ export function floatText(
   opts: FloatTextOptions = {}
 ): void {
   if (!sceneAlive(scene)) return
-  const t = scene.add
-    .text(x, y, text, textStyle(opts.size ?? 18, color, true, opts.stroke ?? 4))
-    .setOrigin(0.5)
-    .setDepth(25)
+  // Эмодзи в надписи — иконками-штампами (art/icons)
+  const t = richText(scene, x, y, text, textStyle(opts.size ?? 18, color, true, opts.stroke ?? 4)).setDepth(25)
   const dur = (opts.duration ?? 700) / speed
   t.setScale(0.6)
   scene.tweens.add({ targets: t, scale: 1, duration: 120 / speed, ease: "Back.easeOut" })
@@ -157,15 +156,10 @@ export function bloodDecal(
 /** Милый призрак улетает вверх. */
 export function ghostRise(scene: Phaser.Scene, x: number, y: number, size: number, speed: number): Promise<void> {
   if (!sceneAlive(scene)) return Promise.resolve()
-  const ghost = scene.add
-    .text(x, y, "👻", textStyle(size * 0.6, "#fff", false, 0))
-    .setOrigin(0.5)
+  const ghost = iconImage(scene, x, y, "👻", size * 0.72, textStyle(size * 0.6, "#fff", false, 0))
     .setDepth(26)
     .setAlpha(0.95)
-  const halo = scene.add
-    .text(x, y - size * 0.4, "✨", textStyle(size * 0.3, "#fff", false, 0))
-    .setOrigin(0.5)
-    .setDepth(26)
+  const halo = iconImage(scene, x, y - size * 0.4, "✨", size * 0.36, textStyle(size * 0.3, "#fff", false, 0)).setDepth(26)
   scene.tweens.add({ targets: halo, y: y - size * 1.4, alpha: 0, duration: 600 / speed })
   return tween(scene, {
     targets: ghost,

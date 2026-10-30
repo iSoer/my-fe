@@ -57,6 +57,7 @@ import { clearGoreStains } from "./gore"
 import { camZoom, cssZoom, initHiDpiScene, pinToScreen, renderScaleOf, restCamera, setCssZoom, viewH, viewW } from "./hidpi"
 import { textRes } from "./renderScale"
 import { tr } from "@game/i18n"
+import { MAP_ICONS, ensureIconTextures } from "./iconText"
 
 /** Сумрак мрачной чащи: тинт всех клеток большого поля. */
 const EXPEDITION_GLOOM = 0x9aa595
@@ -305,7 +306,7 @@ export class MapScene extends Phaser.Scene {
   /** Текстуры тайлов биома и миниатюр живых юнитов (размер карты). */
   private preloadArt(st: BattleState | undefined): Promise<unknown> {
     if (!st) return Promise.resolve()
-    const jobs: Promise<unknown>[] = [ensureEnvTileTextures(this, st.map.biomeId)]
+    const jobs: Promise<unknown>[] = [ensureEnvTileTextures(this, st.map.biomeId), ensureIconTextures(this, MAP_ICONS, "light")]
     if (st.map.expedition) {
       const px = tileTexSize(this)
       jobs.push(

@@ -10,6 +10,7 @@ import { Modal } from "../components/Sheet"
 import { useToast } from "../components/Toast"
 import { haptic } from "@game/platform/haptics"
 import { LANG_NAMES, LANGS, tr } from "@game/i18n"
+import { Icon, IconText } from "../components/Icon"
 
 function Switch({ on, onChange }: { on: boolean, onChange: (v: boolean) => void }) {
   return <span role="switch" aria-checked={on} className={`switch ${on ? "on" : ""}`} onClick={() => onChange(!on)} />
@@ -28,7 +29,7 @@ function Seg<T extends string | number>({
     <div className="seg">
       {options.map(o => (
         <button key={String(o.v)} type="button" className={value === o.v ? "on" : ""} onClick={() => onChange(o.v)}>
-          {o.label}
+          <IconText text={o.label} />
         </button>
       ))}
     </div>
@@ -87,13 +88,13 @@ export function SettingsScreen() {
       <div className="screen-body">
         {SettingsSection && <SettingsSection />}
         <div className="card pop-in">
-          <div className="section-title">🌐 Language · Язык</div>
+          <div className="section-title"><Icon emoji="🌐" /> Language · Язык</div>
           <div className="setting">
             <Seg value={s.lang} options={LANGS.map(v => ({ v, label: LANG_NAMES[v] }))} onChange={v => set({ lang: v })} />
           </div>
         </div>
         <div className="card pop-in">
-          <div className="section-title">🔊 {tr("Sound & feedback", "Звук и отклик")}</div>
+          <div className="section-title"><Icon emoji="🔊" /> {tr("Sound & feedback", "Звук и отклик")}</div>
           <div className="setting">
             <div className="row">
               <span>{tr("Music", "Музыка")}</span>
@@ -129,7 +130,7 @@ export function SettingsScreen() {
         </div>
 
         <div className="card pop-in" style={{ animationDelay: "60ms" }}>
-          <div className="section-title">⚔️ {tr("Battle", "Бой")}</div>
+          <div className="section-title"><Icon emoji="⚔️" /> {tr("Battle", "Бой")}</div>
           <div className="setting">
             <span>{tr("Animation speed", "Скорость анимаций")}</span>
             <Seg
@@ -234,7 +235,7 @@ export function SettingsScreen() {
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "120ms" }}>
-          <div className="section-title">💾 {tr("Save", "Сейв")}</div>
+          <div className="section-title"><Icon emoji="💾" /> {tr("Save", "Сейв")}</div>
           <Button block icon="📤" onClick={() => setExportCode(exportSaveCode())}>
             {tr("Export save code", "Экспортировать код сейва")}
           </Button>
@@ -265,7 +266,7 @@ export function SettingsScreen() {
         </div>
 
         <div className="card stack pop-in" style={{ animationDelay: "180ms" }}>
-          <div className="section-title">📊 {tr("Statistics", "Статистика")}</div>
+          <div className="section-title"><Icon emoji="📊" /> {tr("Statistics", "Статистика")}</div>
           <div className="stats-table">
             <span className="k">{tr("Battles", "Боёв")}</span>
             <span className="v">{save.stats.battles}</span>

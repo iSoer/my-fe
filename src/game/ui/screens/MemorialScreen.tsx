@@ -17,6 +17,7 @@ import { useNow } from "../settlement/BuildingPanel"
 import { fmtDate, fmtDuration, g } from "../lib/format"
 import { stagger } from "../lib/animate"
 import { tr } from "@game/i18n"
+import { Icon, IconText } from "../components/Icon"
 
 /** Кладбище: история павших; на 5-м уровне здания — воскрешение одного бойца в игровой день. */
 export function MemorialScreen() {
@@ -55,18 +56,18 @@ export function MemorialScreen() {
         </p>
         {level > 0 && (
           <div className={`st-revive ${status.unlocked && status.readyToday ? "is-ready" : ""}`}>
-            {level < GRAVEYARD.reviveLevel
+            <IconText text={level < GRAVEYARD.reviveLevel
               ? tr(`🔒 Graveyard level ${level}: resurrection opens at level ${GRAVEYARD.reviveLevel}.`, `🔒 Кладбище ${level}-го уровня: воскрешение откроется на ${GRAVEYARD.reviveLevel}-м.`)
               : status.readyToday
                 ? full
                   ? tr(`✨ A resurrection is ready, but the Barracks are full (${rosterCapacity(save)}).`, `✨ Воскрешение готово, но в Казармах нет мест (${rosterCapacity(save)}).`)
                   : tr("✨ You can bring back one fallen fighter today. They return without gear.", "✨ Сегодня можно вернуть одного павшего. Он вернётся без снаряжения.")
-                : tr(`⏳ Next resurrection in ${fmtDuration((status.nextAt ?? now) - now)}.`, `⏳ Следующее воскрешение через ${fmtDuration((status.nextAt ?? now) - now)}.`)}
+                : tr(`⏳ Next resurrection in ${fmtDuration((status.nextAt ?? now) - now)}.`, `⏳ Следующее воскрешение через ${fmtDuration((status.nextAt ?? now) - now)}.`)} />
           </div>
         )}
         {list.length === 0 && (
           <div className="empty">
-            <div className="big">🪦</div>
+            <div className="big"><Icon emoji="🪦" /></div>
             <p>{tr("Empty for now. Not for long.", "Пока пусто. Это ненадолго.")}</p>
           </div>
         )}

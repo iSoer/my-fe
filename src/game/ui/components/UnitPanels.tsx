@@ -21,6 +21,7 @@ import {
 import { $inventory } from "@game/state/save"
 import { BottomSheet } from "./Sheet"
 import { tr } from "@game/i18n"
+import { Icon } from "./Icon"
 
 /** SVG-иконка снаряжения (оружие или кольцо талисмана). */
 export function GearIcon({ svg, size = 56 }: { svg: string, size?: number }) {
@@ -62,7 +63,7 @@ export function MasteryGrid({ unit, onPick }: { unit: UnitInstance, onPick: (s: 
     <div className="stack" style={{ gap: 8 }}>
       <div className="mastery-grid">{WEAPON_SKILLS.map(s => cell(s, <GearIcon svg={skillIcon(s)} size={30} />))}</div>
       <div className="mastery-grid mastery-grid--move">
-        {MOVEMENT_SKILLS.map(s => cell(s, <span className="mastery-emoji" aria-hidden="true">{MOVE_ICON[s]}</span>))}
+        {MOVEMENT_SKILLS.map(s => cell(s, <span className="mastery-emoji" aria-hidden="true"><Icon emoji={MOVE_ICON[s]} /></span>))}
       </div>
       <div className="mastery-legend">
         <span className="gold">{tr("★ talent", "★ талант")}</span>

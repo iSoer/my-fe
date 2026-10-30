@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Вкусняшки">
+<g transform="translate(6 2) skewX(-10)">
+  <g transform="translate(4 4)"><g transform="rotate(-35 32 32)" fill="#dc3341" stroke="#dc3341" stroke-width="6" stroke-linejoin="round"><rect x="17" y="27.5" width="30" height="9" rx="1.5" /><circle cx="16.5" cy="26.5" r="6.5" /><circle cx="16.5" cy="37.5" r="6.5" /><circle cx="47.5" cy="26.5" r="6.5" /><circle cx="47.5" cy="37.5" r="6.5" /></g></g>
+  <g transform="rotate(-35 32 32)" fill="#0d0b10" stroke="#0d0b10" stroke-width="6" stroke-linejoin="round"><rect x="17" y="27.5" width="30" height="9" rx="1.5" /><circle cx="16.5" cy="26.5" r="6.5" /><circle cx="16.5" cy="37.5" r="6.5" /><circle cx="47.5" cy="26.5" r="6.5" /><circle cx="47.5" cy="37.5" r="6.5" /></g>
+  <g transform="rotate(-35 32 32)" fill="#ffffff"><rect x="17" y="27.5" width="30" height="9" rx="1.5" /><circle cx="16.5" cy="26.5" r="6.5" /><circle cx="16.5" cy="37.5" r="6.5" /><circle cx="47.5" cy="26.5" r="6.5" /><circle cx="47.5" cy="37.5" r="6.5" /></g>
+</g>
+</svg>

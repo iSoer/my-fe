@@ -13,6 +13,7 @@ import {
 } from './pwa';
 import { cloudAvailable, isTelegram } from './telegram';
 import { $lang, tr } from '@game/i18n';
+import { Icon } from '@game/ui/components/Icon';
 
 function fmtMb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} ${tr('MB', 'МБ')}`;
@@ -37,7 +38,9 @@ export function AppCard() {
 
   return (
     <div className="card stack pop-in">
-      <div className="section-title">📲 {tr('App', 'Приложение')}</div>
+      <div className="section-title">
+        <Icon emoji="📲" /> {tr('App', 'Приложение')}
+      </div>
       <div className="stats-table">
         <span className="k">{tr('Offline mode', 'Офлайн-режим')}</span>
         <span className="v">{offline ? tr('ready', 'готов') : tr('no', 'нет')}</span>

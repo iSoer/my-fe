@@ -9,6 +9,7 @@ import { haptic } from "@game/platform/haptics"
 import { plural, tr } from "@game/i18n"
 import { ConfirmModal } from "../components/Sheet"
 import { $pauseOpen } from "../lib/pause"
+import { Icon } from "../components/Icon"
 
 /** Сколько ждёт второго нажатия «взведённая» кнопка «Завершить ход» (режим двойного нажатия). */
 const DOUBLE_TAP_MS = 2000
@@ -78,7 +79,7 @@ export function BattleBar({ battle, ui }: { battle: BattleState, ui: BattleUiSta
           toggleDanger()
         }}
       >
-        <span className="bf-bar-ico" aria-hidden="true">⚠</span>
+        <span className="bf-bar-ico" aria-hidden="true"><Icon emoji="⚠" /></span>
       </button>
       {big && (
         <div className="bf-bar-zoom" role="group" aria-label={tr("Zoom", "Масштаб")}>
@@ -119,7 +120,7 @@ export function BattleBar({ battle, ui }: { battle: BattleState, ui: BattleUiSta
         title={armed ? tr(`${left} ${notActed} acted yet`, `Ещё ${left} ${notActed}`) : undefined}
         onClick={press}
       >
-        <span className="bf-bar-ico" aria-hidden="true">{armed ? "⚠" : "⏭"}</span>
+        <span className="bf-bar-ico" aria-hidden="true"><Icon emoji={armed ? "⚠" : "⏭"} /></span>
         <span className="bf-bar-label">{armed ? tr("Tap again", "Ещё раз") : tr("End turn", "Завершить ход")}</span>
       </button>
       <ConfirmModal

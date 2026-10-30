@@ -8,6 +8,7 @@ import { Button } from "./Button"
 import { ClassFacts, ClassRoleLine, classRoleText } from "./ClassInfo"
 import { BottomSheet } from "./Sheet"
 import { tr } from "@game/i18n"
+import { IconText } from "./Icon"
 
 /** «Таланты: Sword, Flying · Слабости: Bow» — склонности персонажа модели. */
 export function aptitudeLine(unit: UnitInstance): string {
@@ -98,7 +99,7 @@ export function ClassSheet({ unit, army, open, onClose, onPick }: ClassSheetProp
                 <div key={id} className="row between small">
                   <span>
                     {`${fwClass(id).name} `}
-                    <span className="muted">{`· ${classRoleText(id)}`}</span>
+                    <span className="muted"><IconText text={`· ${classRoleText(id)}`} /></span>
                   </span>
                   <span className="muted">
                     {[

@@ -10,6 +10,7 @@ import { Button } from "./Button"
 import { UnitRow } from "./UnitRow"
 import { UnitDetails } from "./UnitDetails"
 import { tr } from "@game/i18n"
+import { IconText } from "./Icon"
 
 /** Набор в Казарме: витрина персонажей за Вкусняшки. Цена зависит от уровня и редкости, витрина обновляется после боя. */
 export function ShopSheet({
@@ -39,7 +40,7 @@ export function ShopSheet({
   return (
     <BottomSheet open={open} onClose={onClose} title={tr("🐾 Recruit", "🐾 Набор")}>
       <p className="muted small hire-sub">
-        {tr("You have 🦴", "У вас 🦴")}
+        <IconText text={tr("You have 🦴", "У вас 🦴")} />
         {" "}
         <b>{treats}</b>
         {" "}
@@ -70,7 +71,7 @@ export function ShopSheet({
                 </div>
               )}
               <Button block primary icon="🦴" disabled={slots === 0 || treats < price} onClick={() => buy(i)}>
-                {slots === 0 ? tr("Roster full", "Ростер полон") : tr(`Buy for 🦴 ${price}`, `Купить за 🦴 ${price}`)}
+                <IconText text={slots === 0 ? tr("Roster full", "Ростер полон") : tr(`Buy for 🦴 ${price}`, `Купить за 🦴 ${price}`)} />
               </Button>
             </div>
           )

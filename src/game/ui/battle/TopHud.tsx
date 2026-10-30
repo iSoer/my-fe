@@ -4,6 +4,7 @@ import type { BattleState } from "@game/core/types"
 import { biomeDef } from "@game/content/biomes"
 import { tr } from "@game/i18n"
 import { BUFFS } from "@game/content/expedition"
+import { IconText } from "../components/Icon"
 
 /** Верхняя полоса HUD во всю ширину: ход, фаза, цель вылазки, добыча и биом. */
 export function TopHud({ battle }: { battle: BattleState }) {
@@ -37,9 +38,9 @@ export function TopHud({ battle }: { battle: BattleState }) {
             "Убейте стража с ключом, встаньте с ключом на сундук — он откроется, затем завершите действие бойца на светящемся ВЫХОДЕ в углу — отряд унесёт всю добычу"
           )}
         >
-          {`📦 ${opened}/${chests}`}
-          {keys > 0 ? ` · 🗝 ${keys}` : ""}
-          {teamBuffs ? ` · ${teamBuffs}` : ""}
+          <IconText text={`📦 ${opened}/${chests}`} />
+          <IconText text={keys > 0 ? ` · 🗝 ${keys}` : ""} />
+          <IconText text={teamBuffs ? ` · ${teamBuffs}` : ""} />
           {opened > 0 ? ` · ${tr("→ exit", "→ к выходу")}` : ""}
         </span>
       )}
@@ -54,7 +55,7 @@ export function TopHud({ battle }: { battle: BattleState }) {
             + `при отступлении — ${Math.round(lootShare("retreat") * 100)}%`
           )}
         >
-          {`${tr("Collected", "Собрано")}: ${battle.stats.loot} 🦴`}
+          <IconText text={`${tr("Collected", "Собрано")}: ${battle.stats.loot} 🦴`} />
         </span>
       )}
       <span className="bf-chip bf-biome">{biome.name}</span>

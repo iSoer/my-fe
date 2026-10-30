@@ -51,7 +51,7 @@ function FoeCard({ unit, note, index, dim, onOpen }: {
       onClick={() => onOpen(unit)}
     >
       <span className="foe-lvl">{`${tr("Lv.", "Ур.")}${unit.level}`}</span>
-      {unit.isBoss && <span className="foe-boss" aria-label={tr("Leader", "Вожак")}>👑</span>}
+      {unit.isBoss && <span className="foe-boss" aria-label={tr("Leader", "Вожак")}><Icon emoji="👑" /></span>}
       <UnitAvatar unit={unit} size="md" animated={false} />
       <b className="foe-name">{displayName(unit)}</b>
       <span className="foe-role">{classRoleText(unit.classId)}</span>
@@ -146,7 +146,7 @@ export function SquadScreen() {
       />
       <div className="screen-body">
         <div className="row wrap" style={{ gap: 6 }}>
-          <span className="chip">{`${DIFF_STYLE[pending.difficulty].icon} ${diff.name}`}</span>
+          <span className="chip"><IconText text={`${DIFF_STYLE[pending.difficulty].icon} ${diff.name}`} /></span>
           <span className="chip">{biomeDef(map.biomeId).name}</span>
           {map.objective === "killBoss" && <span className="chip red">{tr("goal: kill the leader", "цель: убить вожака")}</span>}
         </div>
@@ -188,7 +188,7 @@ export function SquadScreen() {
           </div>
         </div>
 
-        <div className="warning-box">{tr("☠️ The fallen don’t come back — and neither does their gear. Defeat — half the loot.", "☠️ Павшие не возвращаются вместе со снаряжением. Поражение — половина добычи.")}</div>
+        <div className="warning-box"><IconText text={tr("☠️ The fallen don’t come back — and neither does their gear. Defeat — half the loot.", "☠️ Павшие не возвращаются вместе со снаряжением. Поражение — половина добычи.")} /></div>
         <div className="sticky-cta">
           <Button big primary block pulse={squad.length > 0} icon="⚔️" onClick={onStart} disabled={squad.length === 0}>
             {`${tr("Start battle", "Начать бой")} · ${squad.length}/${SQUAD_SIZE}`}
@@ -223,7 +223,7 @@ export function SquadScreen() {
                     ? <span className="chip squad">{tr("Here", "Здесь")}</span>
                     : at >= 0
                       ? <span className="chip">{tr(`Slot ${at + 1}`, `Слот ${at + 1}`)}</span>
-                      : busy ? <span className="chip">{tr("🎯 Training", "🎯 На полигоне")}</span> : undefined
+                      : busy ? <span className="chip"><IconText text={tr("🎯 Training", "🎯 На полигоне")} /></span> : undefined
                 }
               />
             )
@@ -243,3 +243,6 @@ export function SquadScreen() {
     </div>
   )
 }
+
+import { Icon } from "../components/Icon"
+import { IconText } from "../components/Icon"

@@ -4,6 +4,7 @@ import { classInfo } from "@game/content/classes"
 import { SKILL_LABELS } from "@shared/character/skills"
 import { COLOR_CSS, MOVE_EMOJI } from "../lib/format"
 import { tr } from "@game/i18n"
+import { IconText } from "./Icon"
 
 /** Оружейный навык модели (`SKILL_LABELS`) с цветом треугольника. */
 export function WeaponBadge({ skill, name }: { skill: WeaponSkill, name?: string }) {
@@ -20,7 +21,7 @@ export function MoveBadge({ classId }: { classId: string }) {
   const info = classInfo(classId)
   return (
     <span className="badge" title={info.moveNote}>
-      {`${MOVE_EMOJI[info.moveType]} ${info.moveLabel} · ${tr("move", "ход")} ${info.moveRange}`}
+      <IconText text={`${MOVE_EMOJI[info.moveType]} ${info.moveLabel} · ${tr("move", "ход")} ${info.moveRange}`} />
     </span>
   )
 }

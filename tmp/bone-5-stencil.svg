@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Вкусняшки">
+<defs>
+  <mask id="slit"><rect width="64" height="64" fill="#fff"/><polygon points="38,6 44,6 26,58 20,58" fill="#000"/></mask>
+</defs>
+<polygon points="14,6 60,6 50,58 4,58" fill="#dc3341" transform="translate(3 3)"/>
+<polygon points="14,6 60,6 50,58 4,58" fill="#0d0b10" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+<g mask="url(#slit)" transform="translate(32 32) scale(0.8) translate(-32 -32)"><g transform="rotate(-35 32 32)" fill="#ffffff"><rect x="17" y="27.5" width="30" height="9" rx="1.5" /><circle cx="16.5" cy="26.5" r="6.5" /><circle cx="16.5" cy="37.5" r="6.5" /><circle cx="47.5" cy="26.5" r="6.5" /><circle cx="47.5" cy="37.5" r="6.5" /></g></g>
+<polygon points="39.5,9 41.5,9 24.5,55 22.5,55" fill="#dc3341"/>
+</svg>

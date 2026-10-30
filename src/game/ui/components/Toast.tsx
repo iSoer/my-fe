@@ -1,3 +1,4 @@
+import { IconText } from "./Icon"
 import { useEffect, useState } from "react"
 
 export function Toast({ message, at, error = false }: { message?: string, at?: number, error?: boolean }) {
@@ -14,7 +15,7 @@ export function Toast({ message, at, error = false }: { message?: string, at?: n
       <span className="ico" aria-hidden="true">
         {error ? "✕" : "✓"}
       </span>
-      <span>{message}</span>
+      <span><IconText text={message} /></span>
     </div>
   )
 }

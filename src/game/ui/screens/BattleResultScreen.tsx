@@ -20,6 +20,8 @@ import { STAT_LABELS, difficultyName, g } from "../lib/format"
 import { plural, tr } from "@game/i18n"
 import { stagger, useCountUp } from "../lib/animate"
 import { haptic } from "@game/platform/haptics"
+import { Icon } from "../components/Icon"
+import { IconText } from "../components/Icon"
 
 /** Нарастающие задержки появления карточек итогов: каждый вызов прибавляет шаг. */
 function delaySequence(start: number): (step?: number) => number {
@@ -218,7 +220,7 @@ type LastBattle = NonNullable<SaveGame["lastBattle"]>
 function StatTile({ icon, value, label }: { icon: string, value: number | string, label: string }) {
   return (
     <div className="res-tile">
-      <span className="res-tile-ico" aria-hidden="true">{icon}</span>
+      <span className="res-tile-ico" aria-hidden="true"><Icon emoji={icon} /></span>
       <b>{value}</b>
       <span className="res-tile-label">{label}</span>
     </div>
@@ -299,7 +301,7 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
             const it = itemInfo(id)
             return (
               <div key={`${id}:${i}`} className="row" style={{ gap: 10 }}>
-                <span style={{ fontSize: 24 }} aria-hidden="true">{it.icon}</span>
+                <span style={{ fontSize: 24 }} aria-hidden="true"><Icon emoji={it.icon} /></span>
                 <div className="stack grow" style={{ gap: 2, minWidth: 0 }}>
                   <b>{it.name}</b>
                   <span className="small muted">{it.desc}</span>
@@ -335,7 +337,7 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
         <div className="section-title">{tr("Rewards", "Награды")}</div>
         <div className="res-big">
           <div className="res-big-item">
-            <span className="res-big-ico" aria-hidden="true">🦴</span>
+            <span className="res-big-ico" aria-hidden="true"><Icon emoji="🦴" /></span>
             <b><Counter value={lb.rewards.treats} /></b>
             <span className="res-big-label">{tr("Treats", "Вкусняшки")}</span>
             <span className="res-big-total">{tr(`now ${profile.treats}`, `теперь ${profile.treats}`)}</span>
@@ -351,7 +353,7 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
           {rows.map(r => (
             <div key={r.label} className={`res-row ${r.cls ?? ""}`}>
               <span>{r.label}</span>
-              <b>{r.value}</b>
+              <b><IconText text={r.value} /></b>
             </div>
           ))}
         </div>
@@ -371,7 +373,7 @@ function RewardsStep({ lb, title, mvp, profile }: { lb: LastBattle, title: strin
         <div className="card ink res-mvp pop-in" style={{ animationDelay: `${mvpDelay}ms` }}>
           <UnitAvatar unit={mvp} size="md" pose="happy" />
           <div className="grow">
-            <span className="res-mvp-tag">🏆 MVP</span>
+            <span className="res-mvp-tag"><Icon emoji="🏆" /> MVP</span>
             <b className="res-mvp-name">{displayName(mvp)}</b>
             <div className="muted small">{`${unitClassName(mvp)} · ${tr("Lv.", "Ур.")} ${mvp.level} · +${lb.xp[mvp.id] ?? 0} XP`}</div>
           </div>
@@ -400,7 +402,7 @@ function ProgressStep({ lb, mvpId, onShowLevel }: { lb: LastBattle, mvpId?: stri
               <div className="grow">
                 <div className="res-fighter-name">
                   <b>{displayName(u)}</b>
-                  {mvpId === u.id && <span className="chip gold">🏆</span>}
+                  {mvpId === u.id && <span className="chip gold"><Icon emoji="🏆" /></span>}
                 </div>
                 <div className="muted small">{unitClassName(u)}</div>
                 {lvl
@@ -450,7 +452,7 @@ function ProgressStep({ lb, mvpId, onShowLevel }: { lb: LastBattle, mvpId?: stri
 
       {lb.fallen.length > 0 && (
         <div className="stack">
-          <div className="section-title danger">{tr("☠ The Fallen", "☠ Павшие")}</div>
+          <div className="section-title danger"><IconText text={tr("☠ The Fallen", "☠ Павшие")} /></div>
           {lb.fallen.map((f, i) => (
             <div key={f.id} className="card fallen-card grave" style={stagger(i, 160)}>
               <UnitAvatar unit={f.unit} size="md" dead />

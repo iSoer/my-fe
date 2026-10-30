@@ -5,6 +5,7 @@ import { NPCS } from "@game/content/settlement"
 import { $dialogue, advanceDialogue, skipDialogue } from "@game/state/dialogue"
 import { haptic } from "@game/platform/haptics"
 import { tr } from "@game/i18n"
+import { Icon } from "../components/Icon"
 
 /** Скорость печати реплики, символов в секунду. */
 const TYPE_CPS = 45
@@ -73,7 +74,7 @@ export function DialogueBox() {
     <div className="dlg-root" role="dialog" aria-label={tr(`Talking to ${npc.name}`, `Разговор: ${npc.name}`)}>
       <button type="button" className="dlg-skip" onClick={() => { haptic("light"); skipDialogue() }}>
         {tr("Skip", "Пропустить")}
-        {" ⏭"}
+        {" "}<Icon emoji="⏭" />
       </button>
       <div className={`dlg-box${hero ? " is-hero" : ""}`} onClick={next}>
         <div className="dlg-face" aria-hidden="true">

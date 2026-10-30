@@ -66,6 +66,7 @@ import { Gossips } from "./gossips"
 import { stepFx, reducedMotion } from "../motionFx"
 import { sceneAlive } from "../fx"
 import { tr } from "@game/i18n"
+import { SIGN_ICONS, ensureIconTextures, richText } from "../iconText"
 
 export const SETTLEMENT_SCENE_KEY = "settlement"
 
@@ -365,7 +366,7 @@ export class SettlementScene extends Phaser.Scene {
           jobs.push(t(heroArtKey(a), heroSvg(a), heroW, heroH))
         }
     }
-    return Promise.all(jobs)
+    return Promise.all([...jobs, ensureIconTextures(this, SIGN_ICONS, "dark")])
   }
 
   /** Текстура здания на уровне `level` (растеризуется один раз). */
@@ -713,8 +714,9 @@ export class SettlementScene extends Phaser.Scene {
     v.plaque.each((o: Phaser.GameObjects.GameObject) => {
       if (o !== v.frame) o.destroy()
     })
-    const title = this.add.text(0, -8, s.title, textStyle(17, "#3b2614", true, 0)).setOrigin(0.5).setResolution(textRes(2))
-    const sub = this.add.text(0, 12, s.sub, textStyle(13, SUB_COLOR[s.status], true, 0)).setOrigin(0.5).setResolution(textRes(2))
+    // Эмодзи на вывеске — иконками-штампами тёмного тона (плашка светлая)
+    const title = richText(this, 0, -8, s.title, { ...textStyle(17, "#3b2614", true, 0), resolution: textRes(2) }, "dark")
+    const sub = richText(this, 0, 12, s.sub, { ...textStyle(13, SUB_COLOR[s.status], true, 0), resolution: textRes(2) }, "dark")
     v.plaque.add([title, sub])
     v.w = Math.max(title.width, sub.width) + 24
     v.h = 50

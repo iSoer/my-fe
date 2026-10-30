@@ -9,6 +9,7 @@ import { classRoleText, moveText } from "../components/ClassInfo"
 import { COLOR_CSS, STAT_LABELS, statChanges } from "../lib/format"
 import { terrainInfo } from "@game/content/terrain"
 import { tr } from "@game/i18n"
+import { Icon, IconText } from "../components/Icon"
 
 /** Карточка бойца в панели сведений: аватар, имя, HP, статы, спецприём. Всегда развёрнута. */
 export function UnitCard({
@@ -62,7 +63,7 @@ export function UnitCard({
         <div className="bf-unit-body">
           <div className="bf-unit-head">
             <b className="bf-unit-name">
-              {unit.isBoss ? "👑 " : ""}
+              {unit.isBoss && <><Icon emoji="👑" />{" "}</>}
               {displayName(unit)}
             </b>
             <span className={`bf-unit-hp ${hpCls}`}>
@@ -88,7 +89,7 @@ export function UnitCard({
               {unit.level}
             </span>
           </div>
-          <div className="bf-muted bf-role">{`${classRoleText(unit.classId)} · ${moveText(unit.classId)}`}</div>
+          <div className="bf-muted bf-role"><IconText text={`${classRoleText(unit.classId)} · ${moveText(unit.classId)}`} /></div>
           {st && (
             <div className="bf-stats">
               {stat("str", STAT_LABELS.str)}
@@ -136,7 +137,7 @@ export function UnitCard({
       {/* Бонус клетки под бойцом — тонкой полоской под карточкой, в свободном месте над полем */}
       {ground.bonus && (
         <div className="bf-terrain" title={tr(`${ground.name}: bonus while standing here`, `${ground.name}: бонус, пока боец стоит здесь`)}>
-          <span aria-hidden="true">{ground.icon}</span>
+          <span aria-hidden="true"><Icon emoji={ground.icon} /></span>
           <b>{ground.name}</b>
           <span>{ground.bonus}</span>
         </div>

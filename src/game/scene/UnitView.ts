@@ -10,6 +10,7 @@ import { textRes } from "./renderScale"
 import { ensureUnitTexture, ensureUnitTextures, hasTexture, unitTexKey } from "./svgTextures"
 import { dustPuff, tween } from "./fx"
 import { MTEX, ensureMotionTextures, reducedMotion } from "./motionFx"
+import { iconImage } from "./iconText"
 
 /** Походка по клеткам: пехота прыгает, кавалерия скачет галопом, броня тяжело ступает, летуны парят. */
 export type Gait = "infantry" | "cavalry" | "armored" | "flier"
@@ -53,7 +54,7 @@ export class UnitView extends Phaser.GameObjects.Container {
   private readonly rig: Phaser.GameObjects.Container
   private sprite: Phaser.GameObjects.Image | null = null
   private disc: Phaser.GameObjects.Image | null = null
-  private emoji: Phaser.GameObjects.Text | null = null
+  private emoji: Phaser.GameObjects.Text | Phaser.GameObjects.Image | null = null
   private readonly moveGlyph: Phaser.GameObjects.Text
   private readonly hpBar: Phaser.GameObjects.Graphics
   private readonly hpText: Phaser.GameObjects.Text
@@ -131,14 +132,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     if (hasTexture(scene, idleKey)) this.attachSprite(idleKey)
     else {
       this.disc = scene.add.image(0, 0, TEX.disc).setTint(this.furColor)
-      this.emoji = scene.add
-        .text(
-          0,
-          0,
-          unit.species === "cat" ? "🐱" : unit.species === "dog" ? "🐶" : "🐭",
-          textStyle(24, "#fff", false, 0)
-        )
-        .setOrigin(0.5)
+      // Пока рисуется миниатюра — мордочка вида иконкой-штампом
+      this.emoji = iconImage(scene, 0, 0, unit.species === "cat" ? "🐱" : unit.species === "dog" ? "🐶" : "🐭", 30, textStyle(24, "#fff", false, 0))
       this.rig.add([this.disc, this.emoji])
       void ensureUnitTextures(scene, unit, "map").then(() => {
         if (!this.scene || this.sprite) return
@@ -400,7 +395,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     if (this.disc && this.emoji) {
       const d = size * 0.72
       this.disc.setDisplaySize(d, d)
-      this.emoji.setFontSize(Math.round(size * 0.5))
+      if (this.emoji instanceof Phaser.GameObjects.Text) this.emoji.setFontSize(Math.round(size * 0.5))
+      else this.emoji.setDisplaySize(size * 0.62, size * 0.62)
       this.emoji.setPosition(0, -size * 0.02)
     }
     this.moveGlyph.setFontSize(Math.max(8, Math.round(size * 0.2)))
@@ -599,7 +595,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     if (!this.scene) return
     const changed = this.facing !== dir
     this.facing = dir
-    this.emoji?.setScale(dir < 0 ? -1 : 1, 1)
+    if (this.emoji instanceof Phaser.GameObjects.Image) this.emoji.setFlipX(dir < 0)
+    else this.emoji?.setScale(dir < 0 ? -1 : 1, 1)
     const sprite = this.sprite
     if (!sprite) return
     if (!changed || this.dead || reducedMotion()) {

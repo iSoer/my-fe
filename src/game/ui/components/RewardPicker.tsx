@@ -7,6 +7,7 @@ import { Button } from "./Button"
 import { UnitRow } from "./UnitRow"
 import { UnitDetails } from "./UnitDetails"
 import { tr } from "@game/i18n"
+import { IconText } from "./Icon"
 
 /** Бесплатная награда за бой: три кандидата, игрок забирает одного в ростер. */
 export function RewardPicker({
@@ -32,7 +33,7 @@ export function RewardPicker({
 
   return (
     <div className="card stack pop-in reward-card">
-      <div className="section-title">{tr("🎁 Reward: one character for free", "🎁 Награда: один персонаж бесплатно")}</div>
+      <div className="section-title"><IconText text={tr("🎁 Reward: one character for free", "🎁 Награда: один персонаж бесплатно")} /></div>
       {full && <p className="danger-text small">{tr("Roster full — release someone in the Barracks to claim the reward.", "Ростер полон — отпустите кого-нибудь в казарме, чтобы забрать награду.")}</p>}
       {choice.map((unit, i) => {
         const isOpen = expanded === unit.id

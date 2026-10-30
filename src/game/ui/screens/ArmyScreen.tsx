@@ -29,6 +29,8 @@ import { MOVE_RANGE } from "@game/content/classes"
 import { classRoleText } from "../components/ClassInfo"
 import { stagger } from "../lib/animate"
 import { tr } from "@game/i18n"
+import { Icon } from "../components/Icon"
+import { IconText } from "../components/Icon"
 
 /** Заполненный слот: краткая карточка бойца, тап — на экран бойца. */
 function FilledSlot({
@@ -68,8 +70,8 @@ function FilledSlot({
         <div className="slot-meta">
           <div className="slot-name">{displayName(unit)}</div>
           <RarityStars rarity={unit.rarity} />
-          <div className="muted small slot-class">{`${unitClassName(unit)} · ${classRoleText(unit.classId)}`}</div>
-          <div className="muted small slot-class">{`${MOVE_EMOJI[cls.moveType]} ${tr("move", "ход")} ${MOVE_RANGE[cls.moveType]}`}</div>
+          <div className="muted small slot-class"><IconText text={`${unitClassName(unit)} · ${classRoleText(unit.classId)}`} /></div>
+          <div className="muted small slot-class"><IconText text={`${MOVE_EMOJI[cls.moveType]} ${tr("move", "ход")} ${MOVE_RANGE[cls.moveType]}`} /></div>
         </div>
       </div>
       <div className="slot-foot">
@@ -77,7 +79,7 @@ function FilledSlot({
         {canLearn && <span className="chip red pop">{tr("New skill", "Есть навык")}</span>}
         {hasClassUpgrade(unit) && <span className="chip gold pop">{tr("New class", "Новый класс")}</span>}
         {training
-          ? <span className="chip">{tr("🎯 Training", "🎯 На полигоне")}</span>
+          ? <span className="chip"><IconText text={tr("🎯 Training", "🎯 На полигоне")} /></span>
           : (
               <button
                 type="button"
@@ -141,7 +143,7 @@ export function ArmyScreen() {
         <TopBar title={tr("Barracks", "Казарма")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
         <div className="screen-body">
           <div className="empty">
-            <div className="big">🪦</div>
+            <div className="big"><Icon emoji="🪦" /></div>
             <h3>{tr("The Barracks are empty", "Казарма пуста")}</h3>
             <p>{tr("Everyone fell, or nobody’s here yet. A new roster is issued right away; your Glory stays with you.", "Все пали или никого ещё нет. Новый ростер выдаётся сразу; Слава остаётся с вами.")}</p>
             <Button primary big icon="🐾" onClick={() => ensureRoster()}>

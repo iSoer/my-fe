@@ -32,6 +32,7 @@ import { UnitAvatar } from "../components/UnitAvatar"
 import { UnitRow } from "../components/UnitRow"
 import { drinkEffects, fmtDuration } from "../lib/format"
 import { plural, tr } from "@game/i18n"
+import { Icon, IconText } from "../components/Icon"
 
 type Toast = (msg: string, error?: boolean) => void
 
@@ -99,9 +100,9 @@ function GrowthBlock({ save, id, toast }: { save: SaveGame, id: BuildingId, toas
   return (
     <div className="stack" style={{ gap: 6 }}>
       <Button block primary={check.ok} disabled={!check.ok} icon={level === 0 ? "🔨" : "⬆"} onClick={act}>
-        {level === 0
+        <IconText text={level === 0
           ? `${tr("Build", "Построить")} · ${cost} 🦴`
-          : `${tr(`Upgrade to level ${level + 1}`, `Улучшить до ${level + 1}-го уровня`)} · ${cost} 🦴`}
+          : `${tr(`Upgrade to level ${level + 1}`, `Улучшить до ${level + 1}-го уровня`)} · ${cost} 🦴`} />
       </Button>
       {!check.ok && <p className="small danger-text st-why">{check.error}</p>}
     </div>
@@ -159,7 +160,7 @@ function BarracksSection({ save }: { save: SaveGame }) {
                     animated={false}
                     onClick={() => go(`/army/${u.id}`)}
                     tags={training.has(u.id)
-                      ? <span className="chip">{tr("🎯 Training", "🎯 Тренируется")}</span>
+                      ? <span className="chip"><IconText text={tr("🎯 Training", "🎯 Тренируется")} /></span>
                       : squad.has(u.id) ? <span className="chip squad">{tr("Squad", "Отряд")}</span> : undefined}
                   />
                 ))}
@@ -287,11 +288,11 @@ function GraveyardSection({ save }: { save: SaveGame }) {
           : tr(`${total} ${plural(total, ["name", "names"], ["имя", "имени", "имён"])} on the stones.`, `На камнях ${total} ${plural(total, ["name", "names"], ["имя", "имени", "имён"])}.`)}
       </p>
       <div className={`st-revive ${status.unlocked && status.readyToday ? "is-ready" : ""}`}>
-        {!status.unlocked
+        <IconText text={!status.unlocked
           ? tr(`🔒 Resurrection opens at level ${GRAVEYARD.reviveLevel}.`, `🔒 Воскрешение откроется на ${GRAVEYARD.reviveLevel}-м уровне.`)
           : status.readyToday
             ? tr(`✨ You can revive one fighter today (${candidates} can be revived).`, `✨ Сегодня можно воскресить одного бойца (доступно: ${candidates}).`)
-            : tr(`⏳ Next resurrection in ${fmtDuration((status.nextAt ?? now) - now)}.`, `⏳ Следующее воскрешение через ${fmtDuration((status.nextAt ?? now) - now)}.`)}
+            : tr(`⏳ Next resurrection in ${fmtDuration((status.nextAt ?? now) - now)}.`, `⏳ Следующее воскрешение через ${fmtDuration((status.nextAt ?? now) - now)}.`)} />
       </div>
       <Button block primary icon="🪦" onClick={() => go("/memorial")} disabled={total === 0}>
         {tr("Read the gravestones", "Прочитать надгробия")}
@@ -316,7 +317,7 @@ function TavernSection({ save, toast }: { save: SaveGame, toast: Toast }) {
       {orderedDef
         ? (
             <div className="card st-drink is-ordered">
-              <span className="st-drink-ico" aria-hidden="true">{orderedDef.icon}</span>
+              <span className="st-drink-ico" aria-hidden="true"><Icon emoji={orderedDef.icon} /></span>
               <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
                 <b>{tr(`For the next sortie: ${orderedDef.name}`, `На следующую вылазку: ${orderedDef.name}`)}</b>
                 <span className="small st-drink-fx">{drinkEffects(drinkPct(orderedDef, ordered.level))}</span>
@@ -331,7 +332,7 @@ function TavernSection({ save, toast }: { save: SaveGame, toast: Toast }) {
           const check = canOrderDrink(save, d.id)
           return (
             <div key={d.id} className={`card st-drink${open ? "" : " dim"}`}>
-              <span className="st-drink-ico" aria-hidden="true">{open ? d.icon : "🔒"}</span>
+              <span className="st-drink-ico" aria-hidden="true"><Icon emoji={open ? d.icon : "🔒"} /></span>
               <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
                 <b className="st-ellipsis">{d.name}</b>
                 <span className="small st-drink-fx">{drinkEffects(drinkPct(d, Math.max(level, 1)))}</span>
@@ -339,7 +340,7 @@ function TavernSection({ save, toast }: { save: SaveGame, toast: Toast }) {
               </div>
               {open && (
                 <Button sm primary={check.ok} disabled={!check.ok} onClick={() => order(d.id)} title={check.ok ? undefined : check.error}>
-                  {`${d.price} 🦴`}
+                  <IconText text={`${d.price} 🦴`} />
                 </Button>
               )}
             </div>
@@ -356,7 +357,7 @@ function TavernSection({ save, toast }: { save: SaveGame, toast: Toast }) {
 function Header({ icon, name, level, desc }: { icon: string, name: string, level?: number, desc: string }) {
   return (
     <div className="st-head">
-      <span className="st-head-ico" aria-hidden="true">{icon}</span>
+      <span className="st-head-ico" aria-hidden="true"><Icon emoji={icon} /></span>
       <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
         <b className="st-head-name">{name}</b>
         {level === undefined
@@ -399,7 +400,7 @@ export function BuildingPanel({ plotId, save, toast }: { plotId: string, save: S
     return (
       <div className="stack">
         <Header icon="🚧" name={tr("Vacant lot", "Пустырь")} desc={tr("Reserved for future buildings. Nothing can be built here yet.", "Участок под будущие постройки. Пока здесь ничего не построить.")} />
-        <p className="small st-state-locked">{tr("🔒 Unavailable", "🔒 Недоступно")}</p>
+        <p className="small st-state-locked"><IconText text={tr("🔒 Unavailable", "🔒 Недоступно")} /></p>
         <Button block ghost onClick={closePanel}>{tr("Close", "Закрыть")}</Button>
       </div>
     )
@@ -416,7 +417,7 @@ export function BuildingPanel({ plotId, save, toast }: { plotId: string, save: S
             <>
               <div className="section-title">{tr("After construction", "После постройки")}</div>
               <Stats lines={def.stats(1)} />
-              {status === "locked" && <p className="small st-state-locked">{tr("🔒 Can’t be built yet", "🔒 Пока построить нельзя")}</p>}
+              {status === "locked" && <p className="small st-state-locked"><IconText text={tr("🔒 Can’t be built yet", "🔒 Пока построить нельзя")} /></p>}
             </>
           )
         : (

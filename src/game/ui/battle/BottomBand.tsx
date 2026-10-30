@@ -4,6 +4,8 @@ import { terrainInfo } from "@game/content/terrain"
 import type { BattleUiState } from "@game/state/battleUi"
 import { UnitCard } from "./UnitCard"
 import { tr } from "@game/i18n"
+import { Icon } from "../components/Icon"
+import { IconText } from "../components/Icon"
 
 function AssistSummary({ state, ui }: { state: BattleState, ui: BattleUiState }) {
   const plan = ui.assistPlan
@@ -29,7 +31,7 @@ function AssistSummary({ state, ui }: { state: BattleState, ui: BattleUiState })
   return (
     <div className="bf-card bf-assist">
       <b>
-        🩹
+        <Icon emoji="🩹" />
         {" "}
         {plan.assist.name}
         {" "}
@@ -82,12 +84,12 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
         <>
           <div className="bf-card bf-assist" role="status">
             <div className="bf-tile-head">
-              <span className="bf-tile-ico" aria-hidden="true">{info.icon}</span>
+              <span className="bf-tile-ico" aria-hidden="true"><Icon emoji={info.icon} /></span>
               <b className="grow">{info.name}</b>
               <span className="bf-muted bf-tile-kind">{tr("Tile", "Клетка")}</span>
             </div>
             {info.bonus && <div className="bf-status bf-status-terrain">{`${tr("Standing here", "Стоящему здесь")}: ${info.bonus}`}</div>}
-            <div className="bf-muted">{`🐾 ${info.move}`}</div>
+            <div className="bf-muted"><IconText text={`🐾 ${info.move}`} /></div>
             {info.notes.map(n => <div key={n} className="bf-muted">{n}</div>)}
           </div>
         </>
@@ -110,7 +112,7 @@ export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiSt
         <>
           {card}
           <div className="bf-card bf-assist">
-            <b>{tr("🧱 Break the flimsy wall", "🧱 Сломать хлипкую стену")}</b>
+            <b><IconText text={tr("🧱 Break the flimsy wall", "🧱 Сломать хлипкую стену")} /></b>
             <div className="bf-muted">{tr("The wall loses 1 HP. At 0 HP the tile opens up.", "Стена потеряет 1 HP. При 0 HP клетка станет проходимой.")}</div>
           </div>
         </>

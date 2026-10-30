@@ -7,6 +7,7 @@ import { MOVE_EMOJI, atkLabel } from "../lib/format"
 import { classRoleText } from "./ClassInfo"
 import { stagger } from "../lib/animate"
 import { tr } from "@game/i18n"
+import { IconText } from "./Icon"
 
 export function UnitRow({
   unit,
@@ -55,7 +56,7 @@ export function UnitRow({
       <div className="info">
         <div className="name">{displayName(unit)}</div>
         <div className="sub">
-          <span>{`${MOVE_EMOJI[cls.moveType]} ${unitClassName(unit)} · ${classRoleText(unit.classId)}`}</span>
+          <span><IconText text={`${MOVE_EMOJI[cls.moveType]} ${unitClassName(unit)} · ${classRoleText(unit.classId)}`} /></span>
           <WeaponBadge skill={cls.weaponSkill} />
           {tags}
         </div>

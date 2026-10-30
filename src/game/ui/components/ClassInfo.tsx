@@ -10,13 +10,15 @@ import { weaponIconSvg } from "@game/art/gear"
 import { MOVE_EMOJI } from "../lib/format"
 import { GearIcon } from "./UnitPanels"
 import { plural, tr } from "@game/i18n"
+import { Icon } from "./Icon"
+import { IconText } from "./Icon"
 
 /** Значок и роль класса в бою («⚡ Дуэлянт»); `tier` — ещё и ярус. */
 export function ClassRoleLine({ classId, tier = false }: { classId: string, tier?: boolean }) {
   const info = classInfo(classId)
   return (
     <span className="class-role">
-      <span className="class-role-ico" aria-hidden="true">{info.icon}</span>
+      <span className="class-role-ico" aria-hidden="true"><Icon emoji={info.icon} /></span>
       <span className="class-role-name">{info.role}</span>
       {tier && <span className="muted small">{tr(`${info.tierLabel} · from Lv. ${info.tierLevel}`, `${info.tierLabel} · с ${info.tierLevel} ур.`)}</span>}
     </span>
@@ -45,7 +47,7 @@ export function ClassFacts({ classId, unit }: { classId: string, unit?: UnitInst
   return (
     <dl className="class-facts">
       <dt>{tr("Move", "Ход")}</dt>
-      <dd>{`${MOVE_EMOJI[info.moveType]} ${info.moveLabel}: ${cells}, ${info.moveNote}`}</dd>
+      <dd><IconText text={`${MOVE_EMOJI[info.moveType]} ${info.moveLabel}: ${cells}, ${info.moveNote}`} /></dd>
       <dt>{tr("Bonus", "Бонус")}</dt>
       <dd>
         {info.bonus.length === 0
@@ -106,7 +108,7 @@ export function MovePanel({ classId }: { classId: string }) {
   return (
     <div className="class-move">
       <div className="class-move-head">
-        <span className="class-move-ico" aria-hidden="true">{MOVE_EMOJI[info.moveType]}</span>
+        <span className="class-move-ico" aria-hidden="true"><Icon emoji={MOVE_EMOJI[info.moveType]} /></span>
         <span className="grow">
           <b>{info.moveLabel}</b>
           <span className="class-move-range" aria-label={tr(`Move ${info.moveRange}`, `Ход ${info.moveRange}`)}>
@@ -124,13 +126,13 @@ export function MovePanel({ classId }: { classId: string }) {
               <GearIcon svg={tileSvg("yard", t)} size={34} />
               <span className="class-terrain-name">{terrainName(t)}</span>
               <b title={bonus ? tr(`+${bonus.def} Def, +${bonus.res} Res`, `+${bonus.def} Def, +${bonus.res} Res`) : undefined}>
-                {cost === null ? "✕" : cost > 1 ? tr(`${cost} pts`, `${cost} оч.`) : bonus ? `🛡+${bonus.def}` : "✓"}
+                <IconText text={cost === null ? "✕" : cost > 1 ? tr(`${cost} pts`, `${cost} оч.`) : bonus ? `🛡+${bonus.def}` : "✓"} />
               </b>
             </div>
           )
         })}
       </div>
-      {weakness && <div className="class-weak">{`⚠ ${weakness}`}</div>}
+      {weakness && <div className="class-weak"><IconText text={`⚠ ${weakness}`} /></div>}
     </div>
   )
 }
@@ -152,7 +154,7 @@ export function ClassPanel({ unit, openCount, upgrade, nextTierLevel, onChange }
   return (
     <div className="class-panel">
       <div className="class-panel-head">
-        <span className="class-role-ico big" aria-hidden="true">{info.icon}</span>
+        <span className="class-role-ico big" aria-hidden="true"><Icon emoji={info.icon} /></span>
         <span className="grow" style={{ minWidth: 0 }}>
           <span className="class-panel-tier">{tr(`${info.tierLabel} · from Lv. ${info.tierLevel}`, `${info.tierLabel} · с ${info.tierLevel} ур.`)}</span>
           <b className="class-panel-name">{unitClassName(unit)}</b>
@@ -202,7 +204,7 @@ export function ClassPanel({ unit, openCount, upgrade, nextTierLevel, onChange }
       </div>
 
       <button type="button" className={`class-change ${upgrade ? "upgrade" : ""}`} onClick={onChange}>
-        <span className="class-change-ico" aria-hidden="true">{upgrade ? "⬆️" : "🎓"}</span>
+        <span className="class-change-ico" aria-hidden="true"><Icon emoji={upgrade ? "⬆️" : "🎓"} /></span>
         <span className="grow">
           <b>{upgrade ? tr("Promotion available!", "Доступно повышение!") : tr("Change class", "Сменить класс")}</b>
           <span className="small">
