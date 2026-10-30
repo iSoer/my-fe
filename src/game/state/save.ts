@@ -47,9 +47,11 @@ import {
   isBuilt,
   isTraining,
   pruneTraining,
+  rerollStore,
   rosterCapacity,
   settleStore,
-  storePrice
+  storePrice,
+  storeRerollCost
 } from "@game/core/settlement"
 import { isTalismanId } from "@game/content/items"
 import { HERO_RETURN } from "@game/content/settlement"
@@ -482,6 +484,22 @@ export function buyItemAction(itemId: string, period?: number, now = Date.now())
   return { ok: true }
 }
 
+/**
+ * Обновить витрину Лавки за Вкусняшки. `period` — период витрины, которую видит игрок: если она успела смениться
+ * по времени, обновление отклоняется (новый товар и так привезли), Вкусняшки не списываются.
+ */
+export function rerollStoreAction(period?: number, now = Date.now()): { ok: boolean, error?: string, restocked?: boolean } {
+  const before = $save.get()
+  if (!isBuilt(before, "store")) return { ok: false, error: tr("Build the Trading Post first", "Сначала постройте Лавку") }
+  const s = settleStore(before, now)
+  if (s !== before) updateSave(() => s)
+  if (period !== undefined && s.store.period !== period)
+    return { ok: false, restocked: true, error: tr("The stock has just changed — take a look at the new goods", "Ассортимент только что сменился — взгляните на новые товары") }
+  if (s.profile.treats < storeRerollCost(s)) return { ok: false, error: tr("Not enough Treats", "Недостаточно Вкусняшек") }
+  updateSave(st => rerollStore(st, now))
+  return { ok: true }
+}
+
 /** Торговец показал новый ассортимент — снять «!» над ним. */
 export function markStoreSeen(): void {
   if ($save.get().store.fresh) updateSave(st => ({ ...st, store: { ...st.store, fresh: false } }))
@@ -740,6 +758,8 @@ export function finishBattle(): BattleSummary | null {
     else delete next.rewardChoice
     // После боя герой возвращается в поселение через ворота
     next.settlement = { ...next.settlement, hero: { pos: { ...HERO_RETURN }, facing: "up" } }
+    // Цена обновления витрины Лавки сбрасывается после каждой вылазки
+    next.store = { ...next.store, rerolls: 0 }
     // Павшие уходят с полигона; тренирующиеся получают опыт за вылазку (за этот бой — один раз)
     const trained = applySortieTraining(pruneTraining(next), state.id, now)
     // Повышения уровня на полигоне — в итоги вылазки рядом с боевыми

@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react"
 import { useStore } from "@nanostores/react"
 import type { ItemCategory, UnitInstance } from "@game/core/types"
 import { itemCount, itemInfo, storeOffers } from "@game/core/items"
-import { buildingLevel, nextStoreRefresh, storeDiscount, storePrice } from "@game/core/settlement"
+import { buildingLevel, nextStoreRefresh, storeDiscount, storePrice, storeRerollCost } from "@game/core/settlement"
 import { tickSettlement } from "@game/state/settlement"
 import { weaponDef } from "@game/content/weapons"
 import { SKILL_LABELS, rankIndex } from "@shared/character/skills"
 import { skillRank } from "@game/core/units/proficiency"
-import { $save, buyItemAction, markStoreSeen } from "@game/state/save"
+import { $save, buyItemAction, markStoreSeen, rerollStoreAction } from "@game/state/save"
 import { navigate } from "@game/state/router"
 import { haptic } from "@game/platform/haptics"
 import { Button } from "../components/Button"
@@ -43,7 +43,8 @@ function wielders(units: UnitInstance[], weaponId: string): number {
 
 /**
  * Торговая лавка: вкладки оружия и талисманов. Витрина меняется по времени (раз в `STORE.refreshHours`), её размер
- * и скидка — по уровню Лавки. Покупка идёт по той витрине, которую видит игрок: сменилась — покупка отклоняется.
+ * и скидка — по уровню Лавки. Витрину можно обновить за Вкусняшки: каждое обновление дороже прежнего, цена
+ * сбрасывается после вылазки. Покупка и обновление идут по той витрине, которую видит игрок: сменилась — отклоняются.
  */
 export function StoreScreen() {
   const save = useStore($save)
@@ -95,6 +96,16 @@ export function StoreScreen() {
     haptic("success")
     toast(`${tr("Bought", "Куплено")}: ${itemInfo(id).name}`)
   }
+  const rerollCost = storeRerollCost(save)
+  const reroll = () => {
+    const r = rerollStoreAction(save.store.period)
+    if (!r.ok) {
+      if (r.restocked) markStoreSeen()
+      return toast(r.error ?? tr("Error", "Ошибка"), true)
+    }
+    haptic("success")
+    toast(tr("New goods on display!", "Товар на витрине обновлён!"))
+  }
 
   return (
     <div className="screen">
@@ -110,8 +121,17 @@ export function StoreScreen() {
         <p className="small">
           {tr(`Level ${level} · discount ${Math.round(discount * 100)}% · new goods in ${fmtDuration(refreshAt - now)}`, `Уровень ${level} · скидка ${Math.round(discount * 100)}% · новый завоз через ${fmtDuration(refreshAt - now)}`)}
         </p>
+        <div className="store-reroll">
+          <Button sm icon="🎲" disabled={save.profile.treats < rerollCost} onClick={reroll}>
+            {`${tr("Refresh goods", "Обновить товар")} · ${rerollCost} 🦴`}
+          </Button>
+          <span className="muted small">
+            {tr("Each refresh costs more; the price resets after a sortie.", "Каждое обновление дороже; цена сбрасывается после вылазки.")}
+          </span>
+        </div>
         <p className="muted small">{TABS.find(t => t.id === tab)?.hint}</p>
-        <div className="stack">
+        {/* key — при обновлении витрины карточки заново появляются */}
+        <div className="stack" key={`${save.store.period}:${save.store.variant}`}>
           {offers.map((id, i) => {
             const info = itemInfo(id)
             const price = storePrice(save, id)

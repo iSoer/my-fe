@@ -187,7 +187,20 @@ describe("миграции сейва", () => {
     expect(r.ok && r.save.settlement.buildings.tavern).toBeUndefined()
   })
 
-  it("v4 → v11: вся цепочка — сейв проходит схему, бойцы и статистика сохраняются", () => {
+  it("v11 → v12: у витрины Лавки появляются счётчик обновлений и номер выкладки, товар прежний", () => {
+    const save = JSON.parse(serializeSave(createEmptySave(1))) as Record<string, unknown>
+    const store: Record<string, unknown> = { ...(save["store"] as Record<string, unknown>), weapons: ["sword_iron"] }
+    delete store["rerolls"]
+    delete store["variant"]
+    const v11 = { ...save, version: 11, store }
+    const out = MIGRATIONS[11]!(v11)
+    expect(out["version"]).toBe(12)
+    expect(out["store"]).toEqual({ ...store, rerolls: 0, variant: 0 })
+    const r = parseSave(JSON.stringify(v11))
+    expect(r.ok && r.save.store).toMatchObject({ weapons: ["sword_iron"], rerolls: 0, variant: 0 })
+  })
+
+  it("v4 → v12: вся цепочка — сейв проходит схему, бойцы и статистика сохраняются", () => {
     const v4 = legacyV4()
     const r = parseSave(JSON.stringify(v4))
     expect(r.ok).toBe(true)

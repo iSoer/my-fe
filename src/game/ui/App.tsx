@@ -13,45 +13,8 @@ import { MemorialScreen } from "./screens/MemorialScreen"
 import { SettingsScreen } from "./screens/SettingsScreen"
 import { SettlementScreen } from "./screens/SettlementScreen"
 import { StoreScreen } from "./screens/StoreScreen"
-import { critterSvg, furArt } from "@game/art/index"
 import { gameHost } from "@game/platform/host"
 import { $lang, tr } from "@game/i18n"
-
-const SPLASH_TRIO = [
-  critterSvg({
-    species: "cat",
-    fur: furArt(0),
-    iris: "#2ecc71",
-    pattern: 1,
-    eyes: 0,
-    accessory: 1,
-    weapon: "sword",
-    weaponColor: "#e63946",
-    pose: "happy"
-  }),
-  critterSvg({
-    species: "dog",
-    fur: furArt(4),
-    iris: "#8e5a2a",
-    pattern: 0,
-    eyes: 4,
-    accessory: 3,
-    weapon: "axe",
-    weaponColor: "#2ec4b6",
-    pose: "happy"
-  }),
-  critterSvg({
-    species: "mouse",
-    fur: furArt(1),
-    iris: "#3498db",
-    pattern: 0,
-    eyes: 0,
-    accessory: 6,
-    weapon: "bow",
-    weaponColor: "#adb5bd",
-    pose: "happy"
-  })
-]
 
 function Splash({ onStart, ready }: { onStart: () => void, ready: boolean }) {
   // Язык приходит из сейва во время загрузки — перерисовываемся при смене
@@ -59,13 +22,7 @@ function Splash({ onStart, ready }: { onStart: () => void, ready: boolean }) {
   return (
     <div className="screen splash" onClick={ready ? onStart : undefined}>
       <div className="splash-logo">
-        <div className="splash-trio" aria-hidden="true">
-          {SPLASH_TRIO.map((svg, i) => (
-            <div key={i} className="critter-svg critter-svg--lg is-static" dangerouslySetInnerHTML={{ __html: svg }} />
-          ))}
-        </div>
         <h1>Cat Emblem</h1>
-        <p className="muted">{tr("Tactics with kitties, doggos and mice. Cute and bloody.", "Тактика про котиков, собачек и мышек. Милая и кровавая.")}</p>
       </div>
       <p className="splash-hint">{ready ? tr("Tap to start", "Нажмите, чтобы начать") : tr("Loading…", "Загрузка…")}</p>
     </div>

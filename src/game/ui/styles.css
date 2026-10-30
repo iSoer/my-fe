@@ -1436,28 +1436,6 @@ p {
 .splash-logo {
   animation: pop-in 0.6s var(--ease-back) both;
 }
-.splash-trio {
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 2px;
-  margin: 0 auto 14px;
-  padding: 10px 14px 0;
-  width: fit-content;
-  background: var(--paper);
-  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
-  filter: drop-shadow(6px 6px 0 var(--red));
-}
-.splash-trio .critter-svg::after {
-  display: none;
-}
-.splash-trio > :nth-child(1),
-.splash-trio > :nth-child(3) {
-  transform: translateY(8px) scale(0.85);
-}
-.splash-trio > :nth-child(3) {
-  transform: translateY(8px) scale(0.85) scaleX(-1);
-}
 .splash-hint {
   color: var(--paper);
   font-weight: 900;

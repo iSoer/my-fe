@@ -138,7 +138,7 @@ export function inStore(store: StoreStock, id: string): boolean {
 }
 
 /** Пустая Лавка: до постройки и до первой генерации. */
-export const EMPTY_STORE: StoreStock = { seed: 0, weapons: [], talismans: [], fresh: false, period: 0, salt: 0 }
+export const EMPTY_STORE: StoreStock = { seed: 0, weapons: [], talismans: [], fresh: false, period: 0, salt: 0, rerolls: 0, variant: 0 }
 
 /* ---------- Враги ---------- */
 

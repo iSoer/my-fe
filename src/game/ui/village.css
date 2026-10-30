@@ -414,6 +414,13 @@
     text-align: center;
     flex-shrink: 0;
   }
+  /* Обновление витрины за Вкусняшки: кнопка и пояснение про растущую цену */
+  .store-reroll {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
   .store-price-old {
     margin-right: 4px;
     opacity: 0.7;

@@ -18,8 +18,9 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
  * зданиями и уровнями вместо деревни с героем, тренировочный полигон, витрина Лавки по периодам, воскрешение на
  * Кладбище; герой ходит по карте поселения. v10: бар (`tavern`), заказанная кружка в поселении и выпитый напиток
  * в бою. v11: сюжетные факты (`story`: счётчики и просмотренные диалоги) для триггеров диалогов.
+ * v12: обновление витрины Лавки за Вкусняшки (`store.rerolls` — цена, `store.variant` — номер выкладки).
  */
-export const SAVE_VERSION = 11
+export const SAVE_VERSION = 12
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -308,7 +309,9 @@ export const saveSchema = z.object({
     talismans: z.array(z.string()),
     fresh: z.boolean(),
     period: z.number().int(),
-    salt: z.number()
+    salt: z.number(),
+    rerolls: z.number().int().min(0),
+    variant: z.number().int().min(0)
   }),
   settlement: settlementSchema,
   memorial: z.array(memorialSchema),
@@ -508,6 +511,12 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
     put("kills", st.kills)
     put("fallen", st.deaths)
     return { ...old, story: { counters, seen: [] }, version: 11 }
+  },
+  // v11 → v12: витрину Лавки можно обновить за Вкусняшки — счётчик обновлений (цена) и номер выкладки (зерно).
+  // Текущая витрина остаётся плановой выкладкой своего периода.
+  11: (old) => {
+    const store = (old["store"] ?? {}) as Record<string, unknown>
+    return { ...old, store: { ...store, rerolls: 0, variant: 0 }, version: 12 }
   }
 }
 

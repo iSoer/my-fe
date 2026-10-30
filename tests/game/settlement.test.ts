@@ -4,6 +4,7 @@ import {
   buyAction,
   buyItemAction,
   claimRewardAction,
+  rerollStoreAction,
   dispatchBattle,
   ensureRoster,
   finishBattle,
@@ -39,6 +40,7 @@ import {
   settleTraining,
   storePeriod,
   storePrice,
+  storeRerollCost,
   trainingCapacity
 } from "@game/core/settlement"
 import { SAVE_VERSION, createEmptySave, parseSave, serializeSave } from "@game/core/save"
@@ -378,6 +380,62 @@ describe("торговая лавка", () => {
     setTreats(0)
     expect(buyItemAction(s().store.weapons[0]!, s().store.period, T0 + STORE_PERIOD_MS).ok).toBe(false)
     expect(buyItemAction("sword_none", undefined, T0 + STORE_PERIOD_MS).ok).toBe(false)
+  })
+
+  it("обновление за Вкусняшки: новая выкладка того же периода, каждое следующее дороже", () => {
+    const first = s().store
+    const treats = s().profile.treats
+    expect(storeRerollCost(s())).toBe(STORE.reroll.base)
+    expect(rerollStoreAction(first.period, T0).ok).toBe(true)
+    expect(s().profile.treats).toBe(treats - STORE.reroll.base)
+    expect(s().store.period).toBe(first.period)
+    expect(s().store.variant).toBe(1)
+    expect(s().store.rerolls).toBe(1)
+    expect(s().store.seed).not.toBe(first.seed)
+    expect(s().store.weapons.length + s().store.talismans.length).toBe(STORE.offers[0])
+    expect(storeRerollCost(s())).toBe(STORE.reroll.base + STORE.reroll.step)
+    expect(rerollStoreAction(first.period, T0).ok).toBe(true)
+    expect(s().profile.treats).toBe(treats - 2 * STORE.reroll.base - STORE.reroll.step)
+    expect(storeRerollCost(s())).toBe(STORE.reroll.base + 2 * STORE.reroll.step)
+  })
+
+  it("обновление: без денег и из сменившейся витрины — отказ без списания", () => {
+    setTreats(STORE.reroll.base - 1)
+    const stock = s().store
+    expect(rerollStoreAction(stock.period, T0).ok).toBe(false)
+    expect(s().store).toEqual(stock)
+    setTreats(1000)
+    const late = rerollStoreAction(stock.period, T0 + STORE_PERIOD_MS)
+    expect(late.ok).toBe(false)
+    expect(late.restocked).toBe(true)
+    expect(s().profile.treats).toBe(1000)
+    expect(s().store.rerolls).toBe(0)
+  })
+
+  it("улучшение Лавки не откатывает обновлённую витрину; новый период — плановая выкладка, цена прежняя", () => {
+    rerollStoreAction(s().store.period, T0)
+    const rerolled = [...s().store.weapons, ...s().store.talismans]
+    upgradeAction("store", T0)
+    const after = [...s().store.weapons, ...s().store.talismans]
+    expect(rerolled.every(id => after.includes(id))).toBe(true)
+    tickSettlement(nextStoreRefresh(s().store))
+    expect(s().store.variant).toBe(0)
+    expect(s().store.rerolls).toBe(1)
+  })
+
+  it("цена обновления сбрасывается после вылазки, витрина остаётся", () => {
+    rerollStoreAction(s().store.period, T0)
+    rerollStoreAction(s().store.period, T0)
+    const stock = s().store
+    expect(stock.rerolls).toBe(2)
+    scoutBattle("easy")
+    expect(startBattle(s().army!.squadIds).ok).toBe(true)
+    dispatchBattle({ type: "retreat" })
+    finishBattle()
+    expect(s().store.rerolls).toBe(0)
+    expect(storeRerollCost(s())).toBe(STORE.reroll.base)
+    expect(s().store.weapons).toEqual(stock.weapons)
+    expect(s().store.variant).toBe(stock.variant)
   })
 
   it("без построенной Лавки купить нельзя", () => {

@@ -1,6 +1,6 @@
 # Сейвы
 
-Весь прогресс — один объект `SaveGame`. Его тип задан в [core/types.ts](../src/game/core/types.ts), zod-схема `saveSchema` — в [core/save/index.ts](../src/game/core/save/index.ts). Сейв версионируется (`SAVE_VERSION = 11`), старые версии мигрируются по шагам. Хранится в `localStorage`, в Telegram дополнительно зеркалится в CloudStorage. Игра пишет сейв после каждого действия.
+Весь прогресс — один объект `SaveGame`. Его тип задан в [core/types.ts](../src/game/core/types.ts), zod-схема `saveSchema` — в [core/save/index.ts](../src/game/core/save/index.ts). Сейв версионируется (`SAVE_VERSION = 12`), старые версии мигрируются по шагам. Хранится в `localStorage`, в Telegram дополнительно зеркалится в CloudStorage. Игра пишет сейв после каждого действия.
 
 ## Схема
 
@@ -45,10 +45,11 @@
 | 8 → 9   | Деревня становится поселением (`defaultSettlement`). Казармы получают уровень `barracksLevelFor(units.length)`. В начатой игре Лавка и Кладбище строятся на уровне 1. В `store` добавляются `period` и `salt`. Удаляется `village`                                                                                |
 | 9 → 10  | Только номер версии: бар (`tavern`) и напитки необязательны                                                                                                                                                                                                                                                       |
 | 10 → 11 | `story.counters` заполняются из `stats`: `sortie.started`, `sortie.finished`, `sortie.victory`, `kills`, `fallen`. `seen = []`                                                                                                                                                                                    |
+| 11 → 12 | В `store` добавляются `rerolls = 0` и `variant = 0`: обновление витрины Лавки за Вкусняшки. Текущая витрина остаётся плановой выкладкой своего периода |
 
 `parseSave(json)` работает так: `JSON.parse`, затем проверка `MIN_SAVE_VERSION`, затем `migrate`, затем `saveSchema.safeParse`. Результат — `{ ok, save }` или `{ ok: false, error }`, в ошибке не больше 5 первых проблем zod. Сейв **новее** `SAVE_VERSION` отклоняется с `{ ok: false, newer: true, error }` (иначе zod молча отбросил бы незнакомые поля и сейв обрезался бы при первой записи). Результат `parseSave` возвращается без каста: если схема и тип `SaveGame` разойдутся, это ошибка компиляции.
 
-Тесты миграций: 4→5, 5→6, 6→7, 7→8, 8→9, 9→10, цепочка 4→11 целиком и отказ от сейва новой версии — [save.test.ts](../tests/game/save.test.ts); 10→11 — [dialogue.test.ts](../tests/game/dialogue.test.ts).
+Тесты миграций: 4→5, 5→6, 6→7, 7→8, 8→9, 9→10, 11→12, цепочка 4→12 целиком и отказ от сейва новой версии — [save.test.ts](../tests/game/save.test.ts); 10→11 — [dialogue.test.ts](../tests/game/dialogue.test.ts).
 
 ## Хранение
 

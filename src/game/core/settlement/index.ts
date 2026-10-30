@@ -339,13 +339,36 @@ export function storePrice(save: SaveGame, itemId: string): number {
   return Math.max(1, Math.round(itemPrice(itemId) * (1 - storeDiscount(save))))
 }
 
-/** Выложить витрину текущего периода под уровень Лавки (зерно — соль игры + период). */
+/**
+ * Выложить витрину текущего периода под уровень Лавки. Зерно — соль игры + период + номер выкладки (`variant`):
+ * так смена уровня Лавки не откатывает обновлённую за Вкусняшки витрину. Новый период — снова плановая выкладка.
+ */
 export function restockStore(save: SaveGame, now: number, fresh: boolean): SaveGame {
   const period = Math.max(storePeriod(now), save.store.period)
   const salt = save.store.salt
-  const seed = createRng(salt).fork(`period:${period}`).int(0, 0x7fffffff)
+  const variant = period === save.store.period ? save.store.variant : 0
+  const seed = createRng(salt).fork(variant > 0 ? `period:${period}:v${variant}` : `period:${period}`).int(0, 0x7fffffff)
   const goods = generateStore(seed, save.army, save.profile.glory, storeOfferCount(save))
-  return { ...save, store: { ...goods, fresh: fresh || save.store.fresh, period, salt } }
+  return { ...save, store: { ...goods, fresh: fresh || save.store.fresh, period, salt, rerolls: save.store.rerolls, variant } }
+}
+
+/** Цена следующего обновления витрины: растёт с каждым обновлением, сбрасывается после вылазки. */
+export function storeRerollCost(save: SaveGame): number {
+  return STORE.reroll.base + STORE.reroll.step * save.store.rerolls
+}
+
+/**
+ * Обновить витрину за Вкусняшки: новая выкладка того же периода, цена следующего обновления растёт.
+ * Проверки (Лавка построена, хватает Вкусняшек, период не сменился) — у вызывающего.
+ */
+export function rerollStore(save: SaveGame, now: number): SaveGame {
+  const cost = storeRerollCost(save)
+  const paid: SaveGame = {
+    ...save,
+    profile: { ...save.profile, treats: save.profile.treats - cost },
+    store: { ...save.store, rerolls: save.store.rerolls + 1, variant: save.store.variant + 1 }
+  }
+  return restockStore(paid, now, false)
 }
 
 /**

@@ -80,6 +80,8 @@
 - `restockStore` берёт зерно `createRng(store.salt).fork("period:N")` и вызывает `generateStore(seed, army, glory, offers)`. Период только растёт: `max(storePeriod(now), store.period)`.
 - `settleStore` меняет витрину только тогда, когда период прошёл или витрина пуста.
 - `storePrice` = `max(1, round(itemPrice × (1 − discount)))`.
+- Обновление витрины за Вкусняшки — `rerollStore(save, now)` (кнопка «🎲 Обновить товар» в Лавке, действие `rerollStoreAction(period)` в `state/save.ts`). Цена `storeRerollCost` = `STORE.reroll.base + step × store.rerolls` = 20, 40, 60… Каждое обновление увеличивает `store.rerolls` (цену) и `store.variant` (номер выкладки внутри периода). `finishBattle` сбрасывает `rerolls` в 0 после каждой вылазки, витрина при этом остаётся. Если период успел смениться, обновление отклоняется с `restocked: true` без списания.
+- Зерно выкладки — `period:N`, а для `variant > 0` — `period:N:vK`, поэтому `restockStore` при смене уровня Лавки не откатывает обновлённую витрину. В новом периоде `variant` снова 0 (плановая выкладка), `rerolls` не сбрасывается.
 - Покупка — `buyItemAction(itemId, period)` в `state/save.ts`. Если витрина сменилась, покупка отклоняется с `restocked: true`.
 - Экран Лавки — [StoreScreen.tsx](../src/game/ui/screens/StoreScreen.tsx) (`#/store`). Открыть его можно только при построенной Лавке.
 
@@ -120,7 +122,7 @@
 }
 ```
 
-Сейв также хранит `store: StoreStock` (`weapons`, `talismans`, `period`, `salt`, `fresh`) и `story` (см. [dialogues.md](./dialogues.md)).
+Сейв также хранит `store: StoreStock` (`weapons`, `talismans`, `period`, `salt`, `fresh`, `rerolls`, `variant`) и `story` (см. [dialogues.md](./dialogues.md)).
 
 - В `settlementSchema.buildings` каждый id здания перечислен явно. zod по умолчанию молча отбрасывает неизвестные ключи, поэтому здание, которое не перечислено в схеме, исчезнет после перезагрузки.
 - Текущая версия сейва — `SAVE_VERSION = 11`. Бар появился как пустая миграция `9: old => ({ ...old, version: 10 })`.
@@ -289,7 +291,7 @@ __pf.save.set({ ...__pf.save.get(), profile: { ...__pf.save.get().profile, treat
 
 ## Тесты
 
-- [tests/game/settlement.test.ts](../tests/game/settlement.test.ts) — постройка, улучшение, Казармы, полигон, Лавка, Кладбище, игровой день, миграция v8→v9.
+- [tests/game/settlement.test.ts](../tests/game/settlement.test.ts) — постройка, улучшение, Казармы, полигон, Лавка (включая обновление витрины за Вкусняшки), Кладбище, игровой день, миграция v8→v9.
 - [tests/game/settlementMap.test.ts](../tests/game/settlementMap.test.ts):
   - карта: рамка из частокола, выход только через ворота, участки непроходимы и не пересекаются, распределение мест по экранам;
   - достижимость каждого места при всех жителях;
