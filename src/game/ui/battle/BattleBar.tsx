@@ -58,7 +58,7 @@ export function BattleBar({ battle, ui }: { battle: BattleState, ui: BattleUiSta
     <nav className={`bf-bar-bottom${big ? " has-zoom" : ""}`} aria-label={tr("Battle controls", "Управление боем")}>
       <button
         type="button"
-        className="bf-bar-btn"
+        className="bf-bar-btn bf-bar-iconly"
         aria-label={tr("Menu", "Меню")}
         onClick={() => {
           haptic("select")
@@ -66,11 +66,10 @@ export function BattleBar({ battle, ui }: { battle: BattleState, ui: BattleUiSta
         }}
       >
         <span className="bf-bar-ico" aria-hidden="true">≡</span>
-        <span className="bf-bar-label">{tr("Menu", "Меню")}</span>
       </button>
       <button
         type="button"
-        className={`bf-bar-btn ${ui.dangerOn ? "on" : ""}`}
+        className={`bf-bar-btn bf-bar-iconly ${ui.dangerOn ? "on" : ""}`}
         aria-pressed={ui.dangerOn}
         aria-label={tr("Danger zone", "Зона опасности")}
         title={tr("Show where enemies can strike", "Показать, куда могут ударить враги")}
@@ -80,7 +79,6 @@ export function BattleBar({ battle, ui }: { battle: BattleState, ui: BattleUiSta
         }}
       >
         <span className="bf-bar-ico" aria-hidden="true">⚠</span>
-        <span className="bf-bar-label">{tr("Danger", "Опасность")}</span>
       </button>
       {big && (
         <div className="bf-bar-zoom" role="group" aria-label={tr("Zoom", "Масштаб")}>

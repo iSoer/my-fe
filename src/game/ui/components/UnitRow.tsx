@@ -44,7 +44,14 @@ export function UnitRow({
       style={index !== undefined ? stagger(index) : undefined}
       onClick={onClick}
     >
-      <UnitAvatar unit={unit} size="md" animated={animated} friendly={friendly} />
+      <div className="avatar-col">
+        <span className="lvl">
+          {tr("Lv.", "Ур.")}
+          {unit.level}
+        </span>
+        <UnitAvatar unit={unit} size="md" animated={animated} friendly={friendly} />
+        <RarityStars rarity={unit.rarity} />
+      </div>
       <div className="info">
         <div className="name">{displayName(unit)}</div>
         <div className="sub">
@@ -80,14 +87,7 @@ export function UnitRow({
           </span>
         </div>
       </div>
-      <div className="side">
-        <span className="lvl">
-          {tr("Lv.", "Ур.")}
-          {unit.level}
-        </span>
-        <RarityStars rarity={unit.rarity} />
-        {right}
-      </div>
+      {right && <div className="side">{right}</div>}
     </div>
   )
 }

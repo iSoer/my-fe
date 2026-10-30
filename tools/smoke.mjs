@@ -60,7 +60,9 @@ await step('Лавка: постройка и покупка талисмана'
     const s = window.__pf.save.get();
     window.__pf.save.set({ ...s, profile: { ...s.profile, treats: 500 } });
   });
-  await page.locator('.st-dock-btn', { hasText: 'Shop' }).click();
+  // Здания — в меню над кнопкой ☰ рядом с «Вылазкой»
+  await page.locator('.st-menu-toggle').click();
+  await page.locator('.st-menu-item', { hasText: 'Shop' }).click();
   await page.getByRole('button', { name: /^Build ·/ }).click();
   await page.getByRole('button', { name: /Open the shop/ }).click({ timeout: 15000 });
   await page.getByRole('tab', { name: 'Talismans' }).click();
@@ -71,7 +73,7 @@ await step('Лавка: постройка и покупка талисмана'
   await page.locator('.st-canvas canvas').waitFor();
 });
 await step('ворота → вылазка 1/2 и 2/2', async () => {
-  await page.locator('.st-dock-btn.is-main').click();
+  await page.locator('.st-sortie').click();
   await page.getByRole('button', { name: /Plan a sortie/ }).click();
   await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();

@@ -1,6 +1,5 @@
-import { useEffect, useRef, type CSSProperties } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useStore } from "@nanostores/react"
-import type { BuildingId } from "@game/core/types"
 import { BUILDING_IDS, buildingDef, plotOf, type PlaceId } from "@game/content/settlement"
 import { isBuilt } from "@game/core/settlement"
 import { displayName } from "@game/core/units"
@@ -34,7 +33,6 @@ import "../village.css"
 /** Как часто экран догоняет время: опыт на полигоне и смена витрины Лавки. */
 const TICK_MS = 15_000
 
-const DOCK: readonly SettlementPlace[] = [...BUILDING_IDS, "gate"]
 
 const placeOf = (p: SettlementPlace): PlaceId => (p === "gate" ? "gate" : plotOf(p).id)
 
@@ -52,7 +50,21 @@ export function SettlementScreen() {
   const topRef = useRef<HTMLDivElement>(null)
   const dockRef = useRef<HTMLElement>(null)
   const [toastEl, toast] = useToast()
+  const [menuOpen, setMenuOpen] = useState(false)
   const started = gameStarted(save)
+
+  // Меню мест закрывается, когда открылась карточка или начался разговор, и по Escape
+  useEffect(() => {
+    if (panel || talking) setMenuOpen(false)
+  }, [panel, talking])
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [menuOpen])
 
   useEffect(() => {
     if (!gameStarted($save.get())) {
@@ -123,9 +135,17 @@ export function SettlementScreen() {
   const goPlace = (p: SettlementPlace) => {
     const id = placeOf(p)
     haptic("select")
+    setMenuOpen(false)
     if (near !== id) settlementControl()?.teleport(id)
     openPanel(id)
   }
+  const toggleMenu = () => {
+    haptic("light")
+    setMenuOpen(o => !o)
+  }
+  const menuAlert = BUILDING_IDS.some(b => alerts[b])
+  const menuGuide = guide !== "gate"
+  const gateNear = near === placeOf("gate")
 
   return (
     <div className={`st-root${talking ? " is-talking" : ""}`}>
@@ -141,27 +161,61 @@ export function SettlementScreen() {
             ⚙️
           </button>
         </div>
-        <nav className="st-dock" ref={dockRef} style={{ "--st-buildings": BUILDING_IDS.length } as CSSProperties} aria-label={tr("Settlement", "Поселение")}>
-          {DOCK.map((p) => {
-            const main = p === "gate"
-            const built = main || isBuilt(save, p as BuildingId)
-            const label = main ? (battleOn ? tr("To battle", "В бой") : tr("Sortie", "Вылазка")) : buildingDef(p as BuildingId).short
-            const isNear = near === placeOf(p)
-            return (
-              <button
-                key={p}
-                type="button"
-                className={`st-dock-btn${main ? " is-main" : ""}${guide === p ? " is-guide" : ""}${built ? "" : " is-unbuilt"}${isNear ? " is-near" : ""}`}
-                onClick={() => goPlace(p)}
-              >
-                <span className="st-dock-ico" aria-hidden="true">{isNear ? "💬" : main ? "⚔️" : buildingDef(p as BuildingId).icon}</span>
-                <span className="st-dock-name">{label}</span>
-                {!built && <span className="st-dock-hint">{tr("build", "построить")}</span>}
-                {alerts[p] && <i className="st-badge" aria-label={tr("New", "Новое")}>!</i>}
-              </button>
-            )
-          })}
+        <nav className={`st-dock${menuOpen ? " is-open" : ""}`} ref={dockRef} aria-label={tr("Settlement", "Поселение")}>
+          <button
+            type="button"
+            className="btn btn-primary btn-big st-sortie"
+            onClick={() => goPlace("gate")}
+          >
+            <span className="btn-inner">
+              <span className="ico" aria-hidden="true">{gateNear ? "💬" : "⚔️"}</span>
+              {battleOn ? tr("To battle", "В бой") : tr("Sortie", "Вылазка")}
+            </span>
+            {alerts.gate && <i className="st-badge" aria-label={tr("New", "Новое")}>!</i>}
+          </button>
+          <div className="st-menu">
+            {/* Места поселения: выезжают столбиком над кнопкой меню, по одному друг над другом */}
+            <ul className="st-menu-list" id="st-menu-list" hidden={!menuOpen}>
+              {BUILDING_IDS.map((b, i) => {
+                const built = isBuilt(save, b)
+                const isNear = near === placeOf(b)
+                const def = buildingDef(b)
+                return (
+                  <li key={b} style={{ animationDelay: `${(BUILDING_IDS.length - 1 - i) * 35}ms` }}>
+                    <button
+                      type="button"
+                      className={`st-dock-btn st-menu-item${guide === b ? " is-guide" : ""}${built ? "" : " is-unbuilt"}${isNear ? " is-near" : ""}`}
+                      onClick={() => goPlace(b)}
+                    >
+                      <span className="st-dock-ico" aria-hidden="true">{isNear ? "💬" : def.icon}</span>
+                      <span className="st-dock-name">{def.short}</span>
+                      {!built && <span className="st-dock-hint">{tr("build", "построить")}</span>}
+                      {alerts[b] && <i className="st-badge" aria-label={tr("New", "Новое")}>!</i>}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            <button
+              type="button"
+              className={`btn btn-big st-menu-toggle${menuOpen ? " is-open" : ""}${menuGuide && !menuOpen ? " is-guide" : ""}`}
+              aria-expanded={menuOpen}
+              aria-controls="st-menu-list"
+              aria-label={menuOpen ? tr("Close menu", "Закрыть меню") : tr("Settlement menu", "Меню поселения")}
+              onClick={toggleMenu}
+            >
+              {/* Три полоски, при открытии складываются в крестик; рисуются CSS — ровно по центру */}
+              <span className="st-burger" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              {menuAlert && !menuOpen && <i className="st-badge" aria-label={tr("New", "Новое")}>!</i>}
+            </button>
+          </div>
         </nav>
+        {/* Тап мимо меню закрывает его */}
+        {menuOpen && <div className="st-menu-backdrop" onClick={() => setMenuOpen(false)} />}
       </div>
       <BottomSheet open={!!panel} onClose={closePanel}>
         <div className="st-panel">

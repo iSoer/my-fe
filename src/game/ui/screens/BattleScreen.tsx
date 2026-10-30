@@ -16,15 +16,16 @@ import "../village.css"
 import { $boardLayout, setBoardInsets } from "@game/state/boardLayout"
 
 /**
- * Раскладка как в Fire Emblem Heroes: сверху шапка (HUD_H) и информационная панель (не меньше INFO_MIN),
- * под полем — панель кнопок (BAR_H). Поле прижато к панели кнопок, всё свободное место по высоте уходит панели
- * сведений, и она заканчивается ровно над полем — ничего не закрывает клетки.
+ * Раскладка как в Fire Emblem Heroes: сверху тонкая полоса хода (HUD_H) и под ней ещё не меньше INFO_MIN,
+ * под полем — панель кнопок (BAR_H). Поле прижато к панели кнопок. Панель сведений (боец, клетка, прогноз)
+ * открывается от самого верха экрана поверх полосы хода и заканчивается ровно над полем — без прокрутки
+ * и не закрывая клетки.
  */
-const HUD_H = 60
-const INFO_MIN = 130
-/** Ниже этой высоты панель сведений компактная: прогноз в две строки, кнопки ниже. */
-const INFO_COMPACT = 200
-const BAR_H = 66
+const HUD_H = 40
+const INFO_MIN = 166
+/** Ниже этой высоты панель сведений компактная: прогноз в две строки, карточка бойца плотнее. */
+const INFO_COMPACT = 220
+const BAR_H = 78
 
 /**
  * Отступ безопасной зоны в пикселях. Значение переменной не читаем строкой: env() внутри пользовательской
@@ -106,8 +107,9 @@ export function BattleScreen() {
   if (!battle) return <div className="bf-root" />
 
   const pressing = !!ui.pressedId || ui.dragging
-  // Панель сведений — от шапки до верхнего края поля (поле публикует MapScene)
-  const infoTop = HUD_H + safeInset("--tg-safe-top")
+  // Панель сведений — с небольшим отступом от верха экрана (поверх полосы хода) до верхнего края поля
+  // (поле публикует MapScene); отступ входит в INFO_MIN, так что на поле карточка не наезжает
+  const infoTop = 12 + safeInset("--tg-safe-top")
   const infoHeight = layout ? Math.max(INFO_MIN * 0.6, layout.oy - infoTop - 6) : INFO_MIN
 
   return (
@@ -115,7 +117,7 @@ export function BattleScreen() {
       <div id="battle-canvas" className="bf-canvas" ref={canvasRef} />
       <div className={`bf-overlay${pressing ? " is-pressing" : ""}`}>
         <div className="bf-top">
-          <TopHud battle={battle} ui={ui} />
+          <TopHud battle={battle} />
         </div>
         <div className={`bf-info${infoHeight < INFO_COMPACT ? " compact" : ""}`} style={{ top: `${infoTop}px`, height: `${infoHeight}px` }}>
           {ui.mode === "forecast" && ui.forecast && <ForecastCard state={battle} forecast={ui.forecast} />}

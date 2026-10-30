@@ -490,7 +490,6 @@ p {
 }
 .btn-primary:active {
   box-shadow: 0 0 0 var(--paper);
-  filter: brightness(0.92);
 }
 .btn-primary:disabled:active {
   box-shadow: 4px 4px 0 var(--paper);
@@ -531,6 +530,18 @@ p {
 .btn-sm.btn-primary {
   box-shadow: 3px 3px 0 var(--paper);
 }
+/* Нажатие у больших и маленьких красных кнопок: их правила выше перебивают .btn-primary:active,
+   поэтому тень, уходящую под кнопку, повторяем здесь, после них */
+.btn-big.btn-primary:active,
+.btn-sm.btn-primary:active {
+  box-shadow: 0 0 0 var(--paper);
+}
+.btn-big.btn-primary:disabled:active {
+  box-shadow: 6px 6px 0 var(--paper);
+}
+.btn-sm.btn-primary:disabled:active {
+  box-shadow: 3px 3px 0 var(--paper);
+}
 .btn-glow {
   animation: btn-glow 1.4s ease-in-out infinite;
 }
@@ -549,6 +560,11 @@ p {
 }
 .btn-pulse {
   animation: btn-pulse 2.2s ease-in-out infinite;
+}
+/* Анимация тени сильнее :active — на время нажатия её снимаем, иначе тень не уходит под кнопку */
+.btn-glow:active,
+.btn-pulse:active {
+  animation: none;
 }
 @keyframes btn-pulse {
   0%,
@@ -1141,9 +1157,25 @@ p {
   max-width: 100%;
   min-width: 0;
 }
+/* Уровень над аватаром, звёзды под ним: справа остаётся место только под кнопку */
+.unit-row .avatar-col {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
 .unit-row .lvl {
+  font-size: 12px;
   font-weight: 900;
   font-style: italic;
+  line-height: 1;
+}
+.unit-row .avatar-col .stars {
+  font-size: 11px;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* ---------- Ресурсы: белые параллелограммы ---------- */
@@ -2258,6 +2290,8 @@ p {
 /* ---------- Итоги ---------- */
 .result-screen .screen-body {
   position: relative;
+  /* Косые полосы баннера, штамп и перекошенные карточки выступают за край — без горизонтальной прокрутки */
+  overflow-x: hidden;
 }
 .result-banner {
   position: relative;

@@ -9,64 +9,21 @@ import { classRoleText, moveText } from "../components/ClassInfo"
 import { COLOR_CSS, STAT_LABELS, statChanges } from "../lib/format"
 import { terrainInfo } from "@game/content/terrain"
 import { tr } from "@game/i18n"
-import { useStore } from "@nanostores/react"
-import { haptic } from "@game/platform/haptics"
-import { $unitCardOpen, toggleUnitCard } from "./cardState"
 
-/**
- * Карточка бойца в нижней полосе: аватар, имя, HP, статы, спецприём.
- * `collapsible` — карточка выбранного бойца: свёрнута до аватара, имени и класса, тап разворачивает и сворачивает.
- */
+/** Карточка бойца в панели сведений: аватар, имя, HP, статы, спецприём. Всегда развёрнута. */
 export function UnitCard({
   state,
   bu,
   unit,
   enemy = false,
-  collapsible = false,
   extra
 }: {
   state: BattleState
   bu: BattleUnit
   unit: UnitInstance
   enemy?: boolean
-  collapsible?: boolean
   extra?: React.ReactNode
 }) {
-  const open = useStore($unitCardOpen) || !collapsible
-  const toggle = collapsible
-    ? {
-        role: "button",
-        tabIndex: 0,
-        "aria-expanded": open,
-        "aria-label": open ? tr("Hide fighter details", "Скрыть подробности о бойце") : tr("Show fighter details", "Подробнее о бойце"),
-        onClick: () => {
-          haptic("light")
-          toggleUnitCard()
-        },
-        onKeyDown: (e: React.KeyboardEvent) => {
-          if (e.key !== "Enter" && e.key !== " ") return
-          e.preventDefault()
-          toggleUnitCard()
-        }
-      }
-    : {}
-  if (!open) {
-    return (
-      <div className={`bf-card bf-unit compact ${enemy ? "enemy" : ""}`} {...toggle}>
-        <div className="bf-unit-avatar">
-          <UnitAvatar unit={unit} size="sm" animated={!enemy} />
-        </div>
-        <div className="bf-unit-body">
-          <b className="bf-unit-name">
-            {unit.isBoss ? "👑 " : ""}
-            {displayName(unit)}
-          </b>
-          <span className="bf-muted">{`${unitClassName(unit)} ${tr("· Lv.", "· Ур.")}${unit.level}`}</span>
-        </div>
-        <span className="bf-unit-toggle" aria-hidden="true">▲</span>
-      </div>
-    )
-  }
   const st = unitStatsInBattle(state, bu.unitId)
   const cls = unitClass(unit)
   const special = unit.skills.special ? specialDef(unit.skills.special) : undefined
@@ -81,97 +38,109 @@ export function UnitCard({
     const d = (bu.bonuses[k] ?? 0) + (bu.penalties[k] ?? 0)
     return (
       <span className={d < 0 ? "bf-stat-down" : d > 0 ? "bf-stat-up" : ""}>
-        {label}
-        {" "}
-        <b>{st?.[k]}</b>
-        {d !== 0 && <small>{d > 0 ? `+${d}` : `−${Math.abs(d)}`}</small>}
+        <span className="bf-stat-label">{label}</span>
+        <span className="bf-stat-value">
+          <b>{st?.[k]}</b>
+          {d !== 0 && <small>{d > 0 ? `+${d}` : `−${Math.abs(d)}`}</small>}
+        </span>
       </span>
     )
   }
   const skills = enemy
     ? Object.values(unit.skills)
-        .filter((id): id is string => !!id && id !== unit.skills.weapon)
+        // Оружие — в строке оружия, спецприём — плашкой под статами
+        .filter((id): id is string => !!id && id !== unit.skills.weapon && id !== unit.skills.special)
         .map(id => skillInfo(id)?.name)
         .filter(Boolean)
     : []
   return (
-    <div className={`bf-card bf-unit ${collapsible ? "expandable" : ""} ${enemy ? "enemy" : ""}`} {...toggle}>
-      <div className="bf-unit-avatar">
-        <UnitAvatar unit={unit} size="sm" animated={!enemy} />
-      </div>
-      <div className="bf-unit-body">
-        <div className="bf-unit-head">
-          <b className="bf-unit-name">
-            {unit.isBoss ? "👑 " : ""}
-            {displayName(unit)}
-          </b>
-          <span className={`bf-unit-hp ${hpCls}`}>
-            {bu.hp}
-            <small>
-              /
-              {bu.maxHp}
-            </small>
-          </span>
+    <>
+      <div className={`bf-card bf-unit ${enemy ? "enemy" : ""}`}>
+        <div className="bf-unit-avatar">
+          <UnitAvatar unit={unit} size="sm" animated={!enemy} />
         </div>
-        <div className={`bf-bar ${hpCls}`}>
-          <div style={{ width: `${pct}%` }} />
-        </div>
-        <div className="bf-unit-meta">
-          <span className="bf-weapon">
-            <i style={{ background: COLOR_CSS[WEAPON_COLOR[cls.weaponSkill]] }} />
-            {unitWeapon(unit).name}
-          </span>
-          <span className="bf-muted">
-            {unitClassName(unit)}
-            {" "}
-            {tr("· Lv.", "· Ур.")}
-            {unit.level}
-          </span>
-          {special && (
-            <span className={`bf-special ${bu.specialCd <= 0 ? "ready" : ""}`} title={special.desc}>
-              ✦
-              {" "}
-              {special.name}
-              {" "}
-              <b>{bu.specialCd}</b>
+        <div className="bf-unit-body">
+          <div className="bf-unit-head">
+            <b className="bf-unit-name">
+              {unit.isBoss ? "👑 " : ""}
+              {displayName(unit)}
+            </b>
+            <span className={`bf-unit-hp ${hpCls}`}>
+              {bu.hp}
+              <small>
+                /
+                {bu.maxHp}
+              </small>
             </span>
-          )}
-          {ground.bonus && (
-            <span
-              className="bf-terrain"
-              title={tr(`${ground.name}: bonus while standing here`, `${ground.name}: бонус, пока боец стоит здесь`)}
-              aria-label={`${ground.name}: ${ground.bonus}`}
-            >
-              {`${ground.icon} ${ground.bonus}`}
+          </div>
+          <div className={`bf-bar ${hpCls}`}>
+            <div style={{ width: `${pct}%` }} />
+          </div>
+          <div className="bf-unit-meta">
+            <span className="bf-weapon">
+              <i style={{ background: COLOR_CSS[WEAPON_COLOR[cls.weaponSkill]] }} />
+              {unitWeapon(unit).name}
             </span>
+            <span className="bf-muted">
+              {unitClassName(unit)}
+              {" "}
+              {tr("· Lv.", "· Ур.")}
+              {unit.level}
+            </span>
+          </div>
+          <div className="bf-muted bf-role">{`${classRoleText(unit.classId)} · ${moveText(unit.classId)}`}</div>
+          {st && (
+            <div className="bf-stats">
+              {stat("str", STAT_LABELS.str)}
+              {stat("mag", STAT_LABELS.mag)}
+              {stat("spd", "Spd")}
+              {stat("def", "Def")}
+              {stat("res", "Res")}
+            </div>
           )}
+          {/* Спецприём и срок временных изменений статов — одним рядом под статами (какие статы изменены
+              и на сколько, видно по цветным плашкам статов) */}
+          {(special || down || up) && (
+            <div className="bf-statuses">
+              {special && (
+                <span className={`bf-special ${bu.specialCd <= 0 ? "ready" : ""}`} title={special.desc}>
+                  ✦
+                  {" "}
+                  {special.name}
+                  {" "}
+                  <b>{bu.specialCd}</b>
+                </span>
+              )}
+              {down && (
+                <span
+                  className="bf-status bf-status-down"
+                  title={tr(`Weakened: ${down} · until it acts`, `Ослаблен: ${down} · до его хода`)}
+                >
+                  {`▼ ${tr("until it acts", "до его хода")}`}
+                </span>
+              )}
+              {up && (
+                <span
+                  className="bf-status bf-status-up"
+                  title={tr(`Boosted: ${up} · until its next phase`, `Усилен: ${up} · до начала его фазы`)}
+                >
+                  {`▲ ${tr("until its phase", "до его фазы")}`}
+                </span>
+              )}
+            </div>
+          )}
+          {enemy && skills.length > 0 && <div className="bf-muted bf-skills">{skills.join(" · ")}</div>}
+          {extra}
         </div>
-        <div className="bf-muted bf-role">{`${classRoleText(unit.classId)} · ${moveText(unit.classId)}`}</div>
-        {st && (
-          <div className="bf-stats">
-            {stat("str", STAT_LABELS.str)}
-            {stat("mag", STAT_LABELS.mag)}
-            {stat("spd", "Spd")}
-            {stat("def", "Def")}
-            {stat("res", "Res")}
-          </div>
-        )}
-        {down && (
-          <div className="bf-status bf-status-down">
-            {`▼ ${tr("Weakened", "Ослаблен")}: ${down}`}
-            <small>{tr(" · until it acts", " · до его хода")}</small>
-          </div>
-        )}
-        {up && (
-          <div className="bf-status bf-status-up">
-            {`▲ ${tr("Boosted", "Усилен")}: ${up}`}
-            <small>{tr(" · until its next phase", " · до начала его фазы")}</small>
-          </div>
-        )}
-        {enemy && skills.length > 0 && <div className="bf-muted bf-skills">{skills.join(" · ")}</div>}
-        {extra}
-        {collapsible && <div className="bf-unit-hide" aria-hidden="true">{`▼ ${tr("Hide", "Скрыть")}`}</div>}
       </div>
-    </div>
+      {/* Бонус клетки под бойцом — тонкой полоской под карточкой, в свободном месте над полем */}
+      {ground.bonus && (
+        <div className="bf-terrain" title={tr(`${ground.name}: bonus while standing here`, `${ground.name}: бонус, пока боец стоит здесь`)}>
+          <span aria-hidden="true">{ground.icon}</span>
+          <b>{ground.name}</b>
+          <span>{ground.bonus}</span>
+        </div>
+      )}
+    </>
   )
 }

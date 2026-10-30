@@ -207,18 +207,24 @@
   animation: bf-slide-up 0.2s var(--bf-ease) both;
 }
 
-/* ---------- Верхняя полоса ---------- */
+/* ---------- Верхняя полоса: ход и фаза одной тонкой полосой во всю ширину ---------- */
+/* Высота = HUD_H в BattleScreen. Пока открыта панель сведений, полоса скрыта под ней */
 .bf-top {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  height: calc(60px + var(--tg-safe-top));
-  padding: calc(8px + var(--tg-safe-top)) 10px 8px;
-  background: linear-gradient(180deg, rgba(13, 11, 16, 0.6) 0%, rgba(13, 11, 16, 0.3) 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  height: calc(40px + var(--tg-safe-top));
+  padding: calc(5px + var(--tg-safe-top)) 0 5px;
+  overflow: hidden;
+  transition: opacity 0.12s ease;
+}
+.bf-overlay:has(.bf-info > *) .bf-top {
+  opacity: 0;
+  pointer-events: none;
+}
+.bf-overlay:has(.bf-info > *) .bf-top * {
+  pointer-events: none;
 }
 .bf-hud-row {
   display: flex;
@@ -232,37 +238,41 @@
   flex-shrink: 0;
 }
 .bf-phase {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  height: 40px;
-  padding: 0 4px 0 14px;
-  margin-left: 4px;
+  height: 30px;
+  padding: 0 12px;
   position: relative;
   isolation: isolate;
   color: var(--bf-on-ink);
   white-space: nowrap;
-  flex-shrink: 1;
-  overflow: visible;
   animation: bf-slide-left 0.22s var(--bf-ease) both;
 }
+/* Чернильная лента шире экрана: скошенные края уходят за его границы */
 .bf-phase::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 0 -16px;
   z-index: -1;
   background: var(--bf-ink);
   transform: skewX(var(--bf-skew));
-  box-shadow: 3px 3px 0 rgba(13, 11, 16, 0.3);
+  box-shadow: 0 3px 0 rgba(13, 11, 16, 0.3);
+}
+.bf-phase.player::before {
+  box-shadow: 0 3px 0 var(--bf-red);
+}
+.bf-phase.enemy::before {
+  box-shadow: 0 3px 0 var(--bf-paper);
+}
+.bf-phase .bf-chip {
+  padding: 2px 9px;
+  font-size: 11px;
 }
 .bf-phase-turn {
   font-family: var(--bf-font-display);
   font-style: italic;
   font-weight: 900;
-  font-size: 15px;
+  font-size: 14px;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  margin-right: 10px;
 }
 /* Последние ходы перед лимитом — счётчик горит */
 .bf-phase-turn.late {
@@ -280,10 +290,9 @@
   font-family: var(--bf-font-display);
   font-style: italic;
   font-weight: 900;
-  font-size: 12.5px;
+  font-size: 11.5px;
   letter-spacing: 0.06em;
-  padding: 5px 12px;
-  margin-right: 6px;
+  padding: 3px 10px;
   animation: bf-tag-in 0.26s var(--bf-ease) 0.08s both;
 }
 .bf-phase-name::before {
@@ -305,42 +314,60 @@
 .bf-phase.enemy .bf-phase-name::before {
   background: var(--bf-paper);
 }
-.bf-acted {
-  color: var(--bf-text);
-}
-.bf-acted.done {
-  color: #fff;
-}
-.bf-acted.done::before {
-  background: var(--bf-red);
-}
 .bf-biome {
   color: var(--bf-muted);
   font-weight: 800;
 }
 
 /* ---------- Панель сведений над полем ---------- */
-/* Высоту задаёт экран: от шапки до верхнего края поля, лишнее прокручивается — клетки никогда не закрыты. */
+/* Высоту задаёт экран: от верха экрана (поверх полосы хода) до верхнего края поля. Без прокрутки: карточки
+   рассчитаны на эту высоту, на низкой панели (.compact) они плотнее. Пустая панель не ловит тапы */
 .bf-info {
   position: absolute;
   left: 0;
   right: 0;
+  z-index: 1;
   box-sizing: border-box;
-  padding: 4px 12px 2px;
+  padding: 0 12px 2px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: stretch;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  pointer-events: auto;
-  scrollbar-width: none;
-}
-.bf-info::-webkit-scrollbar {
-  display: none;
+  pointer-events: none;
 }
 .bf-info > * {
   flex: none;
+  pointer-events: auto;
+}
+/* Низкая панель (маленький телефон): карточка бойца плотнее, чтобы уместиться над полем без прокрутки —
+   без строки роли и подписи про зону угрозы, статы теснее */
+.bf-info.compact .bf-unit {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.bf-info.compact .bf-unit-body {
+  gap: 5px;
+}
+.bf-info.compact .bf-role,
+.bf-info.compact .bf-caption {
+  display: none;
+}
+.bf-info.compact .bf-stats {
+  gap: 4px;
+}
+.bf-info.compact .bf-stats > span {
+  padding: 1px 3px 1px 5px;
+}
+.bf-info.compact .bf-stats small {
+  margin-left: 1px;
+  font-size: 9.5px;
+}
+.bf-info.compact .bf-status {
+  padding: 1px 6px;
+  font-size: 10.5px;
+}
+.bf-info.compact .bf-status {
+  margin-top: 0;
 }
 /* Низкая панель (маленький телефон): прогноз плотнее — HP и урон в одну строку, кнопки ниже */
 .bf-info.compact .bf-forecast {
@@ -396,8 +423,9 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: calc(66px + var(--tg-safe-bottom));
-  padding: 8px 10px calc(8px + var(--tg-safe-bottom));
+  /* Высота = BAR_H в BattleScreen; снизу у кнопок отступ от края экрана (поверх безопасной зоны) */
+  height: calc(78px + var(--tg-safe-bottom));
+  padding: 8px 10px calc(16px + var(--tg-safe-bottom));
   display: grid;
   grid-template-columns: 1fr 1fr 2fr;
   gap: 8px;
@@ -457,6 +485,10 @@
 .bf-bar-ico {
   font-size: 18px;
   line-height: 1;
+}
+/* Меню и зона опасности — одни значки, без подписи */
+.bf-bar-iconly .bf-bar-ico {
+  font-size: 22px;
 }
 /* Подпись кнопки — до двух строк, а не «ЗАВЕРШИТЬ …» на узком телефоне */
 .bf-bar-label {
@@ -539,7 +571,7 @@
   border-color: var(--bf-ink);
   color: var(--bf-on-ink);
   overflow: hidden;
-  padding: 10px 12px 10px 10px;
+  padding: 14px 12px 14px 10px;
   box-shadow:
     4px 4px 0 var(--bf-red),
     0 0 0 2px var(--bf-paper);
@@ -553,37 +585,6 @@
   width: 86px;
   background: var(--bf-red);
   transform: skewX(var(--bf-skew));
-}
-/* Свёрнутая карточка выбранного бойца: аватар, имя и класс одной полосой */
-.bf-unit.compact {
-  align-items: center;
-  padding: 6px 12px 6px 10px;
-  cursor: pointer;
-}
-.bf-unit.compact .bf-unit-avatar {
-  height: 44px;
-}
-.bf-unit.compact .bf-unit-body {
-  gap: 1px;
-}
-.bf-unit.expandable {
-  cursor: pointer;
-}
-/* Стрелка «развернуть / свернуть» */
-.bf-unit-toggle {
-  flex: none;
-  align-self: center;
-  font-size: 12px;
-  color: var(--bf-on-ink-muted);
-}
-.bf-unit-hide {
-  align-self: flex-end;
-  margin-top: -2px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--bf-on-ink-muted);
 }
 .bf-unit.enemy::before {
   background: var(--bf-paper);
@@ -611,7 +612,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 }
 .bf-unit-head {
   display: flex;
@@ -694,6 +695,7 @@
   box-shadow: 1px 1px 0 var(--bf-paper);
 }
 .bf-special {
+  align-self: flex-start;
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 800;
@@ -701,14 +703,29 @@
   background: rgba(255, 255, 255, 0.12);
   transform: skewX(var(--bf-skew));
 }
-/* Бонус клетки под бойцом (заросли, укрытие) — плашкой рядом со спецприёмом, без лишней строки */
+/* Бонус клетки под бойцом (заросли, укрытие): тонкая полоса под карточкой бойца */
 .bf-terrain {
-  padding: 2px 8px;
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 10px;
+  font-size: 11.5px;
   font-weight: 800;
+  line-height: 1.2;
   color: #fff;
   background: #1f6f8b;
+  box-shadow: 3px 3px 0 var(--bf-ink);
   transform: skewX(var(--bf-skew));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: bf-slide-up 0.2s var(--bf-ease) both;
+}
+.bf-terrain b {
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .bf-special b {
   color: var(--bf-on-ink);
@@ -720,14 +737,20 @@
 .bf-special.ready b {
   color: var(--bf-ink);
 }
+/* Пять колонок поровну: на узком экране последняя (RES) не уезжает за край карточки */
 .bf-stats {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
   font-size: 11.5px;
 }
+/* Название сверху, значение всегда под ним */
 .bf-stats > span {
   position: relative;
   isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   padding: 2px 8px;
   color: var(--bf-muted);
   font-weight: 800;
@@ -741,6 +764,11 @@
   z-index: -1;
   background: var(--bf-paper);
   transform: skewX(var(--bf-skew));
+}
+.bf-stat-label,
+.bf-stat-value {
+  white-space: nowrap;
+  line-height: 1.2;
 }
 .bf-stats b {
   color: var(--bf-text);
@@ -779,6 +807,17 @@
 .bf-status small {
   font-weight: 700;
   opacity: 0.85;
+}
+/* Ряд под статами: спецприём и сроки временных изменений, с переносом */
+.bf-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+.bf-statuses .bf-status {
+  margin-top: 0;
+  white-space: nowrap;
 }
 .bf-status-down {
   background: #7b2cbf;
@@ -1184,14 +1223,7 @@
     gap: 6px;
   }
   .bf-phase-name {
-    font-size: 11.5px;
+    font-size: 11px;
   }
 }
-@media (max-width: 360px) {
-  .bf-phase-turn {
-    display: none;
-  }
-  .bf-phase {
-    padding-left: 8px;
-  }
-}
+

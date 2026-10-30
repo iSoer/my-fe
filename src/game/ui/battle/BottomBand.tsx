@@ -50,7 +50,7 @@ function AssistSummary({ state, ui }: { state: BattleState, ui: BattleUiState })
 export function BottomBand({ battle, ui }: { battle: BattleState, ui: BattleUiState }) {
   const sel = ui.selectedId ? battle.units[ui.selectedId] : undefined
   const selUnit = ui.selectedId ? battle.roster[ui.selectedId] : undefined
-  const card = sel && selUnit ? <UnitCard state={battle} bu={sel} unit={selUnit} collapsible /> : null
+  const card = sel && selUnit ? <UnitCard state={battle} bu={sel} unit={selUnit} /> : null
   if (ui.dragging) return card
   switch (ui.mode) {
     case "enemyInfo": {
