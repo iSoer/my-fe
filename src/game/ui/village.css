@@ -35,12 +35,6 @@
     border-radius: 10px;
     padding: 4px 10px;
   }
-  .st-top .icon-btn {
-    background: rgba(13, 11, 16, 0.72);
-  }
-  .st-grow {
-    flex: 1;
-  }
   .st-pips {
     display: inline-flex;
     gap: 3px;
@@ -239,6 +233,14 @@
   }
   .st-menu-item .st-dock-name {
     font-size: 14px;
+  }
+  /* Главное меню и настройки — тёмные, отделены от мест поселения зазором */
+  .st-menu-item.is-sys {
+    background: #2a2230;
+    color: #f3e2c0;
+  }
+  .st-menu-list li:has(.is-sys) + li:not(:has(.is-sys)) {
+    margin-top: 6px;
   }
   .st-menu-item .st-dock-hint {
     margin-left: auto;

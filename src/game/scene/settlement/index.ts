@@ -55,6 +55,10 @@ export function mountSettlementGame(parent: HTMLElement, opts: SettlementSceneOp
     transparent: false,
     backgroundColor: "#141a12",
     render: { pixelArt: false, antialias: true, roundPixels: false },
+    // Без сглаживания дельты: после старта и возврата из фона Phaser 120 кадров держит дельту не больше 16.7 мс
+    // (и всегда — пока окно «не в фокусе»). Ниже 60 fps герой и камера тогда шли замедленно, а потом резко
+    // ускорялись — камера двигалась рывками. Шаг от сна вкладки сцена и так ограничивает сама (50 мс)
+    fps: { smoothStep: false },
     input: { activePointers: 1 },
     scene: [scene, SettlementFxScene],
     audio: { noAudio: true },

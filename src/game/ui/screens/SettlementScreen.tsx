@@ -36,6 +36,12 @@ const TICK_MS = 15_000
 
 const placeOf = (p: SettlementPlace): PlaceId => (p === "gate" ? "gate" : plotOf(p).id)
 
+/** Пункты меню над местами поселения: выход в главное меню и настройки (раньше — значками в верхней панели). */
+const SYSTEM_ITEMS: { path: string, icon: string, readonly label: string }[] = [
+  { path: "/", icon: "🏠", get label() { return tr("Main menu", "Главное меню") } },
+  { path: "/settings", icon: "⚙️", get label() { return tr("Settings", "Настройки") } }
+]
+
 /**
  * Поселение: Phaser-локация в три экрана шириной, по которой ходит герой; камера идёт за ним вбок. Здания стоят на
  * своих участках; подойти к входу (или тапнуть по зданию, или по кнопке нижней панели) — открыть карточку места:
@@ -152,14 +158,7 @@ export function SettlementScreen() {
       <div className="st-canvas" ref={canvasRef} role="region" aria-label={tr("Settlement map", "Карта поселения")} />
       <div className="st-hud">
         <div className="st-top" ref={topRef}>
-          <button type="button" className="icon-btn" aria-label={tr("Main menu", "Главное меню")} title={tr("Main menu", "Главное меню")} onClick={() => navigate("/")}>
-            🏠
-          </button>
           <ResourceBar />
-          <span className="st-grow" />
-          <button type="button" className="icon-btn" aria-label={tr("Settings", "Настройки")} title={tr("Settings", "Настройки")} onClick={() => navigate("/settings")}>
-            ⚙️
-          </button>
         </div>
         <nav className={`st-dock${menuOpen ? " is-open" : ""}`} ref={dockRef} aria-label={tr("Settlement", "Поселение")}>
           <button
@@ -174,8 +173,25 @@ export function SettlementScreen() {
             {alerts.gate && <i className="st-badge" aria-label={tr("New", "Новое")}>!</i>}
           </button>
           <div className="st-menu">
-            {/* Места поселения: выезжают столбиком над кнопкой меню, по одному друг над другом */}
+            {/* Столбиком над кнопкой меню, по одному друг над другом: сверху главное меню и настройки, ниже —
+                места поселения. Задержка появления — снизу вверх */}
             <ul className="st-menu-list" id="st-menu-list" hidden={!menuOpen}>
+              {SYSTEM_ITEMS.map((it, i) => (
+                <li key={it.path} style={{ animationDelay: `${(SYSTEM_ITEMS.length + BUILDING_IDS.length - 1 - i) * 35}ms` }}>
+                  <button
+                    type="button"
+                    className="st-dock-btn st-menu-item is-sys"
+                    onClick={() => {
+                      haptic("select")
+                      setMenuOpen(false)
+                      navigate(it.path)
+                    }}
+                  >
+                    <span className="st-dock-ico" aria-hidden="true">{it.icon}</span>
+                    <span className="st-dock-name">{it.label}</span>
+                  </button>
+                </li>
+              ))}
               {BUILDING_IDS.map((b, i) => {
                 const built = isBuilt(save, b)
                 const isNear = near === placeOf(b)
