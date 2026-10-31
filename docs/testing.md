@@ -32,7 +32,8 @@ pnpm test:coverage
 - Роутер: [router.test.ts](../tests/game/router.test.ts) (шаги вылазки, неизвестная сложность).
 - i18n: [i18n.test.ts](../tests/game/i18n.test.ts) (`tr`, `plural`, `lang` по умолчанию в старом сейве).
 - Плотность рендера Phaser: [renderScale.test.ts](../tests/game/renderScale.test.ts) (`pickRenderScale` по настройке, DPR и памяти; ступени растра миниатюр, тайлов и поселения; разрешение текста).
-- Управление боем: [battleUi.test.ts](../tests/game/battleUi.test.ts) (выбор, хлипкие стены, перетаскивание, справка о клетке, союзники).
+- Управление боем: [battleUi.test.ts](../tests/game/battleUi.test.ts) (выбор, хлипкие стены, перетаскивание, справка о клетке, союзники, разведка в чаще).
+- Разведка в чаще: [explore.test.ts](../tests/game/explore.test.ts).
 - PWA: [tests/host/pwa.spec.ts](../tests/host/pwa.spec.ts) (`isIosDevice`, `installModeFor`, `shouldCheckUpdate`).
 - Остальное (бой, ИИ, карты, юниты, поселение, кровь, варианты смерти) покрывают параллельные документы по ядру.
 

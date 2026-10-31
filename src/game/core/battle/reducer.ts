@@ -16,16 +16,17 @@ import type {
 import { STATS, inMap, manhattan, mapSize, posKey, samePos } from "../types"
 import { KILLER_FLAG, livingUnits, otherSide, terrainAt, unitAt } from "./query"
 import { planAssist } from "./assist"
-import { isPassable, moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom } from "../map/pathing"
+import { isPassable, moveOrigin, pathTo, reachableTiles, targetsFrom, wallsFrom, type ReachNode } from "../map/pathing"
 import { unitClass } from "@game/content/classes"
 import { simulateCombat } from "../combat"
 import { specialMaxCd, unitKit, xpMultiplier } from "../skills/engine"
 import { levelGains, visibleStats } from "../units"
 import { drinkBonus, drinkBonusOf } from "./drink"
 import { lootFor } from "../progression"
-import { BATTLE, BUFF, difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
+import { BATTLE, difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
 import { BUFFS } from "@game/content/expedition"
 import { buffLootMult } from "./buffs"
+import { alertZone, isCalm } from "./explore"
 import { gainSkillXp } from "../units/proficiency"
 import { MOVEMENT_SKILLS, type Skill } from "@shared/character/skills"
 import { MAX_LEVEL } from "../types"
@@ -120,6 +121,8 @@ export function createBattle(opts: CreateBattleOptions): ReduceResult {
   }
   const events: BattleEvent[] = []
   startPhase(state, "player", events)
+  // Чаща начинается с разведки (если отряд не встал сразу в зону тревоги)
+  if (state.expedition && isCalm(state)) state.explore = true
   return { state, events }
 }
 
@@ -233,13 +236,22 @@ function expeditionActor(state: BattleState, unitId: string): BattleUnit | undef
   return bu && bu.alive && bu.side === "player" ? bu : undefined
 }
 
-/** Сундук под бойцом, который он может открыть: не открыт, и ключ от него — у этого бойца. */
+/**
+ * Сундук под бойцом, который он может открыть: не открыт, и ключ от него — у этого бойца. В разведке ключ общий
+ * на весь отряд: открыть может любой боец, если ключ у кого-то из живых бойцов игрока.
+ */
 export function chestToOpen(state: BattleState, unitId: string): ExpeditionChest | undefined {
   const bu = expeditionActor(state, unitId)
   if (!bu) return undefined
   const exp = state.expedition as NonNullable<BattleState["expedition"]>
-  return state.map.expedition?.chests.find(c =>
-    samePos(c.pos, bu.pos) && !exp.opened.includes(c.id) && exp.keys[c.id]?.unitId === unitId)
+  const hasKey = (chestId: string): boolean => {
+    const holder = exp.keys[chestId]?.unitId
+    if (!holder) return false
+    if (holder === unitId) return true
+    const h = state.units[holder]
+    return !!state.explore && !!h && h.alive && h.side === "player"
+  }
+  return state.map.expedition?.chests.find(c => samePos(c.pos, bu.pos) && !exp.opened.includes(c.id) && hasKey(c.id))
 }
 
 /** Боец может увести отряд: стоит на выходе из чащи (открытые сундуки не обязательны). */
@@ -443,12 +455,6 @@ function startPhase(state: BattleState, side: Side, events: BattleEvent[]): void
     if (!unit) continue
     for (const h of unitKit(unit).hooks) fx.push(...(h.onTurnStart?.(state, u) ?? []))
   }
-  // Вылазка: «живица» лечит отряд в начале его хода
-  if (side === "player" && state.expedition?.buffs.team.includes("regen")) {
-    for (const u of livingUnits(state, "player")) {
-      if (u.hp < u.maxHp) fx.push({ type: "heal", unitId: u.unitId, amount: Math.max(1, Math.round(u.maxHp * BUFF.regen)) })
-    }
-  }
   applyEffects(state, fx, events)
 }
 
@@ -468,7 +474,104 @@ function endPhase(state: BattleState, events: BattleEvent[]): void {
   else {
     state.turn++
     state.stats.turns = state.turn
-    startPhase(state, "player", events)
+    // Чаща: враги отходили, проснувшихся не осталось — бой кончился, снова разведка
+    if (state.expedition && isCalm(state)) enterExplore(state, events)
+    else startPhase(state, "player", events)
+  }
+}
+
+/** Бой в чаще кончился: разведка — фаз и ходов нет, отряд снова ходит свободно. */
+function enterExplore(state: BattleState, events: BattleEvent[]): void {
+  state.phase = "player"
+  state.enemyQueue = null
+  state.explore = true
+  for (const u of livingUnits(state, "player")) {
+    u.acted = false
+    u.bonuses = {}
+    u.penalties = {}
+    delete u.turnStart
+  }
+  events.push({ type: "calm" })
+}
+
+/**
+ * Разведка в чаще: боец идёт к клетке `to` без ограничения дальности — в обход зон тревоги, если так можно дойти;
+ * иначе по кратчайшему пути, но останавливается на последней клетке перед зоной, и начинается пошаговый бой.
+ * Без `solo` остальные бойцы идут следом и встают на ближайшие к нему свободные клетки вне зон.
+ * Встав на клетку, каждый подбирает то, что на ней лежит (`expeditionStepOn`).
+ */
+function exploreMove(state: BattleState, leaderId: string, to: Pos, solo: boolean, events: BattleEvent[]): void {
+  const lead = state.units[leaderId]
+  if (!lead || !lead.alive || lead.side !== "player") throw new Error(tr("unit unavailable", "юнит недоступен"))
+  const size = mapSize(state.map)
+  const far = size.w * size.h
+  const zone = alertZone(state)
+  const occupiedByOther = (p: Pos, id: string) =>
+    Object.values(state.units).some(u => u.alive && u.unitId !== id && samePos(u.pos, p))
+  let path: Pos[]
+  let alarm = false
+  const safe = reachableTiles(state, lead, lead.pos, far, zone)
+  const safeNode = safe.get(posKey(to))
+  if (safeNode?.canStop) path = pathTo(safe, to)
+  else {
+    const full = reachableTiles(state, lead, lead.pos, far)
+    // До самой клетки не дойти (её обступили враги, она за водой) — идём к ближайшей достижимой
+    let node = full.get(posKey(to))
+    if (!node) {
+      for (const n of full.values()) {
+        if (!n.canStop) continue
+        if (!node || manhattan(n.pos, to) < manhattan(node.pos, to) || (manhattan(n.pos, to) === manhattan(node.pos, to) && n.cost < node.cost))
+          node = n
+      }
+      if (!node || samePos(node.pos, lead.pos)) throw new Error(tr("tile unreachable", "клетка недостижима"))
+    }
+    const whole = pathTo(full, node.pos)
+    const cut = whole.findIndex(p => zone.has(posKey(p)))
+    if (cut < 0) {
+      if (!node.canStop) throw new Error(tr("tile unreachable", "клетка недостижима"))
+      path = whole
+    }
+    else {
+      // Перед зоной тревоги — стоп; на занятой союзником клетке не встать — шаг назад
+      alarm = true
+      path = whole.slice(0, Math.max(1, cut))
+      while (path.length > 1 && occupiedByOther(path[path.length - 1] as Pos, leaderId)) path.pop()
+    }
+  }
+  const moves: { unitId: string, path: Pos[] }[] = []
+  const dest = { ...(path[path.length - 1] ?? lead.pos) }
+  if (!samePos(dest, lead.pos)) {
+    lead.pos = dest
+    moves.push({ unitId: leaderId, path })
+  }
+  if (!solo) {
+    // Строй: ближние к ведущему — первыми, каждый на свободную клетку вне зон как можно ближе к нему
+    const followers = livingUnits(state, "player")
+      .filter(u => u.unitId !== leaderId)
+      .sort((a, b) => manhattan(a.pos, dest) - manhattan(b.pos, dest) || (a.unitId < b.unitId ? -1 : 1))
+    for (const f of followers) {
+      const reach = reachableTiles(state, f, f.pos, far, zone)
+      let best: ReachNode | null = null
+      let bestScore = Infinity
+      for (const n of reach.values()) {
+        if (!n.canStop) continue
+        const score = manhattan(n.pos, dest) * 1000 + n.cost
+        if (score < bestScore) {
+          best = n
+          bestScore = score
+        }
+      }
+      if (!best || samePos(best.pos, f.pos)) continue
+      moves.push({ unitId: f.unitId, path: pathTo(reach, best.pos) })
+      f.pos = { ...best.pos }
+    }
+  }
+  if (moves.length > 0) events.push({ type: "squadMoved", leaderId, moves })
+  for (const m of moves) expeditionStepOn(state, m.unitId, events)
+  if (alarm) {
+    // Отряд упёрся в зону тревоги: разведка кончилась, ход игрока — бойцы готовы действовать
+    state.explore = false
+    events.push({ type: "alarm" })
   }
 }
 
@@ -495,6 +598,8 @@ function moveUnit(state: BattleState, bu: BattleUnit, to: Pos, events: BattleEve
 }
 
 function validateActor(state: BattleState, unitId: string): BattleUnit {
+  // В разведке ходов нет — только свободный путь (`explore`), сундуки и выход
+  if (state.explore) throw new Error(tr("the squad is exploring", "отряд в разведке"))
   const bu = state.units[unitId]
   if (!bu || !bu.alive) throw new Error(tr("unit unavailable", "юнит недоступен"))
   if (bu.side !== state.phase) throw new Error(tr("not your phase", "не ваша фаза"))
@@ -521,7 +626,12 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
 
   switch (action.type) {
     case "endPhase":
+      if (state.explore) throw new Error(tr("the squad is exploring", "отряд в разведке"))
       endPhase(state, events)
+      break
+    case "explore":
+      if (!state.explore) throw new Error(tr("not exploring now", "сейчас не разведка"))
+      exploreMove(state, action.unitId, action.to, !!action.solo, events)
       break
     case "retreat":
       state.result = "retreat"

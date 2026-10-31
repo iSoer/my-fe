@@ -203,7 +203,7 @@ export interface ExpeditionChest {
 }
 
 /** Бонус до конца вылазки: выпадает из усиленного врага-одиночки, действует с момента, как его подобрали. */
-export type BuffKind = "fury" | "swift" | "aegis" | "regen" | "fortune"
+export type BuffKind = "fury" | "swift" | "aegis" | "fortune"
 
 /** Что лежит на клетке: сердечко (полное здоровье подобравшему) или бонус. */
 export type PickupKind = "heart" | BuffKind
@@ -400,6 +400,11 @@ export interface BattleState {
   startedAt: number
   /** Вылазка в чащу: где ключи, какие сундуки открыты. */
   expedition?: ExpeditionState
+  /**
+   * Вылазка в чащу: идёт разведка — ходов и фаз нет, отряд ходит свободно. Нет поля — пошаговый бой
+   * (и всегда — вне чащи).
+   */
+  explore?: boolean
   /** Напиток из бара: прибавка к статам отряда игрока на весь бой. */
   drink?: BattleDrink
 }
@@ -440,8 +445,13 @@ export type BattleAction
     | { type: "wait", unitId: string, to: Pos, newStance?: Stance }
     /** Открыть сундук, на котором стоит боец с ключом от него (ход не тратится). */
     | { type: "openChest", unitId: string }
-    /** Увести отряд через выход, на котором стоит боец (нужен открытый сундук): победа. */
+    /** Увести отряд через выход, на котором стоит боец: победа. */
     | { type: "extract", unitId: string }
+    /**
+     * Вылазка в чащу, разведка (`BattleState.explore`): боец идёт к клетке без ограничения дальности, а без `solo` —
+     * весь отряд строем за ним. Путь обрывается перед зоной тревоги врагов — тогда начинается пошаговый бой.
+     */
+    | { type: "explore", unitId: string, to: Pos, solo?: boolean }
     | { type: "endPhase" }
     | { type: "retreat" }
 
@@ -490,6 +500,12 @@ export type BattleEvent
     /** Усиленный одиночка пал — на его клетке остался бонус. */
     | { type: "pickupDropped", pos: Pos, kind: PickupKind }
     | { type: "extracted", unitId: string, pos: Pos }
+    /** Разведка: отряд (или один боец) прошёл к клеткам — все пути разом. */
+    | { type: "squadMoved", leaderId: string, moves: { unitId: string, path: Pos[] }[] }
+    /** Разведка кончилась: отряд упёрся в зону тревоги врагов — начинается пошаговый бой. */
+    | { type: "alarm" }
+    /** Бой кончился: проснувшихся врагов не осталось — снова разведка. */
+    | { type: "calm" }
 
 export interface ReduceResult {
   state: BattleState

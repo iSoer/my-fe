@@ -52,7 +52,8 @@ description: Рецепт добавления нового варианта б�
    grep -rn 'mode === "expedition"\|"expedition"' src/game
    ```
    Известные места:
-   - `turnLimitOf` (`balance.ts`);
+   - `turnLimitOf` (`balance.ts`, в чаще лимита нет);
+   - разведка: `createBattle`/`endPhase` (`state.expedition` → `isCalm`/`enterExplore`) в `reducer.ts`, зоны тревоги в `core/battle/explore.ts`;
    - `BattleBar.tsx` (`big`);
    - `BattleSetupScreen.tsx`;
    - `MapScene.ts` (`relayout`, камера и прокрутка большого поля, `EXPEDITION_GLOOM`);
@@ -71,7 +72,8 @@ description: Рецепт добавления нового варианта б�
 - property «всё достижимо»;
 - три выхода;
 - дороги и лагеря;
-- лимит ходов;
+- лимит ходов (в чаще — `Infinity`);
+- разведка — `tests/game/explore.test.ts`;
 - скорость < 400 мс;
 - автотайлы за пределами 6×8.
 

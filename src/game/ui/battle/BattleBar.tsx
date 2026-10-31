@@ -29,7 +29,7 @@ export function BattleBar({ battle, ui }: { battle: BattleState, ui: BattleUiSta
   const big = battle.map.mode === "expedition"
   const players = livingUnits(battle, "player")
   const left = players.filter(u => !u.acted).length
-  const canEnd = battle.phase === "player" && !battle.result && !ui.busy && !ui.prompt
+  const canEnd = battle.phase === "player" && !battle.result && !ui.busy && !ui.prompt && !battle.explore
   const allActed = left === 0
   const notActed = plural(left, ["fighter hasn’t", "fighters haven’t"], ["боец не действовал", "бойца не действовали", "бойцов не действовали"])
   const go = () => {

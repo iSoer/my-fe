@@ -359,3 +359,65 @@ describe("контроллер боя: ход врага и уход с экра
     expect($battleUi.get().mode).toBe("idle")
   })
 })
+
+describe("контроллер боя: разведка в чаще", () => {
+  /** Чаща 30×30 из генератора; отряд из двух бойцов на старте. */
+  async function exploring() {
+    const { generateExpedition } = await import("@game/core/map/expedition")
+    const { createBattle } = await import("@game/core/battle/reducer")
+    const { makeUnit } = await import("./helpers")
+    const map = generateExpedition({ seed: 3, difficulty: "normal", team: 0, squadSize: 2 })
+    const squad = map.playerSpawns.slice(0, 2).map(p => makeUnit({ classId: "infantry_sword", pos: p }, false))
+    const save = createEmptySave(1)
+    save.battle = createBattle({ map, squad, seed: 3, now: 1 }).state
+    $save.set(save)
+    enterBattleScreen()
+    return save.battle
+  }
+
+  afterEach(() => leaveBattleScreen())
+
+  it("тап по клетке — весь отряд идёт туда за одно нажатие, зоны тревоги видны, конец хода недоступен", async () => {
+    const st = await exploring()
+    expect(st.explore).toBe(true)
+    expect($battleUi.get().alertTiles.size).toBeGreaterThan(0)
+    const lead = Object.values(st.units).find(u => u.side === "player")!
+    const to = { x: lead.pos.x, y: lead.pos.y - 4 }
+    tapTile(to)
+    await flush()
+    const after = $save.get().battle!
+    expect(after.explore).toBe(true)
+    expect(Object.values(after.units).some(u => u.side === "player" && u.pos.x === to.x && u.pos.y === to.y)).toBe(true)
+    expect(Object.values(after.units).filter(u => u.side === "player").every(u => u.pos.y < lead.pos.y)).toBe(true)
+    expect($battleUi.get().busy).toBe(false)
+    await endTurn()
+    expect($save.get().battle!.phase).toBe("player")
+    expect($save.get().battle!.turn).toBe(st.turn)
+  })
+
+  it("выбранный боец идёт один; подсветки хода в разведке нет, но перетаскивать можно", async () => {
+    const st = await exploring()
+    const [a, b] = Object.values(st.units).filter(u => u.side === "player")
+    tapTile(a!.pos)
+    expect($battleUi.get().mode).toBe("unitSelected")
+    const to = { x: a!.pos.x + 3, y: a!.pos.y - 2 }
+    tapTile(to)
+    await flush()
+    const after = $save.get().battle!
+    expect(after.units[a!.unitId]!.pos).toEqual(to)
+    expect(after.units[b!.unitId]!.pos).toEqual(b!.pos)
+  })
+
+  it("путь в лагерь — отряд встаёт перед зоной тревоги, и начинается пошаговый бой", async () => {
+    const st = await exploring()
+    tapTile(st.map.expedition!.chests[0]!.pos)
+    await flush()
+    const after = $save.get().battle!
+    expect(after.explore).toBe(false)
+    expect(after.phase).toBe("player")
+    // Теперь — обычный бой: выбранному бойцу видна его дальность
+    const p = Object.values(after.units).find(u => u.side === "player" && u.alive)!
+    tapTile(p.pos)
+    expect($battleUi.get().reach?.size).toBeLessThan(60)
+  })
+})

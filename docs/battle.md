@@ -100,14 +100,13 @@
    - у живых бойцов этой стороны `acted = false`, **`bonuses = {}`**, удаляется `turnStart`. Поэтому бафф Ободрения или Воя держится до начала следующей фазы своей стороны;
    - для `enemy` сначала `spawnReinforcements`;
    - событие `phaseChanged`;
-   - хуки `onTurnStart` всех бойцов стороны (навыки и талисманы). Эффекты собираются и применяются вместе через `applyEffects`;
-   - бафф вылазки `regen` в фазу игрока лечит всех на `max(1, round(maxHp × BUFF.regen))`, где `BUFF.regen = 0.25`.
+   - хуки `onTurnStart` всех бойцов стороны (навыки и талисманы). Эффекты собираются и применяются вместе через `applyEffects`.
 3. Игрок двигает бойцов. Фаза не кончается сама, её кончает `endPhase` из UI (кнопка или настройка `autoEndTurn`).
 4. `endPhase`:
    - у бойцов уходящей стороны, которые не действовали, сбрасываются `penalties`;
    - после фазы игрока вызывается `startPhase("enemy")`;
-   - после фазы врага, если `turn >= turnLimitOf(map)`, ставится `result = "retreat"` и `timeUp = true`. Лимит `BATTLE.turnLimit = 20`, в вылазке `EXPEDITION.turnLimit = 200`;
-   - иначе `turn++` и `startPhase("player")`.
+   - после фазы врага, если `turn >= turnLimitOf(map)`, ставится `result = "retreat"` и `timeUp = true`. Лимит `BATTLE.turnLimit = 20`; в вылазке лимита нет (`Infinity`);
+   - иначе `turn++` и `startPhase("player")`, а в вылазке при `isCalm` — `enterExplore`: снова разведка (см. [expedition](expedition.md), «Разведка и бой»).
 5. Фаза врага: `runEnemyPhase` в UI в цикле вызывает `nextEnemyAction(state)` ([ai](ai.md)) и `dispatchBattle`. Когда все враги отходили, ИИ возвращает `endPhase`. Если действие ИИ бросило исключение, UI подставляет `wait` на месте.
 
 ## Схватка в редьюсере (`resolveCombat`)
@@ -176,7 +175,7 @@
 2. `objective === "extract"` (вылазка): по убийствам победы нет. Победа наступает только по действию `extract`: боец игрока стоит на клетке из `exits`, и игрок подтвердил уход (сундуки открывать не обязательно).
 3. `objective === "killBoss"`: в `roster` есть вожак (`isBoss`), и среди живых врагов его нет. Это `victory`, даже если остались другие враги.
 4. Живых врагов нет **и** все волны из `map.reinforcements` уже пришли: `victory`.
-5. Действие `retreat` или лимит ходов: `retreat`.
+5. Действие `retreat` или лимит ходов (кроме вылазки): `retreat`.
 
 ## Подкрепления
 
@@ -194,7 +193,7 @@
 - Ключи от сундуков (`ExpeditionState.keys`) лежат у стражей. Если стража убил боец игрока, ключ переходит к нему, иначе падает на клетку (`keyDropped`).
 - Ступив на клетку, боец подбирает ключ, сердечко (полное HP) или бонус (`BUFFS[kind].scope`: `team` или `unit`), Перестановка (`move`) тоже считается: ход при этом не тратится. Сундук (стоя на нём со своим ключом) открывается и отряд уходит через выход только по подтверждению игрока — действия `openChest` и `extract`.
 - Когда погибает усиленный одиночка (`expedition.elites`), на его клетке остаётся бонус.
-- Значения бонусов `BUFF`: `fury` +20 % урона, `aegis` −20 % урона, `swift` +2 к ходу, `regen` 25 % HP в начале хода, `fortune` ×1.5 добычи.
+- Значения бонусов `BUFF`: `fury` +20 % урона, `aegis` −20 % урона, `swift` +2 к ходу, `fortune` ×1.5 добычи.
 
 ## Напиток
 
@@ -204,7 +203,7 @@
 
 - Новое действие: добавить вариант в union `BattleAction` ([types.ts](../src/game/core/types.ts)), ветку в `applyAction` ([reducer.ts](../src/game/core/battle/reducer.ts)), схему в [core/save/index.ts](../src/game/core/save/index.ts) (бой хранится в сейве), вызов в [state/battleUi.ts](../src/game/state/battleUi.ts) и `window.__pf` в `GameRoot.tsx`.
 - Новое событие: union `BattleEvent` ([types.ts](../src/game/core/types.ts)) и его проигрывание в [scene/presenter.ts](../src/game/scene/presenter.ts).
-- Условия победы и лимит ходов: `checkEnd` и `endPhase` в [reducer.ts](../src/game/core/battle/reducer.ts); `BATTLE`, `EXPEDITION.turnLimit` и `turnLimitOf` в [balance.ts](../src/game/content/balance.ts).
+- Условия победы и лимит ходов: `checkEnd` и `endPhase` в [reducer.ts](../src/game/core/battle/reducer.ts); `BATTLE` и `turnLimitOf` в [balance.ts](../src/game/content/balance.ts). Разведка в чаще: `exploreMove`, `enterExplore` и [explore.ts](../src/game/core/battle/explore.ts).
 - Опыт и SP: `XP`, `SP`, `SKILL_XP` в [balance.ts](../src/game/content/balance.ts).
 - Подкрепления: `DifficultyDef.reinforcements` в [balance.ts](../src/game/content/balance.ts), генератор волн в `core/map`, размещение в `spawnReinforcements`.
 - Новый вид Поддержки: `AssistKind` в [skills/types.ts](../src/game/core/skills/types.ts) и ветка в `planAssist` ([assist.ts](../src/game/core/battle/assist.ts)). Подробнее в [skills.md](skills.md).

@@ -80,8 +80,8 @@ export function terrainInfo(state: BattleState, pos: Pos): TerrainInfo {
     notes.unshift(opened
       ? tr("Opened — the loot is in your bag. Now head for the EXIT.", "Открыт — добыча у отряда. Теперь к ВЫХОДУ.")
       : tr(
-          `Locked. The key is on one of its guards; when the fighter who takes it steps onto the chest, you’ll be asked whether to open it. What’s inside is unknown — only the brand on the lid (${CHEST_MARK[chest.kind]}) hints at it.`,
-          `Заперт. Ключ — у одного из стражей; когда боец с ключом встанет на сундук, игра спросит, открыть ли его. Что внутри — не видно, намекает лишь клеймо на крышке (${CHEST_MARK[chest.kind]}).`
+          `Locked. The key is on one of its guards; when the fighter who takes it steps onto the chest (while exploring — any fighter of the squad), you’ll be asked whether to open it. What’s inside is unknown — only the brand on the lid (${CHEST_MARK[chest.kind]}) hints at it.`,
+          `Заперт. Ключ — у одного из стражей; когда боец с ключом (в разведке — любой боец отряда) встанет на сундук, игра спросит, открыть ли его. Что внутри — не видно, намекает лишь клеймо на крышке (${CHEST_MARK[chest.kind]}).`
         ))
   }
   // Сердечко или бонус на земле

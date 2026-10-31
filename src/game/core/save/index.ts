@@ -20,7 +20,7 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
  * в бою. v11: сюжетные факты (`story`: счётчики и просмотренные диалоги) для триггеров диалогов.
  * v12: обновление витрины Лавки за Вкусняшки (`store.rerolls` — цена, `store.variant` — номер выкладки).
  */
-export const SAVE_VERSION = 12
+export const SAVE_VERSION = 13
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -121,7 +121,7 @@ const armySchema = z.object({
 })
 
 const terrain = z.enum(["plain", "forest", "mountain", "water", "wall", "wall_breakable", "cover"])
-const buffKind = z.enum(["fury", "swift", "aegis", "regen", "fortune"])
+const buffKind = z.enum(["fury", "swift", "aegis", "fortune"])
 const pickupSchema = z.object({ id: z.string(), pos, kind: z.union([z.literal("heart"), buffKind]) })
 const stance = z.enum(["hold", "advance", "guard"])
 
@@ -208,6 +208,7 @@ const battleSchema = z.object({
     buffs: z.object({ team: z.array(buffKind), units: z.record(z.string(), z.array(buffKind)) }).default({ team: [], units: {} }),
     found: z.array(z.string()).default([])
   }).optional(),
+  explore: z.boolean().optional(),
   drink: z.object({ id: z.string(), pct: partialStats }).optional()
 })
 
@@ -517,6 +518,56 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
   11: (old) => {
     const store = (old["store"] ?? {}) as Record<string, unknown>
     return { ...old, store: { ...store, rerolls: 0, variant: 0 }, version: 12 }
+  },
+  // v12 → v13: в чаще убран бонус «Живица» (`regen`). В идущей вылазке он пропадает у отряда и с земли, а одиночка,
+  // который его нёс, теперь оставит «Удачу». Разведки (`explore`) в старом бою нет — он продолжается пошагово.
+  12: (old) => ({ ...old, battle: dropRegen(old["battle"]), version: 13 })
+}
+
+/** Убрать бонус `regen` из боя в сейве (миграция v12 → v13). */
+function dropRegen(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw
+  const battle = raw as Record<string, unknown>
+  const noRegen = (list: unknown) => (Array.isArray(list) ? list.filter(k => k !== "regen") : list)
+  const noRegenPickups = (list: unknown) =>
+    (Array.isArray(list) ? list.filter(p => !(p && typeof p === "object" && (p as { kind?: unknown }).kind === "regen")) : list)
+  const map = battle["map"] as Record<string, unknown> | undefined
+  const def = map?.["expedition"] as Record<string, unknown> | undefined
+  const exp = battle["expedition"] as Record<string, unknown> | undefined
+  const buffs = exp?.["buffs"] as { team?: unknown, units?: Record<string, unknown> } | undefined
+  return {
+    ...battle,
+    ...(map && def
+      ? {
+          map: {
+            ...map,
+            expedition: {
+              ...def,
+              pickups: noRegenPickups(def["pickups"]),
+              elites: Array.isArray(def["elites"])
+                ? def["elites"].map((e: Record<string, unknown>) => (e["buff"] === "regen" ? { ...e, buff: "fortune" } : e))
+                : def["elites"]
+            }
+          }
+        }
+      : {}),
+    ...(exp
+      ? {
+          expedition: {
+            ...exp,
+            pickups: noRegenPickups(exp["pickups"]),
+            ...(buffs
+              ? {
+                  buffs: {
+                    ...buffs,
+                    team: noRegen(buffs.team),
+                    units: Object.fromEntries(Object.entries(buffs.units ?? {}).map(([id, l]) => [id, noRegen(l)]))
+                  }
+                }
+              : {})
+          }
+        }
+      : {})
   }
 }
 

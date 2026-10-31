@@ -39,6 +39,9 @@ import { SKILL_LABELS } from "@shared/character/skills"
 import { BUFFS, pickupIcon } from "@game/content/expedition"
 import { itemInfo } from "@game/core/items"
 
+/** Во сколько раз быстрее бегут бойцы в разведке по чаще: путь там — десятки клеток. */
+const EXPLORE_SPEED = 2.5
+
 /** Проигрывает события боя на сцене карты (и в кинематике). Логики игры не содержит. */
 export class GamePresenter implements Presenter {
   private seedCounter = 0
@@ -116,6 +119,22 @@ export class GamePresenter implements Presenter {
     switch (ev.type) {
       case "moved":
         return this.moved(ev.unitId, ev.path, before, map, sp)
+      case "squadMoved": {
+        // Разведка в чаще: весь отряд идёт разом и быстро, камера — за ведущим; шаги слышно только у него
+        const quick = sp * EXPLORE_SPEED
+        const lead = ev.moves.find(m => m.unitId === ev.leaderId) ?? ev.moves[0]
+        const end = lead?.path[lead.path.length - 1]
+        const pan = end ? map.focusOn(end, Math.min(1400, ((lead?.path.length ?? 1) * 135) / quick)) : Promise.resolve()
+        await Promise.all([
+          pan,
+          ...ev.moves.map(m => this.moved(m.unitId, m.path, before, map, quick, m.unitId !== lead?.unitId))
+        ])
+        return
+      }
+      case "alarm":
+        return banner(map, tr("Enemies nearby!", "Враги рядом!"), 0xe63946, sp, 450, { slash: true })
+      case "calm":
+        return banner(map, tr("All clear · Exploring", "Опасность миновала · Разведка"), 0xffffff, sp, 350, { slash: true })
       case "combat":
         // Кто-то погибнет — заранее растеризуем части тела для анимации гибели (с потолком 600 мс).
         this.lastCombat = ev
@@ -298,7 +317,7 @@ export class GamePresenter implements Presenter {
     if (scene.sys.isActive()) scene.tweens.add(cfg)
   }
 
-  private async moved(unitId: string, path: Pos[], state: BattleState, map: MapScene, sp: number): Promise<void> {
+  private async moved(unitId: string, path: Pos[], state: BattleState, map: MapScene, sp: number, quiet = false): Promise<void> {
     const view = map.units.get(unitId)
     if (!view || path.length < 2) return
     view.setAlpha(1)
@@ -334,9 +353,9 @@ export class GamePresenter implements Presenter {
           const feet = view.feetWorld()
           if (view.gait !== "flier") {
             stepFx(map, feet.x, feet.y, map.tile, terrain, state.map.biomeId, heavyStep)
-            sfx(heavyStep ? "stepHeavy" : "step")
+            if (!quiet) sfx(heavyStep ? "stepHeavy" : "step")
           }
-          if (view.gait === "armored") shakeCam(map, 50 / sp, 1.5)
+          if (view.gait === "armored" && !quiet) shakeCam(map, 50 / sp, 1.5)
           // Раненый оставляет кровавый след
           if (view.hpFrac() < 0.5) bloodTrail(map, feet.x, feet.y, map.tile, sp, 2)
         }

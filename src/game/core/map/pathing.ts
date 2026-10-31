@@ -57,8 +57,15 @@ export function moveOrigin(bu: BattleUnit): Pos {
 /**
  * Все клетки, достижимые юнитом (Дейкстра с бюджетом движения). Без `fromOverride` — от клетки начала хода
  * (`moveOrigin`): переставленный боец может встать куда угодно в пределах хода, в том числе вернуться.
+ * `avoid` — клетки, куда не заходить (разведка в чаще обходит зоны тревоги врагов).
  */
-export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?: Pos, budgetOverride?: number): ReachMap {
+export function reachableTiles(
+  state: BattleState,
+  bu: BattleUnit,
+  fromOverride?: Pos,
+  budgetOverride?: number,
+  avoid?: Set<string>
+): ReachMap {
   const unit = state.roster[bu.unitId]
   if (!unit) return new Map()
   const cls = unitClass(unit)
@@ -89,6 +96,7 @@ export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?
         const total = cur.cost + c
         if (total > budget) continue
         const key = posKey(n)
+        if (avoid?.has(key)) continue
         const occupant = occupied.get(key)
         if (occupant && occupant.unitId !== bu.unitId && occupant.side !== bu.side && !pass) continue
         const existing = result.get(key)
@@ -110,8 +118,9 @@ export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?
 export function pathTo(reach: ReachMap, target: Pos): Pos[] {
   const path: Pos[] = []
   let key: string | undefined = posKey(target)
+  // Предохранитель от петли: путь не длиннее числа клеток поля (на большой карте он бывает больше сотни)
   let guard = 0
-  while (key && guard++ < 100) {
+  while (key && guard++ < 10_000) {
     const node = reach.get(key)
     if (!node) break
     path.unshift(node.pos)

@@ -16,7 +16,9 @@ export function ExpeditionPrompt({ battle, prompt, onAnswer }: { battle: BattleS
       <ConfirmModal
         open
         title={tr("📦 Open the chest?", "📦 Открыть сундук?")}
-        text={tr(`${who} has the key to this chest. Open it and take what’s inside?`, `У бойца ${who} есть ключ от этого сундука. Открыть его и забрать содержимое?`)}
+        text={battle.explore
+          ? tr("Your squad has the key to this chest. Open it and take what’s inside?", "У отряда есть ключ от этого сундука. Открыть его и забрать содержимое?")
+          : tr(`${who} has the key to this chest. Open it and take what’s inside?`, `У бойца ${who} есть ключ от этого сундука. Открыть его и забрать содержимое?`)}
         confirmLabel={tr("Yes", "Да")}
         cancelLabel={tr("No", "Нет")}
         onConfirm={() => onAnswer(true)}

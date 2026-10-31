@@ -9,6 +9,7 @@ import { simulateCombat } from "../combat"
 import { attackOf, visibleStats } from "../units"
 import { EXPEDITION, difficultyDef } from "@game/content/balance"
 import { DANCER_CLASS, unitClass } from "@game/content/classes"
+import { alertRadiusOf } from "../battle/explore"
 
 /** Лекарь (White Magic) или танцор (Dancer): держатся позади и ценны как цель. */
 function isSupport(unit: UnitInstance): boolean {
@@ -151,7 +152,7 @@ function nearestPlayerDistance(state: BattleState, pos: Pos): number {
 function shouldWake(state: BattleState, bu: BattleUnit): boolean {
   const diff = difficultyDef(state.difficulty).ai
   if (!bu.post && state.turn >= diff.wakeTurn) return true
-  if (nearestPlayerDistance(state, bu.pos) <= (bu.post ? EXPEDITION.alertRadius : diff.alertRadius)) return true
+  if (nearestPlayerDistance(state, bu.pos) <= alertRadiusOf(state, bu)) return true
   if (alarmNearby(state, bu, 3)) return true
   const zone = threatTiles(state, bu)
   return livingUnits(state, "player").some(p => zone.has(posKey(p.pos)))

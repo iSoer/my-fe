@@ -197,8 +197,8 @@ describe("вылазка в чащу: карта", () => {
     }
   })
 
-  it("лимит ходов: в чаще — 200, в обычном бою — прежние 20", () => {
-    expect(turnLimitOf(generateExpedition({ seed: 1, difficulty: "easy", team: 0, squadSize: 4 }))).toBe(200)
+  it("лимит ходов: в чаще его нет, в обычном бою — прежние 20", () => {
+    expect(turnLimitOf(generateExpedition({ seed: 1, difficulty: "easy", team: 0, squadSize: 4 }))).toBe(Number.POSITIVE_INFINITY)
     expect(turnLimitOf(generateMap({ seed: 1, biomeId: "yard", difficulty: "easy", team: 0, squadSize: 4 }))).toBe(20)
   })
 
@@ -238,7 +238,11 @@ describe("вылазка в чащу: карта", () => {
 })
 
 /** Маленькая вылазка на обычном поле: сундук, его страж с ключом, выход в углу. */
-function miniExpedition(opts: { guardHp?: number, guardPos?: Pos, playerPos?: Pos, leash?: number } = {}) {
+/**
+ * Маленькая вылазка на обычном поле. По умолчанию — пошаговый бой (`explore: true` — оставить разведку, если отряд
+ * вне зоны тревоги): так проверяются правила ключа, сундука и выхода.
+ */
+function miniExpedition(opts: { guardHp?: number, guardPos?: Pos, playerPos?: Pos, leash?: number, explore?: boolean } = {}) {
   const player = makeUnit({ classId: "infantry_sword", pos: opts.playerPos ?? { x: 2, y: 4 }, baseStats: { hp: 40, str: 30, spd: 20, def: 10, res: 10 } }, false)
   const guard = makeUnit({ classId: "infantry_axe", pos: opts.guardPos ?? { x: 2, y: 3 }, baseStats: { hp: opts.guardHp ?? 1, str: 1, spd: 1, def: 0, res: 0 } }, true)
   const chest = { id: "chest_0", pos: { x: 2, y: 1 }, kind: "treats" as const, treats: 77, keyHolderId: guard.id }
@@ -257,6 +261,7 @@ function miniExpedition(opts: { guardHp?: number, guardPos?: Pos, playerPos?: Po
     rewards: { treats: 100, glory: 3 }
   }
   const { state } = createBattle({ map, squad: [player], seed: 3, now: 1 })
+  if (!opts.explore) delete state.explore
   return { state, player, guard, chest }
 }
 
@@ -448,7 +453,7 @@ describe("вылазка в чащу: награды, сердечки и бон
     expect(hasBuff(got.state, player.id, "fury")).toBe(true)
   })
 
-  it("бонусы работают: ярость +20 % урона, оберег −20 %, ветер +2 хода, живица лечит отряд, удача — больше добычи", () => {
+  it("бонусы работают: ярость +20 % урона, оберег −20 %, ветер +2 хода, удача — больше добычи", () => {
     const { state, player, guard } = miniExpedition({ guardHp: 200, guardPos: { x: 2, y: 3 } })
     const plain = simulateCombat(state, player.id, guard.id, { x: 2, y: 4 })
     const dealt = (st: BattleState) => {
@@ -468,15 +473,6 @@ describe("вылазка в чащу: награды, сердечки и бон
     swift.expedition!.buffs.team = ["swift"]
     const bu = state.units[player.id]!
     expect(reachableTiles(swift, swift.units[player.id]!).size).toBeGreaterThan(reachableTiles(state, bu).size)
-    // Живица — в начале хода игрока
-    const regen: BattleState = structuredClone(state)
-    regen.expedition!.buffs.team = ["regen"]
-    regen.phase = "enemy"
-    regen.units[player.id]!.hp = 1
-    regen.units[guard.id]!.acted = true
-    const next = applyAction(regen, { type: "endPhase" })
-    expect(next.state.phase).toBe("player")
-    expect(next.state.units[player.id]!.hp).toBeGreaterThan(1)
     // Удача
     const lucky: BattleState = structuredClone(state)
     lucky.expedition!.buffs.team = ["fortune"]

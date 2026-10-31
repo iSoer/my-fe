@@ -6,8 +6,8 @@ import { BUFFS } from "@game/content/expedition"
 import { IconText } from "../components/Icon"
 
 /**
- * Верхняя полоса HUD во всю ширину: ход, ключи и бонусы отряда в чаще, добыча. Чья фаза — видно по цвету
- * кромки полосы (красная — игрока, светлая — врага).
+ * Верхняя полоса HUD во всю ширину: ход (в чаще — без лимита, а в разведке вместо него «Разведка»), ключи и бонусы
+ * отряда в чаще, добыча. Чья фаза — видно по цвету кромки полосы (красная — игрока, светлая — врага).
  */
 export function TopHud({ battle }: { battle: BattleState }) {
   const isPlayer = battle.phase === "player"
@@ -19,12 +19,28 @@ export function TopHud({ battle }: { battle: BattleState }) {
     : 0
   return (
     <div className={`bf-hud-row bf-phase ${isPlayer ? "player" : "enemy"}`}>
-      <span
-        className={`bf-phase-turn ${limit - battle.turn < 3 ? "late" : ""}`}
-        title={tr(`The battle lasts at most ${limit} turns, then your squad retreats`, `Бой длится не больше ${limit} ходов, затем отряд отступает`)}
-      >
-        {`${tr("Turn", "Ход")} ${battle.turn}/${limit}`}
-      </span>
+      {battle.explore
+        ? (
+            <span
+              className="bf-phase-turn"
+              title={tr(
+                "No enemies are awake: tap a tile and the squad walks there. Crossing the dashed line wakes the enemies — then it’s turn-based combat",
+                "Враги не проснулись: нажмите на клетку — отряд пойдёт туда. За пунктирной линией враги проснутся — начнётся пошаговый бой"
+              )}
+            >
+              {tr("Exploring", "Разведка")}
+            </span>
+          )
+        : Number.isFinite(limit)
+          ? (
+              <span
+                className={`bf-phase-turn ${limit - battle.turn < 3 ? "late" : ""}`}
+                title={tr(`The battle lasts at most ${limit} turns, then your squad retreats`, `Бой длится не больше ${limit} ходов, затем отряд отступает`)}
+              >
+                {`${tr("Turn", "Ход")} ${battle.turn}/${limit}`}
+              </span>
+            )
+          : <span className="bf-phase-turn">{`${tr("Turn", "Ход")} ${battle.turn}`}</span>}
       {/* Чаща: ключи у отряда и бонусы всего отряда — только когда они есть */}
       {(keys > 0 || teamBuffs) && (
         <span

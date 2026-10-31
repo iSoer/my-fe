@@ -110,6 +110,9 @@ export class MapScene extends Phaser.Scene {
   /** Зона опасности (пульсирует) и зона угрозы выбранного врага. */
   private dangerG!: Phaser.GameObjects.Graphics
   private threatG!: Phaser.GameObjects.Graphics
+  /** Контур зон тревоги спящих врагов в чаще; `alertSig` — какие клетки нарисованы. */
+  private alertG!: Phaser.GameObjects.Graphics
+  private alertSig = ""
   private pulseTweens: Phaser.Tweens.Tween[] = []
   /** Подсветка хода/атаки/поддержки: пул тонированных квадратов, появляются «волной». */
   private hlLayer!: Phaser.GameObjects.Container
@@ -212,6 +215,7 @@ export class MapScene extends Phaser.Scene {
     this.tilesG = this.add.graphics().setDepth(0.2)
     this.decalLayer = this.add.container(0, 0).setDepth(1)
     this.dangerG = this.add.graphics().setDepth(1.8)
+    this.alertG = this.add.graphics().setDepth(1.82)
     this.threatG = this.add.graphics().setDepth(1.85)
     this.hlLayer = this.add.container(0, 0).setDepth(2)
     this.pathG = this.add.graphics().setDepth(3)
@@ -1808,9 +1812,49 @@ export class MapScene extends Phaser.Scene {
     this.hidePool(this.threatPool, threat.length)
   }
 
+  /**
+   * Зоны тревоги спящих врагов (чаща): лёгкая заливка и пунктир по краю — войдёшь внутрь, и враги проснутся.
+   * Перерисовывается, только когда сменились клетки или размер клетки.
+   */
+  private drawAlert(ui: BattleUiState): void {
+    const t = this.layout.tile
+    const sig = ui.alertTiles.size === 0 ? "" : `${t}|${this.layout.ox},${this.layout.oy}|${[...ui.alertTiles].join(";")}`
+    if (sig === this.alertSig) return
+    this.alertSig = sig
+    const g = this.alertG
+    g.clear()
+    if (!sig) return
+    const set = ui.alertTiles
+    // Едва заметная заливка — видно, с какой стороны пунктира зона
+    g.fillStyle(HL.alert, 0.16)
+    for (const k of set) {
+      const pos = this.tileAt(k)
+      if (!pos) continue
+      const o = tileOrigin(this.layout, pos)
+      g.fillRect(o.x, o.y, t, t)
+    }
+    g.lineStyle(Math.max(2, t * 0.06), HL.alert, 0.9)
+    // Пунктир: по два штриха на сторону клетки
+    const dash = (x1: number, y1: number, x2: number, y2: number) => {
+      for (const [a, b] of [[0.08, 0.38], [0.58, 0.88]] as const)
+        g.lineBetween(x1 + (x2 - x1) * a, y1 + (y2 - y1) * a, x1 + (x2 - x1) * b, y1 + (y2 - y1) * b)
+    }
+    for (const k of set) {
+      const pos = this.tileAt(k)
+      if (!pos) continue
+      const o = tileOrigin(this.layout, pos)
+      if (!set.has(posKey({ x: pos.x, y: pos.y - 1 }))) dash(o.x, o.y, o.x + t, o.y)
+      if (!set.has(posKey({ x: pos.x, y: pos.y + 1 }))) dash(o.x, o.y + t, o.x + t, o.y + t)
+      if (!set.has(posKey({ x: pos.x - 1, y: pos.y }))) dash(o.x, o.y, o.x, o.y + t)
+      if (!set.has(posKey({ x: pos.x + 1, y: pos.y }))) dash(o.x + t, o.y, o.x + t, o.y + t)
+    }
+  }
+
   private drawReach(ui: BattleUiState): void {
+    // Разведка в чаще: дальность не ограничена — подсвечивать нечего (иначе загорелось бы всё поле)
+    const exploring = !!$save.get().battle?.explore
     const show
-      = !!ui.reach && ui.mode !== "idle" && ui.mode !== "enemyInfo" && ui.mode !== "busy" && ui.mode !== "ended"
+      = !exploring && !!ui.reach && ui.mode !== "idle" && ui.mode !== "enemyInfo" && ui.mode !== "busy" && ui.mode !== "ended"
     if (!show || !ui.reach) {
       this.reachSig = ""
       this.targetSig = ""
@@ -1911,6 +1955,7 @@ export class MapScene extends Phaser.Scene {
     pg.clear()
 
     this.drawDanger(ui)
+    this.drawAlert(ui)
     this.drawReach(ui)
     if (ui.path && ui.path.length > 1) this.drawPathArrow(pg, ui.path)
     this.layPaws(ui.path && ui.path.length > 1 ? ui.path : null)

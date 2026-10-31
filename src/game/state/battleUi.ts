@@ -6,6 +6,7 @@ import {
   attackOptions,
   dangerZone,
   isBreakableWall,
+  isPassable,
   moveOrigin,
   reachableTiles,
   threatCounts,
@@ -18,12 +19,14 @@ import {
 import { assistTargetsFrom, planAssist, type AssistPlan } from "@game/core/battle/assist"
 import { simulateCombat, type CombatOutcome } from "@game/core/combat"
 import { allPlayerUnitsActed, canExtract, chestToOpen } from "@game/core/battle/reducer"
+import { alertZone } from "@game/core/battle/explore"
 import { nextEnemyAction } from "@game/core/ai"
 import { terrainAt, unitAt } from "@game/core/battle/query"
 import { $save, dispatchBattle } from "./save"
 import { haptic } from "@game/platform/haptics"
 import { sfx } from "@game/platform/audio"
 import { tr } from "@game/i18n"
+import { unitClass } from "@game/content/classes"
 
 /**
  * Управление в духе Fire Emblem Heroes, без меню действий и «Ждать»:
@@ -83,6 +86,8 @@ export interface BattleUiState {
   dragValid: boolean
   dangerOn: boolean
   dangerTiles: Set<string>
+  /** Чаща: зоны тревоги спящих врагов — войдёшь, и они проснутся (видны всегда, и в разведке, и в бою). */
+  alertTiles: Set<string>
   busy: boolean
   fastForward: boolean
   toast?: string
@@ -95,6 +100,7 @@ const BASE: BattleUiState = {
   dragValid: false,
   dangerOn: false,
   dangerTiles: new Set(),
+  alertTiles: new Set(),
   busy: false,
   fastForward: false
 }
@@ -170,6 +176,7 @@ function clearSelection(extra: Partial<BattleUiState> = {}): void {
     pressedId: cur.pressedId,
     dangerOn: cur.dangerOn,
     dangerTiles: cur.dangerTiles,
+    alertTiles: cur.alertTiles,
     busy: cur.busy,
     fastForward: cur.fastForward,
     toast: cur.toast,
@@ -181,8 +188,9 @@ function clearSelection(extra: Partial<BattleUiState> = {}): void {
 export function refreshDanger(): void {
   const st = state()
   const ui = $battleUi.get()
-  if (!st || !ui.dangerOn) return patch({ dangerTiles: new Set() })
-  patch({ dangerTiles: dangerZone(st, "enemy") })
+  const alertTiles = st?.expedition && !st.result ? alertZone(st) : new Set<string>()
+  if (!st || !ui.dangerOn) return patch({ dangerTiles: new Set(), alertTiles })
+  patch({ dangerTiles: dangerZone(st, "enemy"), alertTiles })
 }
 
 export function toggleDanger(): void {
@@ -281,6 +289,23 @@ function bestTileForTarget(
 }
 
 function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiState> = {}): void {
+  // Разведка: дальность не ограничена — достижимо всё поле (для перетаскивания); целей и подсветки хода нет
+  if (st.explore) {
+    const size = mapSize(st.map)
+    const cur = $battleUi.get()
+    clearSelection({
+      mode: "unitSelected",
+      selectedId: bu.unitId,
+      origin: { ...bu.pos },
+      reach: reachableTiles(st, bu, bu.pos, size.w * size.h),
+      busy: false,
+      pressedId: cur.pressedId,
+      ...extra
+    })
+    haptic("select")
+    sfx("select")
+    return
+  }
   const reach = reachOf(st, bu)
   const attackTiles = new Set<string>()
   for (const o of attackOptions(st, bu, reach)) {
@@ -305,6 +330,7 @@ function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiStat
     pressedId: cur.pressedId,
     dangerOn: cur.dangerOn,
     dangerTiles: cur.dangerTiles,
+    alertTiles: cur.alertTiles,
     fastForward: cur.fastForward,
     toast: cur.toast,
     toastAt: cur.toastAt,
@@ -446,6 +472,7 @@ export function tapTile(pos: Pos): void {
   const ui = $battleUi.get()
   if (!st || !canAct(st, ui) || ui.dragging) return
   const occupant = unitAt(st, pos)
+  if (st.explore) return tapExplore(st, ui, pos, occupant)
 
   switch (ui.mode) {
     case "idle":
@@ -484,6 +511,54 @@ export function tapTile(pos: Pos): void {
     default:
       return
   }
+}
+
+/**
+ * Разведка в чаще: тап по клетке — отряд идёт туда строем за ближайшим бойцом; если боец выбран — идёт он один.
+ * Тап по своему бойцу выбирает его (повторный — снимает выбор или спрашивает о сундуке и выходе), по врагу —
+ * сведения о нём; непроходимая клетка — справка о ней.
+ */
+function tapExplore(st: BattleState, ui: BattleUiState, pos: Pos, occupant: BattleUnit | undefined): void {
+  if (occupant?.side === "player") {
+    if (ui.selectedId !== occupant.unitId) return selectUnit(st, occupant)
+    if (offerPrompt(st, [occupant.unitId])) return
+    return clearSelection()
+  }
+  if (occupant) {
+    if (ui.mode === "enemyInfo" && ui.infoId === occupant.unitId) return clearSelection()
+    clearSelection({ mode: "enemyInfo", infoId: occupant.unitId, infoThreat: threatTiles(st, occupant) })
+    haptic("select")
+    return
+  }
+  const sel = ui.selectedId ? st.units[ui.selectedId] : undefined
+  const squad = Object.values(st.units).filter(u => u.side === "player" && u.alive)
+  const lead = sel ?? squad.sort((a, b) => manhattan(a.pos, pos) - manhattan(b.pos, pos))[0]
+  // Сюда никто не встанет (стена, скала, вода для пеших) — справка о клетке
+  const walkable = squad.some(u => isPassable(terrainAt(st, pos), unitClass(st.roster[u.unitId] as UnitInstance).moveType))
+  if (!lead || !walkable) {
+    if (ui.mode === "tileInfo" && ui.infoPos && samePos(ui.infoPos, pos)) return clearSelection()
+    return showTileInfo(pos)
+  }
+  void exploreTo(lead.unitId, pos, !!sel)
+}
+
+/** Разведка: отряд (или один боец, `solo`) идёт к клетке; упёрся в зону тревоги — начинается бой. */
+async function exploreTo(unitId: string, to: Pos, solo: boolean): Promise<void> {
+  const before = state()
+  if (!before) return
+  let r: { state: BattleState, events: BattleEvent[] }
+  try {
+    r = dispatchBattle({ type: "explore", unitId, to, solo })
+  }
+  catch (e) {
+    toast((e as Error).message)
+    return
+  }
+  haptic("light")
+  clearSelection({ mode: "busy", busy: true })
+  if (!(await playEvents(r.events, before, r.state))) return
+  const moved = r.events.flatMap(e => (e.type === "squadMoved" ? e.moves.map(m => m.unitId) : []))
+  afterAction(r.state, moved)
 }
 
 /* ---------- Перетаскивание ---------- */
@@ -590,6 +665,8 @@ export function cancelDrag(): void {
 async function moveTo(unitId: string, to: Pos, animate: boolean): Promise<void> {
   const before = state()
   if (!before) return
+  // Разведка: перетащенный боец идёт к клетке один, без ограничения дальности
+  if (before.explore) return exploreTo(unitId, to, true)
   let result: { state: BattleState, events: BattleEvent[] }
   try {
     result = dispatchBattle({ type: "move", unitId, to })
@@ -739,7 +816,7 @@ function afterAction(st: BattleState, stepped: string[] = []): void {
 export async function endTurn(): Promise<void> {
   const before = state()
   const ui = $battleUi.get()
-  if (!before || ui.busy || ui.prompt || before.result || before.phase !== "player") return
+  if (!before || ui.busy || ui.prompt || before.explore || before.result || before.phase !== "player") return
   let r: { state: BattleState, events: BattleEvent[] }
   try {
     r = dispatchBattle({ type: "endPhase" })

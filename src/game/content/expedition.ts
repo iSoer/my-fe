@@ -37,13 +37,6 @@ export const BUFFS: Record<BuffKind, BuffDef> = {
     get desc() { return tr(`−${pct(BUFF.aegis)} damage taken by the fighter who picked it up`, `−${pct(BUFF.aegis)} урона по подобравшему бойцу`) },
     scope: "unit"
   },
-  regen: {
-    id: "regen",
-    icon: "🌿",
-    get name() { return tr("Sap", "Живица") },
-    get desc() { return tr(`The squad heals ${pct(BUFF.regen)} HP at the start of each turn`, `Отряд лечит ${pct(BUFF.regen)} HP в начале каждого хода`) },
-    scope: "team"
-  },
   fortune: {
     id: "fortune",
     icon: "🪙",

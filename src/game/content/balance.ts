@@ -406,7 +406,6 @@ export const EXPEDITION = {
   alertRadius: 4,
   chestShare: 0.6,
   chestSpread: 0.15,
-  turnLimit: 200,
   /** Что в сундуке: веса категорий (Вкусняшки чаще). */
   chestKinds: { treats: 2, weapon: 1, talisman: 1 },
   /**
@@ -429,7 +428,7 @@ export const EXPEDITION = {
  * Бонусы вылазки: «ярость» — +20 % урона подобравшему, «оберег» — −20 % урона по нему, «ветер» — +2 клетки хода
  * всему отряду, «живица» — 25 % здоровья в начале каждого хода всему отряду, «удача» — ×1.5 добычи с врагов.
  */
-export const BUFF = { fury: 0.2, aegis: 0.2, swift: 2, regen: 0.25, fortune: 1.5 }
+export const BUFF = { fury: 0.2, aegis: 0.2, swift: 2, fortune: 1.5 }
 
 
 /** Бой длится не дольше `turnLimit` ходов: после фазы врага последнего хода отряд отступает (живые бойцы целы, часть добычи). */
@@ -439,9 +438,9 @@ export const BATTLE = {
   wallHp: 2
 }
 
-/** Лимит ходов боя: в чаще поле больше — и ходов больше (`EXPEDITION.turnLimit`). */
+/** Лимит ходов боя (`BATTLE.turnLimit`). В чаще лимита нет — бесконечность: отряд уходит сам через выход. */
 export function turnLimitOf(map: { mode?: string }): number {
-  return map.mode === "expedition" ? EXPEDITION.turnLimit : BATTLE.turnLimit
+  return map.mode === "expedition" ? Number.POSITIVE_INFINITY : BATTLE.turnLimit
 }
 
 export const COMBAT = {
