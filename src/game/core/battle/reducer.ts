@@ -504,9 +504,19 @@ function validateActor(state: BattleState, unitId: string): BattleUnit {
 
 /* ---------- Главная функция ---------- */
 
+/**
+ * Копия боя для редьюсера. Карта (`map`) в бою неизменна — она общая у всех состояний одного боя: не тратим
+ * время на копирование поля (на большой карте это половина состояния), а сцена по той же ссылке понимает,
+ * что поле не менялось, и не перерисовывает его.
+ */
+function cloneBattle(prev: BattleState): BattleState {
+  const { map, ...rest } = prev
+  return { ...structuredClone(rest), map }
+}
+
 export function applyAction(prev: BattleState, action: BattleAction): ReduceResult {
   if (prev.result) return { state: prev, events: [] }
-  const state = structuredClone(prev)
+  const state = cloneBattle(prev)
   const events: BattleEvent[] = []
 
   switch (action.type) {

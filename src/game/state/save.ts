@@ -120,9 +120,12 @@ let visibilityHooked = false
 
 function persist(save: SaveGame): void {
   if (!persistEnabled) return
-  const json = serializeSave(save)
   if (localTimer) clearTimeout(localTimer)
-  localTimer = setTimeout(() => saveLocal(json), 100)
+  // Сериализуем уже в таймере: серия действий подряд (ход врагов на большой карте) пишет сейв один раз
+  localTimer = setTimeout(() => {
+    localTimer = null
+    saveLocal(serializeSave(save))
+  }, 100)
 }
 
 export function flushPersist(): void {

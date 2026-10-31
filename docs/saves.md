@@ -54,7 +54,7 @@
 ## Хранение
 
 - Ключ `localStorage` — `pawfield:save:<namespace>` (`localKey()` в [platform/storage.ts](../src/game/platform/storage.ts)). Namespace задаёт `setStorageNamespace(userNamespace())` в [main.tsx](../src/main.tsx): id пользователя из `tg.initDataUnsafe.user.id` или `local`.
-- `updateSave(fn)` ставит `updatedAt = Date.now()`, вызывает `$save.set` и `persist()` (запись через 100 мс).
+- `updateSave(fn)` ставит `updatedAt = Date.now()`, вызывает `$save.set` и `persist()` (сериализация и запись через 100 мс после последнего изменения).
 - `flushPersist()` пишет сразу. Вызывается при `visibilitychange → hidden` (подписка в `initSave`), перед перезагрузкой обновления PWA (`beforeReload`) и в `resetProgress`/`importSaveCode`.
 - `initSave()` загружает сейв. Если сейв повреждён, сырой JSON сначала копируется в `pawfield:backup:<namespace>` (`backupRawSave`; одна, последняя копия), ошибка с пометкой «копия сохранена» уходит в `$saveError` (тост на заставке), и начинается новая игра. `exportBackupCode()` отдаёт копию кодом для импорта (как `exportSaveCode`); в настройках ([SettingsScreen](../src/game/ui/screens/SettingsScreen.tsx)) есть кнопка «Показать копию повреждённого сейва», пока копия существует.
 - Сейв более новой версии игры `initSave` не трогает: `$saveNewer = true`, `$saveStatus = "error"`, запись выключена (ни локально, ни в облако — зеркало пишет только в статусе `ready`).

@@ -26,7 +26,7 @@ Cat Emblem (pawfield) — фронтенд-only тактика в духе Fire 
   → battleUi.ts (tapTile / confirm / endTurn / retreat) — локальная машина состояний UI
   → save.ts dispatchBattle(action)
       → core/battle/reducer.ts applyAction(BattleState, BattleAction) → { state, events: BattleEvent[] }
-      → updateSave(): $save.set(...) + persist() в localStorage (дебаунс 100 мс)
+      → updateSave(): $save.set(...) + persist() в localStorage (дебаунс 100 мс; JSON — уже в таймере, серия действий сериализуется один раз)
       → host/sync.ts startCloudMirror(): зеркало в Telegram CloudStorage
   → battleUi.playEvents(events, before, after)
       → GamePresenter.play() — анимации на MapScene / CinematicScene, звук, вибрация

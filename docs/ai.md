@@ -73,7 +73,7 @@
 ## Детерминизм
 
 - `jitter = (hashString("unitId:turn:x,y:extra") % 1000) / 1100`, где `hashString` — FNV-1a из [core/rng](../src/game/core/rng/index.ts).
-- Порядок перебора задаётся порядком вставки в `state.units` и `ReachMap`, а `structuredClone` его сохраняет.
+- Порядок перебора задаётся порядком вставки в `state.units` и `ReachMap`, а `structuredClone` (в `cloneBattle`) его сохраняет. `reachableTiles` обходит клетки по корзинам стоимости в порядке добавления — как прежняя устойчивая сортировка очереди, пути те же.
 - `Math.random` и `Date` в ИИ не используются.
 
 ## Где менять

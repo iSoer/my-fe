@@ -1,6 +1,6 @@
 import type { BattleState, BattleUnit, BoardSize, MoveType, Pos, Side, TerrainId } from "../types"
 import { MAP_H, MAP_W, inMap, manhattan, mapSize, posKey } from "../types"
-import { livingUnits, otherSide, terrainAt, unitAt } from "../battle/query"
+import { livingUnits, otherSide, terrainAt } from "../battle/query"
 import { hasPassThrough, moveRange } from "../skills/engine"
 import { buffMoveBonus } from "../battle/buffs"
 import { unitClass } from "@game/content/classes"
@@ -66,30 +66,42 @@ export function reachableTiles(state: BattleState, bu: BattleUnit, fromOverride?
   const pass = hasPassThrough(unit)
   const start = fromOverride ?? moveOrigin(bu)
   const result: ReachMap = new Map()
-  result.set(posKey(start), { pos: start, cost: 0, canStop: true })
-  const frontier: ReachNode[] = [{ pos: start, cost: 0, canStop: true }]
+  const first: ReachNode = { pos: start, cost: 0, canStop: true }
+  result.set(posKey(start), first)
+  // Кто где стоит — один раз, а не перебором всех юнитов для каждой клетки (на большой карте их десятки)
+  const occupied = new Map<string, BattleUnit>()
+  for (const u of Object.values(state.units)) if (u.alive) occupied.set(posKey(u.pos), u)
+  // Дейкстра с очередью по корзинам: стоимости хода — малые целые. Внутри корзины — порядок добавления,
+  // как у устойчивой сортировки, так что пути выходят те же
+  const buckets: ReachNode[][] = [[first]]
   const size = mapSize(state.map)
-  while (frontier.length > 0) {
-    frontier.sort((a, b) => a.cost - b.cost)
-    const cur = frontier.shift() as ReachNode
-    for (const n of orthoNeighbors(cur.pos, size)) {
-      const c = moveCost(terrainAt(state, n), cls.moveType)
-      if (c === null) continue
-      const total = cur.cost + c
-      if (total > budget) continue
-      const occupant = unitAt(state, n)
-      if (occupant && occupant.unitId !== bu.unitId && occupant.side !== bu.side && !pass) continue
-      const key = posKey(n)
-      const existing = result.get(key)
-      if (existing && existing.cost <= total) continue
-      const node: ReachNode = {
-        pos: n,
-        cost: total,
-        prev: posKey(cur.pos),
-        canStop: !occupant || occupant.unitId === bu.unitId
+  for (let cost = 0; cost < buckets.length; cost++) {
+    const bucket = buckets[cost]
+    if (!bucket) continue
+    for (let i = 0; i < bucket.length; i++) {
+      const cur = bucket[i] as ReachNode
+      const curKey = posKey(cur.pos)
+      // Устаревшая запись: клетку уже достигли дешевле
+      if (result.get(curKey) !== cur) continue
+      for (const n of orthoNeighbors(cur.pos, size)) {
+        const c = moveCost(terrainAt(state, n), cls.moveType)
+        if (c === null) continue
+        const total = cur.cost + c
+        if (total > budget) continue
+        const key = posKey(n)
+        const occupant = occupied.get(key)
+        if (occupant && occupant.unitId !== bu.unitId && occupant.side !== bu.side && !pass) continue
+        const existing = result.get(key)
+        if (existing && existing.cost <= total) continue
+        const node: ReachNode = {
+          pos: n,
+          cost: total,
+          prev: curKey,
+          canStop: !occupant || occupant.unitId === bu.unitId
+        }
+        result.set(key, node)
+        ;(buckets[total] ??= []).push(node)
       }
-      result.set(key, node)
-      frontier.push(node)
     }
   }
   return result

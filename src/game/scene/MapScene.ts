@@ -165,6 +165,8 @@ export class MapScene extends Phaser.Scene {
   private pendingSync = false
   private lastMapRef: BattleState["map"] | null = null
   private lastLayoutKey = ""
+  /** Вид камеры, по которому последний раз отсекали тайлы большого поля (`cullTiles`). */
+  private cullKey = ""
   private decalCount = -1
 
   /* ---- Перетаскивание и предпросмотр ---- */
@@ -330,6 +332,26 @@ export class MapScene extends Phaser.Scene {
       const st = $save.get().battle
       if (st) this.syncFromState(st)
     }
+    if (this.worldMode) this.cullTiles()
+  }
+
+  /**
+   * Большое поле: Phaser рисует каждый объект, даже за краем экрана, а тайлов на поле 30×30 — больше тысячи.
+   * Видимы только те, что в виде камеры (с запасом в две клетки — тени, пена и кусты выступают за свою клетку);
+   * пересчёт — лишь когда вид сдвинулся или поле перерисовано.
+   */
+  private cullTiles(): void {
+    const v = this.cameras.main.worldView
+    const key = `${Math.round(v.x)}|${Math.round(v.y)}|${Math.round(v.width)}|${Math.round(v.height)}|${this.tileLayer.length}`
+    if (key === this.cullKey) return
+    this.cullKey = key
+    const m = this.tile * 2
+    const x0 = v.x - m
+    const x1 = v.right + m
+    const y0 = v.y - m
+    const y1 = v.bottom + m
+    for (const o of this.tileLayer.list as Phaser.GameObjects.Image[])
+      o.setVisible(o.x >= x0 && o.x <= x1 && o.y >= y0 && o.y <= y1)
   }
 
   private cleanup(): void {
@@ -1165,8 +1187,6 @@ export class MapScene extends Phaser.Scene {
           g.fillStyle(biome.colors[terrain], 1)
           g.fillRect(o.x, o.y, l.tile, l.tile)
         }
-        g.lineStyle(1, 0x000000, 0.1)
-        g.strokeRect(o.x + 0.5, o.y + 0.5, l.tile - 1, l.tile - 1)
         const glyph = hasArt ? undefined : TERRAIN_GLYPH[terrain]
         if (glyph) {
           const txt = this.add
@@ -1192,6 +1212,21 @@ export class MapScene extends Phaser.Scene {
           if (hp > 0 && hp < 2) this.drawCrack(pos, hp)
         }
       }
+    }
+    // Сетка: у каждой клетки тонкий кант внутри неё. Длинными линиями по рядам и столбцам, а не рамкой на клетку:
+    // Graphics перестраивает геометрию каждый кадр, а клеток на большом поле 900
+    g.lineStyle(1, 0x000000, 0.1)
+    const fieldW = l.tile * size.w
+    const fieldH = l.tile * size.h
+    for (let x = 0; x < size.w; x++) {
+      const left = l.ox + x * l.tile
+      g.lineBetween(left + 0.5, l.oy, left + 0.5, l.oy + fieldH)
+      g.lineBetween(left + l.tile - 0.5, l.oy, left + l.tile - 0.5, l.oy + fieldH)
+    }
+    for (let y = 0; y < size.h; y++) {
+      const top = l.oy + y * l.tile
+      g.lineBetween(l.ox, top + 0.5, l.ox + fieldW, top + 0.5)
+      g.lineBetween(l.ox, top + l.tile - 0.5, l.ox + fieldW, top + l.tile - 0.5)
     }
     // Рамка поля: тёмный контур и светлый внутренний кант
     g.lineStyle(Math.max(3, l.tile * 0.06), 0x000000, 0.35)
@@ -1224,6 +1259,7 @@ export class MapScene extends Phaser.Scene {
         .setDepth(-2)
     }
     this.startTileAnimations()
+    this.cullKey = ""
     this.ensureWeather(st, flyAnchors)
     this.ambient?.destroy()
     this.ambient = null
@@ -1369,7 +1405,8 @@ export class MapScene extends Phaser.Scene {
         if (!sceneAlive(this)) return
         const now = this.time.now
         for (const cell of this.animTiles) {
-          if (!cell.img.scene) continue
+          // За краем вида (большое поле) кадр не переключаем: появится — догонит на следующем тике
+          if (!cell.img.scene || !cell.img.visible) continue
           const water = cell.terrain === "water"
           const seq = water ? WATER_SEQ : FOREST_SEQ
           const period = water ? 220 : 900
@@ -1386,7 +1423,7 @@ export class MapScene extends Phaser.Scene {
         }
         // Пена у берега: два кадра, сдвинутые по фазе
         for (const s of this.shoreImgs) {
-          if (!s.img.scene) continue
+          if (!s.img.scene || !s.img.visible) continue
           const f = Math.floor((now + s.phase) / 520) % SHORE_FRAMES
           const key = edgeKey(this.tileBiome, "shore", f)
           if (s.img.texture.key === key || !hasTexture(this, key)) continue
