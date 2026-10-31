@@ -58,6 +58,7 @@ export function ConfirmModal({
   title,
   text,
   confirmLabel,
+  cancelLabel,
   danger = false,
   onConfirm,
   onClose
@@ -66,6 +67,7 @@ export function ConfirmModal({
   title: string
   text?: ReactNode
   confirmLabel?: string
+  cancelLabel?: string
   danger?: boolean
   onConfirm: () => void
   onClose: () => void
@@ -75,7 +77,7 @@ export function ConfirmModal({
       {text && <div className="muted">{typeof text === "string" ? <IconText text={text} /> : text}</div>}
       <div className="row">
         <Button block onClick={onClose}>
-          {tr("Cancel", "Отмена")}
+          {cancelLabel ?? tr("Cancel", "Отмена")}
         </Button>
         <Button block primary={!danger} danger={danger} onClick={onConfirm}>
           {confirmLabel ?? tr("Yes", "Да")}

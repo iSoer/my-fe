@@ -5,6 +5,7 @@ import type {
   BattleState,
   BattleUnit,
   Effect,
+  ExpeditionChest,
   MapDef,
   Pos,
   ReduceResult,
@@ -194,8 +195,8 @@ function passKeys(state: BattleState, u: BattleUnit, killerId: string | undefine
 
 /**
  * Боец игрока встал на клетку в чаще (любой шаг, в том числе перестановка в пределах хода): подобрал ключ, что
- * лежит на ней, и сразу открыл сундук, если стоит на нём с ключом от него, — содержимое идёт в добычу вылазки.
- * Отдельного действия не нужно, ход бойца не тратится.
+ * лежит на ней, сердечко или бонус. Сундук и выход так не срабатывают — игрок подтверждает их сам
+ * (действия `openChest` и `extract`).
  */
 function expeditionStepOn(state: BattleState, unitId: string, events: BattleEvent[]): void {
   const exp = state.expedition
@@ -223,33 +224,28 @@ function expeditionStepOn(state: BattleState, unitId: string, events: BattleEven
     else exp.buffs.units[unitId] = [...new Set([...(exp.buffs.units[unitId] ?? []), p.kind])]
     events.push({ type: "pickup", unitId, pos: { ...bu.pos }, kind: p.kind })
   }
-  for (const chest of def.chests) {
-    if (exp.opened.includes(chest.id) || exp.keys[chest.id]?.unitId !== unitId || !samePos(chest.pos, bu.pos)) continue
-    exp.opened.push(chest.id)
-    delete exp.keys[chest.id]
-    state.stats.loot += chest.treats
-    if (chest.itemId) exp.found.push(chest.itemId)
-    const ev: BattleEvent = { type: "chestOpened", chestId: chest.id, unitId, pos: { ...chest.pos }, treats: chest.treats }
-    if (chest.itemId) ev.itemId = chest.itemId
-    events.push(ev)
-  }
 }
 
-/**
- * Действие бойца игрока в чаще завершено: всё, что даёт клетка (`expeditionStepOn`), а встал на выход, когда открыт
- * хоть один сундук, — отряд уходит с добычей (победа). Выход — только по завершённому действию, не от перестановки.
- */
-function expeditionStep(state: BattleState, unitId: string, events: BattleEvent[]): void {
-  expeditionStepOn(state, unitId, events)
-  const exp = state.expedition
-  const def = state.map.expedition
+/** Живой боец игрока в чаще в фазе игрока — тот, кто может открыть сундук или увести отряд. */
+function expeditionActor(state: BattleState, unitId: string): BattleUnit | undefined {
   const bu = state.units[unitId]
-  if (!exp || !def || !bu || !bu.alive || bu.side !== "player" || state.result) return
-  if (exp.opened.length > 0 && def.exits.some(e => samePos(bu.pos, e))) {
-    events.push({ type: "extracted", unitId, pos: { ...bu.pos } })
-    state.result = "victory"
-    events.push({ type: "battleEnded", result: "victory" })
-  }
+  if (!state.expedition || !state.map.expedition || state.result || state.phase !== "player") return undefined
+  return bu && bu.alive && bu.side === "player" ? bu : undefined
+}
+
+/** Сундук под бойцом, который он может открыть: не открыт, и ключ от него — у этого бойца. */
+export function chestToOpen(state: BattleState, unitId: string): ExpeditionChest | undefined {
+  const bu = expeditionActor(state, unitId)
+  if (!bu) return undefined
+  const exp = state.expedition as NonNullable<BattleState["expedition"]>
+  return state.map.expedition?.chests.find(c =>
+    samePos(c.pos, bu.pos) && !exp.opened.includes(c.id) && exp.keys[c.id]?.unitId === unitId)
+}
+
+/** Боец может увести отряд: стоит на выходе из чащи (открытые сундуки не обязательны). */
+export function canExtract(state: BattleState, unitId: string): boolean {
+  const bu = expeditionActor(state, unitId)
+  return !!bu && !!state.map.expedition?.exits.some(e => samePos(e, bu.pos))
 }
 
 function killUnit(state: BattleState, u: BattleUnit, killerId: string | undefined, events: BattleEvent[]): void {
@@ -364,7 +360,7 @@ function checkEnd(state: BattleState, events: BattleEvent[]): boolean {
     events.push({ type: "battleEnded", result: "defeat" })
     return true
   }
-  // Вылазка в чащу: перебить всех мало — победа только уходом с добычей через выход (`expeditionStep`)
+  // Вылазка в чащу: перебить всех мало — победа только уходом с добычей через выход (действие `extract`)
   if (state.map.objective === "extract") return false
   const enemies = livingUnits(state, "enemy")
   const allWavesSpawned = state.map.reinforcements.every(w => state.spawnedWaves.includes(w.turn))
@@ -521,6 +517,29 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
       state.result = "retreat"
       events.push({ type: "battleEnded", result: "retreat" })
       break
+    case "openChest": {
+      // Ход бойца не тратится: открыть можно и после действия, стоя на сундуке
+      const chest = chestToOpen(state, action.unitId)
+      if (!chest) throw new Error(tr("no chest to open here", "здесь нечего открыть"))
+      const exp = state.expedition as NonNullable<BattleState["expedition"]>
+      exp.opened.push(chest.id)
+      delete exp.keys[chest.id]
+      state.stats.loot += chest.treats
+      if (chest.itemId) exp.found.push(chest.itemId)
+      const ev: BattleEvent = { type: "chestOpened", chestId: chest.id, unitId: action.unitId, pos: { ...chest.pos }, treats: chest.treats }
+      if (chest.itemId) ev.itemId = chest.itemId
+      events.push(ev)
+      break
+    }
+    case "extract": {
+      // Отряд уходит через выход с тем, что успел добыть (хоть и без сундуков): победа
+      if (!canExtract(state, action.unitId)) throw new Error(tr("can’t leave here yet", "уйти отсюда пока нельзя"))
+      const bu = state.units[action.unitId] as BattleUnit
+      events.push({ type: "extracted", unitId: bu.unitId, pos: { ...bu.pos } })
+      state.result = "victory"
+      events.push({ type: "battleEnded", result: "victory" })
+      break
+    }
     case "move": {
       const bu = validateActor(state, action.unitId)
       moveUnit(state, bu, action.to, events)
@@ -614,9 +633,8 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
     }
   }
 
-  if (action.type === "move") expeditionStepOn(state, action.unitId, events)
-  else if (action.type === "wait" || action.type === "attack" || action.type === "assist" || action.type === "attackWall")
-    expeditionStep(state, action.unitId, events)
+  if (action.type === "move" || action.type === "wait" || action.type === "attack" || action.type === "assist" || action.type === "attackWall")
+    expeditionStepOn(state, action.unitId, events)
   checkEnd(state, events)
   return { state, events }
 }

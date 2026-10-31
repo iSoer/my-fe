@@ -438,6 +438,10 @@ export type BattleAction
     | { type: "move", unitId: string, to: Pos }
     | { type: "assist", unitId: string, to: Pos, targetId: string, newStance?: Stance }
     | { type: "wait", unitId: string, to: Pos, newStance?: Stance }
+    /** Открыть сундук, на котором стоит боец с ключом от него (ход не тратится). */
+    | { type: "openChest", unitId: string }
+    /** Увести отряд через выход, на котором стоит боец (нужен открытый сундук): победа. */
+    | { type: "extract", unitId: string }
     | { type: "endPhase" }
     | { type: "retreat" }
 

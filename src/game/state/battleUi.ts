@@ -17,7 +17,7 @@ import {
 } from "@game/core/map/pathing"
 import { assistTargetsFrom, planAssist, type AssistPlan } from "@game/core/battle/assist"
 import { simulateCombat, type CombatOutcome } from "@game/core/combat"
-import { allPlayerUnitsActed } from "@game/core/battle/reducer"
+import { allPlayerUnitsActed, canExtract, chestToOpen } from "@game/core/battle/reducer"
 import { nextEnemyAction } from "@game/core/ai"
 import { terrainAt, unitAt } from "@game/core/battle/query"
 import { $save, dispatchBattle } from "./save"
@@ -45,8 +45,17 @@ export type UiMode
     | "busy"
     | "ended"
 
+/**
+ * Вопрос игроку в чаще: открыть сундук, на котором стоит боец с ключом, или увести отряд через выход.
+ * Пока вопрос открыт, поле не принимает тапов.
+ */
+export type BattlePrompt
+  = | { kind: "chest", unitId: string, chestId: string }
+    | { kind: "exit", unitId: string }
+
 export interface BattleUiState {
   mode: UiMode
+  prompt?: BattlePrompt
   selectedId?: string
   /** Клетка, где выбранный боец стоит сейчас. */
   origin?: Pos
@@ -198,7 +207,26 @@ export function enterBattleScreen(): void {
 /* ---------- Вычисления ---------- */
 
 function canAct(st: BattleState, ui: BattleUiState): boolean {
-  return !ui.busy && !st.result && st.phase === "player"
+  return !ui.busy && !ui.prompt && !st.result && st.phase === "player"
+}
+
+/** Вопрос для бойцов `unitIds` (в порядке приоритета): сначала сундук, который можно открыть, затем выход. */
+function promptFor(st: BattleState, unitIds: string[]): BattlePrompt | undefined {
+  for (const id of unitIds) {
+    const chest = chestToOpen(st, id)
+    if (chest) return { kind: "chest", unitId: id, chestId: chest.id }
+  }
+  for (const id of unitIds) if (canExtract(st, id)) return { kind: "exit", unitId: id }
+  return undefined
+}
+
+/** Задать вопрос о сундуке или выходе, если бойцы на такой клетке. Возвращает true, если вопрос задан. */
+function offerPrompt(st: BattleState, unitIds: string[]): boolean {
+  const prompt = promptFor(st, unitIds)
+  if (!prompt) return false
+  patch({ prompt })
+  haptic("medium")
+  return true
 }
 
 function pathFor(reach: ReachMap, to: Pos): Pos[] {
@@ -376,7 +404,11 @@ function selected(st: BattleState): BattleUnit | undefined {
 /** Тап, когда боец выбран: цель → предпросмотр действия, свободная клетка в пределах хода → встать туда. */
 function tapWithSelection(st: BattleState, sel: BattleUnit, reach: ReachMap, pos: Pos): void {
   const occupant = unitAt(st, pos)
-  if (occupant && occupant.unitId === sel.unitId) return clearSelection()
+  if (occupant && occupant.unitId === sel.unitId) {
+    // Повторный тап по бойцу на сундуке или выходе — снова спросить (если в первый раз ответили «нет»)
+    if (offerPrompt(st, [sel.unitId])) return
+    return clearSelection()
+  }
   if (occupant && occupant.side !== sel.side) {
     if (tryAttack(st, sel, reach, occupant)) return
     clearSelection({ mode: "enemyInfo", infoId: occupant.unitId, infoThreat: threatTiles(st, occupant) })
@@ -424,6 +456,8 @@ export function tapTile(pos: Pos): void {
         return showTileInfo(pos)
       }
       if (occupant.side === "player" && !occupant.acted) return selectUnit(st, occupant)
+      // Уже действовавший боец на сундуке или выходе: открыть сундук или уйти можно и без хода
+      if (occupant.side === "player" && offerPrompt(st, [occupant.unitId])) return
       if (ui.mode === "enemyInfo" && ui.infoId === occupant.unitId) return clearSelection()
       const threat = occupant.side === "enemy" ? threatTiles(st, occupant) : new Set<string>()
       clearSelection({ mode: "enemyInfo", infoId: occupant.unitId, infoThreat: threat })
@@ -565,8 +599,8 @@ async function moveTo(unitId: string, to: Pos, animate: boolean): Promise<void> 
     return
   }
   haptic("light")
-  // Без анимации шага (боец уже на клетке под пальцем) всё равно показать, что дала клетка: ключ, открытый сундук
-  const extra = animate ? [] : result.events.filter(e => e.type === "chestOpened" || e.type === "keyTaken")
+  // Без анимации шага (боец уже на клетке под пальцем) всё равно показать, что дала клетка: ключ
+  const extra = animate ? [] : result.events.filter(e => e.type === "keyTaken")
   if (animate || extra.length > 0) {
     patch({ ...NO_PREVIEW, mode: "busy", busy: true })
     if (!(await playEvents(animate ? result.events : extra, before, result.state))) return
@@ -575,6 +609,43 @@ async function moveTo(unitId: string, to: Pos, animate: boolean): Promise<void> 
   const bu = result.state.units[unitId]
   if (bu && !result.state.result) selectUnit(result.state, bu)
   refreshDanger()
+  // Встал на сундук с ключом или на выход — спросить; боец остаётся выбранным, «нет» оставляет его как есть
+  if (bu && !result.state.result) offerPrompt(result.state, [unitId])
+}
+
+/**
+ * Ответ на вопрос о сундуке или выходе. «Да» — открыть сундук (ход не тратится) или увести отряд (победа);
+ * «нет» — просто закрыть вопрос. Затем бой продолжается: выбранный боец, если ещё не ходил, остаётся выбранным.
+ */
+export async function answerPrompt(yes: boolean): Promise<void> {
+  const ui = $battleUi.get()
+  const p = ui.prompt
+  const before = state()
+  if (!p || ui.busy || !before) return
+  patch({ prompt: undefined })
+  let after = before
+  if (yes) {
+    let r: Reduced
+    try {
+      r = dispatchBattle(p.kind === "chest" ? { type: "openChest", unitId: p.unitId } : { type: "extract", unitId: p.unitId })
+    }
+    catch (e) {
+      toast((e as Error).message)
+      return
+    }
+    haptic("medium")
+    patch({ ...NO_PREVIEW, mode: "busy", busy: true })
+    if (!(await playEvents(r.events, before, r.state))) return
+    patch({ busy: false })
+    after = r.state
+  }
+  const sel = ui.selectedId ? after.units[ui.selectedId] : undefined
+  if (!after.result && after.phase === "player" && sel && sel.alive && !sel.acted && sel.side === "player") {
+    // Боец ещё не ходил: оставить его выбранным (после анимации сундука — выбрать заново)
+    if (yes) selectUnit(after, sel)
+    return
+  }
+  afterAction(after)
 }
 
 export function cancel(): void {
@@ -643,10 +714,16 @@ async function commit(action: BattleAction): Promise<void> {
   }
   clearSelection({ mode: "busy", busy: true })
   if (!(await playEvents(result.events, before, result.state))) return
-  afterAction(result.state)
+  // Кто встал на новую клетку (сам боец и сдвинутые Поддержкой союзники) — может оказаться на сундуке или выходе
+  const actor = "unitId" in action ? action.unitId : undefined
+  const moved = Object.values(result.state.units)
+    .filter(u => u.side === "player" && u.unitId !== actor && !samePos(u.pos, before.units[u.unitId]?.pos ?? u.pos))
+    .map(u => u.unitId)
+  afterAction(result.state, actor ? [actor, ...moved] : moved)
 }
 
-function afterAction(st: BattleState): void {
+/** После действия: итог боя, иначе вопрос о сундуке или выходе для `stepped`, иначе автозавершение хода. */
+function afterAction(st: BattleState, stepped: string[] = []): void {
   if (st.result) {
     clearSelection({ mode: "ended", busy: false })
     onEnded?.(st)
@@ -654,13 +731,15 @@ function afterAction(st: BattleState): void {
   }
   clearSelection({ mode: "idle", busy: false })
   refreshDanger()
+  // Пока открыт вопрос, ход сам не завершается — его завершит ответ (`answerPrompt`)
+  if (offerPrompt(st, stepped)) return
   if (st.phase === "player" && allPlayerUnitsActed(st) && $save.get().settings.autoEndTurn) void endTurn()
 }
 
 export async function endTurn(): Promise<void> {
   const before = state()
   const ui = $battleUi.get()
-  if (!before || ui.busy || before.result || before.phase !== "player") return
+  if (!before || ui.busy || ui.prompt || before.result || before.phase !== "player") return
   let r: { state: BattleState, events: BattleEvent[] }
   try {
     r = dispatchBattle({ type: "endPhase" })

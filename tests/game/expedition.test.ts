@@ -3,7 +3,7 @@ import fc from "fast-check"
 import { fallbackTerrain, generateExpedition } from "@game/core/map/expedition"
 import { createRng } from "@game/core/rng"
 import { generateMap } from "@game/core/map/generate"
-import { applyAction, createBattle } from "@game/core/battle/reducer"
+import { applyAction, canExtract, chestToOpen, createBattle } from "@game/core/battle/reducer"
 import { decideAction } from "@game/core/ai"
 import { isPassable, tilesAtDistance, reachableTiles } from "@game/core/map/pathing"
 import { EXPEDITION, turnLimitOf } from "@game/content/balance"
@@ -153,7 +153,9 @@ describe("вылазка в чащу: карта", () => {
       s.expedition!.opened = [chest.id]
       s.units[player.id]!.pos = { x: exitPos.x, y: 6 }
       const r = applyAction(s, { type: "wait", unitId: player.id, to: exitPos })
-      expect(r.state.result).toBe("victory")
+      expect(r.state.result).toBeUndefined()
+      expect(canExtract(r.state, player.id)).toBe(true)
+      expect(applyAction(r.state, { type: "extract", unitId: player.id }).state.result).toBe("victory")
     }
   })
 
@@ -259,7 +261,7 @@ function miniExpedition(opts: { guardHp?: number, guardPos?: Pos, playerPos?: Po
 }
 
 describe("вылазка в чащу: ключ, сундук, выход", () => {
-  it("ключ у стража; убил его боец — ключ у бойца; встал на сундук — он открылся; встал на выход — победа с добычей", () => {
+  it("ключ у стража; убил его боец — ключ у бойца; встал на сундук и открыл — добыча; встал на выход и ушёл — победа", () => {
     const { state: s0, player, guard, chest } = miniExpedition()
     expect(s0.expedition!.keys[chest.id]).toEqual({ unitId: guard.id })
     const r1 = applyAction(s0, { type: "attack", unitId: player.id, to: { x: 2, y: 4 }, targetId: guard.id })
@@ -269,46 +271,63 @@ describe("вылазка в чащу: ключ, сундук, выход", () =>
     // Все враги мертвы — но это не победа: в чаще нужно уйти через выход
     expect(r1.state.result).toBeUndefined()
 
-    // Следующий ход: встал с ключом на сундук — он открывается сразу, отдельного действия нет, ход не тратится
+    // Следующий ход: встал с ключом на сундук — сам он не открывается, игрок подтверждает (ход не тратится)
     const s2: BattleState = structuredClone(r1.state)
     s2.units[player.id]!.acted = false
     s2.units[player.id]!.pos = { x: 2, y: 2 }
-    const r2 = applyAction(s2, { type: "move", unitId: player.id, to: { x: 2, y: 1 } })
+    const stepped = applyAction(s2, { type: "move", unitId: player.id, to: { x: 2, y: 1 } })
+    expect(stepped.events.some(e => e.type === "chestOpened")).toBe(false)
+    expect(stepped.state.expedition!.opened).toEqual([])
+    expect(chestToOpen(stepped.state, player.id)?.id).toBe(chest.id)
+    const r2 = applyAction(stepped.state, { type: "openChest", unitId: player.id })
     const opened = r2.events.find(e => e.type === "chestOpened")
     expect(opened).toMatchObject({ chestId: chest.id, unitId: player.id, treats: 77 })
     expect(r2.state.expedition!.opened).toEqual([chest.id])
     expect(r2.state.stats.loot).toBe(r1.state.stats.loot + 77)
     expect(r2.state.units[player.id]!.acted).toBe(false)
+    expect(chestToOpen(r2.state, player.id)).toBeUndefined()
+    // Второй раз тот же сундук не открыть
+    expect(() => applyAction(r2.state, { type: "openChest", unitId: player.id })).toThrow()
 
-    // Выход в углу: встал — отряд уходит с добычей
+    // Выход в углу: встал — игрок подтверждает, и отряд уходит с добычей
     const s3: BattleState = structuredClone(r2.state)
     s3.units[player.id]!.acted = false
     delete s3.units[player.id]!.turnStart
     s3.units[player.id]!.pos = { x: 5, y: 6 }
-    const r3 = applyAction(s3, { type: "wait", unitId: player.id, to: { x: 5, y: 7 } })
+    const onExitTile = applyAction(s3, { type: "move", unitId: player.id, to: { x: 5, y: 7 } })
+    expect(onExitTile.state.result).toBeUndefined()
+    expect(canExtract(onExitTile.state, player.id)).toBe(true)
+    const r3 = applyAction(onExitTile.state, { type: "extract", unitId: player.id })
     expect(r3.events.some(e => e.type === "extracted")).toBe(true)
     expect(r3.state.result).toBe("victory")
   })
 
-  it("на выходе без открытого сундука ничего не происходит; без ключа и рядом с сундуком он не открывается", () => {
+  it("без ключа и рядом с сундуком он не открывается; уйти через выход можно и без открытого сундука", () => {
     const { state, player, chest } = miniExpedition({ guardPos: { x: 5, y: 0 } })
     const s: BattleState = structuredClone(state)
     s.units[player.id]!.pos = { x: 2, y: 2 }
     // Без ключа — даже стоя на сундуке
     const r = applyAction(s, { type: "move", unitId: player.id, to: { x: 2, y: 1 } })
-    expect(r.events.some(e => e.type === "chestOpened")).toBe(false)
+    expect(chestToOpen(r.state, player.id)).toBeUndefined()
+    expect(() => applyAction(r.state, { type: "openChest", unitId: player.id })).toThrow()
     expect(r.state.expedition!.opened).toEqual([])
     // С ключом, но рядом (не на сундуке) — тоже нет
     const near: BattleState = structuredClone(state)
     near.units[player.id]!.pos = { x: 2, y: 3 }
     near.expedition!.keys[chest.id] = { unitId: player.id }
     const r1 = applyAction(near, { type: "wait", unitId: player.id, to: { x: 2, y: 2 } })
+    expect(chestToOpen(r1.state, player.id)).toBeUndefined()
     expect(r1.state.expedition!.opened).toEqual([])
     const s2: BattleState = structuredClone(state)
     s2.units[player.id]!.pos = { x: 5, y: 6 }
+    // На выходе без открытого сундука бой сам не кончается, но уйти можно и так — без добычи из сундуков
     const r2 = applyAction(s2, { type: "wait", unitId: player.id, to: { x: 5, y: 7 } })
     expect(r2.state.result).toBeUndefined()
-    void chest
+    expect(canExtract(r2.state, player.id)).toBe(true)
+    const left = applyAction(r2.state, { type: "extract", unitId: player.id })
+    expect(left.state.result).toBe("victory")
+    expect(left.state.expedition!.opened).toEqual([])
+    expect(left.state.expedition!.found).toEqual([])
   })
 
   it("павший носитель роняет ключ на свою клетку, встал на неё — подобрал сразу, без действия", () => {
@@ -320,7 +339,7 @@ describe("вылазка в чащу: ключ, сундук, выход", () =>
     expect(r.state.units[player.id]!.acted).toBe(false)
   })
 
-  it("выход срабатывает по завершённому действию, а не от перестановки", () => {
+  it("сам выход не срабатывает: ни перестановка, ни завершённое действие не уводят отряд без подтверждения", () => {
     const { state, player, chest } = miniExpedition({ guardPos: { x: 5, y: 0 } })
     const s: BattleState = structuredClone(state)
     s.expedition!.opened = [chest.id]
@@ -328,7 +347,11 @@ describe("вылазка в чащу: ключ, сундук, выход", () =>
     const moved = applyAction(s, { type: "move", unitId: player.id, to: { x: 5, y: 7 } })
     expect(moved.state.result).toBeUndefined()
     const done = applyAction(moved.state, { type: "wait", unitId: player.id, to: { x: 5, y: 7 } })
-    expect(done.state.result).toBe("victory")
+    expect(done.state.result).toBeUndefined()
+    // Уйти можно и после действия бойца
+    expect(applyAction(done.state, { type: "extract", unitId: player.id }).state.result).toBe("victory")
+    // Не на выходе — нельзя
+    expect(() => applyAction(s, { type: "extract", unitId: player.id })).toThrow()
   })
 
   it("страж на поводке: дальнего игрока не преследует и возвращается к сундуку, ближнего — только в пределах поводка", () => {

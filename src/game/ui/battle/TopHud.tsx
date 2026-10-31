@@ -34,8 +34,8 @@ export function TopHud({ battle }: { battle: BattleState }) {
         <span
           className={`bf-chip bf-goal ${opened > 0 ? "ready" : ""}`}
           title={tr(
-            "Kill the guard with the key, step onto the chest with the key to open it, then end a fighter’s action on the glowing EXIT in the corner to take all the loot",
-            "Убейте стража с ключом, встаньте с ключом на сундук — он откроется, затем завершите действие бойца на светящемся ВЫХОДЕ в углу — отряд унесёт всю добычу"
+            "Kill the guard with the key, step onto the chest with the key and open it, then step onto the glowing EXIT in the corner and end the sortie to take all the loot. You can leave through the exit at any time, even without opening a chest",
+            "Убейте стража с ключом, встаньте с ключом на сундук и откройте его, затем встаньте на светящийся ВЫХОД в углу и завершите вылазку — отряд унесёт всю добычу. Уйти через выход можно в любой момент, даже не открыв сундук"
           )}
         >
           <IconText text={`📦 ${opened}/${chests}`} />

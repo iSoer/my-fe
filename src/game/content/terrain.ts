@@ -80,8 +80,8 @@ export function terrainInfo(state: BattleState, pos: Pos): TerrainInfo {
     notes.unshift(opened
       ? tr("Opened — the loot is in your bag. Now head for the EXIT.", "Открыт — добыча у отряда. Теперь к ВЫХОДУ.")
       : tr(
-          `Locked. The key is on one of its guards; the fighter who takes it just steps onto the chest to open it. What’s inside is unknown — only the brand on the lid (${CHEST_MARK[chest.kind]}) hints at it.`,
-          `Заперт. Ключ — у одного из стражей; бойцу с ключом достаточно встать на сундук — он откроется сразу. Что внутри — не видно, намекает лишь клеймо на крышке (${CHEST_MARK[chest.kind]}).`
+          `Locked. The key is on one of its guards; when the fighter who takes it steps onto the chest, you’ll be asked whether to open it. What’s inside is unknown — only the brand on the lid (${CHEST_MARK[chest.kind]}) hints at it.`,
+          `Заперт. Ключ — у одного из стражей; когда боец с ключом встанет на сундук, игра спросит, открыть ли его. Что внутри — не видно, намекает лишь клеймо на крышке (${CHEST_MARK[chest.kind]}).`
         ))
   }
   // Сердечко или бонус на земле
@@ -92,7 +92,7 @@ export function terrainInfo(state: BattleState, pos: Pos): TerrainInfo {
       : tr(`${BUFFS[pickup.kind].icon} ${BUFFS[pickup.kind].name}: ${BUFFS[pickup.kind].desc} until the end of the sortie. Step here to pick it up.`, `${BUFFS[pickup.kind].icon} ${BUFFS[pickup.kind].name}: ${BUFFS[pickup.kind].desc} до конца вылазки. Встаньте на клетку, чтобы подобрать.`))
   }
   if (exit)
-    notes.unshift(tr("Step here after opening a chest — the whole squad leaves with all the loot.", "Встаньте сюда после того, как откроете сундук, — отряд уйдёт со всей добычей."))
+    notes.unshift(tr("Step here to leave the thicket — you’ll be asked whether to end the sortie. The squad takes all the loot from the chests it opened.", "Встаньте сюда, чтобы уйти из чащи, — игра спросит, завершить ли вылазку. Отряд унесёт добычу из открытых сундуков."))
   return {
     terrain,
     icon: chest ? "📦" : exit ? "⇱" : bridge ? "🌉" : ICON[terrain],

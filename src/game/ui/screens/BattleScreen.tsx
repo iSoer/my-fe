@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useStore } from "@nanostores/react"
 import { $battle, finishBattle } from "@game/state/save"
-import { $battleUi, enterBattleScreen, leaveBattleScreen, setOnBattleEnded } from "@game/state/battleUi"
+import { $battleUi, answerPrompt, enterBattleScreen, leaveBattleScreen, setOnBattleEnded } from "@game/state/battleUi"
 import { navigate } from "@game/state/router"
 import type { BattleGameHandle } from "@game/scene/index"
 import { Toast } from "../components/Toast"
@@ -11,6 +11,7 @@ import { BottomBand } from "../battle/BottomBand"
 import { ForecastCard } from "../battle/ForecastCard"
 import { BattleBar } from "../battle/BattleBar"
 import { PauseModal } from "../battle/PauseModal"
+import { ExpeditionPrompt } from "../battle/ExpeditionPrompt"
 import "../battle.css"
 import "../village.css"
 import { $boardLayout, setBoardInsets } from "@game/state/boardLayout"
@@ -135,6 +136,7 @@ export function BattleScreen() {
       </div>
       <Toast message={ui.toast} at={ui.toastAt} error />
       <PauseModal battle={battle} />
+      {ui.prompt && <ExpeditionPrompt battle={battle} prompt={ui.prompt} onAnswer={yes => void answerPrompt(yes)} />}
     </div>
   )
 }

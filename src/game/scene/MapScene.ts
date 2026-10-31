@@ -1268,7 +1268,7 @@ export class MapScene extends Phaser.Scene {
     this.expTweens = []
     this.expLayer.removeAll(true)
     const t = this.tile
-    // Выходы: светящиеся клетки в углах с табличкой; пока не открыт ни один сундук — приглушены
+    // Выходы: светящиеся клетки в углах с табличкой; уйти можно всегда, а с открытым сундуком — ярче
     const ready = exp.opened.length > 0
     for (const exitPos of def.exits) {
       const e = this.center(exitPos)

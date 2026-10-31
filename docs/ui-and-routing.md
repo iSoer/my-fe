@@ -68,10 +68,11 @@ idle ──тап по своему бойцу──▶ unitSelected ──та�
                                 ▼                                                      ▼
                            unitSelected                          busy (playEvents) ──▶ afterAction
 idle ──тап по врагу──▶ enemyInfo     idle ──тап по пустой клетке──▶ tileInfo
-afterAction: result → ended (+ onEnded) | idle (+ refreshDanger, autoEndTurn → endTurn)
+afterAction: result → ended (+ onEnded) | idle (+ refreshDanger, вопрос о сундуке/выходе или autoEndTurn → endTurn)
 endTurn(): dispatch endPhase → playEvents → runEnemyPhase(): цикл nextEnemyAction → dispatch → playEvents
 ```
 
+- Вопрос в чаще (`prompt`, окно `ExpeditionPrompt`): после `moveTo` и `commit` бойцы, вставшие на сундук со своим ключом или на выход, получают вопрос «Открыть сундук?» / «Завершить вылазку?». `answerPrompt(yes)` шлёт `openChest` или `extract` либо просто закрывает окно. Пока `prompt` задан, `canAct` и `endTurn` не работают. Тап по бойцу на такой клетке задаёт вопрос снова.
 - Перетаскивание: `setPressed`, `beginDrag`, `dragHover`, `endDrag`, `cancelDrag`.
 - Зона опасности: `toggleDanger`, `refreshDanger`. Ускорение `setFastForward` (×3 к скорости анимаций) осталось в `battleUi`, но кнопки для него в интерфейсе нет.
 - Presenter регистрируется через `setPresenter`. Колбэк конца боя — `setOnBattleEnded`: `BattleScreen` вызывает `finishBattle()` и переходит на `/battle/result`.
@@ -90,7 +91,7 @@ endTurn(): dispatch endPhase → playEvents → runEnemyPhase(): цикл nextEn
 | `save`                                                                      | `$save` (`get`/`set`)                                                                                         |
 | `ui`                                                                        | `$battleUi`                                                                                                   |
 | `layout`                                                                    | `$boardLayout`                                                                                                |
-| `battle.tapTile(pos)`, `battle.confirm()`, `battle.endTurn()`               | Действия игрока в бою                                                                                         |
+| `battle.tapTile(pos)`, `battle.confirm()`, `battle.endTurn()`, `battle.answerPrompt(yes)` | Действия игрока в бою                                                                                         |
 | `settlement.panel`, `settlement.near`                                       | `$settlementPanel`, `$settlementNear`                                                                         |
 | `settlement.teleport(id)`, `settlement.walkTo(id)`                          | Через `settlementControl()` сцены поселения                                                                   |
 | `settlement.open`, `build`, `upgrade`, `train`, `collect`, `revive`, `tick` | `openPanel`, `buildAction`, `upgradeAction`, `trainAction`, `collectAction`, `reviveAction`, `tickSettlement` |

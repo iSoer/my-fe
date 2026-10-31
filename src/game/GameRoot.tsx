@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { App } from "./ui/App"
 import { initRouter } from "./state/router"
-import { $battleUi, confirm, endTurn, tapTile } from "./state/battleUi"
+import { $battleUi, answerPrompt, confirm, endTurn, tapTile } from "./state/battleUi"
 import { $boardLayout } from "./state/boardLayout"
 import { $save, initSave } from "./state/save"
 import { initSound } from "./state/sound"
@@ -36,7 +36,7 @@ export default function GameRoot() {
       ui: $battleUi,
       layout: $boardLayout,
       // Действия игрока в бою — для смоук-тестов и проверки анимаций
-      battle: { tapTile, confirm, endTurn },
+      battle: { tapTile, confirm, endTurn, answerPrompt },
       // Скрытая диагностика размеров Phaser-игры и перезапусков страницы
       diag: { text: diagText, clear: diagClear },
       // Поселение: перенести героя к месту (`plot-store`, `gate`…) или подвести и открыть, сразу открыть карточку,
