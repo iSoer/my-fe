@@ -14,6 +14,7 @@ import {
 import { cloudAvailable, isTelegram } from './telegram';
 import { $lang, tr } from '@game/i18n';
 import { Icon } from '@game/ui/components/Icon';
+import { diagClear, diagText } from '@game/platform/diag';
 
 function fmtMb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} ${tr('MB', 'МБ')}`;
@@ -33,14 +34,47 @@ export function AppCard() {
   useEffect(() => {
     void storageEstimate().then(setStorage);
   }, []);
+  // Скрытая диагностика: пять касаний по заголовку открывают журнал
+  const [taps, setTaps] = useState(0);
+  const [diag, setDiag] = useState<string | null>(null);
+  const onTitleTap = (): void => {
+    const n = taps + 1;
+    setTaps(n);
+    if (n >= 5) {
+      setTaps(0);
+      setDiag(diag === null ? diagText() : null);
+    }
+  };
   const mode = installMode();
   const offline = typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller;
 
   return (
     <div className="card stack pop-in">
-      <div className="section-title">
+      <div className="section-title" onClick={onTitleTap}>
         <Icon emoji="📲" /> {tr('App', 'Приложение')}
       </div>
+      {diag !== null && (
+        <>
+          <pre className="diag-log">{diag || tr('Log is empty', 'Журнал пуст')}</pre>
+          <Button
+            block
+            icon="📋"
+            onClick={() => void navigator.clipboard?.writeText(diag).catch(() => undefined)}
+          >
+            {tr('Copy log', 'Скопировать журнал')}
+          </Button>
+          <Button
+            block
+            icon="🗑️"
+            onClick={() => {
+              diagClear();
+              setDiag('');
+            }}
+          >
+            {tr('Clear log', 'Очистить журнал')}
+          </Button>
+        </>
+      )}
       <div className="stats-table">
         <span className="k">{tr('Offline mode', 'Офлайн-режим')}</span>
         <span className="v">{offline ? tr('ready', 'готов') : tr('no', 'нет')}</span>
@@ -49,7 +83,11 @@ export function AppCard() {
         {isTelegram && (
           <>
             <span className="k">{tr('Telegram cloud', 'Облако Telegram')}</span>
-            <span className="v">{cloudAvailable() ? tr('save is syncing', 'сейв синхронизируется') : tr('unavailable', 'недоступно')}</span>
+            <span className="v">
+              {cloudAvailable()
+                ? tr('save is syncing', 'сейв синхронизируется')
+                : tr('unavailable', 'недоступно')}
+            </span>
           </>
         )}
         {storage && (
@@ -86,7 +124,9 @@ export function AppCard() {
           {iosHelp && (
             <ol className="pwa-steps muted small">
               <li>{tr('Open the game in Safari.', 'Откройте игру в Safari.')}</li>
-              <li>{tr('Tap “Share” (the square with an arrow).', 'Нажмите «Поделиться» (квадрат со стрелкой).')}</li>
+              <li>
+                {tr('Tap “Share” (the square with an arrow).', 'Нажмите «Поделиться» (квадрат со стрелкой).')}
+              </li>
               <li>{tr('Choose “Add to Home Screen”.', 'Выберите «На экран „Домой“».')}</li>
             </ol>
           )}

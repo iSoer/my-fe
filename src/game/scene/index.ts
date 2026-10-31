@@ -22,7 +22,7 @@ export function mountBattleGame(parent: HTMLElement): BattleGameHandle {
     scene: [MapScene, CinematicScene],
     audio: { noAudio: true },
     banner: false
-  })
+  }, "battle")
   const presenter = new GamePresenter(game)
   setPresenter(presenter)
   return {

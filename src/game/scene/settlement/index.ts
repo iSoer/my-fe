@@ -63,7 +63,7 @@ export function mountSettlementGame(parent: HTMLElement, opts: SettlementSceneOp
     scene: [scene, SettlementFxScene],
     audio: { noAudio: true },
     banner: false
-  })
+  }, "settlement")
   setSettlementControl({ teleport: id => scene.teleport(id), walkTo: id => scene.walkTo(id) })
   return {
     destroy() {

@@ -4,9 +4,14 @@ export function svgDataUri(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`
 }
 
+/**
+ * Только растеризации в полёте: одинаковые запросы ждут одну картинку. Готовую держит менеджер текстур Phaser
+ * и освобождает вместе с игрой; постоянный кэш держал бы все картинки сессии (каждый бой и заход в деревню),
+ * и на iOS страницу выгружало по памяти.
+ */
 const cache = new Map<string, Promise<HTMLImageElement>>()
 
-/** Загрузить SVG как картинку заданного пиксельного размера. Кэшируется по ключу. */
+/** Загрузить SVG как картинку заданного пиксельного размера. Одновременные запросы с тем же ключом — одна загрузка. */
 export function svgToImage(key: string, svg: string, width: number, height: number): Promise<HTMLImageElement> {
   const cacheKey = `${key}@${width}x${height}`
   const hit = cache.get(cacheKey)
@@ -23,6 +28,10 @@ export function svgToImage(key: string, svg: string, width: number, height: numb
     img.src = svgDataUri(sized)
   })
   cache.set(cacheKey, p)
+  const drop = (): void => {
+    if (cache.get(cacheKey) === p) cache.delete(cacheKey)
+  }
+  p.then(drop, drop)
   return p
 }
 

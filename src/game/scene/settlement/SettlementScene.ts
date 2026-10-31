@@ -535,9 +535,9 @@ export class SettlementScene extends Phaser.Scene {
 
     this.setupInput()
     this.setupCamera()
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.setupCamera, this)
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scale.off(Phaser.Scale.Events.RESIZE, this.setupCamera, this)
+      this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this)
       this.opts.onRest(this.pos, this.facing)
     })
     this.updateNear()
@@ -877,6 +877,19 @@ export class SettlementScene extends Phaser.Scene {
     this.view.zoom = f.zoom
     this.view.fitsH = f.fitsH
     this.view.snap = true
+    setCssZoom(this, this.view.zoom)
+  }
+
+  /**
+   * RESIZE от Phaser приходит не только при смене размера: раз в 500 мс он сверяет положение канваса на экране,
+   * и любой сдвиг страницы (пружина прокрутки iOS, safe-area и viewportChanged в Telegram) даёт событие. Камера
+   * здесь только меняет масштаб и продолжает плавно догонять героя: прыжок к цели на каждое событие и был рывками.
+   */
+  private onResize(): void {
+    const f = this.fitZoom()
+    this.view.fitsH = f.fitsH
+    if (Math.abs(f.zoom - this.view.zoom) < 1e-3) return
+    this.view.zoom = f.zoom
     setCssZoom(this, this.view.zoom)
   }
 

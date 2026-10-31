@@ -14,6 +14,7 @@ import { PauseModal } from "../battle/PauseModal"
 import "../battle.css"
 import "../village.css"
 import { $boardLayout, setBoardInsets } from "@game/state/boardLayout"
+import { diagScreen, diagSnapshot } from "@game/platform/diag"
 
 /**
  * Раскладка как в Fire Emblem Heroes: сверху тонкая полоса хода (HUD_H) и под ней ещё не меньше INFO_MIN,
@@ -82,6 +83,11 @@ export function BattleScreen() {
       finishBattle()
       navigate("/battle/result", true)
     })
+    // Диагностика: незакрытый экран боя при следующем запуске — страницу выгрузили; пауза — снимок размеров поля
+    diagScreen("battle")
+    const unsubPause = $pauseOpen.subscribe((open) => {
+      if (open) diagSnapshot("pause")
+    })
     // Phaser грузится лениво — только на экране боя (SPEC 15).
     import("@game/scene/index")
       .then((m) => {
@@ -100,7 +106,9 @@ export function BattleScreen() {
       // недоигранные твины уже не завершатся, а бой в сейве и так актуален
       leaveBattleScreen()
       handle?.destroy()
+      unsubPause()
       $pauseOpen.set(false)
+      diagScreen(null)
     }
   }, [])
 

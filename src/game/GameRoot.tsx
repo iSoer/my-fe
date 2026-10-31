@@ -6,6 +6,7 @@ import { $battleUi, confirm, endTurn, tapTile } from "./state/battleUi"
 import { $boardLayout } from "./state/boardLayout"
 import { $save, initSave } from "./state/save"
 import { initSound } from "./state/sound"
+import { diagClear, diagText } from "./platform/diag"
 import {
   $settlementNear,
   $settlementPanel,
@@ -37,6 +38,8 @@ export default function GameRoot() {
       layout: $boardLayout,
       // Действия игрока в бою — для смоук-тестов и проверки анимаций
       battle: { tapTile, confirm, endTurn },
+      // Скрытая диагностика размеров Phaser-игры и перезапусков страницы
+      diag: { text: diagText, clear: diagClear },
       // Поселение: перенести героя к месту (`plot-store`, `gate`…) или подвести и открыть, сразу открыть карточку,
       // строить, улучшать, тренировать, воскрешать
       settlement: {

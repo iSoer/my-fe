@@ -14,7 +14,7 @@
 | [art/held.ts](../src/game/art/held.ts)         | Оружие в правой лапе: `heldWeaponSvg({ kind, grade, variant, pose, paw, pawSvg, leftPaw })`. Форма — по виду оружия, материал — по грейду (`kit`), отметка — по разновидности (`VARIANT_TRIM`). Есть хват по позам и выпавшее оружие (`DROPPED`) |
 | [art/gear.ts](../src/game/art/gear.ts)         | Иконки снаряжения для UI: `weaponIconSvg(kind, grade, variant)`, `ringSvg(talismanId)`, `MATERIAL` по грейду                                                                                                                                     |
 | [art/hero.ts](../src/game/art/hero.ts)         | Главный герой поселения: `heroSvg(HeroArt)`, `heroArtKey`, `heroPortraitSvg`, `HERO_VIEW` 64×80, `HERO_WALK_FRAMES` 4, `HERO_IDLE_FRAMES` 2, `HERO_ANCHOR`                                                                                       |
-| [art/raster.ts](../src/game/art/raster.ts)     | `svgToImage(key, svg, w, h)` с кэшем `key@WxH`, `svgDataUri`, `clearRasterCache`                                                                                                                                                                 |
+| [art/raster.ts](../src/game/art/raster.ts)     | `svgToImage(key, svg, w, h)`: одновременные запросы `key@WxH` ждут одну загрузку, готовые картинки не кэшируются (их держит менеджер текстур Phaser и освобождает вместе с игрой; постоянный кэш копил картинки всей сессии, и iOS выгружала страницу по памяти), `svgDataUri`, `clearRasterCache`                                                                                                                                                                 |
 
 ## От бойца к картинке: `unitArt`
 

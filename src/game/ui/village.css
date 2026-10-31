@@ -11,6 +11,8 @@
   .st-canvas {
     position: absolute;
     inset: 0;
+    /* Жесты джойстика не прокручивают и не пружинят страницу (iOS): сдвиг канваса дёргал камеру */
+    touch-action: none;
   }
   .st-hud {
     position: absolute;

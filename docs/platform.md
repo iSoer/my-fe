@@ -5,12 +5,13 @@ my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Пла�
 ## Порядок запуска (`boot` в main.tsx)
 
 1. Глобальные обработчики `error` и `unhandledrejection` вызывают `showFatal`: экран ошибки с кнопками «Перезапустить» и «Скопировать».
-2. `initTelegram()` — только внутри Telegram (`isTelegram`). Вызывает `ready`, `expand`, `disableVerticalSwipes` (≥ 7.7), `requestFullscreen` (≥ 8.0, iOS/Android) и выставляет safe-area в CSS-переменные `--host-safe-top`/`--host-safe-bottom` и `--tg-viewport`.
-3. `setStorageNamespace(userNamespace())`: ключ сейва зависит от пользователя Telegram.
-4. Только в продакшене: `initPwa({ getSerwist, beforeReload: flushPersist })`.
-5. `setGameHost({ Overlay: PwaBanners, SettingsSection: AppCard, haptic: tgHaptic })`.
-6. `await reconcileCloudSave()`. `newer` (сейв более новой версии игры) — `NewerSaveScreen`, игра не стартует; конфликт — `ConflictScreen`; иначе сразу `start()`.
-7. `start()`:
+2. `diagBoot()` — отметка запуска в скрытом журнале диагностики (см. ниже).
+3. `initTelegram()` — только внутри Telegram (`isTelegram`). Вызывает `ready`, `expand`, `disableVerticalSwipes` (≥ 7.7), `requestFullscreen` (≥ 8.0, iOS/Android) и выставляет safe-area в CSS-переменные `--host-safe-top`/`--host-safe-bottom` и `--tg-viewport`.
+4. `setStorageNamespace(userNamespace())`: ключ сейва зависит от пользователя Telegram.
+5. Только в продакшене: `initPwa({ getSerwist, beforeReload: flushPersist })`.
+6. `setGameHost({ Overlay: PwaBanners, SettingsSection: AppCard, haptic: tgHaptic })`.
+7. `await reconcileCloudSave()`. `newer` (сейв более новой версии игры) — `NewerSaveScreen`, игра не стартует; конфликт — `ConflictScreen`; иначе сразу `start()`.
+8. `start()`:
    - `root.render(<GameRoot />)`;
    - `startCloudMirror()`;
    - `$route.subscribe(syncBackButton)`;
@@ -56,6 +57,14 @@ my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Пла�
 - Баннер обновления не показывается на маршрутах `NO_RELOAD_ROUTES = {battle, battleResult}` (`canReloadOn` в pwa.ts).
 - Манифест и иконки лежат в [public](../public). Иконки генерирует `pnpm icons` ([tools/gen-icons.mjs](../tools/gen-icons.mjs)) из процедурного арта, результат коммитится.
 
+## Скрытая диагностика
+
+Для отладки на телефоне без Web Inspector: [platform/diag.ts](../src/game/platform/diag.ts) ведёт кольцевой журнал (последние 120 событий) в `localStorage` под ключом `pawfield:diag`.
+
+- `boot` — запуск страницы: `devicePixelRatio`, окно и `visualViewport`, тип навигации, хеш и `unclosedScreen` — экран боя или поселения, который был открыт и не закрылся. `pagehide` пишется при обычном уходе со страницы. Если перед `boot` с `unclosedScreen` нет `pagehide`, страницу выгрузила система (на iOS — обычно по памяти).
+- `battle:*` и `settlement:*` — снимки Phaser-игры из `createHiDpiGame`: `ready`, `ready+2s`, `resize` (не чаще раза в секунду), `contextlost`/`contextrestored`, `hidden`/`visible`, `destroy`, а в бою ещё `pause` при открытии меню паузы. В снимке: плотность `s`, размер контейнера, буфер (`sm`, `canvas`), CSS-размер и прямоугольник канваса, буфер WebGL (`db`), потеря контекста, зум камер активных сцен и раскладка поля. В норме буфер = CSS × `s`, зум камеры карты = `s`.
+- Просмотр: Настройки → карточка «Приложение» → пять касаний по заголовку; там же «Скопировать журнал» и «Очистить журнал». Из консоли и смоуков — `window.__pf.diag.text()` / `.clear()`.
+
 ## Сборка и деплой
 
 - `pnpm build` = `pnpm typecheck` (два tsconfig: приложение и SW) → `vite build` → `cp dist/index.html dist/404.html` → `node tools/check-sw.mjs`.
@@ -71,5 +80,6 @@ my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Пла�
 - Порядок запуска и связка с игрой: [src/main.tsx](../src/main.tsx).
 - Telegram: [host/telegram.ts](../src/host/telegram.ts). URL SDK — в `index.html` и `TG_SDK_URL` в `sw.ts`.
 - Облако и конфликт: [host/sync.ts](../src/host/sync.ts), [host/cloud.ts](../src/host/cloud.ts).
+- Скрытая диагностика: [platform/diag.ts](../src/game/platform/diag.ts), снимки — `watchDiag` в [scene/hidpi.ts](../src/game/scene/hidpi.ts), просмотр — [host/AppCard.tsx](../src/host/AppCard.tsx).
 - PWA: [host/pwa.ts](../src/host/pwa.ts), [host/PwaBanners.tsx](../src/host/PwaBanners.tsx), [host/AppCard.tsx](../src/host/AppCard.tsx), [src/sw.ts](../src/sw.ts), блок `serwist(...)` в [vite.config.ts](../vite.config.ts).
 - CI: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml).

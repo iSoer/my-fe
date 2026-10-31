@@ -3,6 +3,7 @@ import { getSerwist } from 'virtual:serwist';
 import GameRoot from '@game/GameRoot';
 import { setGameHost } from '@game/platform/host';
 import { setStorageNamespace } from '@game/platform/storage';
+import { diagBoot } from '@game/platform/diag';
 import { $route, back, navigate } from '@game/state/router';
 import { $battle, $save, flushPersist } from '@game/state/save';
 import { $pauseOpen } from '@game/ui/lib/pause';
@@ -78,6 +79,8 @@ function syncBackButton(): void {
 }
 
 async function boot(): Promise<void> {
+  // Скрытая диагностика: отметка запуска (и незакрытого экрана боя/поселения — признак выгрузки страницы iOS)
+  diagBoot();
   initTelegram();
   // Сейвы разных пользователей Telegram на одном устройстве не смешиваются
   setStorageNamespace(userNamespace());

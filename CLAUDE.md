@@ -77,7 +77,7 @@ The game itself is developed in the sibling project `next-instapok`, where it is
 - `art/`: procedural SVG/raster art for critters, gear, tiles, and buildings.
 - `ui/`: React screens and components that read the stores.
 - `platform/`: storage, audio, haptics, and the host hook.
-- `GameRoot.tsx` exposes `window.__pf` (`save`, `ui`, `layout`, `battle.{tapTile,confirm,endTurn}`, `settlement.*`). The smoke tests use it to drive the game and to change the save directly, so keep it in sync when you rename actions.
+- `GameRoot.tsx` exposes `window.__pf` (`save`, `ui`, `layout`, `battle.{tapTile,confirm,endTurn}`, `settlement.*`, `diag.{text,clear}`). The smoke tests use it to drive the game and to change the save directly, so keep it in sync when you rename actions.
 
 ## Saves
 

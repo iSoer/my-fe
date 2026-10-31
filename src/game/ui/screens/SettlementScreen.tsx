@@ -30,6 +30,7 @@ import { BuildingPanel, GatePanel } from "../settlement/BuildingPanel"
 import { DialogueBox } from "../settlement/DialogueBox"
 import { $dialogue, canTalk, npcStoryAlerts, openDialogue, skipDialogue } from "@game/state/dialogue"
 import { tr } from "@game/i18n"
+import { diagScreen } from "@game/platform/diag"
 import "../village.css"
 
 /** Как часто экран догоняет время: опыт на полигоне и смена витрины Лавки. */
@@ -90,6 +91,8 @@ export function SettlementScreen() {
     tick()
     const t = setInterval(tick, TICK_MS)
 
+    // Диагностика: незакрытый экран при следующем запуске — страницу выгрузили
+    diagScreen("village")
     const el = canvasRef.current
     let handle: SettlementGameHandle | null = null
     let cancelled = false
@@ -134,6 +137,7 @@ export function SettlementScreen() {
       skipDialogue()
       setNearPlace(undefined)
       setFocusPlace(undefined)
+      diagScreen(null)
     }
   }, [])
 

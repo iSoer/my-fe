@@ -1,5 +1,7 @@
 import Phaser from "phaser"
 import { $save } from "@game/state/save"
+import { $boardLayout } from "@game/state/boardLayout"
+import { diagEnv, diagLog, setDiagSnapshotter } from "@game/platform/diag"
 import { browserRenderScale, setActiveRenderScale, textRes } from "./renderScale"
 
 /**
@@ -140,7 +142,7 @@ export function initHiDpiScene(scene: Phaser.Scene, opts: { keepAtRest?: boolean
  * Phaser-игра на весь контейнер с буфером `CSS × scale`. Плотность берётся из настройки `graphics` в момент
  * монтирования; смена настройки применяется со следующего монтирования игры.
  */
-export function createHiDpiGame(parent: HTMLElement, config: Phaser.Types.Core.GameConfig): Phaser.Game {
+export function createHiDpiGame(parent: HTMLElement, config: Phaser.Types.Core.GameConfig, diagTag = "game"): Phaser.Game {
   const s = browserRenderScale($save.get().settings.graphics ?? "auto")
   setActiveRenderScale(s)
   const css = (): { w: number, h: number } => ({
@@ -185,9 +187,87 @@ export function createHiDpiGame(parent: HTMLElement, config: Phaser.Types.Core.G
     ro.observe(parent)
   }
   else window.addEventListener("resize", fit)
+  const stopDiag = watchDiag(game, parent, s, diagTag)
   game.events.once(Phaser.Core.Events.DESTROY, () => {
     ro?.disconnect()
     window.removeEventListener("resize", fit)
+    stopDiag()
   })
   return game
+}
+
+/* ---------- Диагностика (`@game/platform/diag`) ---------- */
+
+/** Снимок размеров игры: всё, что должно сходиться — буфер = CSS × s, зум камеры карты = s × зум вида. */
+function diagGame(game: Phaser.Game, parent: HTMLElement, s: number, tag: string, reason: string): void {
+  const sm = game.scale as Phaser.Scale.ScaleManager | undefined
+  const canvas = game.canvas as HTMLCanvasElement | undefined
+  const gl = (game.renderer as Partial<Phaser.Renderer.WebGL.WebGLRenderer> | undefined)?.gl
+  const rect = canvas?.getBoundingClientRect()
+  const cams: Record<string, number> = {}
+  for (const sc of game.scene?.getScenes(true) ?? []) {
+    const z = sc.cameras?.main?.zoom
+    if (typeof z === "number") cams[sc.sys.settings.key] = Math.round(z * 1000) / 1000
+  }
+  const l = tag === "battle" ? $boardLayout.get() : null
+  diagLog(`${tag}:${reason}`, {
+    ...diagEnv(),
+    s,
+    parent: `${parent.clientWidth}x${parent.clientHeight}`,
+    sm: sm ? `${sm.width}x${sm.height}` : null,
+    canvas: canvas ? `${canvas.width}x${canvas.height}` : null,
+    css: canvas ? `${canvas.style.width}x${canvas.style.height}` : null,
+    rect: rect ? `${Math.round(rect.width)}x${Math.round(rect.height)}@${Math.round(rect.x)},${Math.round(rect.y)}` : null,
+    db: gl ? `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}` : `renderer:${game.renderer?.type ?? "-"}`,
+    lost: gl ? gl.isContextLost() : null,
+    cams,
+    layout: l ? `${l.tile}@${l.ox},${l.oy} ${l.width}x${l.height}` : null
+  })
+}
+
+/** Снимки игры: готовность (и через 2 с), RESIZE (не чаще раза в секунду), потеря WebGL, возврат из фона. */
+function watchDiag(game: Phaser.Game, parent: HTMLElement, s: number, tag: string): () => void {
+  const snap = (reason: string): void => {
+    try {
+      diagGame(game, parent, s, tag, reason)
+    }
+    catch {
+      /* диагностика не должна ломать игру */
+    }
+  }
+  const timers: ReturnType<typeof setTimeout>[] = []
+  let lastResize = 0
+  let pendingResize: ReturnType<typeof setTimeout> | null = null
+  const onResize = (): void => {
+    if (pendingResize) return
+    const wait = Math.max(0, 1000 - (Date.now() - lastResize))
+    pendingResize = setTimeout(() => {
+      pendingResize = null
+      lastResize = Date.now()
+      snap("resize")
+    }, wait)
+  }
+  const onLost = (): void => snap("contextlost")
+  const onRestored = (): void => snap("contextrestored")
+  const canvas = (): HTMLCanvasElement | undefined => game.canvas as HTMLCanvasElement | undefined
+  // Phaser может загрузиться прямо в конструкторе (BOOT уже прошёл), поэтому подписки — по READY
+  game.events.once(Phaser.Core.Events.READY, () => {
+    game.scale.on(Phaser.Scale.Events.RESIZE, onResize)
+    canvas()?.addEventListener("webglcontextlost", onLost)
+    canvas()?.addEventListener("webglcontextrestored", onRestored)
+    snap("ready")
+    timers.push(setTimeout(() => snap("ready+2s"), 2000))
+  })
+  const onVisibility = (): void => snap(document.visibilityState === "visible" ? "visible" : "hidden")
+  document.addEventListener("visibilitychange", onVisibility)
+  setDiagSnapshotter(snap)
+  return () => {
+    for (const t of timers) clearTimeout(t)
+    if (pendingResize) clearTimeout(pendingResize)
+    document.removeEventListener("visibilitychange", onVisibility)
+    canvas()?.removeEventListener("webglcontextlost", onLost)
+    canvas()?.removeEventListener("webglcontextrestored", onRestored)
+    setDiagSnapshotter(null, snap)
+    snap("destroy")
+  }
 }
