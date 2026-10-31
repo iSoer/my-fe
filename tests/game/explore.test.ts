@@ -5,6 +5,7 @@ import { applyAction, chestToOpen, createBattle } from "@game/core/battle/reduce
 import { alertZone, isAsleep, isCalm, isRevealed } from "@game/core/battle/explore"
 import { decideAction, nextEnemyAction } from "@game/core/ai"
 import { MIGRATIONS, SAVE_VERSION, createEmptySave, parseSave, serializeSave } from "@game/core/save"
+import type { BattleUnit } from "@game/core/types"
 import { isPassable, reachableTiles } from "@game/core/map/pathing"
 import { EXPEDITION } from "@game/content/balance"
 import { terrainAt } from "@game/core/battle/query"
@@ -335,4 +336,54 @@ describe("чаща: туман войны", () => {
     const v13 = { ...JSON.parse(serializeSave(save)), version: 13 }
     expect(MIGRATIONS[13]!(v13)).toEqual({ ...v13, version: 14 })
   })
+})
+
+describe("чаща: проснувшиеся стражи не застревают", () => {
+  /** Ход отряда: каждый боец отходит как можно дальше от ближайшего живого врага. */
+  function retreatTurn(s0: BattleState): BattleState {
+    let s = s0
+    for (const id of players(s).map(u => u.unitId)) {
+      const cur = s.units[id] as BattleUnit
+      if (cur.acted || !cur.alive || s.result) continue
+      const foes = Object.values(s.units).filter(u => u.side === "enemy" && u.alive)
+      const far = (q: Pos) => Math.min(...foes.map(f => manhattan(f.pos, q)))
+      const best = [...reachableTiles(s, cur).values()].filter(n => n.canStop).sort((a, b) => far(b.pos) - far(a.pos))[0]
+      s = applyAction(s, { type: "wait", unitId: id, to: best?.pos ?? cur.pos }).state
+    }
+    return s
+  }
+
+  it("отряд разбудил лагерь и ушёл — стражи (и раненые, и танцоры, и лекари) возвращаются на посты, бой кончается", () => {
+    let fights = 0
+    for (const difficulty of ["normal", "hard", "nightmare"] as Difficulty[]) {
+      for (const seed of [2, 5, 8, 13, 14, 24]) {
+        const map = generateExpedition({ seed, difficulty, team: seed % 4, squadSize: 4 })
+        const squad = map.playerSpawns.slice(0, 4).map((p, i) =>
+          makeUnit({ classId: CLASSES[i]!, pos: p, level: 15, baseStats: { hp: 80, str: 30, spd: 25, def: 25, res: 25 } }, false))
+        const s0 = createBattle({ map, squad, seed, now: 1 }).state
+        for (const chest of map.expedition!.chests) {
+          const lead = players(s0)[0]!
+          let s = applyAction(s0, { type: "explore", unitId: lead.unitId, to: chest.pos }).state
+          if (s.explore) continue
+          // Отряд у лагеря: всех врагов в 8 клетках разбудили, а кое-кого ранили
+          s = structuredClone(s)
+          const ps = players(s)
+          for (const e of Object.values(s.units)) {
+            if (e.side !== "enemy" || !e.alive || Math.min(...ps.map(p => manhattan(p.pos, e.pos))) > 8) continue
+            e.stance = "advance"
+            if (e.unitId.charCodeAt(e.unitId.length - 1) % 2) e.hp = Math.max(1, Math.round(e.maxHp * 0.2))
+          }
+          fights++
+          let turns = 0
+          while (!s.explore && !s.result && turns < 10) {
+            s = enemyPhase(retreatTurn(s)).state
+            turns++
+          }
+          if (s.result) continue
+          expect({ seed, difficulty, chest: chest.id, explore: s.explore }).toEqual({ seed, difficulty, chest: chest.id, explore: true })
+        }
+      }
+    }
+    expect(fights).toBeGreaterThan(20)
+  }, 60_000)
 })

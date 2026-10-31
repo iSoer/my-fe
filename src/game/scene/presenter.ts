@@ -74,6 +74,18 @@ export class GamePresenter implements Presenter {
       map.syncFromState(after)
       return
     }
+    // Туман войны: враг ходит целиком в тумане (до и после действия) — смотреть не на что, без пауз и пробежки
+    // невидимки: иначе игрок секундами смотрит на неподвижное поле, будто враги застряли
+    const hidden = this.enemyActor(events, before)
+    const hiddenBefore = hidden ? before.units[hidden]?.pos : undefined
+    const hiddenAfter = hidden ? after.units[hidden]?.pos : undefined
+    if (
+      hidden && hiddenBefore && hiddenAfter && !isRevealed(before, hiddenBefore) && !isRevealed(after, hiddenAfter)
+      && events.every(e => e.type === "moved" || e.type === "waited" || e.type === "assist" || e.type === "effect")
+    ) {
+      map.syncFromState(after)
+      return
+    }
     map.playing = true
     try {
       // Смещённый предпросмотр: вид уже стоит на клетке назначения — не дёргаем его назад,

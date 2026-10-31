@@ -256,12 +256,17 @@ export function decideAction(state: BattleState, unitId: string): BattleAction {
     else return { type: "wait", unitId, to: bu.pos, newStance: "guard" }
   }
 
+  // Страж, которому некого преследовать (отряд не достать, не покидая поводка): поддержка не держит его
+  // «проснувшимся» — лечит своих, но засыпает, а освежать союзников танцору незачем (иначе — вечный бой в чаще)
+  const idleGuard = !!bu.post && !livingUnits(state, "player").some(p =>
+    manhattan(p.pos, bu.post as Pos) <= (bu.leash ?? EXPEDITION.leash) + weaponDef(unit.skills.weapon).range)
+
   // Лекарь: лечение приоритетнее
   if (healer) {
     const heal = evaluateHeal(state, bu, reach)
-    if (heal) return { ...heal, newStance: "advance" } as BattleAction
+    if (heal) return { ...heal, newStance: idleGuard ? "hold" : "advance" } as BattleAction
   }
-  if (dancer) {
+  if (dancer && !idleGuard) {
     const refresh = evaluateRefresh(state, bu, reach)
     if (refresh) return { ...refresh, newStance: "advance" } as BattleAction
   }
@@ -271,24 +276,42 @@ export function decideAction(state: BattleState, unitId: string): BattleAction {
 
   // Страж: преследует только тех, кого можно достать, не покидая поводка; иначе — назад к сундуку и снова на пост
   let chase = livingUnits(state, "player")
-  if (bu.post) {
-    const post = bu.post
+  const post = bu.post
+  /**
+   * Назад к посту. Засыпает (`hold`), когда вернулся (не дальше 3 клеток — так стражи стоят вокруг сундука) или
+   * ближе к посту ему не подойти: клетки у сундука заняты своими. Иначе страж остался бы «проснувшимся» навсегда,
+   * а с ним — и пошаговый бой в чаще.
+   */
+  const goBack = (p: Pos): BattleAction => {
+    const back = [...reach.values()].filter(n => n.canStop).sort((a, b) => manhattan(a.pos, p) - manhattan(b.pos, p))[0]
+    const to = back?.pos ?? bu.pos
+    const settled = manhattan(to, p) <= 3 || manhattan(to, p) >= manhattan(bu.pos, p)
+    return { type: "wait", unitId, to, newStance: settled ? "hold" : "advance" }
+  }
+  if (post) {
     const range = weaponDef(unit.skills.weapon).range
     chase = chase.filter(p => manhattan(p.pos, post) <= (bu.leash ?? EXPEDITION.leash) + range)
-    if (chase.length === 0) {
-      const back = [...reach.values()].filter(n => n.canStop).sort((a, b) => manhattan(a.pos, post) - manhattan(b.pos, post))[0]
-      const to = back?.pos ?? bu.pos
-      return { type: "wait", unitId, to, newStance: manhattan(to, post) <= 2 ? "hold" : "advance" }
-    }
+    if (chase.length === 0) return goBack(post)
   }
 
   // Раненый без шанса убить — отступает подлечиться (кроме Легко)
   const diff = difficultyDef(state.difficulty).ai
   if (diff.retreatHp > 0 && hpPct(bu) < diff.retreatHp) {
+    // Раненый страж отступает к своему посту и там засыпает: иначе он убегал бы в чащу и оставался «проснувшимся»
+    // навсегда — а с ним и пошаговый бой
+    if (post) return goBack(post)
     const to = retreatMove(state, bu, reach, threat)
     return { type: "wait", unitId, to, newStance: "advance" }
   }
 
   const to = advanceMove(state, bu, reach, threat, isSupport(unit), chase)
+  // Страж у края поводка: ни ударить, ни подойти к отряду ближе (поводок не пускает, путь перекрыт) — бросает
+  // погоню и возвращается на пост, а не стоит «проснувшимся» вечно
+  if (post) {
+    const moveType = unitClass(unit).moveType
+    const field = distanceField(state, chase.map(p => p.pos), moveType)
+    const dist = (p: Pos) => field.get(posKey(p)) ?? Infinity
+    if (dist(to) >= dist(bu.pos)) return goBack(post)
+  }
   return { type: "wait", unitId, to, newStance: "advance" }
 }
