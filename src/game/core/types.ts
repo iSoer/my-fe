@@ -344,7 +344,8 @@ export interface Settings {
    */
   endTurnConfirm: "modal" | "none" | "double"
   dangerZoneDefault: boolean
-  blood: "sea" | "pools"
+  /** Кровь в бою: выключена (по умолчанию), «лужи» — сдержанно, «море» — вся. */
+  blood: "off" | "pools" | "sea"
   confirmAttack: boolean
   /** Разговоры с жителями (визуальная новелла): выключены — тап по жителю открывает его место, как раньше. */
   dialogues: boolean
@@ -368,7 +369,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoEndTurn: false,
   endTurnConfirm: "double",
   dangerZoneDefault: false,
-  blood: "sea",
+  blood: "off",
   confirmAttack: true,
   dialogues: true,
   lang: DEFAULT_LANG,

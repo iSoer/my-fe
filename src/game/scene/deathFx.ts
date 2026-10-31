@@ -12,6 +12,7 @@ import {
   bloodFountain,
   bloodSquirt,
   ensureGoreTextures,
+  bloodOn,
   goreEnabled,
   groundStain,
   hitGore,
@@ -23,7 +24,7 @@ import { ensureUnitPartTextures, hasTexture, withTimeout, type UnitTexSize } fro
 import { tr } from "@game/i18n"
 import { deathSfx, sfx } from "@game/platform/audio"
 
-import { deathHash as hash, type DeathVariant } from "./deathVariants"
+import { GORY_VARIANTS, deathHash as hash, type DeathVariant } from "./deathVariants"
 import { viewW } from "./hidpi"
 export { DEATH_VARIANTS, deathSeed, pickDeathVariant, type DeathVariant } from "./deathVariants"
 
@@ -270,7 +271,7 @@ function punchText(
 
 /** Кровавый шлепок на земле. Не блокирует. */
 function splatAt(b: Body, x: number, y: number, scale: number, seed: number): void {
-  if (!sceneAlive(b.scene)) return
+  if (!sceneAlive(b.scene) || !bloodOn()) return
   ensureGoreTextures(b.scene)
   const img = b.scene.add
     .image(x, y, GORE_TEX.splat(seed))
@@ -475,7 +476,7 @@ function dripper(ctx: DeathCtx, b: Body): (x: number, y: number) => void {
 
 /** Кровавые кусочки разлетаются и шлёпаются на землю. */
 function chunks(ctx: DeathCtx, b: Body, rng: () => number, count: number): Promise<void>[] {
-  if (!sceneAlive(b.scene)) return []
+  if (!sceneAlive(b.scene) || !bloodOn()) return []
   ensureGoreTextures(b.scene)
   const s = fxSize(ctx, b)
   const n = goreEnabled().level === "sea" ? count : Math.ceil(count / 2)
@@ -2346,7 +2347,7 @@ const knockout: VariantFn = async (ctx, b) => {
   await tween(b.scene, { targets: b.t, angle: d * 84, duration: 70 / sp, yoyo: true })
   ctx.onPool?.()
   ensureGoreTextures(b.scene)
-  growPool(b, px, ctx.y + 2, GORE_TEX.pool(2), null, s * 1.4, s * 0.42, 700 / sp)
+  if (bloodOn()) growPool(b, px, ctx.y + 2, GORE_TEX.pool(2), null, s * 1.4, s * 0.42, 700 / sp)
   if (ctx.unit.isEnemy) growPool(b, px + d * s * 0.12, ctx.y + 3, TEX.pool, 0x7cb518, s * 0.6, s * 0.18, 600 / sp, 0.05)
   await wait(b.scene, 650 / sp)
   stopOrbit()
@@ -2393,7 +2394,7 @@ const zombieMelt: VariantFn = async (ctx, b, rng) => {
   deathSfx("melt", sp)
   // Зелёная лужа поверх обычной кровавой (её кладёт onPool), внутри — немного красного
   growPool(b, ctx.x, ctx.y + 2, TEX.pool, 0x6fa12a, s * 1.6, s * 0.48, 820 / sp, 0.1)
-  growPool(b, ctx.x + d * s * 0.15, ctx.y + 3, GORE_TEX.pool(1), null, s * 0.6, s * 0.18, 700 / sp, 0.15)
+  if (bloodOn()) growPool(b, ctx.x + d * s * 0.15, ctx.y + 3, GORE_TEX.pool(1), null, s * 0.6, s * 0.18, 700 / sp, 0.15)
   const drips = b.scene.time.addEvent({
     delay: 160 / sp,
     repeat: 3,
@@ -2496,6 +2497,8 @@ async function playDeath(ctx: DeathCtx, mode: Mode): Promise<void> {
   let variant = ctx.variant
   if (variant === "gibs" && !ctx.parts) variant = "explode"
   if (variant === "zombieMelt" && !ctx.unit.isEnemy) variant = "sink"
+  // Кровь выключена: кровавый вариант (пришёл, например, из кинематика до смены настройки) — обычное падение
+  if (!bloodOn() && GORY_VARIANTS.includes(variant)) variant = "fall"
   const rng = makeRng(hash(`${ctx.unit.id}:${variant}:${ctx.unit.seed}`))
   try {
     await killMoment(ctx, b)

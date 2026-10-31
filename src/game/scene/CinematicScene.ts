@@ -14,7 +14,7 @@ import { ensureTextures, TEX } from "./textures"
 import { FONT, WEAPON_COLOR_HEX, hpColor, textStyle } from "./style"
 import { floatText, ghostRise, tween, wait } from "./fx"
 import { MAP_ICONS, ensureIconTextures, iconImage } from "./iconText"
-import { hitGore, screenBloodSplat } from "./gore"
+import { bloodOn, hitGore, screenBloodSplat } from "./gore"
 import { bigNumber, ensureMotionTextures, goreKindOfUnit, hitStop, shakeCam, shakeMul, speedLines } from "./motionFx"
 import { WeatherLayer } from "./weather"
 import { impactFeel, isSlayer, playAttackFx, weaponKindOfUnit, weaponLookOfUnit } from "./attackFx"
@@ -738,7 +738,7 @@ export class CinematicScene extends Phaser.Scene {
     // Вариант гибели: тот же seed, что и на карте (юнит + ход), с уклоном под оружие убийцы.
     const killer = [...this.fighters.values()].find(o => o.id !== f.id)
     const killerKind = killer ? weaponKindOfUnit(killer.unit) : undefined
-    const variant = pickDeathVariant(deathSeed(f.id, this.cine.before.turn), killerKind, unitClass(f.unit).moveType, f.unit.isEnemy)
+    const variant = pickDeathVariant(deathSeed(f.id, this.cine.before.turn), killerKind, unitClass(f.unit).moveType, f.unit.isEnemy, bloodOn())
     let pooled = false
     const ctx: DeathCtx = {
       scene: this,

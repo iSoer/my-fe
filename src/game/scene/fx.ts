@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import { TEX } from "./textures"
 import { FONT, textStyle } from "./style"
-import { GORE_TEX, ensureGoreTextures, goreBurst, goreDecal, goreEnabled } from "./gore"
+import { GORE_TEX, bloodOn, ensureGoreTextures, goreBurst, goreDecal, goreEnabled } from "./gore"
 import { pinToScreen, viewH, viewW } from "./hidpi"
 import { iconImage, richText } from "./iconText"
 
@@ -516,7 +516,8 @@ export function ichorSplash(
   speed: number,
   power = 1
 ): void {
-  if (!sceneAlive(scene)) return
+  // Сукровица зомби — тоже кровь: выключена вместе с ней
+  if (!sceneAlive(scene) || !bloodOn()) return
   ensureGoreTextures(scene)
   const level = goreEnabled().level === "sea" ? 1 : 0.5
   const n = Math.max(3, Math.min(12, Math.round(7 * power * level)))

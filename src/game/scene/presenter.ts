@@ -14,7 +14,7 @@ import { deathSeed, pickDeathVariant, playDeathMap, preloadDeathParts, type Deat
 import { isSlayer, playQuickAttackFx, shakePx, weaponKindOfUnit, weaponLookOfUnit } from "./attackFx"
 import { WEAPON_COLOR_HEX } from "./style"
 import { weaponDef } from "@game/content/weapons"
-import { hitGore, bloodTrail, screenBloodSplat } from "./gore"
+import { bloodOn, hitGore, bloodTrail, screenBloodSplat } from "./gore"
 import { unitTexKey } from "./svgTextures"
 import { camZoom } from "./hidpi"
 import {
@@ -659,7 +659,7 @@ export class GamePresenter implements Presenter {
       view.setDead()
       view.hideHud()
       const feet = view.feetWorld()
-      const variant = pickDeathVariant(deathSeed(unitId, after.turn), killerKind, unitClass(unit).moveType, unit.isEnemy)
+      const variant = pickDeathVariant(deathSeed(unitId, after.turn), killerKind, unitClass(unit).moveType, unit.isEnemy, bloodOn())
       const ctx: DeathCtx = {
         scene: map,
         variant,

@@ -200,6 +200,17 @@ describe("миграции сейва", () => {
     expect(r.ok && r.save.store).toMatchObject({ weapons: ["sword_iron"], rerolls: 0, variant: 0 })
   })
 
+  it("v14 → v15: кровь выключается; в новой игре она выключена по умолчанию", () => {
+    const save = JSON.parse(serializeSave(createEmptySave(1))) as Record<string, unknown>
+    expect((save["settings"] as Record<string, unknown>)["blood"]).toBe("off")
+    const v14 = { ...save, version: 14, settings: { ...(save["settings"] as Record<string, unknown>), blood: "sea" } }
+    const out = MIGRATIONS[14]!(v14)
+    expect(out["version"]).toBe(15)
+    expect((out["settings"] as Record<string, unknown>)["blood"]).toBe("off")
+    const r = parseSave(JSON.stringify(v14))
+    expect(r.ok && r.save.settings.blood).toBe("off")
+  })
+
   it("v4 → v12: вся цепочка — сейв проходит схему, бойцы и статистика сохраняются", () => {
     const v4 = legacyV4()
     const r = parseSave(JSON.stringify(v4))

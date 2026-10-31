@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { blobOutline, goreRng } from "@game/scene/goreShape"
-import { DEATH_VARIANTS, ZOMBIE_ONLY_VARIANTS, deathSeed, deathWeights, pickDeathVariant } from "@game/scene/deathVariants"
+import { DEATH_VARIANTS, GORY_VARIANTS, ZOMBIE_ONLY_VARIANTS, deathSeed, deathWeights, pickDeathVariant } from "@game/scene/deathVariants"
 import type { MoveType, WeaponSkill } from "@game/core/types"
 
 describe("форма клякс крови", () => {
@@ -85,5 +85,29 @@ describe("варианты гибели", () => {
     expect(share("blackMagic", "ash")).toBeGreaterThan(0.12)
     expect(share("whiteMagic", "ascend")).toBeGreaterThan(0.12)
     expect(share("sword", "halve") + share("sword", "behead")).toBeGreaterThan(0.2)
+  })
+})
+
+describe("кровь выключена", () => {
+  it("кровавые варианты гибели не выпадают, остальные — да", () => {
+    const weapons = ["sword", "spear", "axe", "gauntlet", "bow", "blackMagic", "whiteMagic"] as const
+    const moves = ["infantry", "armored", "cavalry", "flier"] as const
+    const seen = new Set<string>()
+    for (const w of weapons) {
+      for (const m of moves) {
+        for (const enemy of [false, true]) {
+          const weights = deathWeights(w, m, enemy, false)
+          for (const v of GORY_VARIANTS) expect(weights[v]).toBe(0)
+          for (let i = 0; i < 200; i++) {
+            const v = pickDeathVariant(deathSeed(`u${i}`, i), w, m, enemy, false)
+            expect(GORY_VARIANTS).not.toContain(v)
+            seen.add(v)
+          }
+        }
+      }
+    }
+    // Мирных вариантов достаточно, чтобы гибель не была однообразной
+    expect(seen.size).toBeGreaterThanOrEqual(8)
+    expect(DEATH_VARIANTS.filter(v => !GORY_VARIANTS.includes(v)).length).toBeGreaterThanOrEqual(10)
   })
 })

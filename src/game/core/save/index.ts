@@ -20,7 +20,7 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
  * в бою. v11: сюжетные факты (`story`: счётчики и просмотренные диалоги) для триггеров диалогов.
  * v12: обновление витрины Лавки за Вкусняшки (`store.rerolls` — цена, `store.variant` — номер выкладки).
  */
-export const SAVE_VERSION = 14
+export const SAVE_VERSION = 15
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -235,7 +235,7 @@ const settingsSchema = z.object({
   // Сейвы без этой настройки — двойное нажатие, как в новой игре
   endTurnConfirm: z.enum(["modal", "none", "double"]).default("double"),
   dangerZoneDefault: z.boolean(),
-  blood: z.enum(["sea", "pools"]),
+  blood: z.enum(["off", "pools", "sea"]),
   confirmAttack: z.boolean(),
   // Сейвы до диалогов — разговоры включены
   dialogues: z.boolean().default(true),
@@ -525,7 +525,13 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
   12: (old) => ({ ...old, battle: dropRegen(old["battle"]), version: 13 }),
   // v13 → v14: туман войны в чаще (`battle.revealed`). Поле необязательное: в идущей вылазке из старого сейва тумана
   // нет — видно всё поле. Версия поднята, чтобы старый клиент не прочитал новый сейв и не потерял разведанное.
-  13: (old) => ({ ...old, version: 14 })
+  13: (old) => ({ ...old, version: 14 }),
+  // v14 → v15: появилась настройка «Кровь: выкл.», она же по умолчанию — кровь выключается и в старых сейвах
+  // (включить можно в Настройках: «Лужи» или «Море»)
+  14: (old) => {
+    const settings = (old["settings"] ?? {}) as Record<string, unknown>
+    return { ...old, settings: { ...settings, blood: "off" }, version: 15 }
+  }
 }
 
 /** Убрать бонус `regen` из боя в сейве (миграция v12 → v13). */

@@ -19,20 +19,29 @@ const HIGHLIGHT = 0xff9aa8
 /** Оттенки для частиц (tint на белой текстуре). */
 export const GORE_TINTS = [0xd9122b, 0x9e1420, 0xff2d4a, 0xb3001b, 0xe8233b]
 
-export type GoreLevel = "sea" | "pools"
+export type GoreLevel = "off" | "pools" | "sea"
 
-/** Уровень крови из настроек: «sea» — максимум, «pools» — сдержанно (меньше частиц, без брызг на камеру). */
+/**
+ * Уровень крови из настроек: «off» — крови нет (по умолчанию), «pools» — сдержанно (меньше частиц, без брызг
+ * на камеру), «sea» — максимум.
+ */
 export function goreEnabled(scene?: Phaser.Scene): { level: GoreLevel } {
   // Настройка общая на игру; сцена — на будущее (например, отключить кровь в превью)
   if (scene && !scene.sys) return { level: "pools" }
-  let level: GoreLevel = "sea"
+  let level: GoreLevel = "off"
   try {
-    level = $settings.get()?.blood === "pools" ? "pools" : "sea"
+    const v = $settings.get()?.blood
+    level = v === "sea" || v === "pools" ? v : "off"
   }
   catch {
-    level = "sea"
+    level = "off"
   }
   return { level }
+}
+
+/** Кровь включена в настройках. Выключена — все брызги, кляксы, лужи и следы не рисуются. */
+export function bloodOn(): boolean {
+  return goreEnabled().level !== "off"
 }
 
 function amount(): number {
@@ -237,6 +246,7 @@ function groundDepth(scene: Phaser.Scene): number {
 
 /** Маленькое пятно, куда упала капля. Старые пятна сверх лимита растворяются. */
 export function groundStain(scene: Phaser.Scene, x: number, y: number, size: number, seed: number): void {
+  if (!bloodOn()) return
   if (!alive(scene)) return
   ensureGoreTextures(scene)
   const img = scene.add.image(x, y, GORE_TEX.stain(seed)).setDepth(groundDepth(scene))
@@ -392,6 +402,7 @@ let hitSeq = 1
 
 /** Брызги при попадании: взвесь, капли конусом, крупные капли с пятнами, у сильного удара — струйка. */
 export function hitGore(scene: Phaser.Scene, o: HitGoreOptions): void {
+  if (!bloodOn()) return
   if (!alive(scene) || o.damage <= 0) return
   ensureGoreTextures(scene)
   const level = amount()
@@ -521,6 +532,7 @@ export function bloodSquirt(
   depth = 24,
   groundY?: number
 ): void {
+  if (!bloodOn()) return
   if (!alive(scene)) return
   ensureGoreTextures(scene)
   const pulses = Math.max(2, Math.round((ms / 70) * amount()))
@@ -555,6 +567,7 @@ export function bloodFountain(
   speed: number,
   depth = 24
 ): void {
+  if (!bloodOn()) return
   if (!alive(scene)) return
   ensureGoreTextures(scene)
   const step = 60
@@ -581,6 +594,7 @@ export function bloodFountain(
 
 /** Капли за раненым при движении: пара капель и пятнышко на земле в (x, y). */
 export function bloodTrail(scene: Phaser.Scene, x: number, y: number, size: number, speed: number, depth?: number): void {
+  if (!bloodOn()) return
   if (!alive(scene)) return
   ensureGoreTextures(scene)
   const seed = hitSeq++ * 131
@@ -602,6 +616,7 @@ const lastScreenSplat = new WeakMap<Phaser.Scene, number>()
 
 /** Кровь «на камеру»: несколько клякс в углах экрана стекают вниз, плюс красный виньет. Не чаще раза в 0.4 с. */
 export function screenBloodSplat(scene: Phaser.Scene, intensity: number, speed: number): void {
+  if (!bloodOn()) return
   if (!alive(scene)) return
   const now = scene.time.now
   if (now - (lastScreenSplat.get(scene) ?? -1e9) < 400) return
@@ -730,6 +745,7 @@ export function goreBurst(
   scale = 1,
   speed = 1
 ): void {
+  if (!bloodOn()) return
   if (!alive(scene)) return
   ensureGoreTextures(scene)
   const k = amount()
@@ -785,6 +801,7 @@ export function bloodDrip(
   speed: number,
   depth = 24
 ): void {
+  if (!bloodOn()) return
   if (!alive(scene) || (amount() < 1 && hitSeq % 2 === 0)) return
   ensureGoreTextures(scene)
   ballisticDrops(scene, x, y, groundY, size * 0.6, 90, 40, 1, speed, depth, hitSeq++ * 17)

@@ -45,13 +45,14 @@ const DRIP_SVG = `<svg viewBox="0 0 180 18" xmlns="http://www.w3.org/2000/svg" a
   <circle cx="101" cy="16.5" r="1.6" fill="#e63946" />
 </svg>`
 
-function Diorama({ crew }: { crew: UnitInstance[] }) {
+/** Диорама на главном экране; `blood` — кровавые брызги поверх (выключены вместе с кровью в настройках). */
+function Diorama({ crew, blood }: { crew: UnitInstance[], blood: boolean }) {
   return (
     <div className="diorama" aria-hidden="true">
       <div className="bg" dangerouslySetInnerHTML={{ __html: YARD_BG }} />
       <div className="cloud" dangerouslySetInnerHTML={{ __html: CLOUD_SVG }} />
       <div className="cloud c2" dangerouslySetInnerHTML={{ __html: CLOUD_SVG }} />
-      <div className="blood" dangerouslySetInnerHTML={{ __html: BLOOD_SVG }} />
+      {blood && <div className="blood" dangerouslySetInnerHTML={{ __html: BLOOD_SVG }} />}
       <div className="crew">
         {crew.map((u, i) => (
           <span key={u.id}>
@@ -68,6 +69,7 @@ export function MenuScreen() {
   const army = save.army
   const battle = save.battle
   const started = gameStarted(save)
+  const bloody = save.settings.blood !== "off"
   const hasBattle = started && !!battle && !battle.result
   const [surrender, setSurrender] = useState(false)
   const [confirmNew, setConfirmNew] = useState(false)
@@ -107,10 +109,10 @@ export function MenuScreen() {
       </div>
       <div className="menu-hero">
         <div className="paper-frame">
-          <Diorama crew={crew} />
+          <Diorama crew={crew} blood={bloody} />
         </div>
         <h1>Cat Emblem</h1>
-        <span className="title-drip" dangerouslySetInnerHTML={{ __html: DRIP_SVG }} />
+        {bloody && <span className="title-drip" dangerouslySetInnerHTML={{ __html: DRIP_SVG }} />}
         <p className="muted">{tr("Tactics with kitties, doggos and mice", "Тактика про котиков, собачек и мышек")}</p>
       </div>
       <div className="menu-actions">

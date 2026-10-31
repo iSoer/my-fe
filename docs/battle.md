@@ -25,7 +25,7 @@
 - `turn` (с 1) и `phase: "player" | "enemy"`.
 - `units: Record<id, BattleUnit>`: состояние бойца в бою. `roster: Record<id, UnitInstance>`: снимок персонажей. XP, уровни, `history` и `skillXp` меняются в `roster`, а после боя сливаются в армию.
 - `walls`: HP хлипких стен по `posKey`. В `createBattle` каждая `wall_breakable` получает `BATTLE.wallHp = 2` HP. Стена с 0 HP читается в `terrainAt` как `plain`.
-- `decals`: лужи крови на местах гибели.
+- `decals`: лужи крови на местах гибели (хранятся всегда; рисуются, только если кровь включена в настройках).
 - `stats: BattleStats`: `kills`, `damage` (урон только от бойцов игрока), `deaths`, `xpGained`, `loot`.
 - `spawnedWaves`: номера ходов уже пришедших волн подкреплений.
 - `result?: "victory" | "defeat" | "retreat"` и `timeUp?`.

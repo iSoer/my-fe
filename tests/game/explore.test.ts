@@ -331,7 +331,7 @@ describe("чаща: туман войны", () => {
     save.battle = expedition(5)
     const r = parseSave(serializeSave(save))
     expect(r.ok && r.save.battle?.revealed).toBe(save.battle.revealed)
-    expect(SAVE_VERSION).toBe(14)
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(14)
     const v13 = { ...JSON.parse(serializeSave(save)), version: 13 }
     expect(MIGRATIONS[13]!(v13)).toEqual({ ...v13, version: 14 })
   })

@@ -55,7 +55,7 @@ import {
 } from "./env"
 import { isTallTerrain, waterFillsTile } from "@game/art/tile"
 import { bridgeVertical, decorMask } from "@game/core/map/layouts"
-import { clearGoreStains } from "./gore"
+import { bloodOn, clearGoreStains } from "./gore"
 import { camZoom, cssZoom, initHiDpiScene, pinToScreen, renderScaleOf, restCamera, setCssZoom, viewH, viewW } from "./hidpi"
 import { textRes } from "./renderScale"
 import { tr } from "@game/i18n"
@@ -997,6 +997,8 @@ export class MapScene extends Phaser.Scene {
   }
 
   addDecal(pos: Pos, kind: "splat" | "pool", seed: number): void {
+    // Кровь выключена в настройках — ни клякс, ни луж
+    if (!bloodOn()) return
     const c = this.center(pos)
     // Клякса — со случайным сдвигом внутри клетки; лужа — под телом и растекается
     const jx = kind === "splat" ? (((seed * 37) % 11) - 5) * this.tile * 0.035 : 0
@@ -1147,7 +1149,7 @@ export class MapScene extends Phaser.Scene {
     if (result === "victory") confettiRain(this, 30, speed)
     else if (result === "defeat") {
       bloodBurst(this, w / 2, h * 0.42, 60, null, 1.6, speed)
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < (bloodOn() ? 5 : 0); i++) {
         const x = w * (0.1 + i * 0.2)
         this.endOverlay.push(
           pinToScreen(bloodDecal(this, x, h * (0.3 + ((i * 37) % 50) / 100), this.tile * 1.4, "splat", i + 3).setDepth(60.5))
@@ -1590,7 +1592,8 @@ export class MapScene extends Phaser.Scene {
   }
 
   private syncDecals(st: BattleState): void {
-    const pools = st.decals.filter(d => d.kind === "pool")
+    // Кровь выключена — луж нет (включили посреди боя — появятся при следующей синхронизации)
+    const pools = bloodOn() ? st.decals.filter(d => d.kind === "pool") : []
     if (pools.length === this.decalCount) return
     // Поле перерисовано (раскладка или новый бой): лужи из состояния — сразу в итоговом виде, капли-пятна сбрасываются
     this.decalLayer.removeAll(true)

@@ -207,8 +207,9 @@ export function SettingsScreen() {
             <Seg
               value={s.blood}
               options={[
-                { v: "sea" as const, label: `🩸 ${tr("Sea", "Море")}` },
-                { v: "pools" as const, label: `💧 ${tr("Puddles", "Лужи")}` }
+                { v: "off" as const, label: tr("Off", "Выкл.") },
+                { v: "pools" as const, label: `💧 ${tr("Puddles", "Лужи")}` },
+                { v: "sea" as const, label: `🩸 ${tr("Sea", "Море")}` }
               ]}
               onChange={v => set({ blood: v })}
             />

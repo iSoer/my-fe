@@ -55,6 +55,13 @@ export const DEATH_VARIANTS: readonly DeathVariant[] = [
 /** Варианты только для зомби (врагов): бойцам игрока не выпадают. */
 export const ZOMBIE_ONLY_VARIANTS: readonly DeathVariant[] = ["zombieMelt"]
 
+/**
+ * Кровавые по самой сути варианты (куски, отрубленная голова, разрез, насаживание, стрелы в теле, расплющивание,
+ * бур, погружение в лужу крови): при выключенной крови (`Settings.blood = "off"`) не выпадают. В остальных кровь
+ * гасится в самих эффектах (`gore.ts`, `bloodOn`).
+ */
+export const GORY_VARIANTS: readonly DeathVariant[] = ["gibs", "explode", "behead", "halve", "impale", "pincushion", "flatten", "drill", "sink"]
+
 const BASE_WEIGHTS: Record<DeathVariant, number> = {
   fall: 3,
   gibs: 2,
@@ -128,7 +135,8 @@ function readOverride(isEnemy: boolean): DeathVariant | null {
 export function deathWeights(
   killerKind: ArtWeapon | undefined,
   moveType: MoveType,
-  isEnemy: boolean
+  isEnemy: boolean,
+  bloody = true
 ): Record<DeathVariant, number> {
   const weights: Record<DeathVariant, number> = { ...BASE_WEIGHTS }
   const addAll = (bias: Partial<Record<DeathVariant, number>>): void => {
@@ -137,6 +145,7 @@ export function deathWeights(
   if (killerKind) addAll(WEAPON_BIAS[killerKind])
   addAll(MOVE_BIAS[moveType])
   if (!isEnemy) for (const v of ZOMBIE_ONLY_VARIANTS) weights[v] = 0
+  if (!bloody) for (const v of GORY_VARIANTS) weights[v] = 0
   return weights
 }
 
@@ -144,11 +153,12 @@ export function pickDeathVariant(
   seed: number,
   killerKind: ArtWeapon | undefined,
   moveType: MoveType,
-  isEnemy = false
+  isEnemy = false,
+  bloody = true
 ): DeathVariant {
   const forced = readOverride(isEnemy)
-  if (forced) return forced
-  const weights = deathWeights(killerKind, moveType, isEnemy)
+  if (forced && (bloody || !GORY_VARIANTS.includes(forced))) return forced
+  const weights = deathWeights(killerKind, moveType, isEnemy, bloody)
   let total = 0
   for (const v of DEATH_VARIANTS) total += weights[v]
   let r = ((seed % 100000) / 100000) * total
