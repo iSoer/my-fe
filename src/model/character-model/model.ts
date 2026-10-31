@@ -1,8 +1,8 @@
 import { STATS } from "@shared/character/stats"
 import { MAX_LEVEL, MIN_LEVEL, RARITIES, type Rarity, type RarityScale, type StatValues } from "@shared/character/leveling"
-import { loadModel } from "@/server/stat-model/loadModel"
-import { ceil5, floor5, fromVector, roundTo } from "@/server/stat-model/math"
-import type { ClassKey, StatModel } from "@/server/stat-model/schema"
+import { loadModel } from "@model/stat-model/loadModel"
+import { ceil5, floor5, fromVector, roundTo } from "@model/stat-model/math"
+import type { ClassKey, StatModel } from "@model/stat-model/schema"
 
 /** Bump when the derivation or the meaning of a field changes */
 export const CHARACTER_MODEL_VERSION = 2

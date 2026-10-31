@@ -113,7 +113,7 @@
 4. Добавить цену в `WEAPON_PRICES.variant` ([balance.ts](../src/game/content/balance.ts)).
 5. Если нужна новая боевая механика: поле в `WeaponDef` и его обработка в `simulateCombat` ([core/combat](../src/game/core/combat/index.ts)). Хуков у оружия нет.
 
-**Новый грейд:** union `WeaponGrade` и `WEAPON_GRADE_LABELS` в `src/shared/character/skills.ts` (тоже синхронизируется), затем `GRADES`, `WEAPON_PRICES.grade`, пул `generateStore` и `enemyWeaponGrade`.
+**Новый грейд:** union `WeaponGrade` и `WEAPON_GRADE_LABELS` в `src/shared/character/skills.ts`, затем `GRADES`, `WEAPON_PRICES.grade`, пул `generateStore` и `enemyWeaponGrade`.
 
 **Новый оружейный навык** (`WeaponSkill` в `@shared`): `WEAPON_COLOR` и `SPECS` в weapons.ts имеют тип `Record<WeaponSkill, …>`, и TypeScript потребует запись. Ещё навык нужно добавить в классы ([content/classes.ts](../src/game/content/classes.ts)).
 

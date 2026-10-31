@@ -1,6 +1,6 @@
 # Тестирование
 
-Юнит- и property-тесты пишутся на Vitest и fast-check и запускаются в окружении `node`. Браузерные смоуки на playwright-core гоняют полный цикл игры по собранному preview. Тесты игры синхронизируются из next-instapok (`tests/unit/game` → `tests/game`), тесты платформы лежат в `tests/host`.
+Юнит- и property-тесты пишутся на Vitest и fast-check и запускаются в окружении `node`. Браузерные смоуки на playwright-core гоняют полный цикл игры по собранному preview. Тесты игры лежат в `tests/game`, тесты платформы — в `tests/host`.
 
 ## Vitest
 
@@ -64,6 +64,6 @@ CI делает то же (`lint`, `test`, `build` с typecheck и `check-sw`). 
 ## Где менять
 
 - Конфиг: [vitest.config.ts](../vitest.config.ts).
-- Тесты игры: [tests/game](../tests/game). Их перезаписывает синхронизация, поэтому дублируйте их в next-instapok.
+- Тесты игры: [tests/game](../tests/game).
 - Тесты платформы: [tests/host](../tests/host).
 - Смоуки: [tools/smoke.mjs](../tools/smoke.mjs), [tools/smoke-telegram.mjs](../tools/smoke-telegram.mjs), [tools/smoke-pwa.mjs](../tools/smoke-pwa.mjs).

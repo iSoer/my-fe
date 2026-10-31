@@ -6,7 +6,7 @@ Cat Emblem (pawfield) — фронтенд-only тактика в духе Fire 
 
 | Слой     | Где                                        | Что делает                                                                                                                          | Зависит от                           |
 | -------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| core     | [src/game/core](../src/game/core)          | Чистая логика без DOM/Phaser: редьюсер боя, бой, ИИ, карты, навыки, юниты, предметы, поселение, сюжет, сейв                         | content, `@shared`, `@/server`       |
+| core     | [src/game/core](../src/game/core)          | Чистая логика без DOM/Phaser: редьюсер боя, бой, ИИ, карты, навыки, юниты, предметы, поселение, сюжет, сейв                         | content, `@shared`, `@model`         |
 | content  | [src/game/content](../src/game/content)    | Таблицы данных: классы, оружие, навыки, биомы, местность, предметы, баланс ([balance.ts](../src/game/content/balance.ts))           | —                                    |
 | state    | [src/game/state](../src/game/state)        | nanostores-атомы, клей между core и UI; все игровые действия (`*Action`)                                                            | core, platform                       |
 | scene    | [src/game/scene](../src/game/scene)        | Phaser-рендер: `MapScene`, `CinematicScene`, `GamePresenter`, эффекты; поселение — [scene/settlement](../src/game/scene/settlement) | state (чтение), core (типы)          |
@@ -47,38 +47,17 @@ Cat Emblem (pawfield) — фронтенд-only тактика в духе Fire 
 
 Заданы в `ALIASES` ([vite.config.ts](../vite.config.ts), их же использует [vitest.config.ts](../vitest.config.ts)) и в `paths` [tsconfig.json](../tsconfig.json):
 
-| Алиас        | Каталог        | Откуда синхронизируется                                     |
-| ------------ | -------------- | ----------------------------------------------------------- |
-| `@game/*`    | `src/game/*`   | next-instapok `src/client/game/**`                          |
-| `@shared/*`  | `src/shared/*` | next-instapok `src/shared/**` (то, что импортирует игра)    |
-| `@/server/*` | `src/model/*`  | next-instapok `src/server/**` (генератор персонажа, чистый) |
-| `@host/*`    | `src/host/*`   | только здесь                                                |
+| Алиас       | Каталог        | Что там                                                           |
+| ----------- | -------------- | ----------------------------------------------------------------- |
+| `@game/*`   | `src/game/*`   | игра: core, content, state, сцены, арт, UI                        |
+| `@shared/*` | `src/shared/*` | данные персонажа, общие для игры и модели (классы, статы, навыки) |
+| `@model/*`  | `src/model/*`  | генератор персонажа и статов, чистый, работает в браузере         |
+| `@host/*`   | `src/host/*`   | платформа: Telegram, облако, PWA                                  |
 
 Каталог `src/i18n` в корне `src` пуст и ни откуда не импортируется. Локализация живёт в `src/game/i18n`.
-
-## Синхронизация с next-instapok
-
-[tools/sync-game.mjs](../tools/sync-game.mjs) (`pnpm sync:game [путь]`, по умолчанию `../next-instapok`):
-
-1. Обходит `src/client/game/**` и `tests/unit/game/**` и транзитивно всё, что они импортируют (относительные пути и алиасы `@game/`, `@shared/`, `@/`).
-2. Копирует файлы по карте путей из таблицы выше.
-3. **Удаляет** все файлы в `src/game`, `src/shared`, `src/model`, `tests/game`, которых не было среди скопированных.
-4. Копирует `docs/game.md` → `docs/game.md`. Этот файл принадлежит синхронизации, не создавайте и не правьте его здесь.
-
-### Текущее расхождение (проверено `diff -rq`)
-
-Сейчас **my-fe впереди next-instapok**, а не наоборот:
-
-- В `src/game` 34 файла и каталога есть только здесь, среди них `art/gear.ts`, `art/held.ts`, `art/look.ts`, `art/expedition.ts`, `content/settlement.ts`, `content/dialogues.ts`, `content/quotes.ts`, `content/tavern.ts`, `content/terrain.ts`, `core/settlement/`, `core/story/`, `core/map/expedition.ts`, `core/units/proficiency.ts`, весь `i18n/`, `platform/audio.ts`, `scene/settlement/`, `scene/epicFx.ts`, `scene/deathVariants.ts`, `state/settlement.ts`, `state/dialogue.ts`, `state/sound.ts`, `ui/screens/SettlementScreen.tsx`. Ещё 92 файла отличаются по содержимому.
-- В `tests/game` только здесь есть `dialogue`, `expedition`, `gossips`, `i18n`, `movement`, `proficiency`, `rebirth`, `reinforce`, `router`, `settlement`, `settlementMap`, `tavern`, `terrain`.
-- `src/shared/character/stats.ts` и `src/model/stat-model/` есть только здесь.
-- `SAVE_VERSION` здесь 11, в next-instapok 6.
-
-**Что будет, если запустить `pnpm sync:game` сейчас.** Скрипт удалит всё перечисленное и откатит 92 файла. Работа последних коммитов пропадёт (git её вернёт, но только если она закоммичена). Сборка сломается: например, `@game/i18n` импортируется повсюду, а в источнике его нет. Сейвы игроков v7–v11 не пройдут схему v6 и будут заменены новой игрой (подробнее в [saves.md](saves.md)). Пока расхождение не устранено, источник истины — **этот репозиторий**. Перед синхронизацией нужно сначала перенести изменения в next-instapok.
 
 ## Где менять
 
 - Слой и его границы: этот файл и [CLAUDE.md](../CLAUDE.md).
 - Алиасы: `ALIASES` в [vite.config.ts](../vite.config.ts) и `paths` в [tsconfig.json](../tsconfig.json), всегда вместе.
 - Чанки: `manualChunks` в [vite.config.ts](../vite.config.ts), затем обновить `required` в [tools/check-sw.mjs](../tools/check-sw.mjs).
-- Карта синхронизации: `MAP`, `OWNED`, `ALIASES` в [tools/sync-game.mjs](../tools/sync-game.mjs).

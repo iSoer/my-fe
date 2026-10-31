@@ -5,7 +5,7 @@ import { canRebirth, generateRoster, generateUnit, rebirthUnit, rescaleRarity, s
 import { generateRewardChoice, generateShop, recruitLevel } from "@game/core/progression"
 import { MAX_LEVEL, STATS, type Rarity, type UnitInstance } from "@game/core/types"
 import { recruitRarityWeights } from "@game/content/balance"
-import { loadCharacterModel } from "@/server/character-model/model"
+import { loadCharacterModel } from "@model/character-model/model"
 import { levelOneStats } from "@shared/character/leveling"
 
 function freshGame(): void {

@@ -93,8 +93,7 @@
    - round-trip `serializeSave` → `parseSave` для нового сейва.
 7. Если поле читает UI или хост, обновите [ConflictScreen](../src/host/ConflictScreen.tsx), [tools/smoke.mjs](../tools/smoke.mjs) и `window.__pf` (см. [ui-and-routing.md](ui-and-routing.md)).
 8. Повысить `MIN_SAVE_VERSION` можно, только если вы сознательно отказываетесь от старых сейвов. Игроки получат новую игру.
-9. Перенесите те же изменения в next-instapok, иначе `pnpm sync:game` их откатит.
-10. `pnpm typecheck && pnpm test && pnpm lint`.
+9. `pnpm typecheck && pnpm test && pnpm lint`.
 
 ## Где менять
 

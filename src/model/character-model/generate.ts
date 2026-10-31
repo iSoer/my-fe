@@ -12,10 +12,10 @@ import {
 import {
   GenerateRequestError, GenerationError, distributeStats, fitBst, normalizeShares, pickArchetype, pickBst, pickExperience,
   sampleProfile, sampleSize
-} from "@/server/stat-model/generate"
-import { cosine } from "@/server/stat-model/math"
-import { generateName } from "@/server/stat-model/names"
-import { createRng, type Rng } from "@/server/stat-model/random"
+} from "@model/stat-model/generate"
+import { cosine } from "@model/stat-model/math"
+import { generateName } from "@model/stat-model/names"
+import { createRng, type Rng } from "@model/stat-model/random"
 import { budgetRangeOf, referenceBstOf, type CharacterModel } from "./model"
 import { validateCharacter } from "./validate"
 

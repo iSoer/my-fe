@@ -17,7 +17,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sw.json",
     "icons": "node tools/gen-icons.mjs",
     "smoke:pwa": "node tools/smoke-pwa.mjs",
-    "sync:game": "node tools/sync-game.mjs",
     "smoke": "node tools/smoke.mjs",
     "smoke:tg": "node tools/smoke-telegram.mjs"
   },

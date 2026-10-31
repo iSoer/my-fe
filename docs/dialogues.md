@@ -204,4 +204,3 @@ interface DialogueLine {
 - **Бормотание рыбака** — `FISHER_MUTTERS` и `MUTTER_TIMING`.
 - **Цитаты** — [quotes.json](../src/game/content/quotes.json). Ритм, места и тапы сплетников — `GOSSIP_TIMING` и `GOSSIP_SPOTS`; поведение — [gossips.ts](../src/game/scene/settlement/gossips.ts).
 - **Проверка** — `pnpm vitest run tests/game/dialogue.test.ts tests/game/gossips.test.ts tests/game/settlementMap.test.ts`.
-- Всё это лежит в `src/game` и синхронизируется из `next-instapok`.

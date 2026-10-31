@@ -20,7 +20,7 @@
     "paths": {
       "@game/*": ["src/game/*"],
       "@shared/*": ["src/shared/*"],
-      "@/server/*": ["src/model/*"],
+      "@model/*": ["src/model/*"],
       "@host/*": ["src/host/*"]
     },
     "types": ["vite/client", "node", "@serwist/vite/typings"]

@@ -1,4 +1,3 @@
-"use client"
 import { useEffect } from "react"
 import { App } from "./ui/App"
 import { initRouter } from "./state/router"
@@ -23,8 +22,8 @@ import "./ui/styles.css"
 import "./ui/mobile.css"
 
 /**
- * Корень игры «Cat Emblem» на маршруте /game. Только клиент: сейв в localStorage, хеш-роутер и Phaser
- * читают window при импорте, поэтому страница грузит этот модуль через next/dynamic с ssr: false.
+ * Корень игры «Cat Emblem». Только браузер: сейв в localStorage, хеш-роутер и Phaser читают window при импорте.
+ * Монтирует его main.tsx после подключения платформы.
  */
 export default function GameRoot() {
   useEffect(() => {

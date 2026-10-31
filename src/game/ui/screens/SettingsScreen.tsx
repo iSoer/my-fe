@@ -110,7 +110,7 @@ export function SettingsScreen() {
           </div>
           <div className="setting">
             <div className="row">
-              <span>{tr("Sound effects", "Звуки")}</span>
+              <span>{tr("Sound effects", "Звуки-пуки")}</span>
               <span className="muted small">{s.sfx}</span>
             </div>
             <input

@@ -2,8 +2,6 @@
 
 Поселение (деревня, база) — это экран `#/village`. Герой ходит по Phaser-карте шириной в три экрана, строит и улучшает здания, оставляет бойцов на полигоне, покупает снаряжение в Лавке, заказывает кружку в баре, воскрешает павших и уходит через ворота на вылазку. Логика поселения — чистые функции над `SaveGame` без DOM и Phaser. Сцена только рисует то, что лежит в сейве.
 
-> Код поселения лежит в `src/game/**`. Эти папки синхронизируются из `next-instapok` (см. [CLAUDE.md](../CLAUDE.md)). Правки, которые не перенесены туда, пропадут при следующем `pnpm sync:game`.
-
 ## Слои и файлы
 
 | Слой           | Файл                                                                                                                                                                                                                                                                               | Что внутри                                                                                                                                                                                                                                             |
@@ -312,4 +310,3 @@ __pf.save.set({ ...__pf.save.get(), profile: { ...__pf.save.get().profile, treat
 - **Карточка здания** — [BuildingPanel.tsx](../src/game/ui/settlement/BuildingPanel.tsx). Подсказки «!» — `placeAlerts` в [state/settlement.ts](../src/game/state/settlement.ts).
 - **Схема сейва** — `settlementSchema`, `SAVE_VERSION`, `MIGRATIONS` в [core/save/index.ts](../src/game/core/save/index.ts).
 - **Игровой день** — `GAME_DAY`. **Дождь** — `SETTLEMENT_RAIN`.
-- Всё перечисленное лежит в `src/game` и синхронизируется. Сначала правьте в `next-instapok`.

@@ -19,8 +19,8 @@ import { ConflictScreen } from '@host/ConflictScreen';
 import '@host/host.css';
 import { setLang, tr } from '@game/i18n';
 
-// my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Сама игра (src/game) синхронизируется из next-instapok
-// (tools/sync-game.mjs) и одинакова в обоих проектах; платформа подключается здесь через setGameHost и сторы игры.
+// my-fe — игра (src/game) и её платформа: Telegram Mini App и PWA на GitHub Pages. Игра не знает о хосте;
+// платформа подключается здесь через setGameHost и сторы игры.
 
 function showFatal(message: string, stack: string): void {
   const root = document.getElementById('app');

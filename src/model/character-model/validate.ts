@@ -3,8 +3,8 @@ import type { GeneratedCharacterType } from "@shared/api/schema/character/genera
 import { MAX_LEVEL, MIN_LEVEL, RARITIES, levelOneStats, totalOfStats } from "@shared/character/leveling"
 import { canTakeClass, classById, statsInClass } from "@shared/character/classes"
 import { MAX_TALENTS, MAX_WEAKNESSES, SKILLS, ranksAtLevel, skillsWith } from "@shared/character/skills"
-import { predictLnHeight, predictLnWeight } from "@/server/stat-model/predict"
-import { MIN_ROUND_SHARE, SIZE_SIGMAS, withinBand, type ValidationResult } from "@/server/stat-model/validate"
+import { predictLnHeight, predictLnWeight } from "@model/stat-model/predict"
+import { MIN_ROUND_SHARE, SIZE_SIGMAS, withinBand, type ValidationResult } from "@model/stat-model/validate"
 import { budgetRangeOf, referenceBstOf, type CharacterModel } from "./model"
 
 const result = (violations: string[]): ValidationResult => ({ ok: violations.length === 0, violations })

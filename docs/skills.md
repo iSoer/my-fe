@@ -174,8 +174,6 @@
 
    Поведение проверяется в [tests/game/combat.test.ts](../tests/game/combat.test.ts) через хелперы [tests/game/helpers.ts](../tests/game/helpers.ts), в которых есть `skills: Partial<UnitSkills>`.
 
-9. **Синхронизация.** `src/game` и `tests/game` синхронизируются из next-instapok, поэтому ту же правку нужно внести и там.
-
 ## Где менять
 
 - Таблицы навыков: [passives.ts](../src/game/content/skills/passives.ts), [specials.ts](../src/game/content/skills/specials.ts), [assists.ts](../src/game/content/skills/assists.ts).

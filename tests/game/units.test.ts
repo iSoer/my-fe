@@ -29,7 +29,7 @@ import { CLASS_IDS, DANCER_CLASS, classDef, classWeapons, unitClass } from "@gam
 import { classStatMods } from "@game/content/classStats"
 import { isMagicWeapon } from "@game/content/weapons"
 import { ROSTER } from "@game/content/balance"
-import { budgetRangeOf, loadCharacterModel } from "@/server/character-model/model"
+import { budgetRangeOf, loadCharacterModel } from "@model/character-model/model"
 import { levelOneStats, totalOfStats } from "@shared/character/leveling"
 
 describe("generateUnit", () => {

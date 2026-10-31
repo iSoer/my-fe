@@ -116,7 +116,7 @@
 
 ## Как добавить персонажа
 
-Именованных персонажей-бойцов в игре нет: все бойцы процедурные. «Новый персонаж» поэтому означает одно из шести действий ниже. Все упомянутые файлы, кроме `docs/`, синхронизируются из next-instapok, поэтому правку нужно делать там и затем запускать `pnpm sync:game`. Если в сейве появляется новое значение enum, повышайте `SAVE_VERSION` в [core/save/index.ts](../src/game/core/save/index.ts) и добавляйте тождественную миграцию по образцу `9: (old) => ({ ...old, version: 10 })`, иначе старая сборка молча отклонит новый сейв.
+Именованных персонажей-бойцов в игре нет: все бойцы процедурные. «Новый персонаж» поэтому означает одно из шести действий ниже. Если в сейве появляется новое значение enum, повышайте `SAVE_VERSION` в [core/save/index.ts](../src/game/core/save/index.ts) и добавляйте тождественную миграцию по образцу `9: (old) => ({ ...old, version: 10 })`, иначе старая сборка молча отклонит новый сейв.
 
 ### Новый класс
 
@@ -193,4 +193,4 @@
 | Вместимость Казарм, воскрешение                         | [content/settlement.ts](../src/game/content/settlement.ts), [core/settlement/index.ts](../src/game/core/settlement/index.ts)                                                                                                                                                                       |
 | Тесты                                                   | [units](../tests/game/units.test.ts), [roster](../tests/game/roster.test.ts), [rebirth](../tests/game/rebirth.test.ts), [reinforce](../tests/game/reinforce.test.ts), [content](../tests/game/content.test.ts)                                                                                     |
 
-`src/game`, `src/shared`, `src/model` и `tests/game` приходят синхронизацией из next-instapok (`pnpm sync:game`). Правьте их там.
+`src/game`, `src/shared`, `src/model` и `tests/game` пишутся в стиле игры: двойные кавычки, без `;`, без Prettier.

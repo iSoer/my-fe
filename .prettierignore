@@ -1,9 +1,8 @@
 dist
 node_modules
 coverage
-# Синхронизируется из next-instapok (tools/sync-game.mjs) — там свой стиль, не переформатировать
+# Код игры — свой стиль (двойные кавычки, без точек с запятой), Prettier его не форматирует
 src/game
 src/shared
 src/model
 tests/game
-docs/game.md

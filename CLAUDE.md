@@ -20,7 +20,6 @@ pnpm test:coverage       # coverage covers only src/game/core and src/game/conte
 pnpm typecheck           # tsc for the app (tsconfig.json) and for the Service Worker (tsconfig.sw.json)
 pnpm lint                # eslint with --max-warnings 0
 pnpm build               # typecheck, vite build, copy dist/404.html, then tools/check-sw.mjs (verifies the precache)
-pnpm sync:game [path]    # pull the game in from ../next-instapok (see below)
 pnpm icons               # regenerate the PWA icons in public/ from the procedural art
 ```
 
@@ -42,23 +41,21 @@ The art gallery lives at `pnpm dev`, then http://localhost:5173/tools/gallery/in
 
 - `docs/` holds the project documentation in Russian, one file per topic; the index is `docs/README.md`. Read the relevant file before working on a subsystem.
 - Project skills in `.claude/skills/`: `add-character`, `add-small-map`, `add-big-map`, `add-building` (recipes for content), and `update-docs`. After any significant change to behavior or structure described in `docs/`, follow `update-docs` and update the affected documents before finishing.
-- `docs/game.md` is overwritten by `pnpm sync:game`; don't create or edit it here.
 
 ## Game code vs. platform code
 
-The game itself is developed in the sibling project `next-instapok`, where it is the `/game` route. `tools/sync-game.mjs` copies it here and **deletes any extra files** in the folders it writes to:
+This repo is the only source of the game and its platform. Layers and aliases:
 
-| next-instapok                     | here         | alias        |
-| --------------------------------- | ------------ | ------------ |
-| `src/client/game/**`              | `src/game/`  | `@game/*`    |
-| `src/shared/**` (what the game uses) | `src/shared/` | `@shared/*` |
-| `src/server/**` (what the game uses) | `src/model/`  | `@/server/*` |
-| `tests/unit/game/**`              | `tests/game/`| —            |
+| folder        | alias       | what                                                                               |
+| ------------- | ----------- | ---------------------------------------------------------------------------------- |
+| `src/game/`   | `@game/*`   | the game: core, content, state, scenes, art, UI                                    |
+| `src/shared/` | `@shared/*` | character data shared by the game and the model (classes, stats, skills, leveling) |
+| `src/model/`  | `@model/*`  | pure character/stat generator, runs in the browser                                 |
+| `src/host/`   | `@host/*`   | platform: Telegram WebApp, CloudStorage sync, PWA banners, save-conflict screen    |
+| `tests/game/` | —           | game unit and property tests                                                       |
 
-- As of 2026-10-29, my-fe is **ahead** of next-instapok: dozens of game files exist only here, and `SAVE_VERSION` is 11 here vs. 6 there. Running `pnpm sync:game` now would wipe that work and reset players' saves, so never run it unless the user explicitly asks.
-- `src/game`, `src/shared`, `src/model`, and `tests/game` belong to the sync. Changes made here are lost on the next `pnpm sync:game` unless they are also made in next-instapok. Check with the user which repo is the source of truth before making large edits there.
-- These folders use next-instapok's style (double quotes, no semicolons) and are listed in `.prettierignore`, so never reformat them. The platform code (`src/host`, `src/main.tsx`, `tools`, configs) uses Prettier: single quotes, semicolons, width 110.
-- Only the platform lives in this repo: `src/host` (Telegram WebApp, CloudStorage sync, PWA banners, save-conflict screen), `src/main.tsx` (boot), and `src/sw.ts` (Service Worker).
+- `src/main.tsx` is the boot, and `src/sw.ts` is the Service Worker.
+- Two code styles. `src/game`, `src/shared`, `src/model`, and `tests/game` use double quotes and no semicolons. They are listed in `.prettierignore`, so never run Prettier on them. The platform code (`src/host`, `src/main.tsx`, `src/sw.ts`, `tools`, configs) uses Prettier: single quotes, semicolons, width 110.
 - The game is host-agnostic. `main.tsx` plugs the platform in before mounting `GameRoot`, through `setGameHost({ Overlay, SettingsSection, haptic })` (`@game/platform/host`) and `setStorageNamespace(userNamespace())`. It also wires the Telegram Back button and close confirmation to the game's `$route`, `$battle`, and `$pauseOpen` stores. If game routes are renamed, update `syncBackButton` in `main.tsx`.
 
 ## Game architecture (`src/game`)
@@ -73,7 +70,7 @@ The game itself is developed in the sibling project `next-instapok`, where it is
   - `save.ts` holds `$save`, `$battle`, persistence, and the game actions.
   - `router.ts` is hash-based routing; the `Route` union is parsed from `location.hash`.
   - Other stores: `battleUi.ts`, `boardLayout.ts`, `settlement.ts`.
-- `scene/`: Phaser rendering. `presenter.ts` (`GamePresenter`) only *plays back* `BattleEvent`s on `MapScene` and `CinematicScene` and holds no game logic. Phaser is split into its own lazy chunk (`manualChunks` in `vite.config.ts`).
+- `scene/`: Phaser rendering. `presenter.ts` (`GamePresenter`) only _plays back_ `BattleEvent`s on `MapScene` and `CinematicScene` and holds no game logic. Phaser is split into its own lazy chunk (`manualChunks` in `vite.config.ts`).
 - `art/`: procedural SVG/raster art for critters, gear, tiles, and buildings.
 - `ui/`: React screens and components that read the stores.
 - `platform/`: storage, audio, haptics, and the host hook.

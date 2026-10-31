@@ -110,8 +110,7 @@ endTurn(): dispatch endPhase → playEvents → runEnemyPhase(): цикл nextEn
 5. Кнопка «Назад» Telegram: если поведение отличается от `back()` (скрыть, закрыть оверлей), добавьте ветку в `syncBackButton` в [src/main.tsx](../src/main.tsx). Если экран — это бой или итоги, проверьте ещё `NO_RELOAD_ROUTES` в [host/PwaBanners.tsx](../src/host/PwaBanners.tsx) и музыку в [state/sound.ts](../src/game/state/sound.ts).
 6. Если смоуки будут управлять экраном напрямую, добавьте действия в `window.__pf` ([GameRoot.tsx](../src/game/GameRoot.tsx)).
 7. Тест разбора в [tests/game/router.test.ts](../tests/game/router.test.ts): `parseRoute(routePath(r))` возвращает `r`, неверный параметр даёт не этот экран.
-8. Повторите изменения в next-instapok: `src/game` синхронизируемый.
-9. `pnpm typecheck && pnpm test && pnpm lint`. При желании — `pnpm smoke` и `pnpm smoke:tg`.
+8. `pnpm typecheck && pnpm test && pnpm lint`. При желании — `pnpm smoke` и `pnpm smoke:tg`.
 
 ## Где менять
 

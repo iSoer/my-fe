@@ -8,13 +8,13 @@ const base = process.env.VITE_BASE_PATH ?? '/';
 const src = (dir: string) => fileURLToPath(new URL(`./src/${dir}`, import.meta.url));
 
 /**
- * Алиасы как в next-instapok, чтобы синхронизированный код игры собирался без правок:
- * @game → src/game, @shared → src/shared, @/server → src/model (генератор персонажа — чистый, работает в браузере).
+ * Алиасы слоёв: @game → src/game, @shared → src/shared, @model → src/model (генератор персонажа — чистый, работает
+ * в браузере), @host → src/host.
  */
 export const ALIASES = [
   { find: /^@game\//, replacement: `${src('game')}/` },
   { find: /^@shared\//, replacement: `${src('shared')}/` },
-  { find: /^@\/server\//, replacement: `${src('model')}/` },
+  { find: /^@model\//, replacement: `${src('model')}/` },
   { find: /^@host\//, replacement: `${src('host')}/` },
 ];
 

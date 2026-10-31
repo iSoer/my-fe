@@ -42,7 +42,7 @@ description: Обязательная сверка и правка докуме�
 | `src/host/*`, `src/main.tsx`, `src/sw.ts`, `vite.config.ts`, `.github/workflows/*`                                             | `platform.md`           |
 | `tests/**`, `vitest.config.ts`, `tools/smoke*.mjs`                                                                             | `testing.md`            |
 | `src/game/i18n`                                                                                                                | `i18n.md`               |
-| Слои, алиасы, синхронизация с next-instapok                                                                                    | `architecture.md`       |
+| Слои, алиасы                                                                                                                   | `architecture.md`       |
 | `.prettierrc`, `.prettierignore`, `eslint.config.js`                                                                           | `code-style.md`         |
 
 Оглавление всех документов лежит в `docs/README.md`. Новый документ обязательно добавь туда.
@@ -69,4 +69,3 @@ description: Обязательная сверка и правка докуме�
 - Каждый документ: H1, краткое резюме в 1–2 предложения, основное содержание, в конце раздел «Где менять».
 - Описывай то, что есть в коде, а не планы. Если что-то не реализовано, так и пиши.
 - Числа бери из кода (`content/balance.ts` и таблицы контента) и не пересказывай по памяти.
-- Не создавай и не правь `docs/game.md`: этот файл перезаписывает `pnpm sync:game` из next-instapok.

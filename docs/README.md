@@ -2,11 +2,9 @@
 
 Пошаговая тактика в духе Fire Emblem Heroes с котами, псами и мышами: Telegram Mini App + PWA, только фронтенд. Здесь описано, как игра устроена **сейчас**. Документы поддерживаются вместе с кодом (скил `update-docs` в `.claude/skills/`).
 
-> `docs/game.md` (если появится) принадлежит синхронизации `pnpm sync:game` из next-instapok — не правьте его здесь.
-
 ## Устройство проекта
 
-- [architecture.md](architecture.md) — слои (core / content / state / scene / ui / platform / host), поток данных, алиасы, синхронизация с next-instapok
+- [architecture.md](architecture.md) — слои (core / content / state / scene / ui / platform / host), поток данных, алиасы
 - [code-style.md](code-style.md) — две зоны стиля, Prettier, ESLint, язык комментариев
 - [saves.md](saves.md) — схема сейва, версии и миграции, localStorage, CloudStorage, конфликты
 - [ui-and-routing.md](ui-and-routing.md) — маршруты и экраны, сторы, машина состояний боевого UI, `window.__pf`
