@@ -1,18 +1,17 @@
 import { lootShare } from "@game/core/progression"
 import { turnLimitOf } from "@game/content/balance"
 import type { BattleState } from "@game/core/types"
-import { biomeDef } from "@game/content/biomes"
 import { tr } from "@game/i18n"
 import { BUFFS } from "@game/content/expedition"
 import { IconText } from "../components/Icon"
 
-/** Верхняя полоса HUD во всю ширину: ход, фаза, цель вылазки, добыча и биом. */
+/**
+ * Верхняя полоса HUD во всю ширину: ход, ключи и бонусы отряда в чаще, добыча. Чья фаза — видно по цвету
+ * кромки полосы (красная — игрока, светлая — врага).
+ */
 export function TopHud({ battle }: { battle: BattleState }) {
   const isPlayer = battle.phase === "player"
-  const biome = biomeDef(battle.map.biomeId)
   const limit = turnLimitOf(battle.map)
-  const chests = battle.map.expedition?.chests.length ?? 0
-  const opened = battle.expedition?.opened.length ?? 0
   // Бонусы всего отряда (личные — значками над бойцами)
   const teamBuffs = (battle.expedition?.buffs.team ?? []).map(b => BUFFS[b].icon).join("")
   const keys = battle.expedition
@@ -26,22 +25,13 @@ export function TopHud({ battle }: { battle: BattleState }) {
       >
         {`${tr("Turn", "Ход")} ${battle.turn}/${limit}`}
       </span>
-      {/* key — плашка фазы заново въезжает при смене хода и фазы */}
-      <span key={`${battle.turn}-${battle.phase}`} className="bf-phase-name">
-        {isPlayer ? tr("YOUR PHASE", "ВАША ФАЗА") : tr("ENEMY PHASE", "ФАЗА ВРАГА")}
-      </span>
-      {chests > 0 && (
+      {/* Чаща: ключи у отряда и бонусы всего отряда — только когда они есть */}
+      {(keys > 0 || teamBuffs) && (
         <span
-          className={`bf-chip bf-goal ${opened > 0 ? "ready" : ""}`}
-          title={tr(
-            "Kill the guard with the key, step onto the chest with the key and open it, then step onto the glowing EXIT in the corner and end the sortie to take all the loot. You can leave through the exit at any time, even without opening a chest",
-            "Убейте стража с ключом, встаньте с ключом на сундук и откройте его, затем встаньте на светящийся ВЫХОД в углу и завершите вылазку — отряд унесёт всю добычу. Уйти через выход можно в любой момент, даже не открыв сундук"
-          )}
+          className="bf-chip"
+          title={tr("Keys carried by your squad and squad-wide bonuses", "Ключи у отряда и бонусы всего отряда")}
         >
-          <IconText text={`📦 ${opened}/${chests}`} />
-          <IconText text={keys > 0 ? ` · 🗝 ${keys}` : ""} />
-          <IconText text={teamBuffs ? ` · ${teamBuffs}` : ""} />
-          {opened > 0 ? ` · ${tr("→ exit", "→ к выходу")}` : ""}
+          <IconText text={[keys > 0 ? `🗝 ${keys}` : "", teamBuffs].filter(Boolean).join(" · ")} />
         </span>
       )}
       <span className="bf-grow" />
@@ -58,7 +48,6 @@ export function TopHud({ battle }: { battle: BattleState }) {
           <IconText text={`${tr("Collected", "Собрано")}: ${battle.stats.loot} 🦴`} />
         </span>
       )}
-      <span className="bf-chip bf-biome">{biome.name}</span>
     </div>
   )
 }

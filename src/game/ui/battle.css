@@ -284,40 +284,6 @@
     opacity: 0.45;
   }
 }
-.bf-phase-name {
-  position: relative;
-  isolation: isolate;
-  font-family: var(--bf-font-display);
-  font-style: italic;
-  font-weight: 900;
-  font-size: 11.5px;
-  letter-spacing: 0.06em;
-  padding: 3px 10px;
-  animation: bf-tag-in 0.26s var(--bf-ease) 0.08s both;
-}
-.bf-phase-name::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  transform: skewX(var(--bf-skew));
-}
-.bf-phase.player .bf-phase-name {
-  color: #fff;
-}
-.bf-phase.player .bf-phase-name::before {
-  background: var(--bf-red);
-}
-.bf-phase.enemy .bf-phase-name {
-  color: var(--bf-ink);
-}
-.bf-phase.enemy .bf-phase-name::before {
-  background: var(--bf-paper);
-}
-.bf-biome {
-  color: var(--bf-muted);
-  font-weight: 800;
-}
 
 /* ---------- Панель сведений над полем ---------- */
 /* Высоту задаёт экран: от верха экрана (поверх полосы хода) до верхнего края поля. Без прокрутки: карточки
@@ -446,9 +412,6 @@
 }
 .bf-bar-zoom .bf-bar-btn:disabled {
   opacity: 0.4;
-}
-.bf-chip.bf-goal.ready::before {
-  background: #7dffb0;
 }
 .bf-bar-btn {
   position: relative;
@@ -1170,16 +1133,6 @@
     opacity: 1;
   }
 }
-@keyframes bf-tag-in {
-  from {
-    transform: translateX(-10px) scale(0.8);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
-}
 @keyframes bf-fade {
   from {
     opacity: 0;
@@ -1221,7 +1174,6 @@
   .bf-card,
   .bf-phase-turn.late,
   .bf-phase,
-  .bf-phase-name,
   .bf-bar-end::before,
   .bf-tag.death,
   .bf-unit-hp.crit {
@@ -1234,14 +1186,8 @@
 
 /* ---------- Узкие экраны ---------- */
 @media (max-width: 430px) {
-  .bf-biome {
-    display: none;
-  }
   .bf-hud-row {
     gap: 6px;
-  }
-  .bf-phase-name {
-    font-size: 11px;
   }
 }
 
