@@ -377,10 +377,9 @@ describe("контроллер боя: разведка в чаще", () => {
 
   afterEach(() => leaveBattleScreen())
 
-  it("тап по клетке — весь отряд идёт туда за одно нажатие, зоны тревоги видны, конец хода недоступен", async () => {
+  it("тап по клетке — весь отряд идёт туда за одно нажатие, конец хода недоступен", async () => {
     const st = await exploring()
     expect(st.explore).toBe(true)
-    expect($battleUi.get().alertTiles.size).toBeGreaterThan(0)
     const lead = Object.values(st.units).find(u => u.side === "player")!
     const to = { x: lead.pos.x, y: lead.pos.y - 4 }
     tapTile(to)
@@ -406,6 +405,21 @@ describe("контроллер боя: разведка в чаще", () => {
     const after = $save.get().battle!
     expect(after.units[a!.unitId]!.pos).toEqual(to)
     expect(after.units[b!.unitId]!.pos).toEqual(b!.pos)
+  })
+
+  it("туман войны: скрытый враг для игрока — пустая клетка, дымка тревоги — только на разведанном", async () => {
+    const { isRevealed } = await import("@game/core/battle/explore")
+    const st = await exploring()
+    const hidden = Object.values(st.units).find(u => u.side === "enemy" && u.alive && !isRevealed(st, u.pos))!
+    expect(hidden).toBeDefined()
+    for (const k of $battleUi.get().alertTiles) {
+      const [x, y] = k.split(",").map(Number)
+      expect(isRevealed(st, { x: x!, y: y! })).toBe(true)
+    }
+    // Нажатие на скрытого врага не показывает его — отряд идёт в ту сторону
+    tapTile(hidden.pos)
+    expect($battleUi.get().mode).not.toBe("enemyInfo")
+    expect($battleUi.get().infoId).toBeUndefined()
   })
 
   it("путь в лагерь — отряд встаёт перед зоной тревоги, и начинается пошаговый бой", async () => {

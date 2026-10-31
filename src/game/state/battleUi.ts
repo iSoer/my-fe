@@ -19,7 +19,7 @@ import {
 import { assistTargetsFrom, planAssist, type AssistPlan } from "@game/core/battle/assist"
 import { simulateCombat, type CombatOutcome } from "@game/core/combat"
 import { allPlayerUnitsActed, canExtract, chestToOpen } from "@game/core/battle/reducer"
-import { alertZone } from "@game/core/battle/explore"
+import { alertZone, enemyAlertZone, isAsleep, isRevealed } from "@game/core/battle/explore"
 import { nextEnemyAction } from "@game/core/ai"
 import { terrainAt, unitAt } from "@game/core/battle/query"
 import { $save, dispatchBattle } from "./save"
@@ -185,12 +185,44 @@ function clearSelection(extra: Partial<BattleUiState> = {}): void {
   })
 }
 
+/** Клетки из набора, которые не скрыты туманом войны. */
+function onlyRevealed(st: BattleState, keys: Set<string>): Set<string> {
+  if (!st.revealed) return keys
+  return new Set([...keys].filter((k) => {
+    const [x, y] = k.split(",").map(Number)
+    return isRevealed(st, { x: x as number, y: y as number })
+  }))
+}
+
+/** Враг, которого видно: не скрыт туманом войны. */
+function visibleFoe(st: BattleState, u: BattleUnit | undefined): BattleUnit | undefined {
+  return u && (u.side !== "enemy" || isRevealed(st, u.pos)) ? u : undefined
+}
+
 export function refreshDanger(): void {
   const st = state()
   const ui = $battleUi.get()
-  const alertTiles = st?.expedition && !st.result ? alertZone(st) : new Set<string>()
+  // Туман войны: дымка тревоги и зона опасности — только на разведанных клетках и только от видимых врагов.
+  // Зона врага в тумане не показывается: на него можно наткнуться неожиданно
+  const alertTiles = st?.expedition && !st.result ? onlyRevealed(st, visibleAlertZone(st)) : new Set<string>()
   if (!st || !ui.dangerOn) return patch({ dangerTiles: new Set(), alertTiles })
-  patch({ dangerTiles: dangerZone(st, "enemy"), alertTiles })
+  const danger = st.revealed
+    ? new Set(livingUnitsVisible(st).flatMap(u => [...threatTiles(st, u)]))
+    : dangerZone(st, "enemy")
+  patch({ dangerTiles: danger, alertTiles })
+}
+
+/** Зоны тревоги спящих врагов, которых видно (без тумана войны — всех). */
+function visibleAlertZone(st: BattleState): Set<string> {
+  if (!st.revealed) return alertZone(st)
+  const out = new Set<string>()
+  for (const e of livingUnitsVisible(st)) if (isAsleep(e)) for (const k of enemyAlertZone(st, e)) out.add(k)
+  return out
+}
+
+/** Живые враги вне тумана войны. */
+function livingUnitsVisible(st: BattleState): BattleUnit[] {
+  return Object.values(st.units).filter(u => u.side === "enemy" && u.alive && isRevealed(st, u.pos))
 }
 
 export function toggleDanger(): void {
@@ -309,7 +341,8 @@ function selectUnit(st: BattleState, bu: BattleUnit, extra: Partial<BattleUiStat
   const reach = reachOf(st, bu)
   const attackTiles = new Set<string>()
   for (const o of attackOptions(st, bu, reach)) {
-    const t = st.units[o.targetId]
+    // Враг в тумане войны — не цель: его не видно
+    const t = visibleFoe(st, st.units[o.targetId])
     if (t) attackTiles.add(posKey(t.pos))
   }
   for (const o of wallOptions(st, bu, reach)) attackTiles.add(posKey(o.wall))
@@ -429,7 +462,7 @@ function selected(st: BattleState): BattleUnit | undefined {
 
 /** Тап, когда боец выбран: цель → предпросмотр действия, свободная клетка в пределах хода → встать туда. */
 function tapWithSelection(st: BattleState, sel: BattleUnit, reach: ReachMap, pos: Pos): void {
-  const occupant = unitAt(st, pos)
+  const occupant = visibleFoe(st, unitAt(st, pos))
   if (occupant && occupant.unitId === sel.unitId) {
     // Повторный тап по бойцу на сундуке или выходе — снова спросить (если в первый раз ответили «нет»)
     if (offerPrompt(st, [sel.unitId])) return
@@ -471,7 +504,8 @@ export function tapTile(pos: Pos): void {
   const st = state()
   const ui = $battleUi.get()
   if (!st || !canAct(st, ui) || ui.dragging) return
-  const occupant = unitAt(st, pos)
+  // Враг в тумане войны для игрока — пустая клетка
+  const occupant = visibleFoe(st, unitAt(st, pos))
   if (st.explore) return tapExplore(st, ui, pos, occupant)
 
   switch (ui.mode) {
@@ -533,8 +567,10 @@ function tapExplore(st: BattleState, ui: BattleUiState, pos: Pos, occupant: Batt
   const sel = ui.selectedId ? st.units[ui.selectedId] : undefined
   const squad = Object.values(st.units).filter(u => u.side === "player" && u.alive)
   const lead = sel ?? squad.sort((a, b) => manhattan(a.pos, pos) - manhattan(b.pos, pos))[0]
-  // Сюда никто не встанет (стена, скала, вода для пеших) — справка о клетке
-  const walkable = squad.some(u => isPassable(terrainAt(st, pos), unitClass(st.roster[u.unitId] as UnitInstance).moveType))
+  // Сюда никто не встанет (стена, скала, вода для пеших) — справка о клетке. В тумане войны местность не видна:
+  // отряд идёт туда в любом случае (недостижимая клетка — к ближайшей достижимой)
+  const walkable = !isRevealed(st, pos)
+    || squad.some(u => isPassable(terrainAt(st, pos), unitClass(st.roster[u.unitId] as UnitInstance).moveType))
   if (!lead || !walkable) {
     if (ui.mode === "tileInfo" && ui.infoPos && samePos(ui.infoPos, pos)) return clearSelection()
     return showTileInfo(pos)
@@ -593,7 +629,7 @@ export function dragHover(pos: Pos | null): void {
   if (!sel || !reach) return
   if (pos && ui.dragHover && samePos(pos, ui.dragHover) && ui.path) return
   if (!pos) return patch({ ...NO_PREVIEW, dragHover: undefined, dragValid: false })
-  const occupant = unitAt(st, pos)
+  const occupant = visibleFoe(st, unitAt(st, pos))
   const aim = (from: Pos | null, targetId?: string, wallPos?: Pos): void =>
     from
       ? patch({ ...NO_PREVIEW, dragHover: pos, dragValid: true, movedTo: from, path: previewPath(st, sel, reach, from), targetId, wallPos })

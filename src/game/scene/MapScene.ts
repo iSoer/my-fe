@@ -2,6 +2,8 @@ import Phaser from "phaser"
 import type { BattleState, Pos, TerrainId } from "@game/core/types"
 import { inMap, mapSize, posKey } from "@game/core/types"
 import { terrainAt, unitAt } from "@game/core/battle/query"
+import { isRevealed } from "@game/core/battle/explore"
+import { EXPEDITION } from "@game/content/balance"
 import { biomeDef } from "@game/content/biomes"
 import { $save } from "@game/state/save"
 import {
@@ -94,6 +96,95 @@ interface HighlightTile {
   pulse?: number
 }
 
+/** Дымка зон тревоги: пикселей текстуры на клетку, размер и ключ мягкого пятна, общая прозрачность. */
+const FOG_RES = 12
+const FOG_BLOB_PX = 64
+const FOG_TEX = "map:fogBlob"
+const FOG_ALPHA = 0.42
+
+/**
+ * Туман войны: пикселей текстуры на клетку, подложка (тёмно-серая, почти непрозрачная) и ширина мягкого края (клеток).
+ * Поверх подложки — серая облачная текстура `FOW_CLOUD_TEX`: светлые клубы и тёмные просветы.
+ */
+const FOW_RES = 16
+const FOW_BASE = 0x3b4043
+const FOW_BASE_ALPHA = 0.88
+const FOW_SOFT = 2.2
+const FOW_CLOUD_TEX = "map:fowCloud"
+const FOW_CLOUD_PX = 256
+
+/**
+ * Бесшовная облачная текстура для тумана войны: фрактальный шум на периодической решётке (4 октавы), серый с
+ * лёгкой голубизной; светлые клубы плотнее. Рисуется один раз, детерминированно.
+ */
+function ensureFowCloudTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists(FOW_CLOUD_TEX)) return
+  const n = FOW_CLOUD_PX
+  const tex = scene.textures.createCanvas(FOW_CLOUD_TEX, n, n)
+  if (!tex) return
+  let seed = 0x2f6e2b1
+  const rand = (): number => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const octaves = [4, 8, 16, 32].map(cells => ({ cells, grid: Array.from({ length: cells * cells }, rand) }))
+  const smooth = (t: number) => t * t * (3 - 2 * t)
+  const noise = (x: number, y: number): number => {
+    let sum = 0
+    let amp = 1
+    let total = 0
+    for (const o of octaves) {
+      const fx = (x / n) * o.cells
+      const fy = (y / n) * o.cells
+      const x0 = Math.floor(fx)
+      const y0 = Math.floor(fy)
+      const at = (gx: number, gy: number) => o.grid[((gy % o.cells) * o.cells) + (gx % o.cells)] as number
+      const sx = smooth(fx - x0)
+      const sy = smooth(fy - y0)
+      const top = at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx
+      const bottom = at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx
+      sum += (top * (1 - sy) + bottom * sy) * amp
+      total += amp
+      amp *= 0.5
+    }
+    return sum / total
+  }
+  const ctx = tex.getContext()
+  const img = ctx.createImageData(n, n)
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      // Растянуть контраст: шум собирается к середине
+      const v = Math.min(1, Math.max(0, (noise(x, y) - 0.3) / 0.4))
+      const b = 96 + v * 96
+      const i = (y * n + x) * 4
+      img.data[i] = b - 4
+      img.data[i + 1] = b
+      img.data[i + 2] = b + 6
+      img.data[i + 3] = Math.round((0.55 + v * 0.4) * 255)
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+  tex.refresh()
+}
+
+/** Мягкое фиолетовое пятно для дымки (рисуется один раз). */
+function ensureFogTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists(FOG_TEX)) return
+  const tex = scene.textures.createCanvas(FOG_TEX, FOG_BLOB_PX, FOG_BLOB_PX)
+  if (!tex) return
+  const ctx = tex.getContext()
+  const r = FOG_BLOB_PX / 2
+  const grd = ctx.createRadialGradient(r, r, 0, r, r, r)
+  grd.addColorStop(0, "rgba(150, 100, 255, 1)")
+  grd.addColorStop(0.5, "rgba(150, 100, 255, 0.6)")
+  grd.addColorStop(1, "rgba(150, 100, 255, 0)")
+  ctx.fillStyle = grd
+  ctx.fillRect(0, 0, FOG_BLOB_PX, FOG_BLOB_PX)
+  tex.refresh()
+}
+
 export class MapScene extends Phaser.Scene {
   layout: BoardLayout = computeLayout(360, 480)
   readonly units = new Map<string, UnitView>()
@@ -110,9 +201,16 @@ export class MapScene extends Phaser.Scene {
   /** Зона опасности (пульсирует) и зона угрозы выбранного врага. */
   private dangerG!: Phaser.GameObjects.Graphics
   private threatG!: Phaser.GameObjects.Graphics
-  /** Контур зон тревоги спящих врагов в чаще; `alertSig` — какие клетки нарисованы. */
-  private alertG!: Phaser.GameObjects.Graphics
+  /** Дымка зон тревоги спящих врагов в чаще; `alertSig` — какие клетки в ней нарисованы. */
+  private alertFog: Phaser.GameObjects.RenderTexture | null = null
   private alertSig = ""
+  /**
+   * Туман войны (чаща): тёмная текстура над полем, из которой «стёрты» разведанные клетки. `fowShown` — какие клетки
+   * уже стёрты (по `y * w + x`), `fowKey` — бой и размер поля, для которых она построена.
+   */
+  private fow: Phaser.GameObjects.RenderTexture | null = null
+  private fowShown: Uint8Array = new Uint8Array(0)
+  private fowKey = ""
   private pulseTweens: Phaser.Tweens.Tween[] = []
   /** Подсветка хода/атаки/поддержки: пул тонированных квадратов, появляются «волной». */
   private hlLayer!: Phaser.GameObjects.Container
@@ -215,7 +313,6 @@ export class MapScene extends Phaser.Scene {
     this.tilesG = this.add.graphics().setDepth(0.2)
     this.decalLayer = this.add.container(0, 0).setDepth(1)
     this.dangerG = this.add.graphics().setDepth(1.8)
-    this.alertG = this.add.graphics().setDepth(1.82)
     this.threatG = this.add.graphics().setDepth(1.85)
     this.hlLayer = this.add.container(0, 0).setDepth(2)
     this.pathG = this.add.graphics().setDepth(3)
@@ -359,6 +456,11 @@ export class MapScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    // Дымка и туман войны уходят вместе со сценой: при новом запуске сцены — заново
+    this.alertFog = null
+    this.alertSig = ""
+    this.fow = null
+    this.fowKey = ""
     if (this.captureHandler) {
       this.game.canvas.removeEventListener("pointerdown", this.captureHandler)
       this.captureHandler = null
@@ -853,7 +955,10 @@ export class MapScene extends Phaser.Scene {
       view.setCd(bu.specialCd)
       view.setActed(bu.acted && st.phase === bu.side)
       view.setStatus(bu.bonuses, bu.penalties)
+      // Враг в тумане войны не виден
+      view.setVisible(bu.side !== "enemy" || isRevealed(st, bu.pos))
     }
+    this.syncFog(st)
     for (const [id, view] of this.units) {
       if (!alive.has(id)) {
         if (this.displacedId === id) this.displacedId = null
@@ -1301,7 +1406,10 @@ export class MapScene extends Phaser.Scene {
       const drop = eliteBuff.get(v.unitId)
       v.setMark(drop ? BUFFS[drop].icon : (exp.buffs.units[v.unitId] ?? []).map(b => BUFFS[b].icon).join(""))
     }
-    const sig = `${this.layout.tile}|${exp.opened.join(",")}|${JSON.stringify(exp.keys)}|${exp.pickups.map(p => p.id).join(",")}`
+    // Туман войны: сундуки, ключи и бонусы в неразведанных клетках не рисуются; число разведанных клеток — в подписи
+    let seen = 0
+    if (st.revealed) for (let i = 0; i < st.revealed.length; i++) if (st.revealed[i] === "1") seen++
+    const sig = `${this.layout.tile}|${seen}|${exp.opened.join(",")}|${JSON.stringify(exp.keys)}|${exp.pickups.map(p => p.id).join(",")}`
     if (sig === this.expSig) return
     this.expSig = sig
     for (const t of this.expTweens) t.stop()
@@ -1311,6 +1419,8 @@ export class MapScene extends Phaser.Scene {
     // Выходы: светящиеся клетки в углах с табличкой; уйти можно всегда, а с открытым сундуком — ярче
     const ready = exp.opened.length > 0
     for (const exitPos of def.exits) {
+      // Выход в тумане войны не виден — его нужно найти
+      if (!isRevealed(st, exitPos)) continue
       const e = this.center(exitPos)
       const glow = this.add.graphics()
       glow.fillStyle(ready ? 0x7dffb0 : 0xbfe8cf, ready ? 0.42 : 0.22)
@@ -1330,6 +1440,7 @@ export class MapScene extends Phaser.Scene {
       this.expTweens.push(this.tweens.add({ targets: glow, alpha: 0.45, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }))
     }
     for (const chest of def.chests) {
+      if (!isRevealed(st, chest.pos)) continue
       const c = this.center(chest.pos)
       const opened = exp.opened.includes(chest.id)
       const tex = opened ? CHEST_OPEN_TEX : CHEST_TEX
@@ -1358,6 +1469,7 @@ export class MapScene extends Phaser.Scene {
     // Сердечки и бонусы на земле: медленно парят и мягко пульсируют в ореоле; у каждого своя фаза, чтобы не мигали
     // хором. Сердечко — векторная картинка (эмодзи-текст дрожит при движении на доли пикселя)
     for (const p of exp.pickups) {
+      if (!isRevealed(st, p.pos)) continue
       const c = this.center(p.pos)
       const phase = (Math.abs(p.pos.x * 73 + p.pos.y * 151) % 1000) / 1000
       const halo = this.add.circle(c.x, c.y + t * 0.08, t * 0.3, p.kind === "heart" ? 0xff6b8a : 0xffd166, 0.26)
@@ -1378,7 +1490,7 @@ export class MapScene extends Phaser.Scene {
     }
     // Ключи на земле подпрыгивают и светятся
     for (const spot of Object.values(exp.keys)) {
-      if (!spot.pos || !hasTexture(this, KEY_TEX)) continue
+      if (!spot.pos || !hasTexture(this, KEY_TEX) || !isRevealed(st, spot.pos)) continue
       const c = this.center(spot.pos)
       const halo = this.add.circle(c.x, c.y, t * 0.32, 0xffe08a, 0.35)
       const key = this.add.image(c.x, c.y - t * 0.05, KEY_TEX).setDisplaySize(t * 0.6, t * 0.6)
@@ -1813,40 +1925,113 @@ export class MapScene extends Phaser.Scene {
   }
 
   /**
-   * Зоны тревоги спящих врагов (чаща): лёгкая заливка и пунктир по краю — войдёшь внутрь, и враги проснутся.
-   * Перерисовывается, только когда сменились клетки или размер клетки.
+   * Туман войны: тёмная текстура над полем (`FOW_RES` пикселей на клетку, растянута на всё поле — края мягкие),
+   * разведанные клетки из неё стёрты. Новый бой или другое поле — строится заново, иначе стираются только новые клетки.
+   */
+  private syncFog(st: BattleState): void {
+    if (!st.revealed) {
+      this.fow?.setVisible(false)
+      return
+    }
+    const size = mapSize(st.map)
+    const l = this.layout
+    if (!this.fow) {
+      ensureFogTexture(this)
+      this.fow = this.add.renderTexture(0, 0, size.w * FOW_RES, size.h * FOW_RES).setOrigin(0, 0).setDepth(1.95)
+    }
+    const fow = this.fow
+    fow.setVisible(true).setPosition(l.ox, l.oy).setDisplaySize(l.tile * size.w, l.tile * size.h)
+    const key = `${st.id}|${size.w}x${size.h}`
+    const fresh = key !== this.fowKey
+    if (fresh) {
+      this.fowKey = key
+      if (fow.width !== size.w * FOW_RES || fow.height !== size.h * FOW_RES) fow.setSize(size.w * FOW_RES, size.h * FOW_RES)
+      fow.clear()
+      // Подложка прячет всё под туманом, облачная текстура поверх делает его похожим на туман
+      ensureFowCloudTexture(this)
+      fow.fill(FOW_BASE, FOW_BASE_ALPHA)
+      fow.repeat(FOW_CLOUD_TEX, undefined, 0, 0, fow.width, fow.height)
+      this.fowShown = new Uint8Array(size.w * size.h)
+    }
+    const cells: Pos[] = []
+    for (let i = 0; i < st.revealed.length; i++)
+      if (st.revealed[i] === "1" && !this.fowShown[i]) cells.push({ x: i % size.w, y: Math.floor(i / size.w) })
+    this.clearFog(cells, !fresh)
+  }
+
+  /**
+   * Пока бойцы идут, туман рассеивается с каждым их шагом (до того, как бой обновит разведанное) — радиус обзора
+   * тот же, что у правил (`EXPEDITION.vision`).
+   */
+  peekFog(pos: Pos): void {
+    const st = $save.get().battle
+    if (!this.fow || !st?.revealed) return
+    const size = mapSize(st.map)
+    const r = EXPEDITION.vision
+    const cells: Pos[] = []
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const p = { x: pos.x + dx, y: pos.y + dy }
+        if (dx * dx + dy * dy > r * r + r || !inMap(size, p) || this.fowShown[p.y * size.w + p.x]) continue
+        cells.push(p)
+      }
+    }
+    this.clearFog(cells, true)
+  }
+
+  /** Стереть туман над клетками: мягкими пятнами, с `fade` — проявляясь за три шага. */
+  private clearFog(cells: Pos[], fade: boolean): void {
+    const fow = this.fow
+    const st = $save.get().battle
+    if (!fow || cells.length === 0 || !st) return
+    const w = mapSize(st.map).w
+    for (const p of cells) this.fowShown[p.y * w + p.x] = 1
+    const scale = (FOW_RES * FOW_SOFT) / FOG_BLOB_PX
+    const erase = (alpha: number) => {
+      if (!fow.scene) return
+      for (const p of cells) fow.stamp(FOG_TEX, undefined, (p.x + 0.5) * FOW_RES, (p.y + 0.5) * FOW_RES, { scale, alpha, erase: true })
+    }
+    if (!fade) return erase(1)
+    erase(0.35)
+    this.time.delayedCall(90, () => erase(0.5))
+    this.time.delayedCall(180, () => erase(1))
+  }
+
+  /**
+   * Зоны тревоги спящих врагов (чаща): едва заметная фиолетовая дымка — войдёшь в неё, и враги проснутся.
+   * Дымка рисуется мягкими пятнами в маленькую текстуру (`FOG_RES` пикселей на клетку) и растягивается на всё поле:
+   * края размываются сами, а на кадр — один объект. Текстура перерисовывается, только когда сменились клетки зоны.
    */
   private drawAlert(ui: BattleUiState): void {
-    const t = this.layout.tile
-    const sig = ui.alertTiles.size === 0 ? "" : `${t}|${this.layout.ox},${this.layout.oy}|${[...ui.alertTiles].join(";")}`
+    const st = $save.get().battle
+    const set = ui.alertTiles
+    if (!st || set.size === 0) {
+      this.alertSig = ""
+      this.alertFog?.setVisible(false)
+      return
+    }
+    const size = mapSize(st.map)
+    const l = this.layout
+    if (!this.alertFog) {
+      ensureFogTexture(this)
+      this.alertFog = this.add.renderTexture(0, 0, size.w * FOG_RES, size.h * FOG_RES).setOrigin(0, 0).setDepth(1.82)
+      this.alertFog.setAlpha(FOG_ALPHA)
+      // Дымка медленно «дышит»
+      this.tweens.add({ targets: this.alertFog, alpha: FOG_ALPHA * 0.7, duration: 2600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" })
+    }
+    const fog = this.alertFog
+    fog.setVisible(true).setPosition(l.ox, l.oy).setDisplaySize(l.tile * size.w, l.tile * size.h)
+    const sig = `${size.w}x${size.h}|${[...set].join(";")}`
     if (sig === this.alertSig) return
     this.alertSig = sig
-    const g = this.alertG
-    g.clear()
-    if (!sig) return
-    const set = ui.alertTiles
-    // Едва заметная заливка — видно, с какой стороны пунктира зона
-    g.fillStyle(HL.alert, 0.16)
+    if (fog.width !== size.w * FOG_RES || fog.height !== size.h * FOG_RES) fog.setSize(size.w * FOG_RES, size.h * FOG_RES)
+    fog.clear()
+    // Пятно чуть шире клетки: соседние сливаются в облако, за край зоны дымка почти не заходит
+    const scale = (FOG_RES * 1.5) / FOG_BLOB_PX
     for (const k of set) {
       const pos = this.tileAt(k)
       if (!pos) continue
-      const o = tileOrigin(this.layout, pos)
-      g.fillRect(o.x, o.y, t, t)
-    }
-    g.lineStyle(Math.max(2, t * 0.06), HL.alert, 0.9)
-    // Пунктир: по два штриха на сторону клетки
-    const dash = (x1: number, y1: number, x2: number, y2: number) => {
-      for (const [a, b] of [[0.08, 0.38], [0.58, 0.88]] as const)
-        g.lineBetween(x1 + (x2 - x1) * a, y1 + (y2 - y1) * a, x1 + (x2 - x1) * b, y1 + (y2 - y1) * b)
-    }
-    for (const k of set) {
-      const pos = this.tileAt(k)
-      if (!pos) continue
-      const o = tileOrigin(this.layout, pos)
-      if (!set.has(posKey({ x: pos.x, y: pos.y - 1 }))) dash(o.x, o.y, o.x + t, o.y)
-      if (!set.has(posKey({ x: pos.x, y: pos.y + 1 }))) dash(o.x, o.y + t, o.x + t, o.y + t)
-      if (!set.has(posKey({ x: pos.x - 1, y: pos.y }))) dash(o.x, o.y, o.x, o.y + t)
-      if (!set.has(posKey({ x: pos.x + 1, y: pos.y }))) dash(o.x + t, o.y, o.x + t, o.y + t)
+      fog.stamp(FOG_TEX, undefined, (pos.x + 0.5) * FOG_RES, (pos.y + 0.5) * FOG_RES, { scale, alpha: 0.55 })
     }
   }
 

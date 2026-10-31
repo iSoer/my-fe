@@ -26,7 +26,7 @@ import { lootFor } from "../progression"
 import { BATTLE, difficultyDef, SKILL_XP, SP, turnLimitOf, XP } from "@game/content/balance"
 import { BUFFS } from "@game/content/expedition"
 import { buffLootMult } from "./buffs"
-import { alertZone, isCalm } from "./explore"
+import { alertZone, enemyAlertZone, initFog, isAsleep, isCalm, reveal, revealSquad } from "./explore"
 import { gainSkillXp } from "../units/proficiency"
 import { MOVEMENT_SKILLS, type Skill } from "@shared/character/skills"
 import { MAX_LEVEL } from "../types"
@@ -121,8 +121,11 @@ export function createBattle(opts: CreateBattleOptions): ReduceResult {
   }
   const events: BattleEvent[] = []
   startPhase(state, "player", events)
-  // Чаща начинается с разведки (если отряд не встал сразу в зону тревоги)
-  if (state.expedition && isCalm(state)) state.explore = true
+  // Чаща начинается с разведки (если отряд не встал сразу в зону тревоги) и в тумане войны
+  if (state.expedition) {
+    if (isCalm(state)) state.explore = true
+    initFog(state)
+  }
   return { state, events }
 }
 
@@ -532,8 +535,12 @@ function exploreMove(state: BattleState, leaderId: string, to: Pos, solo: boolea
       path = whole
     }
     else {
-      // Перед зоной тревоги — стоп; на занятой союзником клетке не встать — шаг назад
+      // Перед зоной тревоги — стоп; на занятой союзником клетке не встать — шаг назад. Те, кого потревожили, —
+      // видны сквозь туман войны: игрок должен понимать, почему отряд встал
       alarm = true
+      const edge = whole[cut] as Pos
+      const woken = livingUnits(state, "enemy").filter(e => isAsleep(e) && enemyAlertZone(state, e).has(posKey(edge)))
+      reveal(state, woken.map(e => e.pos), 1)
       path = whole.slice(0, Math.max(1, cut))
       while (path.length > 1 && occupiedByOther(path[path.length - 1] as Pos, leaderId)) path.pop()
     }
@@ -755,6 +762,15 @@ export function applyAction(prev: BattleState, action: BattleAction): ReduceResu
 
   if (action.type === "move" || action.type === "wait" || action.type === "attack" || action.type === "assist" || action.type === "attackWall")
     expeditionStepOn(state, action.unitId, events)
+  // Туман войны: обзор вокруг отряда и по всем пройденным им путям
+  if (state.revealed) {
+    const paths = events.flatMap((e) => {
+      if (e.type === "squadMoved") return e.moves.map(m => m.path)
+      if (e.type === "moved" && state.units[e.unitId]?.side === "player") return [e.path]
+      return []
+    })
+    revealSquad(state, paths)
+  }
   checkEnd(state, events)
   return { state, events }
 }

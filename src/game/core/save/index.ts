@@ -20,7 +20,7 @@ import { DEFAULT_LANG, tr } from "@game/i18n"
  * в бою. v11: сюжетные факты (`story`: счётчики и просмотренные диалоги) для триггеров диалогов.
  * v12: обновление витрины Лавки за Вкусняшки (`store.rerolls` — цена, `store.variant` — номер выкладки).
  */
-export const SAVE_VERSION = 13
+export const SAVE_VERSION = 14
 
 const stat = z.number()
 /** Бонусы и штрафы боя; в старых сейвах — `atk` (Str/Mag разом), он раскладывается на оба стата. */
@@ -209,6 +209,7 @@ const battleSchema = z.object({
     found: z.array(z.string()).default([])
   }).optional(),
   explore: z.boolean().optional(),
+  revealed: z.string().optional(),
   drink: z.object({ id: z.string(), pct: partialStats }).optional()
 })
 
@@ -521,7 +522,10 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
   },
   // v12 → v13: в чаще убран бонус «Живица» (`regen`). В идущей вылазке он пропадает у отряда и с земли, а одиночка,
   // который его нёс, теперь оставит «Удачу». Разведки (`explore`) в старом бою нет — он продолжается пошагово.
-  12: (old) => ({ ...old, battle: dropRegen(old["battle"]), version: 13 })
+  12: (old) => ({ ...old, battle: dropRegen(old["battle"]), version: 13 }),
+  // v13 → v14: туман войны в чаще (`battle.revealed`). Поле необязательное: в идущей вылазке из старого сейва тумана
+  // нет — видно всё поле. Версия поднята, чтобы старый клиент не прочитал новый сейв и не потерял разведанное.
+  13: (old) => ({ ...old, version: 14 })
 }
 
 /** Убрать бонус `regen` из боя в сейве (миграция v12 → v13). */

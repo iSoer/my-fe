@@ -16,8 +16,6 @@ export const HL = {
   assist: 0x1fe8b0,
   danger: 0xffb86b,
   threat: 0xb79cff,
-  /** Чаща: граница зоны тревоги спящих врагов. */
-  alert: 0xffe14d,
   path: 0xfff4f7
 }
 

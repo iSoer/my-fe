@@ -37,6 +37,7 @@ import type { UnitView } from "./UnitView"
 import { tr } from "@game/i18n"
 import { SKILL_LABELS } from "@shared/character/skills"
 import { BUFFS, pickupIcon } from "@game/content/expedition"
+import { isRevealed } from "@game/core/battle/explore"
 import { itemInfo } from "@game/core/items"
 
 /** Во сколько раз быстрее бегут бойцы в разведке по чаще: путь там — десятки клеток. */
@@ -80,7 +81,9 @@ export class GamePresenter implements Presenter {
       const skip = map.beginPlayback()
       map.syncFromState(before, skip)
       const actor = this.enemyActor(events, before)
-      if (actor) {
+      // Враг в тумане войны: камера на него не наезжает и не подсвечивает — его не видно
+      const actorPos = actor ? before.units[actor]?.pos : undefined
+      if (actor && actorPos && isRevealed(before, actorPos)) {
         // Большое поле: камера наезжает на того, кто сейчас ходит
         const at = before.units[actor]?.pos
         if (at) await map.focusOn(at, 260 / this.speed())
@@ -336,6 +339,8 @@ export class GamePresenter implements Presenter {
     const perTile = view.gait === "cavalry" ? 105 : view.gait === "armored" ? 170 : view.gait === "flier" ? 120 : 135
     const heavyStep = view.gait === "armored" || view.gait === "cavalry"
     view.setRunning(true)
+    // Боец отряда разгоняет туман войны на каждом шаге
+    const scout = state.units[unitId]?.side === "player"
     for (let i = 1; i < path.length; i++) {
       const p = path[i]
       const prev = path[i - 1]
@@ -350,6 +355,7 @@ export class GamePresenter implements Presenter {
         last: i === path.length - 1,
         onLand: () => {
           if (!map.sys.isActive()) return
+          if (scout) map.peekFog(p)
           const feet = view.feetWorld()
           if (view.gait !== "flier") {
             stepFx(map, feet.x, feet.y, map.tile, terrain, state.map.biomeId, heavyStep)

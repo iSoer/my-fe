@@ -24,8 +24,8 @@ export function TopHud({ battle }: { battle: BattleState }) {
             <span
               className="bf-phase-turn"
               title={tr(
-                "No enemies are awake: tap a tile and the squad walks there. Crossing the dashed line wakes the enemies — then it’s turn-based combat",
-                "Враги не проснулись: нажмите на клетку — отряд пойдёт туда. За пунктирной линией враги проснутся — начнётся пошаговый бой"
+                "No enemies are awake: tap a tile and the squad walks there. Stepping into the purple haze wakes the enemies — then it’s turn-based combat",
+                "Враги не проснулись: нажмите на клетку — отряд пойдёт туда. В фиолетовой дымке враги проснутся — начнётся пошаговый бой"
               )}
             >
               {tr("Exploring", "Разведка")}

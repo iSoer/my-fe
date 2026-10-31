@@ -1,6 +1,7 @@
 import type { BattleState, MoveType, Pos, TerrainId } from "@game/core/types"
 import { posKey } from "@game/core/types"
 import { terrainAt } from "@game/core/battle/query"
+import { isRevealed } from "@game/core/battle/explore"
 import { moveCost } from "@game/core/map/pathing"
 import { CHARACTER_STAT_LABELS as L } from "@shared/character/leveling"
 import { COMBAT, TERRAIN_BONUS } from "./balance"
@@ -62,6 +63,16 @@ function moveText(terrain: TerrainId): string {
 /** Всё о клетке поля: название в биоме, проходимость, бонус стоящему и особенности (HP хлипкого препятствия). */
 export function terrainInfo(state: BattleState, pos: Pos): TerrainInfo {
   const terrain = terrainAt(state, pos)
+  // Туман войны: что на клетке — неизвестно
+  if (!isRevealed(state, pos)) {
+    return {
+      terrain,
+      icon: "☁️",
+      name: tr("Unexplored", "Неразведано"),
+      move: tr("Unknown", "Неизвестно"),
+      notes: [tr("Hidden by the fog of war. Come closer to see what’s here.", "Скрыто туманом войны. Подойдите ближе, чтобы увидеть, что здесь.")]
+    }
+  }
   const notes: string[] = []
   if (terrain === "wall_breakable") {
     const hp = state.walls[posKey(pos)] ?? 0

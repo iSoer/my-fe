@@ -360,7 +360,8 @@ describe("вылазка в чащу: ключ, сундук, выход", () =>
   })
 
   it("страж на поводке: дальнего игрока не преследует и возвращается к сундуку, ближнего — только в пределах поводка", () => {
-    const far = miniExpedition({ guardHp: 40, guardPos: { x: 2, y: 3 }, playerPos: { x: 0, y: 7 }, leash: 2 })
+    // Игрок дальше радиуса тревоги (`EXPEDITION.alertRadius = 6`) и зоны атаки стража
+    const far = miniExpedition({ guardHp: 40, guardPos: { x: 2, y: 3 }, playerPos: { x: 5, y: 7 }, leash: 2 })
     const s: BattleState = structuredClone(far.state)
     s.phase = "enemy"
     s.units[far.guard.id]!.stance = "advance"

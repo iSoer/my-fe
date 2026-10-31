@@ -403,7 +403,10 @@ export const EXPEDITION = {
   chests: { easy: 4, normal: 5, hard: 6, nightmare: 6 } as Record<"easy" | "normal" | "hard" | "nightmare", number>,
   group: { easy: [2, 3], normal: [2, 4], hard: [3, 4], nightmare: [3, 4] } as Record<"easy" | "normal" | "hard" | "nightmare", [number, number]>,
   leash: 5,
-  alertRadius: 4,
+  /** Радиус тревоги стражей: шире обзора отряда (`vision`) — часть стычек начинается с врага, которого не видно. */
+  alertRadius: 6,
+  /** Туман войны: радиус обзора бойца (круг). Выходы тоже скрыты, пока их не найдут. */
+  vision: 3,
   chestShare: 0.6,
   chestSpread: 0.15,
   /** Что в сундуке: веса категорий (Вкусняшки чаще). */
