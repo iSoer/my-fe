@@ -241,19 +241,20 @@
   color: var(--ok-text);
 }
 
-/* Вылазка, шаг 1: выбор режима (схватка или мрачная чаща) */
+/* Вылазка, шаг 1: выбор режима (схватка или мрачная чаща) — карточки друг под другом, тап ведёт дальше */
 .pawfield .mode-pick {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 14px;
 }
 .pawfield .mode-card {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
   border: 3px solid transparent;
   background: var(--paper);
   color: var(--text-paper);
@@ -267,8 +268,22 @@
   box-shadow: 5px 5px 0 var(--red);
 }
 .pawfield .mode-ico {
-  font-size: 26px;
+  flex-shrink: 0;
+  font-size: 30px;
   line-height: 1;
+}
+.pawfield .mode-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.pawfield .mode-go {
+  flex-shrink: 0;
+  font-size: 26px;
+  font-weight: 900;
+  opacity: 0.55;
 }
 
 /* Кружка из бара на вылазку — строка над выбором режима */

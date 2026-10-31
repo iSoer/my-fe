@@ -70,6 +70,7 @@ try {
   await step('офлайн: вылазка у ворот и бой с канвасом Phaser', async () => {
     await page.evaluate(() => window.__pf.settlement.open('gate'));
     await page.getByRole('button', { name: /Plan a sortie/ }).first().click();
+    await page.getByRole('button', { name: 'Skirmish' }).click();
     await page.locator('.diff-card:not(.locked)').first().click();
     await page.getByRole('button', { name: /^Next/ }).first().click();
     await page.waitForURL(/battle\/squad/, { timeout: 5000 });

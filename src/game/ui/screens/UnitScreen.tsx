@@ -142,8 +142,12 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     toast(
       r.unlocked
         ? tr(
-            `Reborn as ★${r.unlocked}! ★${r.unlocked} fighters now appear in the Shop, rewards and new rosters.`,
-            `Перерождение: ★${r.unlocked}! Бойцы с ★${r.unlocked} теперь появляются в магазине, наградах и новых ростерах.`
+            r.unlocked >= 5
+              ? `Reborn as ★${r.unlocked}! A ★5 fighter gets a second passive skill. ★5 never come from the Shop or rewards — only by rebirth.`
+              : `Reborn as ★${r.unlocked}! ★${r.unlocked} fighters now appear in the Shop, rewards and new rosters.`,
+            r.unlocked >= 5
+              ? `Перерождение: ★${r.unlocked}! У бойца ★5 — вторая пассивная способность. ★5 не приходят из магазина и наград — только перерождением.`
+              : `Перерождение: ★${r.unlocked}! Бойцы с ★${r.unlocked} теперь появляются в магазине, наградах и новых ростерах.`
           )
         : tr(`Reborn as ★${nextStar}! Back to level 1.`, `Перерождение: ★${nextStar}! Снова 1-й уровень.`)
     )
@@ -390,10 +394,14 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         text={tr(
           `${displayName(unit)} goes back to level 1 and gains a star: at level ${MAX_LEVEL} the stats will be higher than now. `
           + "Class, weapon, skills and SP stay."
-          + (nextStar > save.profile.maxRarity ? ` ★${nextStar} fighters will start appearing in the Shop, rewards and new rosters.` : ""),
+          + (nextStar >= 5
+            ? " A ★5 fighter has two passive skills: a missing one is granted on rebirth. ★5 fighters never come from the Shop, rewards or new rosters — only by rebirth."
+            : nextStar > save.profile.maxRarity ? ` ★${nextStar} fighters will start appearing in the Shop, rewards and new rosters.` : ""),
           `${displayName(unit)} вернётся на 1-й уровень и получит звезду: к ${MAX_LEVEL}-му статы будут выше, чем сейчас. `
           + "Класс, оружие, навыки и SP сохранятся."
-          + (nextStar > save.profile.maxRarity ? ` Бойцы с ★${nextStar} начнут появляться в магазине, наградах и новых ростерах.` : "")
+          + (nextStar >= 5
+            ? " У бойца ★5 две пассивные способности: недостающую он получит при перерождении. Бойцы ★5 не приходят из магазина, наград и новых ростеров — только перерождением."
+            : nextStar > save.profile.maxRarity ? ` Бойцы с ★${nextStar} начнут появляться в магазине, наградах и новых ростерах.` : "")
         )}
         confirmLabel={tr("Rebirth", "Переродить")}
         onConfirm={onRebirth}

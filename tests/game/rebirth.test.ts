@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { $save, ensureRoster, rebirthAction } from "@game/state/save"
 import { createEmptySave, parseSave, serializeSave } from "@game/core/save"
-import { canRebirth, generateRoster, generateUnit, rebirthUnit, rescaleRarity, statsAtLevel } from "@game/core/units"
-import { generateRewardChoice, generateShop, recruitLevel } from "@game/core/progression"
+import { canRebirth, generateRoster, generateUnit, rebirthUnit, rescaleRarity, statsAtLevel, withFiveStarPassives } from "@game/core/units"
+import { generateRewardChoice, generateShop, recruitLevel, reinforcements } from "@game/core/progression"
 import { MAX_LEVEL, STATS, type Rarity, type UnitInstance } from "@game/core/types"
 import { recruitRarityWeights } from "@game/content/balance"
 import { loadCharacterModel } from "@model/character-model/model"
@@ -69,9 +69,15 @@ describe("перерождение", () => {
         expect(next.xp).toBe(0)
         expect(next.sp).toBe(123)
         expect(next.classId).toBe(u.classId)
-        expect(next.skills).toEqual(u.skills)
-        expect(next.learned).toEqual(u.learned)
-        expect(next.learnable.slice(0, u.learnable.length)).toEqual(u.learnable)
+        // Навыки на месте; на ★5 — ещё вторая пассивка в свободный слот
+        for (const [slot, id] of Object.entries(u.skills)) expect(next.skills[slot as keyof typeof next.skills]).toBe(id)
+        for (const id of u.learned) expect(next.learned).toContain(id)
+        if (star < 5) {
+          expect(next.skills).toEqual(u.skills)
+          expect(next.learned).toEqual(u.learned)
+          expect(next.learnable.slice(0, u.learnable.length)).toEqual(u.learnable)
+        }
+        else expect((["a", "b", "c"] as const).filter(sl => next.skills[sl]).length).toBeGreaterThanOrEqual(2)
         // 1-й уровень — по формуле модели для новой звезды
         expect(next.baseStats).toEqual(levelOneStats(next.maxStats, model.growth, model.rarities[star as Rarity]))
         const before = statsAtLevel(u, MAX_LEVEL)
@@ -153,6 +159,44 @@ describe("уровень бойцов новой звезды", () => {
         if (u.rarity === 2) expect(u.level).toBeGreaterThanOrEqual(28)
         if (u.rarity === 2) expect(u.level).toBeLessThanOrEqual(31)
       }
+    }
+  })
+})
+
+describe("★5: только перерождением, с двумя пассивками", () => {
+  it("случайные бойцы — не выше ★4, даже когда ★5 открыта", () => {
+    expect(recruitRarityWeights(5)[5]).toBe(0)
+    expect(recruitRarityWeights(5, true)[5]).toBe(0)
+    expect(recruitRarityWeights(5, true)[4]).toBe(2 * recruitRarityWeights(5)[4])
+    const army = { id: "a", units: [generateUnit({ seed: 1, level: 60, rarity: 4, preset: true })], squadIds: [], createdAt: 0, battles: 0, wins: 0 }
+    for (let seed = 0; seed < 60; seed++) {
+      const shop = generateShop(seed, army, { glory: 999, maxRarity: 5 }, 0)
+      expect(shop.candidates.every(u => u.rarity <= 4)).toBe(true)
+      const reward = generateRewardChoice(seed, army, { maxRarity: 5 }, true, 0)
+      expect(reward.every(u => u.rarity <= 4)).toBe(true)
+      expect(reinforcements(seed, { ...army, units: [] }, { maxRarity: 5 }, 0).every(u => u.rarity <= 4)).toBe(true)
+    }
+  })
+
+  it("боец игрока ★5 из генератора — с двумя пассивками; враг — как раньше", () => {
+    for (let seed = 0; seed < 40; seed++) {
+      const u = generateUnit({ seed, level: 30, rarity: 5, preset: true })
+      expect((["a", "b", "c"] as const).filter(sl => u.skills[sl]).length).toBeGreaterThanOrEqual(2)
+      expect(withFiveStarPassives(u)).toBe(u)
+    }
+  })
+
+  it("старый ★5 с одной пассивкой получает вторую; ★4 не меняется; повтор ничего не меняет", () => {
+    for (let seed = 0; seed < 30; seed++) {
+      const base = generateUnit({ seed, level: 40, rarity: 4, preset: true })
+      expect(withFiveStarPassives(base)).toBe(base)
+      const one = { ...base, rarity: 5 as const, skills: { weapon: base.skills.weapon, special: base.skills.special, a: undefined, b: undefined, c: undefined } }
+      const fixed = withFiveStarPassives(one)
+      const passives = (["a", "b", "c"] as const).map(sl => fixed.skills[sl]).filter(Boolean) as string[]
+      expect(passives.length).toBe(2)
+      for (const id of passives) expect(fixed.learned).toContain(id)
+      expect(fixed.learnable.some(id => passives.includes(id))).toBe(false)
+      expect(withFiveStarPassives(fixed)).toBe(fixed)
     }
   })
 })

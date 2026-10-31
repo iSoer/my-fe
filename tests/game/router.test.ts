@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { parentRoute, parseRoute, routePath } from "@game/state/router"
 
 describe("маршруты вылазки", () => {
-  it("сложность → вражеская армия → отряд", () => {
+  it("режим → сложность → вражеская армия → отряд", () => {
     expect(parseRoute("#/battle/setup")).toEqual({ name: "battleSetup" })
+    expect(parseRoute("#/battle/difficulty")).toEqual({ name: "battleDifficulty" })
+    expect(routePath({ name: "battleDifficulty" })).toBe("/battle/difficulty")
+    expect(parentRoute({ name: "battleDifficulty" })).toEqual({ name: "battleSetup" })
     expect(parseRoute("#/battle/enemy/hard")).toEqual({ name: "battleEnemy", difficulty: "hard" })
     expect(routePath({ name: "battleEnemy", difficulty: "nightmare" })).toBe("/battle/enemy/nightmare")
-    expect(parentRoute({ name: "battleEnemy", difficulty: "easy" })).toEqual({ name: "battleSetup" })
+    expect(parentRoute({ name: "battleEnemy", difficulty: "easy" })).toEqual({ name: "battleDifficulty" })
     expect(parseRoute("#/battle/squad")).toEqual({ name: "battleSquad" })
   })
   it("неизвестная сложность — не экран врагов", () => {

@@ -17,6 +17,16 @@ my-fe — хост игры: Telegram Mini App и PWA на GitHub Pages. Пла�
    - `$route.subscribe(syncBackButton)`;
    - `$battle.subscribe(b => setClosingConfirmation(!!b && !b.result))` — подтверждение закрытия Mini App во время боя.
 
+## Высота экрана и прокрутка
+
+[host/host.css](../src/host/host.css) закрепляет приложение на весь экран: `html` и `body` не прокручиваются
+(`overflow: hidden`), `#app` — `position: fixed; inset: 0` и задаёт игре `--app-h: 100%`. Полноэкранные контейнеры
+игры (`.pawfield`, `.route`, `.screen`, `.bf-root`, `.st-root`) берут высоту из `var(--app-h, 100dvh)`: при этом
+хосте — высоту закреплённого корня, при другом — прежние `100dvh`. Прокрутка — только внутри экранов
+(`.screen-body`). Причина: iOS PWA (standalone, `viewport-fit=cover`, `black-translucent`) при запуске считает
+`100dvh` неточно, и документ оказывался чуть прокручен вниз, пока его не сдвинуть пальцем. Экран фатальной ошибки
+(`.fatal`) прокручивается сам.
+
 ## Хук хоста
 
 [platform/host.ts](../src/game/platform/host.ts), интерфейс `GameHost`:

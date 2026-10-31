@@ -151,11 +151,10 @@ function DrinkNote({ save }: { save: SaveGame }) {
   )
 }
 
-/** Вылазка, шаг 1 из 3: режим и сложность. Тап по открытой сложности ведёт к выбору вражеской армии. */
+/** Вылазка, шаг 1 из 4: режим — карточки друг под другом; тап выбирает режим и ведёт к выбору сложности. */
 export function BattleSetupScreen() {
   const save = useStore($save)
   const mode = useStore($sortieMode)
-  const [toastEl, toast] = useToast()
 
   useEffect(() => {
     ensureRoster()
@@ -164,30 +163,57 @@ export function BattleSetupScreen() {
 
   return (
     <div className="screen">
-      <TopBar title={tr("Sortie · 1/3", "Вылазка · 1/3")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
+      <TopBar title={tr("Sortie · 1/4", "Вылазка · 1/4")} right={<ResourceBar />} onBack={() => navigate("/village", true)} />
       <div className="screen-body">
         <DrinkNote save={save} />
         <div className="section-title">{tr("Mode", "Режим")}</div>
-        <div className="mode-pick" role="radiogroup" aria-label={tr("Mode", "Режим")}>
-          {MODES.map(m => (
+        <div className="mode-pick">
+          {MODES.map((m, i) => (
             <button
               key={m.id}
               type="button"
-              role="radio"
-              aria-checked={mode === m.id}
-              className={`mode-card ${mode === m.id ? "selected" : ""}`}
+              aria-label={m.name()}
+              className={`mode-card pop-in ${mode === m.id ? "selected" : ""}`}
+              style={stagger(i, 60)}
               onClick={() => {
                 haptic("select")
                 $sortieMode.set(m.id)
+                navigate("/battle/difficulty")
               }}
             >
               <span className="mode-ico" aria-hidden="true"><Icon emoji={m.icon} /></span>
-              <b>{m.name()}</b>
-              <span className="muted small">{m.desc()}</span>
+              <span className="mode-body">
+                <b>{m.name()}</b>
+                <span className="muted small">{m.desc()}</span>
+              </span>
+              <span className="mode-go" aria-hidden="true">›</span>
             </button>
           ))}
         </div>
-        <div className="section-title">{tr("Difficulty", "Сложность")}</div>
+      </div>
+    </div>
+  )
+}
+
+/** Вылазка, шаг 2 из 4: сложность в выбранном режиме. Тап по открытой сложности ведёт к выбору вражеской армии. */
+export function DifficultyScreen() {
+  const save = useStore($save)
+  const mode = useStore($sortieMode)
+  const [toastEl, toast] = useToast()
+  const modeDef = MODES.find(m => m.id === mode)
+
+  useEffect(() => {
+    ensureRoster()
+    ensureSortieSeed()
+  }, [])
+
+  return (
+    <div className="screen">
+      <TopBar title={tr("Sortie · 2/4", "Вылазка · 2/4")} right={<ResourceBar />} onBack={() => navigate("/battle/setup", true)} />
+      <div className="screen-body">
+        <div className="section-title">
+          <IconText text={`${tr("Difficulty", "Сложность")}${modeDef ? ` · ${modeDef.icon} ${modeDef.name()}` : ""}`} />
+        </div>
         <div className="stack">
           {DIFFICULTIES.map((d, i) => {
             const unlocked = difficultyUnlocked(save, d.id)
@@ -254,7 +280,7 @@ export function BattleSetupScreen() {
 }
 
 /**
- * Вылазка, шаг 2 из 3: вражеская армия на выбранной сложности (биом у каждой случайный).
+ * Вылазка, шаг 3 из 4: вражеская армия на выбранной сложности (биом у каждой случайный).
  * По умолчанию выбрана ближайшая к уровню армии игрока; «Далее» разведывает бой и ведёт к выбору отряда.
  */
 export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
@@ -272,7 +298,7 @@ export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
   }, [])
   // Закрытая сложность по прямой ссылке — назад к выбору сложности
   useEffect(() => {
-    if (!unlocked) navigate("/battle/setup", true)
+    if (!unlocked) navigate("/battle/difficulty", true)
   }, [unlocked])
 
   // Команды появляются, когда есть зерно вылазки (создаётся при входе на экран)
@@ -291,7 +317,7 @@ export function EnemyTeamScreen({ difficulty }: { difficulty: Difficulty }) {
 
   return (
     <div className="screen">
-      <TopBar title={tr("Sortie · 2/3", "Вылазка · 2/3")} right={<ResourceBar />} onBack={() => navigate("/battle/setup", true)} />
+      <TopBar title={tr("Sortie · 3/4", "Вылазка · 3/4")} right={<ResourceBar />} onBack={() => navigate("/battle/difficulty", true)} />
       <div className="screen-body">
         <div className="row between">
           <div className="section-title">

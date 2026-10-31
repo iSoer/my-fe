@@ -91,7 +91,9 @@
   font-size: 15px;
   line-height: 1.35;
   overscroll-behavior: none;
-  min-height: 100dvh;
+  /* Высота экрана: от хоста (`--app-h`, корень приложения закреплён на весь экран), иначе — 100dvh */
+  height: var(--app-h, auto);
+  min-height: var(--app-h, 100dvh);
   -webkit-user-select: none;
   user-select: none;
   /* чернила с едва заметной диагональной штриховкой */
@@ -227,7 +229,8 @@ p {
 /* ---------- Переходы между экранами: косой взмах чернил ---------- */
 .route {
   position: relative;
-  min-height: 100dvh;
+  height: var(--app-h, auto);
+  min-height: var(--app-h, 100dvh);
   animation: route-in 0.26s var(--ease-out) 0.1s both;
 }
 .route::before {
@@ -279,7 +282,7 @@ p {
 .screen {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: var(--app-h, 100dvh);
   padding-top: var(--tg-safe-top);
   padding-bottom: var(--tg-safe-bottom);
   overflow: hidden;
@@ -2605,7 +2608,7 @@ p {
 
 /* ---------- Фатальная ошибка ---------- */
 .fatal {
-  min-height: 100dvh;
+  min-height: var(--app-h, 100dvh);
   padding: 40px 16px 24px;
   display: flex;
   flex-direction: column;

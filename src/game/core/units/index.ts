@@ -20,7 +20,7 @@ import { BOSS_TITLES, EPITHETS, NAMES } from "@game/content/names"
 import { BREEDS } from "@game/content/breeds"
 import { PERSONALITIES } from "@game/content/personalities"
 import { ACCESSORIES, EYES, EYE_COLORS, FUR_PALETTES, PATTERNS } from "@game/content/appearance"
-import { COMBAT, HEALING, LEVEL_UP, MODEL_SCALE, ROSTER, recruitRarityWeights } from "@game/content/balance"
+import { COMBAT, HEALING, LEVEL_UP, MODEL_SCALE, RECRUIT_MAX_RARITY, ROSTER, recruitRarityWeights } from "@game/content/balance"
 import { classStatMods } from "@game/content/classStats"
 import { factionDef } from "@game/content/factions"
 import { generateCharacter, validateCharacterRequest } from "@model/character-model/generate"
@@ -394,7 +394,43 @@ export function rebirthUnit(unit: UnitInstance): UnitInstance {
     for (const s of short) maxStats[MODEL_STAT_OF[s]] += 5
     next = { ...next, maxStats, baseStats: levelOneStats(maxStats, model.growth, model.rarities[rarity]) }
   }
-  return next
+  // ★5 — две пассивки: недостающую боец получает при перерождении
+  return withFiveStarPassives(next)
+}
+
+/** Сколько пассивок у бойца ★5 (`withFiveStarPassives`). */
+export const FIVE_STAR_PASSIVES = 2
+
+/**
+ * Боец игрока ★5 — с двумя пассивками в слотах A/B/C. Недостающие: сначала уже изученные пассивки ставятся в
+ * свободные слоты, затем выдаются новые из разрешённых классу (детерминированно по `seed`). Остальным — без изменений.
+ */
+export function withFiveStarPassives(unit: UnitInstance): UnitInstance {
+  if (unit.rarity < 5 || unit.isEnemy) return unit
+  const slots = ["a", "b", "c"] as const
+  const equipped = () => slots.filter(sl => skills[sl]).length
+  const skills: UnitSkills = { ...unit.skills }
+  const learned = [...unit.learned]
+  if (equipped() >= FIVE_STAR_PASSIVES) return unit
+  const passiveOf = (id: string) => PASSIVES.find(p => p.id === id)
+  const fits = (id: string) => {
+    const p = passiveOf(id)
+    return !!p && !skills[p.slot] && !Object.values(skills).includes(id)
+  }
+  for (const id of learned) {
+    if (equipped() >= FIVE_STAR_PASSIVES) break
+    if (fits(id)) skills[(passiveOf(id) as PassiveDef).slot] = id
+  }
+  const rng = createRng(unit.seed).fork("five-star-passives")
+  const cands = rng.shuffle(allowedSkillIds(unitClass(unit), unit.species).filter(id => passiveOf(id) && !learned.includes(id)))
+  for (const id of cands) {
+    if (equipped() >= FIVE_STAR_PASSIVES) break
+    if (!fits(id)) continue
+    skills[(passiveOf(id) as PassiveDef).slot] = id
+    learned.push(id)
+  }
+  invalidateKit(unit)
+  return { ...unit, skills, learned, learnable: unit.learnable.filter(id => !learned.includes(id)) }
 }
 
 /* ---------- Пулы навыков ---------- */
@@ -573,8 +609,10 @@ export function generateUnit(opts: GenerateUnitOptions): UnitInstance {
     learned.push(sp)
   }
   const extraCount = rarity <= 2 ? 0 : rarity <= 4 ? 1 : 2
+  // Боец игрока ★5 — две пассивки (без Поддержки вместо одной из них)
+  const twoPassives = rarity === 5 && !opts.isEnemy
   for (let i = 0; i < extraCount; i++) {
-    const wantAssist = !skills.assist && assists.length > 0 && r.skills.chance(0.4)
+    const wantAssist = !twoPassives && !skills.assist && assists.length > 0 && r.skills.chance(0.4)
     if (wantAssist) {
       const a = r.skills.pick(assists)
       skills.assist = a
@@ -702,7 +740,8 @@ const FALLBACK_ROSTER: readonly [string, WeaponSkill][] = [
  * по одному каждого (`STARTER_CLASSES`), остальные — случайный стартовый; оружие класса и статы выбирает модель.
  */
 export function generateRoster(opts: RosterOptions): UnitInstance[] {
-  const maxRarity = opts.maxRarity ?? 1
+  // ★5 в случайный ростер не приходят (только перерождением): высшая звезда ростера — не выше ★4
+  const maxRarity = Math.min(opts.maxRarity ?? 1, RECRUIT_MAX_RARITY) as Rarity
   const rarityWeights = recruitRarityWeights(maxRarity)
   const size = opts.size ?? (opts.glory >= 25 ? ROSTER.sizeWithGlory25 : ROSTER.size)
   const startLevel = opts.glory >= 75 ? ROSTER.startLevelWithGlory75 : ROSTER.startLevel

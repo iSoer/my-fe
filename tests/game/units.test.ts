@@ -166,10 +166,11 @@ describe("generateRoster", () => {
         expect(r.filter(u => u.classId === DANCER_CLASS).length).toBeLessThanOrEqual(1)
         expect(r.some(u => u.species === "cat")).toBe(true)
         expect(r.some(u => u.species === "dog")).toBe(true)
-        // Только открытые звёзды; Слава 300 — гарантирован боец высшей открытой
+        // Только открытые звёзды и не выше ★4 (★5 — только перерождением); Слава 300 — гарантирован боец высшей из них
+        const top = Math.min(maxRarity, 4)
         expect(r.every(u => STARTER_CLASSES.includes(u.classId))).toBe(true)
-        expect(r.every(u => u.rarity <= maxRarity)).toBe(true)
-        if (glory >= 300) expect(r.some(u => u.rarity === maxRarity)).toBe(true)
+        expect(r.every(u => u.rarity <= top)).toBe(true)
+        if (glory >= 300) expect(r.some(u => u.rarity === top)).toBe(true)
         expect(r.every(u => u.level === (glory >= 75 ? ROSTER.startLevelWithGlory75 : ROSTER.startLevel))).toBe(true)
         expect(new Set(r.map(u => u.id)).size).toBe(r.length)
       }),

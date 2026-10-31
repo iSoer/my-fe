@@ -134,6 +134,7 @@ await step('кнопка «Назад»: из деревни — в меню, в
     .click();
   await page.evaluate(() => window.__pf.settlement.open('gate'));
   await page.getByRole('button', { name: /Plan a sortie/ }).click();
+  await page.getByRole('button', { name: 'Skirmish' }).click();
   await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();
   await page.getByRole('button', { name: /Start battle/ }).click();

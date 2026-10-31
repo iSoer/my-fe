@@ -22,19 +22,19 @@ export const GORE_TINTS = [0xd9122b, 0x9e1420, 0xff2d4a, 0xb3001b, 0xe8233b]
 export type GoreLevel = "off" | "pools" | "sea"
 
 /**
- * Уровень крови из настроек: «off» — крови нет (по умолчанию), «pools» — сдержанно (меньше частиц, без брызг
- * на камеру), «sea» — максимум.
+ * Уровень крови из настроек: «sea» — максимум (по умолчанию), «pools» — сдержанно (меньше частиц, без брызг
+ * на камеру), «off» — крови нет.
  */
 export function goreEnabled(scene?: Phaser.Scene): { level: GoreLevel } {
   // Настройка общая на игру; сцена — на будущее (например, отключить кровь в превью)
   if (scene && !scene.sys) return { level: "pools" }
-  let level: GoreLevel = "off"
+  let level: GoreLevel = "sea"
   try {
     const v = $settings.get()?.blood
-    level = v === "sea" || v === "pools" ? v : "off"
+    level = v === "off" || v === "pools" ? v : "sea"
   }
   catch {
-    level = "off"
+    level = "sea"
   }
   return { level }
 }

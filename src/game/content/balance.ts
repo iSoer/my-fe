@@ -334,10 +334,17 @@ export const ROSTER = {
 export const RECRUIT_RARITY_WEIGHTS: Record<Rarity, number> = { 1: 40, 2: 30, 3: 18, 4: 9, 5: 3 }
 
 /** Веса звёзд при открытых ★1…`maxRarity`; `boost` (награда за победу) удваивает вес высшей открытой звезды. */
+/**
+ * Высшая звезда случайного бойца (Казармы, награды, пополнение, стартовый ростер): ★5 так не приходят — только
+ * перерождением своего бойца, даже когда ★5 уже открыта (`profile.maxRarity`).
+ */
+export const RECRUIT_MAX_RARITY: Rarity = 4
+
 export function recruitRarityWeights(maxRarity: Rarity, boost = false): Record<Rarity, number> {
+  const top = Math.min(maxRarity, RECRUIT_MAX_RARITY) as Rarity
   const w = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<Rarity, number>
-  for (const r of [1, 2, 3, 4, 5] as Rarity[]) if (r <= maxRarity) w[r] = RECRUIT_RARITY_WEIGHTS[r]
-  if (boost && maxRarity > 1) w[maxRarity] *= 2
+  for (const r of [1, 2, 3, 4, 5] as Rarity[]) if (r <= top) w[r] = RECRUIT_RARITY_WEIGHTS[r]
+  if (boost && top > 1) w[top] *= 2
   return w
 }
 
@@ -351,7 +358,7 @@ export const GLORY_TIERS: readonly GloryTier[] = [
   { glory: 25, get bonus() { return tr("Starting Roster of 7 characters", "Стартовый ростер из 7 персонажей") } },
   { glory: 75, get bonus() { return tr("Roster starts at level 10", "Ростер стартует с 10 уровня") } },
   { glory: 150, get bonus() { return tr("Shop shows 5 candidates", "Витрина магазина из 5 кандидатов") } },
-  { glory: 300, get bonus() { return tr("Starting Roster has a fighter of your highest unlocked ★", "В стартовом ростере гарантирован боец высшей открытой ★") } },
+  { glory: 300, get bonus() { return tr("Starting Roster has a fighter of your highest unlocked ★ (up to ★4)", "В стартовом ростере гарантирован боец высшей открытой ★ (до ★4)") } },
   { glory: 600, get bonus() { return tr("500 starting Treats", "Стартовые Вкусняшки 500") } }
 ]
 

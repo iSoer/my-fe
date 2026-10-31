@@ -1,7 +1,22 @@
 /* Платформа my-fe поверх игры: плашка обновления PWA, шаги установки, фатальная ошибка. */
-/* Страница целиком под игрой: без стандартного отступа браузера (8px рамка и прокрутка на 100dvh-экранах) */
+/*
+ * Страница целиком под игрой: без стандартного отступа браузера, и сам документ не прокручивается. iOS PWA
+ * (standalone, viewport-fit=cover) при запуске считает 100dvh неточно — страница оказывалась чуть прокручена
+ * вниз, пока её не сдвинуть пальцем. Поэтому приложение закреплено на весь экран (`position: fixed; inset: 0`),
+ * а игра берёт высоту из `--app-h` (от этого корня); прокрутка — только внутри экранов.
+ */
+html,
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  --app-h: 100%;
 }
 .pawfield {
   .pwa-banner {
@@ -39,7 +54,10 @@ body {
 
 /* Фатальная ошибка рисуется вместо игры (вне .pawfield), поэтому со своими цветами. */
 .fatal {
-  min-height: 100dvh;
+  /* Документ не прокручивается (см. выше) — у экрана ошибки своя прокрутка на всю высоту корня */
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
   /* Экран ошибки — вне .pawfield: безопасные зоны берём напрямую (хост Telegram или системные) */
   padding: calc(40px + var(--host-safe-top, env(safe-area-inset-top, 0px))) 16px
     calc(24px + var(--host-safe-bottom, env(safe-area-inset-bottom, 0px)));

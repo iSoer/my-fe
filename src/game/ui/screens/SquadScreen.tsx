@@ -140,7 +140,7 @@ export function SquadScreen() {
   return (
     <div className="screen">
       <TopBar
-        title={tr("Sortie · 3/3", "Вылазка · 3/3")}
+        title={tr("Sortie · 4/4", "Вылазка · 4/4")}
         right={<ResourceBar />}
         onBack={() => navigate(pending ? `/battle/enemy/${pending.difficulty}` : "/battle/setup", true)}
       />

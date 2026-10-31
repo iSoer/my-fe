@@ -344,7 +344,7 @@ export interface Settings {
    */
   endTurnConfirm: "modal" | "none" | "double"
   dangerZoneDefault: boolean
-  /** Кровь в бою: выключена (по умолчанию), «лужи» — сдержанно, «море» — вся. */
+  /** Кровь в бою: «море» — вся (по умолчанию), «лужи» — сдержанно, выключена — ни капли. */
   blood: "off" | "pools" | "sea"
   confirmAttack: boolean
   /** Разговоры с жителями (визуальная новелла): выключены — тап по жителю открывает его место, как раньше. */
@@ -369,7 +369,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoEndTurn: false,
   endTurnConfirm: "double",
   dangerZoneDefault: false,
-  blood: "off",
+  blood: "sea",
   confirmAttack: true,
   dialogues: true,
   lang: DEFAULT_LANG,
@@ -527,7 +527,10 @@ export interface Profile {
   treats: number
   wins: Record<Difficulty, number>
   armiesCreated: number
-  /** Высшая звезда, открытая перерождением бойца: случайные бойцы (ростер, магазин, награды) — ★1…maxRarity. */
+  /**
+   * Высшая звезда, открытая перерождением бойца: случайные бойцы (ростер, магазин, награды) — ★1…maxRarity, но не
+   * выше ★4 (`RECRUIT_MAX_RARITY`): ★5 бывают только перерождением.
+   */
   maxRarity: Rarity
 }
 

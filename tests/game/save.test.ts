@@ -200,15 +200,18 @@ describe("миграции сейва", () => {
     expect(r.ok && r.save.store).toMatchObject({ weapons: ["sword_iron"], rerolls: 0, variant: 0 })
   })
 
-  it("v14 → v15: кровь выключается; в новой игре она выключена по умолчанию", () => {
+  it("v14 → v15: выбор крови игрока сохраняется; в новой игре кровь включена («Море»); «Выкл.» читается", () => {
     const save = JSON.parse(serializeSave(createEmptySave(1))) as Record<string, unknown>
-    expect((save["settings"] as Record<string, unknown>)["blood"]).toBe("off")
-    const v14 = { ...save, version: 14, settings: { ...(save["settings"] as Record<string, unknown>), blood: "sea" } }
+    expect((save["settings"] as Record<string, unknown>)["blood"]).toBe("sea")
+    const v14 = { ...save, version: 14, settings: { ...(save["settings"] as Record<string, unknown>), blood: "pools" } }
     const out = MIGRATIONS[14]!(v14)
     expect(out["version"]).toBe(15)
-    expect((out["settings"] as Record<string, unknown>)["blood"]).toBe("off")
+    expect((out["settings"] as Record<string, unknown>)["blood"]).toBe("pools")
     const r = parseSave(JSON.stringify(v14))
-    expect(r.ok && r.save.settings.blood).toBe("off")
+    expect(r.ok && r.save.settings.blood).toBe("pools")
+    const off = { ...save, settings: { ...(save["settings"] as Record<string, unknown>), blood: "off" } }
+    const r2 = parseSave(JSON.stringify(off))
+    expect(r2.ok && r2.save.settings.blood).toBe("off")
   })
 
   it("v4 → v12: вся цепочка — сейв проходит схему, бойцы и статистика сохраняются", () => {

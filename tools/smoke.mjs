@@ -74,9 +74,10 @@ await step('Лавка: постройка и покупка талисмана'
   await page.getByRole('button', { name: 'Back' }).click();
   await page.locator('.st-canvas canvas').waitFor();
 });
-await step('ворота → вылазка 1/2 и 2/2', async () => {
+await step('ворота → вылазка: режим, сложность, враги, отряд', async () => {
   await page.locator('.st-sortie').click();
   await page.getByRole('button', { name: /Plan a sortie/ }).click();
+  await page.getByRole('button', { name: 'Skirmish' }).click();
   await page.locator('.diff-card:not(.locked)').first().click();
   await page.getByRole('button', { name: /^Next/ }).click();
   await page.locator('.foe-card').first().waitFor();

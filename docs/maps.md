@@ -164,11 +164,12 @@ ruins 1008, glade 904, forestEdge 856, pass 824, riverBridge 572, fort 484, lake
 `BattleSetupScreen` ([ui/screens/BattleSetupScreen.tsx](../src/game/ui/screens/BattleSetupScreen.tsx)) ведёт
 игрока по шагам:
 
-1. Маршрут `#/battle/setup`: выбор режима (`$sortieMode`: «Схватка» или «Мрачная чаща») и сложности.
-2. Маршрут `#/battle/enemy/<difficulty>`: `enemyTeams(difficulty, mode)` создаёт 4 команды (`ENEMY_TEAMS = 4`)
+1. Маршрут `#/battle/setup`: выбор режима (`$sortieMode`: «Схватка» или «Мрачная чаща»), тап по карточке ведёт дальше.
+2. Маршрут `#/battle/difficulty` (`DifficultyScreen`): выбор сложности.
+3. Маршрут `#/battle/enemy/<difficulty>`: `enemyTeams(difficulty, mode)` создаёт 4 команды (`ENEMY_TEAMS = 4`)
    с готовыми картами. Каждой показывается биом (`BIOME_ICON` и `biomeDef().name`), уровни, число врагов и награда.
    Результат кешируется в `offerCache`.
-3. `scoutBattle(difficulty, team, mode)` кладёт выбранную карту в `save.pendingBattle`. Маршрут `#/battle/squad`:
+4. `scoutBattle(difficulty, team, mode)` кладёт выбранную карту в `save.pendingBattle`. Маршрут `#/battle/squad`:
    выбор отряда, затем `startBattle(ids)` → `createBattle` → `#/battle`.
 
 ## Тесты

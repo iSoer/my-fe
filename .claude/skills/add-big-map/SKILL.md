@@ -18,7 +18,7 @@ description: Рецепт добавления нового варианта б�
 
 Подробности в `docs/expedition.md`, `docs/maps.md`, `docs/map-rendering.md`.
 
-Режим выбирается на `#/battle/setup` (`MODES` в `BattleSetupScreen.tsx`). Дальше путь общий:
+Режим выбирается на `#/battle/setup` (`MODES` в `BattleSetupScreen.tsx`, карточки друг под другом), сложность — на `#/battle/difficulty` (`DifficultyScreen`). Дальше путь общий:
 
 1. `enemyTeams(difficulty, mode)` в `src/game/state/save.ts` генерирует карты;
 2. `scoutBattle`;
@@ -91,7 +91,7 @@ pnpm typecheck && pnpm lint && pnpm test
 ## Визуальная проверка
 
 1. Запусти `pnpm dev`.
-2. Открой `#/battle/setup`, выбери режим и сложность и посмотри превью команд.
+2. Открой `#/battle/setup`, выбери режим, затем сложность и посмотри превью команд.
 3. Начни бой. Проверь:
    - прокрутку и камеру большого поля на телефоне и на широком экране;
    - туман/мрак;

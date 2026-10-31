@@ -5,7 +5,7 @@ import { $saveError, $saveNewer, $saveStatus } from "@game/state/save"
 import { MenuScreen } from "./screens/MenuScreen"
 import { ArmyScreen } from "./screens/ArmyScreen"
 import { UnitScreen } from "./screens/UnitScreen"
-import { BattleSetupScreen, EnemyTeamScreen } from "./screens/BattleSetupScreen"
+import { BattleSetupScreen, DifficultyScreen, EnemyTeamScreen } from "./screens/BattleSetupScreen"
 import { SquadScreen } from "./screens/SquadScreen"
 import { BattleScreen } from "./screens/BattleScreen"
 import { BattleResultScreen } from "./screens/BattleResultScreen"
@@ -50,6 +50,8 @@ function Screen({ route }: { route: Route }) {
       return <UnitScreen unitId={route.unitId} />
     case "battleSetup":
       return <BattleSetupScreen />
+    case "battleDifficulty":
+      return <DifficultyScreen />
     case "battleEnemy":
       return <EnemyTeamScreen difficulty={route.difficulty} />
     case "battleSquad":

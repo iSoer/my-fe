@@ -15,8 +15,9 @@
 | `#/army/create`                                  | `armyCreate`   | `ArmyScreen`                                              |
 | `#/army/recruit`                                 | `recruit`      | `ArmyScreen`                                              |
 | `#/army/<unitId>`                                | `unit`         | `UnitScreen unitId`                                       |
-| `#/battle/setup`                                 | `battleSetup`  | `BattleSetupScreen` (шаг 1: режим и сложность)            |
-| `#/battle/enemy/<easy\|normal\|hard\|nightmare>` | `battleEnemy`  | `EnemyTeamScreen difficulty` (из `BattleSetupScreen.tsx`) |
+| `#/battle/setup`                                 | `battleSetup`  | `BattleSetupScreen` (шаг 1/4: режим — карточки друг под другом, тап ведёт дальше) |
+| `#/battle/difficulty`                            | `battleDifficulty` | `DifficultyScreen` (шаг 2/4: сложность в выбранном режиме) |
+| `#/battle/enemy/<easy\|normal\|hard\|nightmare>` | `battleEnemy`  | `EnemyTeamScreen difficulty` (шаг 3/4, из `BattleSetupScreen.tsx`); отряд — `#/battle/squad`, шаг 4/4 |
 | `#/battle/squad`                                 | `battleSquad`  | `SquadScreen`                                             |
 | `#/battle`                                       | `battle`       | `BattleScreen` (Phaser-бой, ленивый чанк)                 |
 | `#/battle/result`                                | `battleResult` | `BattleResultScreen`                                      |

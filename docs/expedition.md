@@ -170,7 +170,7 @@
 
 ## Как узел становится боем
 
-Узлов как таковых нет. На шаге 1 `BattleSetupScreen` выбирается режим `$sortieMode = "expedition"`. Дальше
+Узлов как таковых нет. На шаге 1 `BattleSetupScreen` выбирается режим `$sortieMode = "expedition"`, на шаге 2 (`DifficultyScreen`, `#/battle/difficulty`) — сложность. Дальше
 `enemyTeams(difficulty, "expedition")` создаёт 4 карты чащи с seed
 `createRng(sortieSeed).fork("${difficulty}:${team}:expedition")`. Остальной путь общий со схваткой:
 `scoutBattle` → `pendingBattle` → `startBattle`.

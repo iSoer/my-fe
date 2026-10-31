@@ -29,7 +29,8 @@ import {
   equipWeapon,
   rebirthUnit,
   reclassUnit,
-  skillCost
+  skillCost,
+  withFiveStarPassives
 } from "@game/core/units"
 import {
   addAll,
@@ -176,13 +177,30 @@ export function exportBackupCode(): string | null {
  * а причина — в `$saveError`. Сейв более новой версии игры не трогается: статус «error», `$saveNewer`, запись
  * выключена. Повторный вызов ничего не делает.
  */
+/**
+ * Сейв из хранилища или импорта: бойцы ★5 (в армии, на витрине Казарм и в награде) — с двумя пассивками. Сейвы,
+ * записанные до этого правила, догоняют его при загрузке; уже подходящие бойцы не меняются.
+ */
+function normalizeLoaded(save: SaveGame): SaveGame {
+  const fix = (list: UnitInstance[]): UnitInstance[] => {
+    const next = list.map(withFiveStarPassives)
+    return next.some((u, i) => u !== list[i]) ? next : list
+  }
+  return {
+    ...save,
+    army: save.army ? { ...save.army, units: fix(save.army.units) } : save.army,
+    shelter: { ...save.shelter, candidates: fix(save.shelter.candidates) },
+    rewardChoice: save.rewardChoice ? fix(save.rewardChoice) : save.rewardChoice
+  }
+}
+
 export function initSave(): void {
   if ($saveStatus.get() === "ready") return
   const localJson = loadLocal()
   let local: SaveGame | null = null
   if (localJson) {
     const r = parseSave(localJson)
-    if (r.ok) local = r.save
+    if (r.ok) local = normalizeLoaded(r.save)
     else if (r.newer) {
       $saveError.set(r.error)
       $saveNewer.set(true)
@@ -804,7 +822,7 @@ export function importSaveCode(code: string): { ok: boolean, error?: string } {
     const r = parseSave(json)
     if (!r.ok) return { ok: false, error: r.error }
     // Импорт — свежее изменение: иначе более новый сейв другого устройства выиграл бы конфликт с облаком
-    $save.set({ ...r.save, updatedAt: Date.now() })
+    $save.set({ ...normalizeLoaded(r.save), updatedAt: Date.now() })
     setHapticsEnabled(r.save.settings.haptics)
     flushPersist()
     return { ok: true }

@@ -9,8 +9,11 @@ export type Route
     | { name: "armyCreate" }
     | { name: "recruit" }
     | { name: "unit", unitId: string }
+    /** Шаг 1 вылазки: режим (схватка или мрачная чаща). */
     | { name: "battleSetup" }
-    /** Шаг 2 вылазки: вражеская армия на выбранной сложности. */
+    /** Шаг 2 вылазки: сложность. */
+    | { name: "battleDifficulty" }
+    /** Шаг 3 вылазки: вражеская армия на выбранной сложности. */
     | { name: "battleEnemy", difficulty: Difficulty }
     | { name: "battleSquad" }
     | { name: "battle" }
@@ -37,6 +40,7 @@ export function parseRoute(hash: string): Route {
   if (a === "battle") {
     if (!b) return { name: "battle" }
     if (b === "setup") return { name: "battleSetup" }
+    if (b === "difficulty") return { name: "battleDifficulty" }
     if (b === "enemy" && parts[2] && (DIFFICULTY_IDS as readonly string[]).includes(parts[2]))
       return { name: "battleEnemy", difficulty: parts[2] as Difficulty }
     if (b === "squad") return { name: "battleSquad" }
@@ -67,6 +71,8 @@ export function routePath(r: Route): string {
       return `/army/${r.unitId}`
     case "battleSetup":
       return "/battle/setup"
+    case "battleDifficulty":
+      return "/battle/difficulty"
     case "battleEnemy":
       return `/battle/enemy/${r.difficulty}`
     case "battleSquad":
@@ -150,6 +156,8 @@ export function parentRoute(r: Route): Route {
     case "recruit":
       return { name: "army" }
     case "battleEnemy":
+      return { name: "battleDifficulty" }
+    case "battleDifficulty":
       return { name: "battleSetup" }
     case "battleSetup":
     case "battleResult":
